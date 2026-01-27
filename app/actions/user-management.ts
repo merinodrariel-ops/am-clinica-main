@@ -15,7 +15,21 @@ const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
             persistSession: false
         }
     })
-    : {} as any;
+    : {
+        auth: {
+            admin: {
+                listUsers: () => Promise.resolve({ data: { users: [] }, error: null }),
+                inviteUserByEmail: () => Promise.resolve({ data: { user: null }, error: 'Build time mock' }),
+                updateUserById: () => Promise.resolve({ error: null }),
+                resetPasswordForEmail: () => Promise.resolve({ error: null }),
+            }
+        },
+        from: () => ({
+            select: () => Promise.resolve({ data: [], error: null }),
+            update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+            insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+        })
+    } as any;
 
 export async function getUsers() {
     try {

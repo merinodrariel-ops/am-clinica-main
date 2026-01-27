@@ -1,4 +1,6 @@
 import { getUsers } from '@/app/actions/user-management';
+
+export const dynamic = 'force-dynamic';
 import UserManagementClient from '@/components/admin/UserManagementClient';
 import RoleGuard from '@/components/auth/RoleGuard';
 
