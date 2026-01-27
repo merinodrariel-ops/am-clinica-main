@@ -103,7 +103,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
             // setTarifarioItems(data || []);
 
             // Group by category
-            const grouped = (data || []).reduce((acc, item) => {
+            const grouped = (data || []).reduce((acc: Record<string, TarifarioItem[]>, item: TarifarioItem) => {
                 if (!acc[item.categoria]) acc[item.categoria] = [];
                 acc[item.categoria].push(item);
                 return acc;

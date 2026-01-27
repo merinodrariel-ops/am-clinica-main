@@ -145,7 +145,7 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                 const { data: existing } = await query.or(conditions.join(','));
 
                 if (existing && existing.length > 0) {
-                    const confirmMsg = `El paciente ya existe:\n\n${existing.map(p => `- ${p.nombre} ${p.apellido} (DNI: ${p.documento || '-'})`).join('\n')}\n\nNo se puede crear un duplicado.`;
+                    const confirmMsg = `El paciente ya existe:\n\n${existing.map((p: any) => `- ${p.nombre} ${p.apellido} (DNI: ${p.documento || '-'})`).join('\n')}\n\nNo se puede crear un duplicado.`;
                     alert(confirmMsg);
                     setSaving(false);
                     return;

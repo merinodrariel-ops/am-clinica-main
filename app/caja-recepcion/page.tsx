@@ -158,10 +158,10 @@ export default function CajaRecepcionPage() {
                 .neq('estado', 'anulado');
 
             // Calculate stats
-            const pagadosHoy = (movHoy || []).filter(m => m.estado !== 'anulado');
-            const pendientesHoy = (movHoy || []).filter(m => m.estado === 'pendiente');
-            const totalDiaUsd = pagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
-            const totalMesUsd = (movMes || []).reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
+            const pagadosHoy = (movHoy || []).filter((m: any) => m.estado !== 'anulado');
+            const pendientesHoy = (movHoy || []).filter((m: any) => m.estado === 'pendiente');
+            const totalDiaUsd = pagadosHoy.reduce((sum: number, m: any) => sum + (m.usd_equivalente || 0), 0);
+            const totalMesUsd = (movMes || []).reduce((sum: number, m: any) => sum + (m.usd_equivalente || 0), 0);
 
             setStats({
                 totalDiaUsd: Math.round(totalDiaUsd * 100) / 100,

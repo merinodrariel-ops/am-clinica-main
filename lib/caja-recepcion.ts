@@ -192,7 +192,7 @@ export async function cerrarCajaDelDia(
         .is('cierre_id', null)
         .neq('estado', 'anulado');
 
-    const totalIngresosUsd = movimientos?.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0) || 0;
+    const totalIngresosUsd = movimientos?.reduce((sum: number, m: any) => sum + (m.usd_equivalente || 0), 0) || 0;
 
     const { data: transferencias } = await supabase
         .from('transferencias_caja')
@@ -201,7 +201,7 @@ export async function cerrarCajaDelDia(
         .lt('fecha_hora', `${fecha}T23:59:59`)
         .eq('estado', 'confirmada');
 
-    const totalTransferenciasUsd = transferencias?.reduce((sum, t) => sum + (t.usd_equivalente || 0), 0) || 0;
+    const totalTransferenciasUsd = transferencias?.reduce((sum: number, t: any) => sum + (t.usd_equivalente || 0), 0) || 0;
 
     // Calculate difference
     const ultimo = await getUltimoCierre(fecha);
@@ -294,26 +294,26 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         .gte('fecha_hora', `${firstDayOfMonth}T00:00:00`)
         .neq('estado', 'anulado');
 
-    const pagadosHoy = (movHoy || []).filter(m => m.estado !== 'anulado');
-    const pendientesHoy = (movHoy || []).filter(m => m.estado === 'pendiente');
+    const pagadosHoy = (movHoy || []).filter((m: any) => m.estado !== 'anulado');
+    const pendientesHoy = (movHoy || []).filter((m: any) => m.estado === 'pendiente');
 
     // Aggregate by method
     const porMetodo: Record<string, number> = {};
-    pagadosHoy.forEach(m => {
+    pagadosHoy.forEach((m: any) => {
         porMetodo[m.metodo_pago] = (porMetodo[m.metodo_pago] || 0) + (m.usd_equivalente || 0);
     });
 
     // Aggregate by category
     const porCategoria: Record<string, number> = {};
-    pagadosHoy.forEach(m => {
+    pagadosHoy.forEach((m: any) => {
         if (m.categoria) {
             porCategoria[m.categoria] = (porCategoria[m.categoria] || 0) + (m.usd_equivalente || 0);
         }
     });
 
     return {
-        totalDiaUsd: Math.round(pagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0) * 100) / 100,
-        totalMesUsd: Math.round((movMes || []).reduce((sum, m) => sum + (m.usd_equivalente || 0), 0) * 100) / 100,
+        totalDiaUsd: Math.round(pagadosHoy.reduce((sum: number, m: any) => sum + (m.usd_equivalente || 0), 0) * 100) / 100,
+        totalMesUsd: Math.round((movMes || []).reduce((sum: number, m: any) => sum + (m.usd_equivalente || 0), 0) * 100) / 100,
         porMetodo,
         porCategoria,
         movimientosHoy: pagadosHoy.length,

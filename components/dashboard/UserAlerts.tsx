@@ -26,8 +26,8 @@ export default function UserAlerts() {
 
                 if (error) throw error;
 
-                const pending = profiles?.filter(p => p.estado === 'invitado') || [];
-                const suspended = profiles?.filter(p => p.estado === 'suspendido') || [];
+                const pending = profiles?.filter((p: any) => p.estado === 'invitado') || [];
+                const suspended = profiles?.filter((p: any) => p.estado === 'suspendido') || [];
 
                 const newAlerts: UserAlert[] = [];
 
@@ -35,7 +35,7 @@ export default function UserAlerts() {
                     newAlerts.push({
                         type: 'pending',
                         count: pending.length,
-                        users: pending.map(u => ({
+                        users: pending.map((u: any) => ({
                             id: u.id,
                             full_name: u.full_name || 'Sin nombre',
                             email: u.email || '',
@@ -48,7 +48,7 @@ export default function UserAlerts() {
                     newAlerts.push({
                         type: 'suspended',
                         count: suspended.length,
-                        users: suspended.map(u => ({
+                        users: suspended.map((u: any) => ({
                             id: u.id,
                             full_name: u.full_name || 'Sin nombre',
                             email: u.email || '',
@@ -76,8 +76,8 @@ export default function UserAlerts() {
             {alerts.map(alert => (
                 <div key={alert.type}
                     className={`rounded-xl p-4 border ${alert.type === 'pending'
-                            ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800'
-                            : 'bg-orange-50 border-orange-200 dark:bg-orange-900/10 dark:border-orange-800'
+                        ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800'
+                        : 'bg-orange-50 border-orange-200 dark:bg-orange-900/10 dark:border-orange-800'
                         }`}
                 >
                     <div className="flex items-start gap-4">

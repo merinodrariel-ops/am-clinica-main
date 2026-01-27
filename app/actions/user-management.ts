@@ -5,16 +5,17 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
 // Initialize Admin Client securely
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
+    ? createClient(supabaseUrl, supabaseServiceKey, {
         auth: {
             autoRefreshToken: false,
             persistSession: false
         }
-    }
-);
+    })
+    : {} as any;
 
 export async function getUsers() {
     try {
@@ -34,8 +35,8 @@ export async function getUsers() {
         if (dbError) throw dbError;
 
         // 3. Merge Data
-        const mergedUsers = profiles.map(profile => {
-            const authUser = users.find(u => u.id === profile.id);
+        const mergedUsers = profiles.map((profile: any) => {
+            const authUser = users.find((u: any) => u.id === profile.id);
             return {
                 ...profile,
                 email: authUser?.email || profile.email, // Fallback

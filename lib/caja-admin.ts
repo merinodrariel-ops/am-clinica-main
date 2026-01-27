@@ -616,7 +616,7 @@ export async function generarLiquidacion(
         .gte('fecha', startDate)
         .lte('fecha', `${mes}-${endDate.getDate()}`);
 
-    const totalHoras = horas?.reduce((sum, h) => sum + h.horas, 0) || 0;
+    const totalHoras = horas?.reduce((sum: number, h: any) => sum + h.horas, 0) || 0;
     const totalArs = totalHoras * personal.valor_hora_ars;
     const totalUsd = tcBna ? totalArs / tcBna : undefined;
 
@@ -675,7 +675,7 @@ export async function getReporteMensual(
             .lt('fecha_hora', `${endDateStr}T23:59:59`)
             .neq('estado', 'Anulado');
 
-        ingresosPacientesUsd = ingresos?.reduce((sum, i) => sum + (i.usd_equivalente || 0), 0) || 0;
+        ingresosPacientesUsd = ingresos?.reduce((sum: number, i: any) => sum + (i.usd_equivalente || 0), 0) || 0;
     } else {
         // UY: Read from caja_admin_movimientos with INGRESO_PACIENTE
         const { data: ingresos } = await supabase
@@ -687,7 +687,7 @@ export async function getReporteMensual(
             .lt('fecha_hora', `${endDateStr}T23:59:59`)
             .neq('estado', 'Anulado');
 
-        ingresosPacientesUsd = ingresos?.reduce((sum, i) => sum + (i.usd_equivalente_total || 0), 0) || 0;
+        ingresosPacientesUsd = ingresos?.reduce((sum: number, i: any) => sum + (i.usd_equivalente_total || 0), 0) || 0;
     }
 
     // Egresos from caja_admin_movimientos
@@ -700,7 +700,7 @@ export async function getReporteMensual(
         .lt('fecha_hora', `${endDateStr}T23:59:59`)
         .neq('estado', 'Anulado');
 
-    egresosUsd = egresos?.reduce((sum, e) => sum + (e.usd_equivalente_total || 0), 0) || 0;
+    egresosUsd = egresos?.reduce((sum: number, e: any) => sum + (e.usd_equivalente_total || 0), 0) || 0;
 
     // Honorarios from prestaciones
     const { data: honorarios } = await supabase
@@ -710,7 +710,7 @@ export async function getReporteMensual(
         .lte('fecha', endDateStr)
         .neq('estado', 'Anulado');
 
-    const honorariosProfesionalesUsd = honorarios?.reduce((sum, h) => sum + (h.usd_equivalente || 0), 0) || 0;
+    const honorariosProfesionalesUsd = honorarios?.reduce((sum: number, h: any) => sum + (h.usd_equivalente || 0), 0) || 0;
 
     // Sueldos from liquidaciones_mensuales
     const { data: sueldos } = await supabase
@@ -719,7 +719,7 @@ export async function getReporteMensual(
         .eq('mes', startDate)
         .neq('estado', 'Anulado');
 
-    const sueldosStaffUsd = sueldos?.reduce((sum, s) => sum + (s.total_usd || 0), 0) || 0;
+    const sueldosStaffUsd = sueldos?.reduce((sum: number, s: any) => sum + (s.total_usd || 0), 0) || 0;
 
     // Calculate margins
     const margenBruto = ingresosPacientesUsd - honorariosProfesionalesUsd - sueldosStaffUsd - egresosUsd;
@@ -755,14 +755,14 @@ export async function getEgresosPorSubtipo(
     if (error || !data) return [];
 
     // Group by subtipo
-    const grouped = data.reduce((acc, item) => {
+    const grouped = data.reduce((acc: Record<string, number>, item: any) => {
         const key = item.subtipo || 'Sin categoría';
         acc[key] = (acc[key] || 0) + (item.usd_equivalente_total || 0);
         return acc;
     }, {} as Record<string, number>);
 
     return Object.entries(grouped)
-        .map(([subtipo, total_usd]) => ({ subtipo, total_usd }))
+        .map(([subtipo, total_usd]) => ({ subtipo, total_usd: Number(total_usd) }))
         .sort((a, b) => b.total_usd - a.total_usd)
         .slice(0, 10);
 }

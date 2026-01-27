@@ -81,7 +81,7 @@ export default function TarifarioPage() {
                 setItems(itemsData || []);
 
                 // Group by category
-                const grouped = (itemsData || []).reduce((acc, item) => {
+                const grouped = (itemsData || []).reduce((acc: Record<string, TarifarioItem[]>, item: TarifarioItem) => {
                     if (!acc[item.categoria]) acc[item.categoria] = [];
                     acc[item.categoria].push(item);
                     return acc;
