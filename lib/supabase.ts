@@ -84,19 +84,21 @@ export interface CajaArqueo {
     id: string;
     fecha: string;
     usuario: string;
-    hora_inicio: string;
+    hora_inicio?: string | null;
     hora_cierre: string | null;
     saldo_inicial_usd_billete: number;
     saldo_inicial_ars_billete: number;
     saldo_inicial_usd_equivalente: number;
     saldo_final_usd_billete: number | null;
     saldo_final_ars_billete: number | null;
+    saldo_final_usd_equivalente: number | null;
     tc_bna_venta_dia: number | null;
     total_ingresos_dia_usd: number | null;
     total_transferencias_admin_usd: number | null;
     diferencia_usd: number | null;
     observaciones: string | null;
     estado: 'abierto' | 'cerrado';
+    snapshot_datos?: any;
     created_at: string;
 }
 

@@ -105,6 +105,8 @@ export default function CajaRecepcionPage() {
     const [showTransferencia, setShowTransferencia] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+    const [isBoxClosed, setIsBoxClosed] = useState(false);
+
     useEffect(() => {
         loadData();
     }, []);
@@ -112,13 +114,23 @@ export default function CajaRecepcionPage() {
     async function loadData() {
         setLoading(true);
         try {
+            // Check closure status for today
+            const today = new Date().toISOString().split('T')[0];
+            const { data: cierre, error: cierreError } = await supabase
+                .from('caja_recepcion_arqueos')
+                .select('id')
+                .eq('fecha', today)
+                .eq('estado', 'cerrado')
+                .maybeSingle();
+
+            setIsBoxClosed(!!cierre);
+
             // Fetch BNA rate
             const rateRes = await fetch('/api/bna-cotizacion');
             const rateData = await rateRes.json();
             setBnaRate(rateData);
 
             // Get today's date range
-            const today = new Date().toISOString().split('T')[0];
             const firstDayOfMonth = `${today.substring(0, 7)}-01`;
 
             // Fetch today's movements from Supabase
@@ -205,14 +217,26 @@ export default function CajaRecepcionPage() {
                     </Link>
                     <button
                         onClick={() => setShowTransferencia(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 border border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg text-orange-600 dark:text-orange-400 font-medium transition-colors"
+                        disabled={isBoxClosed}
+                        className={clsx(
+                            "flex items-center gap-2 px-4 py-2.5 border border-orange-200 dark:border-orange-800 rounded-lg font-medium transition-colors",
+                            isBoxClosed
+                                ? "opacity-50 cursor-not-allowed text-gray-400 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+                                : "hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400"
+                        )}
                     >
                         <ArrowRightLeft size={18} />
                         Transferir
                     </button>
                     <button
                         onClick={() => setShowNuevoIngreso(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                        disabled={isBoxClosed}
+                        className={clsx(
+                            "flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors",
+                            isBoxClosed
+                                ? "bg-gray-300 cursor-not-allowed text-gray-500"
+                                : "bg-blue-600 hover:bg-blue-700 text-white"
+                        )}
                     >
                         <Plus size={20} />
                         Nuevo Ingreso

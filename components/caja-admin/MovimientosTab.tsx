@@ -26,6 +26,7 @@ import {
     SUBTIPOS_MOVIMIENTO,
     SUBTIPOS_ADJUNTO_OBLIGATORIO
 } from '@/lib/caja-admin';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface Props {
     sucursal: Sucursal;
@@ -43,6 +44,7 @@ const TIPOS_MOVIMIENTO = [
 ];
 
 export default function MovimientosTab({ sucursal, tcBna }: Props) {
+    const { role } = useUserRole();
     const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
     const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
     const [loading, setLoading] = useState(true);
@@ -225,15 +227,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     </div>
                 </div>
 
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-shadow"
-                >
-                    <Plus className="w-5 h-5" />
-                    Nuevo Movimiento
-                </motion.button>
+                {role === 'owner' && (
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowForm(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-shadow"
+                    >
+                        <Plus className="w-5 h-5" />
+                        Nuevo Movimiento
+                    </motion.button>
+                )}
             </div>
 
             {/* New Movement Form */}

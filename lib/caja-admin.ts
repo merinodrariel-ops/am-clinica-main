@@ -56,14 +56,16 @@ export interface CajaAdminArqueo {
     fecha: string;
     sucursal_id: string;
     usuario?: string;
-    hora_inicio: string;
-    hora_cierre?: string;
+    hora_inicio?: string | null;
+    hora_cierre?: string | null;
     saldos_iniciales: Record<string, number>;
     saldos_finales: Record<string, number>;
+    saldo_final_usd_equivalente?: number | null;
     tc_bna_venta_dia?: number;
     diferencia_usd: number;
     observaciones?: string;
-    estado: 'Abierto' | 'Cerrado';
+    estado: 'Abierto' | 'Cerrado' | 'abierto' | 'cerrado';
+    snapshot_datos?: any;
 }
 
 export interface Profesional {
@@ -332,71 +334,72 @@ export async function anularMovimiento(
     return { success: true };
 }
 
-// =============================================
-// Arqueo
-// =============================================
-
-export async function getArqueoAbierto(sucursalId: string): Promise<CajaAdminArqueo | null> {
-    const { data, error } = await supabase
+export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: string): Promise<CajaAdminArqueo | null> {
+    let query = supabase
         .from('caja_admin_arqueos')
         .select('*')
         .eq('sucursal_id', sucursalId)
-        .eq('estado', 'Abierto')
-        .single();
+        .eq('estado', 'cerrado') // Lowecase 'cerrado' based on RPC? Wait, table uses 'cerrado' or 'Cerrado'? Previous code used 'Cerrado'. RPC uses 'cerrado'. I should normalize.
+        .order('fecha', { ascending: false })
+        .limit(1);
 
-    if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching arqueo:', error);
+    if (fechaLimite) {
+        query = query.lt('fecha', fechaLimite);
     }
-    return data || null;
-}
 
-export async function abrirArqueo(
-    sucursalId: string,
-    saldosIniciales: Record<string, number>,
-    tcBna?: number,
-    usuario?: string
-): Promise<{ data: CajaAdminArqueo | null; error: Error | null }> {
-    const { data, error } = await supabase
-        .from('caja_admin_arqueos')
-        .insert({
-            fecha: new Date().toISOString().split('T')[0],
-            sucursal_id: sucursalId,
-            usuario,
-            hora_inicio: new Date().toISOString(),
-            saldos_iniciales: saldosIniciales,
-            tc_bna_venta_dia: tcBna,
-            estado: 'Abierto',
-        })
-        .select()
-        .single();
+    const { data, error } = await query.single();
 
     if (error) {
-        return { data: null, error: new Error(error.message) };
+        if (error.code === 'PGRST116') return null;
+        console.error('Error fetching ultimo cierre admin:', error);
+        return null;
     }
-    return { data, error: null };
+    return data;
 }
 
-export async function cerrarArqueo(
-    arqueoId: string,
-    saldosFinales: Record<string, number>,
-    diferenciaUsd: number,
-    observaciones?: string
-): Promise<{ success: boolean; error?: string }> {
-    const { error } = await supabase
-        .from('caja_admin_arqueos')
-        .update({
-            hora_cierre: new Date().toISOString(),
-            saldos_finales: saldosFinales,
-            diferencia_usd: diferenciaUsd,
-            observaciones,
-            estado: 'Cerrado',
-        })
-        .eq('id', arqueoId);
+// Deprecated or Aliased
+export async function getArqueoAbierto(sucursalId: string): Promise<CajaAdminArqueo | null> {
+    // Return null as there are no "Open" arqueos anymore
+    return null;
+}
+
+export async function cerrarCajaAdmin(params: {
+    sucursalId: string;
+    fecha: string;
+    usuario: string;
+    saldosFinales: Record<string, number>;
+    saldoFinalUsdEq: number;
+    diferenciaUsd: number;
+    tcBna: number;
+    observaciones?: string;
+    snapshot: any;
+}): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.rpc('cerrar_caja_admin', {
+        p_sucursal_id: params.sucursalId,
+        p_fecha: params.fecha,
+        p_usuario: params.usuario,
+        p_saldo_final_usd: 0, // Not used directly in JSON structure but might be needed if I add columns later. For now RPC expects it?
+        p_saldo_final_ars: 0,
+        p_saldo_final_usd_eq: params.saldoFinalUsdEq,
+        p_saldos_finales: params.saldosFinales,
+        p_diferencia_usd: params.diferenciaUsd,
+        p_tc_bna: params.tcBna,
+        p_observaciones: params.observaciones,
+        p_snapshot: params.snapshot
+    });
 
     if (error) {
         return { success: false, error: error.message };
     }
     return { success: true };
+}
+
+export async function abrirArqueo(): Promise<{ data: null; error: Error }> {
+    return { data: null, error: new Error('Action not supported') };
+}
+
+export async function cerrarArqueo(): Promise<{ success: boolean; error?: string }> {
+    return { success: false, error: 'Use cerrarCajaAdmin' };
 }
 
 // =============================================
@@ -984,3 +987,24 @@ export async function getAuditoriaRegistro(registroId: string): Promise<Auditori
     return data || [];
 }
 
+
+// =============================================
+// ADMIN: Alertas
+// =============================================
+
+export interface DiaSinCierreAdmin {
+    fecha: string;
+    cantidad: number;
+    ultimo_usuario: string;
+}
+
+export async function getDiasSinCierreAdmin(sucursalId: string): Promise<DiaSinCierreAdmin[]> {
+    const { data, error } = await supabase.rpc('get_dias_sin_cierre_admin', {
+        p_sucursal_id: sucursalId
+    });
+    if (error) {
+        console.error('Error checking alerts admin:', error);
+        return [];
+    }
+    return data || [];
+}

@@ -153,13 +153,19 @@ export async function anularMovimiento(
 
 // ===================== ARQUEO =====================
 
-export async function getArqueoAbierto(usuario: string): Promise<CajaArqueo | null> {
-    const { data, error } = await supabase
+export async function getUltimoCierre(fechaLimite?: string): Promise<CajaArqueo | null> {
+    let query = supabase
         .from('caja_recepcion_arqueos')
         .select('*')
-        .eq('usuario', usuario)
-        .eq('estado', 'abierto')
-        .single();
+        .eq('estado', 'cerrado')
+        .order('fecha', { ascending: false })
+        .limit(1);
+
+    if (fechaLimite) {
+        query = query.lt('fecha', fechaLimite);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) {
         if (error.code === 'PGRST116') return null;
@@ -168,88 +174,59 @@ export async function getArqueoAbierto(usuario: string): Promise<CajaArqueo | nu
     return data;
 }
 
-export async function iniciarArqueo(
+export async function cerrarCajaDelDia(
+    fecha: string,
     usuario: string,
-    saldoInicialUsd: number,
-    saldoInicialArs: number,
-    tcBnaVenta: number
-): Promise<CajaArqueo> {
-    const saldoInicialUsdEquivalente = saldoInicialUsd + (tcBnaVenta > 0 ? saldoInicialArs / tcBnaVenta : 0);
-
-    const { data, error } = await supabase
-        .from('caja_recepcion_arqueos')
-        .insert({
-            fecha: new Date().toISOString().split('T')[0],
-            usuario,
-            saldo_inicial_usd_billete: saldoInicialUsd,
-            saldo_inicial_ars_billete: saldoInicialArs,
-            saldo_inicial_usd_equivalente: Math.round(saldoInicialUsdEquivalente * 100) / 100,
-            tc_bna_venta_dia: tcBnaVenta,
-            estado: 'abierto',
-        })
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
-}
-
-export async function cerrarArqueo(
-    arqueoId: string,
     saldoFinalUsd: number,
     saldoFinalArs: number,
+    tcBnaVenta: number,
+    snapshot: any,
     observaciones?: string
-): Promise<CajaArqueo> {
-    // First get the arqueo to calculate totals
-    const { data: arqueo } = await supabase
-        .from('caja_recepcion_arqueos')
-        .select('*')
-        .eq('id', arqueoId)
-        .single();
-
-    if (!arqueo) throw new Error('Arqueo not found');
-
-    // Get total income for the day
+): Promise<string> {
+    // Calculate totals for verification
     const { data: movimientos } = await supabase
         .from('caja_recepcion_movimientos')
         .select('usd_equivalente')
-        .gte('fecha_hora', `${arqueo.fecha}T00:00:00`)
-        .lt('fecha_hora', `${arqueo.fecha}T23:59:59`)
+        .gte('fecha_hora', `${fecha}T00:00:00`)
+        .lt('fecha_hora', `${fecha}T23:59:59`)
+        .is('cierre_id', null)
         .neq('estado', 'anulado');
 
     const totalIngresosUsd = movimientos?.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0) || 0;
 
-    // Get total transfers to admin
     const { data: transferencias } = await supabase
         .from('transferencias_caja')
         .select('usd_equivalente')
-        .gte('fecha_hora', `${arqueo.fecha}T00:00:00`)
-        .lt('fecha_hora', `${arqueo.fecha}T23:59:59`)
+        .gte('fecha_hora', `${fecha}T00:00:00`)
+        .lt('fecha_hora', `${fecha}T23:59:59`)
         .eq('estado', 'confirmada');
 
     const totalTransferenciasUsd = transferencias?.reduce((sum, t) => sum + (t.usd_equivalente || 0), 0) || 0;
 
-    // Calculate expected vs actual
-    const tcBna = arqueo.tc_bna_venta_dia || 1;
-    const saldoFinalUsdEquivalente = saldoFinalUsd + (tcBna > 0 ? saldoFinalArs / tcBna : 0);
-    const esperado = arqueo.saldo_inicial_usd_equivalente + totalIngresosUsd - totalTransferenciasUsd;
-    const diferencia = Math.round((saldoFinalUsdEquivalente - esperado) * 100) / 100;
+    // Calculate difference
+    const ultimo = await getUltimoCierre(fecha);
+    const saldoInicialUsd = ultimo?.saldo_final_usd_billete || 0;
+    const saldoInicialArs = ultimo?.saldo_final_ars_billete || 0;
 
-    const { data, error } = await supabase
-        .from('caja_recepcion_arqueos')
-        .update({
-            hora_cierre: new Date().toISOString(),
-            saldo_final_usd_billete: saldoFinalUsd,
-            saldo_final_ars_billete: saldoFinalArs,
-            total_ingresos_dia_usd: Math.round(totalIngresosUsd * 100) / 100,
-            total_transferencias_admin_usd: Math.round(totalTransferenciasUsd * 100) / 100,
-            diferencia_usd: diferencia,
-            observaciones,
-            estado: 'cerrado',
-        })
-        .eq('id', arqueoId)
-        .select()
-        .single();
+    const saldoInicialEq = saldoInicialUsd + (tcBnaVenta > 0 ? saldoInicialArs / tcBnaVenta : 0);
+    const saldoFinalEq = saldoFinalUsd + (tcBnaVenta > 0 ? saldoFinalArs / tcBnaVenta : 0);
+
+    const esperado = saldoInicialEq + totalIngresosUsd - totalTransferenciasUsd;
+    const diferenciaUsd = Math.round((saldoFinalEq - esperado) * 100) / 100;
+
+    const { data, error } = await supabase.rpc('cerrar_caja_recepcion', {
+        p_fecha: fecha,
+        p_usuario: usuario,
+        p_saldo_final_usd: saldoFinalUsd,
+        p_saldo_final_ars: saldoFinalArs,
+        p_saldo_final_usd_eq: Math.round(saldoFinalEq * 100) / 100, // Added
+        p_total_ingresos_usd: Math.round(totalIngresosUsd * 100) / 100,
+        p_total_transferencias_usd: Math.round(totalTransferenciasUsd * 100) / 100,
+        p_diferencia_usd: diferenciaUsd,
+        p_tc_bna: tcBnaVenta,
+        p_observaciones: observaciones,
+        p_snapshot: snapshot
+    });
 
     if (error) throw error;
     return data;
@@ -342,4 +319,23 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         movimientosHoy: pagadosHoy.length,
         pendientes: pendientesHoy.length,
     };
+}
+
+// =============================================
+// Alertas
+// =============================================
+
+export interface DiaSinCierre {
+    fecha: string;
+    cantidad: number;
+    ultimo_usuario: string;
+}
+
+export async function getDiasSinCierreRecepcion(): Promise<DiaSinCierre[]> {
+    const { data, error } = await supabase.rpc('get_dias_sin_cierre_recepcion');
+    if (error) {
+        console.error('Error checking alerts:', error);
+        return [];
+    }
+    return data || [];
 }

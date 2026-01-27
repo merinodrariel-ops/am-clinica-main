@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Users, Banknote, BarChart3 } from 'lucide-react';
+import CajaAlerts from '@/components/dashboard/CajaAlerts';
+import UserAlerts from '@/components/dashboard/UserAlerts';
 
 export default function DashboardPage() {
     return (
@@ -10,6 +12,9 @@ export default function DashboardPage() {
                 </h1>
                 <p className="text-gray-500 mt-1">AM Clínica – Operativa 360</p>
             </div>
+
+            <UserAlerts />
+            <CajaAlerts />
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
