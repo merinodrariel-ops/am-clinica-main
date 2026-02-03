@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, UserX, Clock, ArrowRight } from 'lucide-react';
+import { UserX, Clock, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -9,6 +9,15 @@ interface UserAlert {
     type: 'pending' | 'suspended';
     count: number;
     users: { id: string, full_name: string, email: string, date: string }[];
+}
+
+interface Profile {
+    id: string;
+    full_name: string;
+    email: string;
+    estado: string;
+    created_at: string;
+    invitation_sent_at: string;
 }
 
 export default function UserAlerts() {
@@ -19,15 +28,17 @@ export default function UserAlerts() {
         async function checkUsers() {
             try {
                 // Fetch profiles with issues
-                const { data: profiles, error } = await supabase
+                const { data, error } = await supabase
                     .from('profiles')
                     .select('id, full_name, email, estado, created_at, invitation_sent_at')
                     .in('estado', ['invitado', 'suspendido']);
 
                 if (error) throw error;
 
-                const pending = profiles?.filter((p: any) => p.estado === 'invitado') || [];
-                const suspended = profiles?.filter((p: any) => p.estado === 'suspendido') || [];
+                const profiles = data as unknown as Profile[];
+
+                const pending = profiles?.filter((p) => p.estado === 'invitado') || [];
+                const suspended = profiles?.filter((p) => p.estado === 'suspendido') || [];
 
                 const newAlerts: UserAlert[] = [];
 
@@ -35,7 +46,7 @@ export default function UserAlerts() {
                     newAlerts.push({
                         type: 'pending',
                         count: pending.length,
-                        users: pending.map((u: any) => ({
+                        users: pending.map((u) => ({
                             id: u.id,
                             full_name: u.full_name || 'Sin nombre',
                             email: u.email || '',
@@ -48,7 +59,7 @@ export default function UserAlerts() {
                     newAlerts.push({
                         type: 'suspended',
                         count: suspended.length,
-                        users: suspended.map((u: any) => ({
+                        users: suspended.map((u) => ({
                             id: u.id,
                             full_name: u.full_name || 'Sin nombre',
                             email: u.email || '',

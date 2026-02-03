@@ -13,7 +13,6 @@ import {
     MapPin,
     Trash2,
     AlertTriangle,
-    X,
     Loader2
 } from 'lucide-react';
 import Link from 'next/link';

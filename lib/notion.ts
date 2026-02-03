@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Client } from '@notionhq/client';
 
 if (!process.env.NOTION_API_KEY) {
@@ -52,8 +52,7 @@ const MOCK_PAYMENTS: Payment[] = [
 async function resolveDataSourceId(dbId: string): Promise<string> {
     try {
         const dbInfo = await notion.databases.retrieve({ database_id: dbId });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ds = (dbInfo as any).data_sources;
+        const ds = (dbInfo as unknown as { data_sources: { id: string }[] }).data_sources;
         if (ds && ds.length > 0) {
             return ds[0].id;
         }
@@ -71,12 +70,12 @@ export async function getPatients(): Promise<Patient[]> {
 
     try {
         const targetId = await resolveDataSourceId(DATABASE_ID!);
-        let allResults: any[] = [];
+        let allResults: Record<string, unknown>[] = [];
         let hasMore = true;
         let cursor: string | undefined = undefined;
 
         while (hasMore) {
-            const response: any = await notion.dataSources.query({
+            const response = await notion.dataSources.query({
                 data_source_id: targetId,
                 start_cursor: cursor,
                 sorts: [
@@ -87,29 +86,29 @@ export async function getPatients(): Promise<Patient[]> {
                 ],
             });
 
-            allResults = [...allResults, ...response.results];
-            hasMore = response.has_more;
-            cursor = response.next_cursor;
+            allResults = [...allResults, ...((response as unknown as { results: Record<string, unknown>[] }).results)];
+            hasMore = (response as unknown as { has_more: boolean }).has_more;
+            cursor = (response as unknown as { next_cursor: string | undefined }).next_cursor;
         }
 
-        return allResults.map((page: any) => {
-            const props = page.properties;
+        return allResults.map((page) => {
+            const props = (page as { properties: Record<string, Record<string, unknown>> }).properties;
 
             // Helper to safely get property values
-            const getName = (p: any) => p?.title?.[0]?.plain_text ?? 'Sin Nombre';
-            const getSelect = (p: any) => p?.select?.name ?? 'Sin asignar';
-            const getDate = (p: any) => p?.date?.start ?? null;
-            const getNumber = (p: any) => p?.number ?? 0;
-            const getPhone = (p: any) => p?.phone_number ?? null;
+            const getName = (p: Record<string, unknown> | undefined) => (p as { title: { plain_text: string }[] } | undefined)?.title?.[0]?.plain_text ?? 'Sin Nombre';
+            const getSelect = (p: Record<string, unknown> | undefined) => (p as { select: { name: string } } | undefined)?.select?.name ?? 'Sin asignar';
+            const getDate = (p: Record<string, unknown> | undefined) => (p as { date: { start: string } } | undefined)?.date?.start ?? null;
+            const getNumber = (p: Record<string, unknown> | undefined) => (p as { number: number } | undefined)?.number ?? 0;
+            const getPhone = (p: Record<string, unknown> | undefined) => (p as { phone_number: string } | undefined)?.phone_number ?? null;
 
             return {
-                id: page.id,
+                id: (page as { id: string }).id,
                 name: getName(props['Apellido y Nombre']),
                 source: getSelect(props['Fuente']),
                 dsdStageDate: getDate(props['Fecha etapa DSD']),
                 originalDate: getDate(props['Fecha original (importados)']),
-                createdAt: page.created_time,
-                lastEditedAt: page.last_edited_time,
+                createdAt: (page as { created_time: string }).created_time,
+                lastEditedAt: (page as { last_edited_time: string }).last_edited_time,
                 phoneNumber: getPhone(props['Enviar mensajes']),
                 totalValue: getNumber(props['Valor']),
                 status: getSelect(props['DSD']),
@@ -130,13 +129,13 @@ export async function getPatientById(id: string) {
     // For retrieve page, we don't need data source ID resolution if extracting from page_id
     // But usually page_id is unique.
     const page = await notion.pages.retrieve({ page_id: id });
-    const props = (page as any).properties;
+    const props = (page as unknown as { properties: Record<string, Record<string, unknown>> }).properties;
 
-    const getName = (p: any) => p?.title?.[0]?.plain_text ?? 'Sin Nombre';
-    const getSelect = (p: any) => p?.select?.name ?? 'Sin asignar';
-    const getDate = (p: any) => p?.date?.start ?? null;
-    const getNumber = (p: any) => p?.number ?? 0;
-    const getPhone = (p: any) => p?.phone_number ?? null;
+    const getName = (p: Record<string, unknown> | undefined) => (p as { title: { plain_text: string }[] } | undefined)?.title?.[0]?.plain_text ?? 'Sin Nombre';
+    const getSelect = (p: Record<string, unknown> | undefined) => (p as { select: { name: string } } | undefined)?.select?.name ?? 'Sin asignar';
+    const getDate = (p: Record<string, unknown> | undefined) => (p as { date: { start: string } } | undefined)?.date?.start ?? null;
+    const getNumber = (p: Record<string, unknown> | undefined) => (p as { number: number } | undefined)?.number ?? 0;
+    const getPhone = (p: Record<string, unknown> | undefined) => (p as { phone_number: string } | undefined)?.phone_number ?? null;
 
     return {
         id: page.id,
@@ -144,8 +143,8 @@ export async function getPatientById(id: string) {
         source: getSelect(props['Fuente']),
         dsdStageDate: getDate(props['Fecha etapa DSD']),
         originalDate: getDate(props['Fecha original (importados)']),
-        createdAt: (page as any).created_time,
-        lastEditedAt: (page as any).last_edited_time,
+        createdAt: (page as unknown as { created_time: string }).created_time,
+        lastEditedAt: (page as unknown as { last_edited_time: string }).last_edited_time,
         phoneNumber: getPhone(props['Enviar mensajes']),
         totalValue: getNumber(props['Valor']),
         status: getSelect(props['DSD']),

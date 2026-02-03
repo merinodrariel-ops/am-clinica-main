@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Plus,
     ExternalLink,
@@ -24,11 +24,7 @@ export default function PatientsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
 
-    useEffect(() => {
-        loadPatients();
-    }, [searchTerm, estadoFilter]);
-
-    async function loadPatients() {
+    const loadPatients = useCallback(async () => {
         setLoading(true);
         try {
             const data = await getPacientes({
@@ -42,7 +38,11 @@ export default function PatientsPage() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [searchTerm, estadoFilter]);
+
+    useEffect(() => {
+        loadPatients();
+    }, [loadPatients]);
 
     function handleSearch() {
         loadPatients();

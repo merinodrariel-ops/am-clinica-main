@@ -6,7 +6,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // Fail gracefully during build if env vars are missing
 export const supabase = (supabaseUrl && supabaseAnonKey)
     ? createClient(supabaseUrl, supabaseAnonKey)
-    : {} as any;
+    : {} as ReturnType<typeof createClient>;
 
 
 // Types for Caja Recepción Module
@@ -102,7 +102,7 @@ export interface CajaArqueo {
     diferencia_usd: number | null;
     observaciones: string | null;
     estado: 'abierto' | 'cerrado';
-    snapshot_datos?: any;
+    snapshot_datos?: Record<string, unknown>;
     created_at: string;
 }
 

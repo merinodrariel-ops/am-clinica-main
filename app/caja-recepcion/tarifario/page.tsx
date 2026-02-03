@@ -6,7 +6,6 @@ import {
     Plus,
     Edit2,
     Trash2,
-    Save,
     X,
     ArrowLeft,
     Loader2,
@@ -14,7 +13,6 @@ import {
     DollarSign,
     Check
 } from 'lucide-react';
-import clsx from 'clsx';
 import { supabase, TarifarioItem, TarifarioVersion } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
 

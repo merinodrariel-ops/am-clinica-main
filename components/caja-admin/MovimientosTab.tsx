@@ -140,14 +140,15 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
         setSubmitting(true);
 
-        const { data, error } = await createMovimiento(
+        const { error } = await createMovimiento(
             {
                 sucursal_id: sucursal.id,
                 tipo_movimiento: formData.tipo_movimiento as CajaAdminMovimiento['tipo_movimiento'],
+                tc_bna_venta: tcBna || undefined,
                 subtipo: formData.subtipo || undefined,
                 descripcion: formData.descripcion,
                 nota: formData.nota || undefined,
-                tc_bna_venta: tcBna || undefined,
+
                 tc_fuente: tcBna ? 'BNA_AUTO' : 'N/A',
                 tc_fecha_hora: new Date().toISOString(),
             },

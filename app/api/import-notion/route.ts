@@ -9,7 +9,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const NOTION_DATABASE_ID_ADMIN = process.env.NOTION_DB_ADMIN_ID;
 const NOTION_DATABASE_ID_RECEPCION = process.env.NOTION_DB_RECEPCION_ID;
-const NOTION_DATABASE_ID_PACIENTES = process.env.NOTION_DB_PACIENTES_ID;
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 
 const IMPORTACION_PACIENTE_ID = 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59'; // Placeholder ID for Recepcion imports
@@ -120,7 +119,7 @@ export async function GET(request: Request) {
                     // Common Fields
                     let fecha = new Date().toISOString();
                     let descripcion = 'Sin descripción';
-                    let externalUrl = page.url;
+                    const externalUrl = page.url;
 
                     if (source === 'recepcion') {
                         // === RECEPCION MAPPING ===

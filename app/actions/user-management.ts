@@ -1,12 +1,14 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
 // Initialize Admin Client securely
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Define strict types for the fallback mock to avoid 'any'
+
 
 const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
     ? createClient(supabaseUrl, supabaseServiceKey, {
@@ -29,7 +31,20 @@ const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
             update: () => ({ eq: () => Promise.resolve({ error: null }) }),
             insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
         })
-    } as any;
+    } as unknown as ReturnType<typeof createClient>; // Cast to client type instead of any, or use the mock structure if strictly needed for tests
+
+interface Profile {
+    id: string;
+    email?: string;
+    last_sign_in_at?: string;
+    created_at: string;
+    full_name?: string;
+    role?: string;
+    telefono?: string;
+    estado?: string;
+    invitation_sent_at?: string;
+    [key: string]: unknown; // Allow other props for now to be safe
+}
 
 export async function getUsers() {
     try {
@@ -49,24 +64,23 @@ export async function getUsers() {
         if (dbError) throw dbError;
 
         // 3. Merge Data
-        const mergedUsers = profiles.map((profile: any) => {
-            const authUser = users.find((u: any) => u.id === profile.id);
+        const mergedUsers = (profiles as Profile[]).map((profile) => {
+            const authUser = users.find((u) => u.id === profile.id);
             return {
                 ...profile,
-                email: authUser?.email || profile.email, // Fallback
+                email: authUser?.email || profile.email || '',
                 last_sign_in_at: authUser?.last_sign_in_at,
                 created_at: authUser?.created_at || profile.created_at,
-                // If status is 'invitado' but they have signed in, arguably they are 'activo'
-                // But we'll respect the profile status mostly.
-                // Auto-fix: If 'invitado' and last_sign_in exists -> set active?
-                // Let's leave that logic for now.
+                full_name: profile.full_name || '',
+                role: profile.role || 'user',
+                estado: profile.estado || 'inactivo',
             };
         });
 
         return { success: true, data: mergedUsers };
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error fetching users:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
 
@@ -111,8 +125,8 @@ export async function inviteUser(formData: FormData) {
 
         revalidatePath('/admin/users');
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
 
@@ -130,12 +144,18 @@ export async function resendInvitation(email: string) {
 
         revalidatePath('/admin/users');
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
 
-export async function updateUser(userId: string, data: any) {
+interface UpdateUserData {
+    full_name?: string;
+    telefono?: string;
+    role?: string;
+}
+
+export async function updateUser(userId: string, data: UpdateUserData) {
     try {
         // Update Profile
         const { error } = await supabaseAdmin
@@ -162,8 +182,8 @@ export async function updateUser(userId: string, data: any) {
 
         revalidatePath('/admin/users');
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
 
@@ -186,8 +206,8 @@ export async function suspendUser(userId: string) {
 
         revalidatePath('/admin/users');
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
 
@@ -210,8 +230,8 @@ export async function reactivateUser(userId: string) {
 
         revalidatePath('/admin/users');
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
 
@@ -224,7 +244,7 @@ export async function resetUserPassword(email: string) {
 
         if (error) throw error;
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }

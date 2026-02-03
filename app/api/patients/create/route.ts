@@ -9,8 +9,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
         return NextResponse.json({ patient: data }, { status: 201 });
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Error in create patient API:', e);
-        return NextResponse.json({ error: e.message || 'Unknown error' }, { status: 500 });
+        const message = e instanceof Error ? e.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import {
-    Plus, MoreVertical, Mail, Lock, Ban, CheckCircle,
-    Shield, Edit2, RotateCcw, Search, User as UserIcon, Phone
+    Plus, MoreVertical, Mail, Ban, CheckCircle,
+    Edit2, RotateCcw, Search, User as UserIcon, Phone
 } from 'lucide-react';
 import { inviteUser, suspendUser, reactivateUser, resetUserPassword, updateUser, resendInvitation } from '@/app/actions/user-management';
-import { useUserRole } from '@/hooks/useUserRole';
+
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -24,7 +24,7 @@ interface User {
 export default function UserManagementClient({ initialUsers }: { initialUsers: User[] }) {
     const [users, setUsers] = useState<User[]>(initialUsers);
     const [search, setSearch] = useState('');
-    const { role: currentUserRole } = useUserRole();
+
     const router = useRouter();
 
     // Modals
@@ -37,7 +37,7 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
     // Users are passed from server component, but for interactive updates without full reload:
     // We rely on router.refresh() which re-runs server component.
 
-    const handleAction = async (action: () => Promise<any>) => {
+    const handleAction = async (action: () => Promise<{ success: boolean; error?: string }>) => {
         setLoadingAction(true);
         const res = await action();
         setLoadingAction(false);
@@ -68,9 +68,9 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
         const data = {
-            full_name: formData.get('fullName'),
-            telefono: formData.get('telefono'),
-            role: formData.get('role')
+            full_name: formData.get('fullName') as string,
+            telefono: formData.get('telefono') as string,
+            role: formData.get('role') as string
         };
 
         const success = await handleAction(() => updateUser(selectedUser.id, data));
@@ -163,7 +163,7 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                                             user.estado === 'suspendido' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' :
                                                 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-400'}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${user.estado === 'activo' ? 'bg-green-500' :
-                                                user.estado === 'suspendido' ? 'bg-red-500' : 'bg-yellow-500'
+                                            user.estado === 'suspendido' ? 'bg-red-500' : 'bg-yellow-500'
                                             }`} />
                                         {user.estado}
                                     </span>

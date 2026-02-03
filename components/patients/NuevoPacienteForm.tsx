@@ -135,7 +135,7 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
         // Check for duplicates
         try {
             const emailCompleto = getFullEmail();
-            let query = supabase.from('pacientes').select('id_paciente, nombre, apellido, documento, email').eq('is_deleted', false);
+            const query = supabase.from('pacientes').select('id_paciente, nombre, apellido, documento, email').eq('is_deleted', false);
 
             const conditions: string[] = [];
             if (form.documento) conditions.push(`documento.eq.${form.documento}`);
@@ -145,7 +145,7 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                 const { data: existing } = await query.or(conditions.join(','));
 
                 if (existing && existing.length > 0) {
-                    const confirmMsg = `El paciente ya existe:\n\n${existing.map((p: any) => `- ${p.nombre} ${p.apellido} (DNI: ${p.documento || '-'})`).join('\n')}\n\nNo se puede crear un duplicado.`;
+                    const confirmMsg = `El paciente ya existe:\n\n${existing.map((p: { nombre: string; apellido: string; documento: string }) => `- ${p.nombre} ${p.apellido} (DNI: ${p.documento || '-'})`).join('\n')}\n\nNo se puede crear un duplicado.`;
                     alert(confirmMsg);
                     setSaving(false);
                     return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
     Plus,
@@ -100,23 +100,17 @@ export default function CajaRecepcionPage() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
     const [bnaRate, setBnaRate] = useState<BNARate | null>(null);
-    const [loading, setLoading] = useState(true);
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
     const [showTransferencia, setShowTransferencia] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
     const [isBoxClosed, setIsBoxClosed] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    async function loadData() {
-        setLoading(true);
+    const loadData = useCallback(async () => {
         try {
             // Check closure status for today
             const today = new Date().toISOString().split('T')[0];
-            const { data: cierre, error: cierreError } = await supabase
+            const { data: cierre } = await supabase
                 .from('caja_recepcion_arqueos')
                 .select('id')
                 .eq('fecha', today)
@@ -134,7 +128,7 @@ export default function CajaRecepcionPage() {
             const firstDayOfMonth = `${today.substring(0, 7)}-01`;
 
             // Fetch today's movements from Supabase
-            const { data: movHoy, error: movError } = await supabase
+            const { data: movHoyRaw, error: movError } = await supabase
                 .from('caja_recepcion_movimientos')
                 .select(`
                     *,
@@ -144,6 +138,9 @@ export default function CajaRecepcionPage() {
                 .lt('fecha_hora', `${today}T23:59:59`)
                 .order('fecha_hora', { ascending: false });
 
+            // Cast to Movimiento[] to avoid any
+            const movHoy = movHoyRaw as unknown as Movimiento[] | null;
+
             if (movError) {
                 console.error('Error fetching movements:', movError);
             } else {
@@ -151,17 +148,19 @@ export default function CajaRecepcionPage() {
             }
 
             // Fetch month's totals
-            const { data: movMes } = await supabase
+            const { data: movMesRaw } = await supabase
                 .from('caja_recepcion_movimientos')
                 .select('usd_equivalente, estado')
                 .gte('fecha_hora', `${firstDayOfMonth}T00:00:00`)
                 .neq('estado', 'anulado');
 
+            const movMes = movMesRaw as unknown as Pick<Movimiento, 'usd_equivalente' | 'estado'>[] | null;
+
             // Calculate stats
-            const pagadosHoy = (movHoy || []).filter((m: any) => m.estado !== 'anulado');
-            const pendientesHoy = (movHoy || []).filter((m: any) => m.estado === 'pendiente');
-            const totalDiaUsd = pagadosHoy.reduce((sum: number, m: any) => sum + (m.usd_equivalente || 0), 0);
-            const totalMesUsd = (movMes || []).reduce((sum: number, m: any) => sum + (m.usd_equivalente || 0), 0);
+            const pagadosHoy = (movHoy || []).filter((m) => m.estado !== 'anulado');
+            const pendientesHoy = (movHoy || []).filter((m) => m.estado === 'pendiente');
+            const totalDiaUsd = pagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
+            const totalMesUsd = (movMes || []).reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
 
             setStats({
                 totalDiaUsd: Math.round(totalDiaUsd * 100) / 100,
@@ -173,10 +172,13 @@ export default function CajaRecepcionPage() {
             });
         } catch (error) {
             console.error('Error loading data:', error);
-        } finally {
-            setLoading(false);
         }
-    }
+    }, []);
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        loadData();
+    }, [loadData]);
 
     function copyToClipboard(key: string, text: string) {
         navigator.clipboard.writeText(text);

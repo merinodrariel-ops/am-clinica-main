@@ -65,7 +65,7 @@ export interface CajaAdminArqueo {
     diferencia_usd: number;
     observaciones?: string;
     estado: 'Abierto' | 'Cerrado' | 'abierto' | 'cerrado';
-    snapshot_datos?: any;
+    snapshot_datos?: Record<string, unknown>;
 }
 
 export interface Profesional {
@@ -358,7 +358,7 @@ export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: str
 }
 
 // Deprecated or Aliased
-export async function getArqueoAbierto(sucursalId: string): Promise<CajaAdminArqueo | null> {
+export async function getArqueoAbierto(): Promise<CajaAdminArqueo | null> {
     // Return null as there are no "Open" arqueos anymore
     return null;
 }
@@ -372,9 +372,9 @@ export async function cerrarCajaAdmin(params: {
     diferenciaUsd: number;
     tcBna: number;
     observaciones?: string;
-    snapshot: any;
+    snapshot: unknown;
 }): Promise<{ success: boolean; error?: string }> {
-    const { data, error } = await supabase.rpc('cerrar_caja_admin', {
+    const { error } = await supabase.rpc('cerrar_caja_admin', {
         p_sucursal_id: params.sucursalId,
         p_fecha: params.fecha,
         p_usuario: params.usuario,
@@ -616,7 +616,7 @@ export async function generarLiquidacion(
         .gte('fecha', startDate)
         .lte('fecha', `${mes}-${endDate.getDate()}`);
 
-    const totalHoras = horas?.reduce((sum: number, h: any) => sum + h.horas, 0) || 0;
+    const totalHoras = horas?.reduce((sum: number, h: { horas: number }) => sum + h.horas, 0) || 0;
     const totalArs = totalHoras * personal.valor_hora_ars;
     const totalUsd = tcBna ? totalArs / tcBna : undefined;
 
@@ -675,7 +675,7 @@ export async function getReporteMensual(
             .lt('fecha_hora', `${endDateStr}T23:59:59`)
             .neq('estado', 'Anulado');
 
-        ingresosPacientesUsd = ingresos?.reduce((sum: number, i: any) => sum + (i.usd_equivalente || 0), 0) || 0;
+        ingresosPacientesUsd = ingresos?.reduce((sum: number, i: { usd_equivalente: number }) => sum + (i.usd_equivalente || 0), 0) || 0;
     } else {
         // UY: Read from caja_admin_movimientos with INGRESO_PACIENTE
         const { data: ingresos } = await supabase
@@ -687,7 +687,7 @@ export async function getReporteMensual(
             .lt('fecha_hora', `${endDateStr}T23:59:59`)
             .neq('estado', 'Anulado');
 
-        ingresosPacientesUsd = ingresos?.reduce((sum: number, i: any) => sum + (i.usd_equivalente_total || 0), 0) || 0;
+        ingresosPacientesUsd = ingresos?.reduce((sum: number, i: { usd_equivalente_total: number }) => sum + (i.usd_equivalente_total || 0), 0) || 0;
     }
 
     // Egresos from caja_admin_movimientos
@@ -700,7 +700,7 @@ export async function getReporteMensual(
         .lt('fecha_hora', `${endDateStr}T23:59:59`)
         .neq('estado', 'Anulado');
 
-    egresosUsd = egresos?.reduce((sum: number, e: any) => sum + (e.usd_equivalente_total || 0), 0) || 0;
+    egresosUsd = egresos?.reduce((sum: number, e: { usd_equivalente_total: number }) => sum + (e.usd_equivalente_total || 0), 0) || 0;
 
     // Honorarios from prestaciones
     const { data: honorarios } = await supabase
@@ -710,7 +710,7 @@ export async function getReporteMensual(
         .lte('fecha', endDateStr)
         .neq('estado', 'Anulado');
 
-    const honorariosProfesionalesUsd = honorarios?.reduce((sum: number, h: any) => sum + (h.usd_equivalente || 0), 0) || 0;
+    const honorariosProfesionalesUsd = honorarios?.reduce((sum: number, h: { usd_equivalente: number }) => sum + (h.usd_equivalente || 0), 0) || 0;
 
     // Sueldos from liquidaciones_mensuales
     const { data: sueldos } = await supabase
@@ -719,7 +719,7 @@ export async function getReporteMensual(
         .eq('mes', startDate)
         .neq('estado', 'Anulado');
 
-    const sueldosStaffUsd = sueldos?.reduce((sum: number, s: any) => sum + (s.total_usd || 0), 0) || 0;
+    const sueldosStaffUsd = sueldos?.reduce((sum: number, s: { total_usd: number }) => sum + (s.total_usd || 0), 0) || 0;
 
     // Calculate margins
     const margenBruto = ingresosPacientesUsd - honorariosProfesionalesUsd - sueldosStaffUsd - egresosUsd;
@@ -755,7 +755,7 @@ export async function getEgresosPorSubtipo(
     if (error || !data) return [];
 
     // Group by subtipo
-    const grouped = data.reduce((acc: Record<string, number>, item: any) => {
+    const grouped = data.reduce((acc: Record<string, number>, item: { subtipo: string; usd_equivalente_total: number }) => {
         const key = item.subtipo || 'Sin categoría';
         acc[key] = (acc[key] || 0) + (item.usd_equivalente_total || 0);
         return acc;

@@ -4,14 +4,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import RoleGuard from '@/components/auth/RoleGuard';
 import {
-    User,
-    Shield,
     Mail,
     Plus,
     Loader2,
     CheckCircle2,
-    XCircle,
-    MoreVertical
+    XCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -87,9 +84,9 @@ export default function UserManagementPage() {
                 setFormData({ email: '', password: '', fullName: '', role: 'partner_viewer' });
                 loadUsers();
             }, 1000);
-        } catch (error: any) {
+        } catch (error: unknown) {
             setInviteStatus('error');
-            setErrorMessage(error.message);
+            setErrorMessage(error instanceof Error ? error.message : 'Error desconocido');
         }
     }
 
@@ -140,7 +137,7 @@ export default function UserManagementPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-medium">
-                                                    {user.full_name?.[0] || user.email[0].toUpperCase()}
+                                                    {user.full_name?.[0] || user.email?.[0]?.toUpperCase() || '?'}
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-gray-900 dark:text-white">
@@ -148,7 +145,7 @@ export default function UserManagementPage() {
                                                     </p>
                                                     <div className="flex items-center gap-1 text-sm text-gray-500">
                                                         <Mail size={12} />
-                                                        {user.email}
+                                                        {user.email || 'No email'}
                                                     </div>
                                                 </div>
                                             </div>

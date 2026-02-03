@@ -1,12 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
-    LockOpen,
     Lock,
-    AlertTriangle,
-    DollarSign
+    AlertTriangle
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -32,7 +29,7 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
     const [observaciones, setObservaciones] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [showCerrarModal, setShowCerrarModal] = useState(false);
-    const [expectedBalances, setExpectedBalances] = useState<Record<string, number>>({});
+
 
     useEffect(() => {
         loadData();
@@ -62,8 +59,9 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
 
             // Calculate expected balances for "Active" day
             // Initial (from last closure) + Movements
-            const initial = cierreData && cierreData.fecha !== today ? cierreData.saldos_finales : (cierreData && cierreData.fecha === today ? (await getUltimoCierreAdmin(sucursal.id, today))?.saldos_finales : {});
-            const startBalances = initial || {};
+            // Initial (from last closure) + Movements
+            // const initial = cierreData && cierreData.fecha !== today ? cierreData.saldos_finales : (cierreData && cierreData.fecha === today ? (await getUltimoCierreAdmin(sucursal.id, today))?.saldos_finales : {});
+            // const startBalances = initial || {};
 
             // To do this strictly, we need to fetch movements of the day.
             // Simplified: Just use initial for now, or fetch movements if we want to show "Expected".
@@ -143,8 +141,8 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
 
             setShowCerrarModal(false);
             loadData();
-        } catch (err: any) { // Type 'unknown' requires checking, 'any' is temporary fix
-            alert(err.message);
+        } catch (err: unknown) {
+            alert(err instanceof Error ? err.message : 'Error desconocido');
         } finally {
             setSubmitting(false);
         }

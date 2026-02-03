@@ -6,7 +6,7 @@ import {
     Plus,
     Calendar,
     Clock,
-    FileText,
+
     Check,
     X,
     DollarSign,
@@ -35,7 +35,7 @@ interface Props {
 
 type SubTab = 'registros' | 'observados';
 
-export default function PersonalTab({ sucursal, tcBna }: Props) {
+export default function PersonalTab({ tcBna }: Props) {
     const [activeSubTab, setActiveSubTab] = useState<SubTab>('registros');
     const [observadosCount, setObservadosCount] = useState(0);
     const [personal, setPersonal] = useState<Personal[]>([]);

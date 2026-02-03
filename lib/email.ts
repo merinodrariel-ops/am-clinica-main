@@ -8,13 +8,6 @@ const PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY;
 const SERVICE_ID = process.env.EMAILJS_SERVICE_ID || 'contact_service';
 const TEMPLATE_ID_WELCOME = process.env.EMAILJS_TEMPLATE_ID_WELCOME || 'welcome_template';
 
-interface EmailParams {
-    to_name: string;
-    to_email: string;
-    message?: string;
-    [key: string]: string | undefined;
-}
-
 export async function sendWelcomeEmail(toName: string, toEmail: string, whatsapp?: string) {
     if (!PUBLIC_KEY || !PRIVATE_KEY) {
         console.warn('EmailJS keys missing. Skipping email.');

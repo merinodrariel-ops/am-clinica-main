@@ -31,7 +31,7 @@ function LoginForm() {
             } else {
                 router.push(redirectPath);
             }
-        } catch (err) {
+        } catch {
             setError('Ocurrió un error inesperado');
         } finally {
             setLoading(false);

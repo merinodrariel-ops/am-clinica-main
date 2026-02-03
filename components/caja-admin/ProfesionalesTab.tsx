@@ -27,7 +27,7 @@ interface Props {
     tcBna: number | null;
 }
 
-export default function ProfesionalesTab({ sucursal, tcBna }: Props) {
+export default function ProfesionalesTab({ tcBna }: Props) {
     const [profesionales, setProfesionales] = useState<Profesional[]>([]);
     const [prestaciones, setPrestaciones] = useState<Prestacion[]>([]);
     const [honorarios, setHonorarios] = useState<HonorarioItem[]>([]);

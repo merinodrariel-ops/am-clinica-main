@@ -64,7 +64,8 @@ async function bootstrap() {
     }
 
     // 2. Create user
-    const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
+    // 2. Create user
+    const { error } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,

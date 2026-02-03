@@ -51,7 +51,7 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                 setUltimoCierre(ultimo);
             }
 
-        } catch (error) {
+        } catch {
             // PGRST116 is no rows, which is expected
             // console.error('Error checking caja:', error);
         } finally {
@@ -81,9 +81,10 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
             setObservaciones('');
             await checkEstadoCaja();
             onArqueoChange?.();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error cerrando caja:', error);
-            alert('Error al cerrar caja: ' + error.message);
+            const message = error instanceof Error ? error.message : 'Error desconocido';
+            alert('Error al cerrar caja: ' + message);
         } finally {
             setSaving(false);
         }
@@ -97,8 +98,6 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
         );
     }
 
-    const saldoInicialUsd = ultimoCierre ? ultimoCierre.saldo_final_usd_billete : 0;
-    const saldoInicialArs = ultimoCierre ? ultimoCierre.saldo_final_ars_billete : 0;
     const saldoInicialEq = ultimoCierre ? ultimoCierre.saldo_final_usd_equivalente : 0;
 
     return (
