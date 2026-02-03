@@ -33,6 +33,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const signOut = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        setSession(null);
+    };
+
+    const fetchProfile = async (userId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (error) {
+                console.error('Error fetching profile:', error);
+            } else if (data) {
+                if (data.is_active === false) {
+                    await signOut();
+                    window.location.href = '/login?error=account_disabled';
+                    return;
+                }
+                setProfile(data as Profile);
+            }
+        } catch (error) {
+            console.error('Unexpected error fetching profile:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         // Check active session
         supabase.auth.getSession().then((response: { data: { session: Session | null } }) => {
@@ -59,34 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => subscription.unsubscribe();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const fetchProfile = async (userId: string) => {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-
-            if (error) {
-                console.error('Error fetching profile:', error);
-            } else {
-                setProfile(data as Profile);
-            }
-        } catch (error) {
-            console.error('Unexpected error fetching profile:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const signOut = async () => {
-        await supabase.auth.signOut();
-        setUser(null);
-        setProfile(null);
-        setSession(null);
-    };
 
     const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
     const isOwner = profile?.role === 'owner';

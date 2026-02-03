@@ -235,6 +235,64 @@ export async function reactivateUser(userId: string) {
     }
 }
 
+
+export async function resendUserAccessEmail(userId: string, ownerId: string) {
+    try {
+        // 1. Verify Requestor is Owner
+        const { data: requestorProfile, error: reqError } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', ownerId)
+            .single();
+
+        if (reqError || requestorProfile.role !== 'owner') {
+            throw new Error('Unauthorized: Only Only owners can perform this action');
+        }
+
+        // 2. Get Target User Profile & Auth Data
+        const { data: { user: targetUser }, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (userError || !targetUser) throw new Error('User not found');
+
+        let actionType = '';
+
+        // 3. Determine Action
+        if (!targetUser.email_confirmed_at) {
+            // Case A: User never confirmed -> Resend Invite
+            // inviteUserByEmail triggers the magic link again
+            const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(targetUser.email!);
+            if (inviteError) throw inviteError;
+            actionType = 'resend_invite';
+        } else {
+            // Case B: User confirmed -> Send Password Reset
+            const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(targetUser.email!, {
+                redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password`
+            });
+            if (resetError) throw resetError;
+            actionType = 'send_reset_password';
+        }
+
+        // 4. Audit Log
+        await supabaseAdmin.from('audit_logs').insert({
+            user_id: ownerId,
+            user_email: requestorProfile.email,
+            role: 'owner',
+            action: 'resend_access_email',
+            table_name: 'profiles',
+            record_id: userId,
+            metadata: {
+                target_email: targetUser.email,
+                sub_action: actionType,
+                timestamp: new Date().toISOString()
+            }
+        });
+
+        return { success: true, message: actionType === 'resend_invite' ? 'Email de invitación reenviado.' : 'Email de restablecimiento de contraseña enviado.' };
+    } catch (error) {
+        console.error('Error resending access email:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
 export async function resetUserPassword(email: string) {
     try {
         // Send recovery email

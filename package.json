@@ -11,6 +11,7 @@
   "dependencies": {
     "@emailjs/nodejs": "^5.0.2",
     "@notionhq/client": "^5.6.0",
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.26.2",

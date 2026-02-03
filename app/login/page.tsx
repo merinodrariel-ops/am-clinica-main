@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
@@ -9,6 +9,7 @@ function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectPath = searchParams.get('redirect') || '/dashboard';
+    const supabase = createClient();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -90,6 +91,14 @@ function LoginForm() {
                             {error}
                         </div>
                     )}
+
+                    <div className="flex items-center justify-end">
+                        <div className="text-sm">
+                            <a href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500 hover:underline">
+                                ¿Olvidaste tu contraseña?
+                            </a>
+                        </div>
+                    </div>
 
                     <div>
                         <button

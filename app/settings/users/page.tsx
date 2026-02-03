@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { resendUserAccessEmail } from '@/app/actions/user-management';
 import RoleGuard from '@/components/auth/RoleGuard';
 import {
     Mail,
     Plus,
     Loader2,
     CheckCircle2,
-    XCircle
+    XCircle,
+    RefreshCw
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -37,9 +39,33 @@ export default function UserManagementPage() {
     const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
 
+    // Resend action state
+    const [resendingId, setResendingId] = useState<string | null>(null);
+    const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
     useEffect(() => {
         loadUsers();
     }, []);
+
+    async function handleResendAccess(user: Profile) {
+        if (!session?.user?.id) return;
+        setResendingId(user.id);
+        setActionMessage(null);
+
+        try {
+            const result = await resendUserAccessEmail(user.id, session.user.id);
+            if (result.success) {
+                setActionMessage({ type: 'success', text: result.message || 'Email enviado.' });
+            } else {
+                setActionMessage({ type: 'error', text: result.error || 'Error al enviar.' });
+            }
+        } catch (error) {
+            setActionMessage({ type: 'error', text: 'Error inesperado.' });
+        } finally {
+            setResendingId(null);
+            setTimeout(() => setActionMessage(null), 4000);
+        }
+    }
 
     async function loadUsers() {
         try {
@@ -113,6 +139,19 @@ export default function UserManagementPage() {
                     </button>
                 </div>
 
+
+
+                {/* Feedback Message */}
+                {actionMessage && (
+                    <div className={`mb-4 p-4 rounded-xl flex items-center gap-3 ${actionMessage.type === 'success'
+                        ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        }`}>
+                        {actionMessage.type === 'success' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                        <p className="font-medium">{actionMessage.text}</p>
+                    </div>
+                )}
+
                 {/* Users List */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                     <div className="overflow-x-auto">
@@ -123,12 +162,13 @@ export default function UserManagementPage() {
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rol</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha Alta</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={4} className="px-6 py-8 text-center">
+                                        <td colSpan={5} className="px-6 py-8 text-center">
                                             <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
                                         </td>
                                     </tr>
@@ -171,6 +211,21 @@ export default function UserManagementPage() {
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-500">
                                             {new Date(user.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                onClick={() => handleResendAccess(user)}
+                                                disabled={resendingId === user.id}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition-colors disabled:opacity-50"
+                                                title="Reenviar email de acceso / restablecer contraseña"
+                                            >
+                                                {resendingId === user.id ? (
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                ) : (
+                                                    <RefreshCw size={16} />
+                                                )}
+                                                <span className="hidden sm:inline">Reenviar Acceso</span>
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
