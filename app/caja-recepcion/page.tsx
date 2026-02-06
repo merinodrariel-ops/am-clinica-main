@@ -14,6 +14,11 @@ import {
     CheckCircle,
     ArrowRightLeft,
     FileText,
+    AlertTriangle,
+    History,
+    Calendar,
+    Pencil,
+    X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
@@ -21,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import NuevoIngresoForm from '@/components/caja/NuevoIngresoForm';
 import ArqueoPanel from '@/components/caja/ArqueoPanel';
 import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
+import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 
 // Types
 interface DashboardStats {
@@ -35,7 +41,15 @@ interface DashboardStats {
 interface Movimiento {
     id: string;
     fecha_hora: string;
-    paciente?: { nombre: string; apellido: string; id_paciente: string };
+    fecha_movimiento?: string;
+    paciente?: {
+        nombre: string;
+        apellido: string;
+        id_paciente: string;
+        financ_estado?: string;
+        financ_monto_total?: number;
+        financ_cuotas_total?: number;
+    };
     concepto_nombre: string;
     categoria: string | null;
     monto: number;
@@ -43,6 +57,8 @@ interface Movimiento {
     metodo_pago: string;
     estado: string;
     usd_equivalente: number | null;
+    registro_editado?: boolean;
+    origen?: string;
 }
 
 interface BNARate {
@@ -103,8 +119,17 @@ export default function CajaRecepcionPage() {
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
     const [showTransferencia, setShowTransferencia] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    const [historialMovId, setHistorialMovId] = useState<string | null>(null);
 
     const [isBoxClosed, setIsBoxClosed] = useState(false);
+
+    // Edit date modal state
+    const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
+    const [newFecha, setNewFecha] = useState('');
+    const [savingDate, setSavingDate] = useState(false);
+    const [editMonto, setEditMonto] = useState<number>(0);
+    const [displayMonto, setDisplayMonto] = useState<string>('');
+    const [editMoneda, setEditMoneda] = useState<string>('ARS');
 
     const loadData = useCallback(async () => {
         try {
@@ -132,7 +157,14 @@ export default function CajaRecepcionPage() {
                 .from('caja_recepcion_movimientos')
                 .select(`
                     *,
-                    paciente:pacientes(id_paciente, nombre, apellido)
+                    paciente:pacientes(
+                        id_paciente, 
+                        nombre, 
+                        apellido,
+                        financ_estado,
+                        financ_monto_total,
+                        financ_cuotas_total
+                    )
                 `)
                 .gte('fecha_hora', `${today}T00:00:00`)
                 .lt('fecha_hora', `${today}T23:59:59`)
@@ -195,6 +227,64 @@ export default function CajaRecepcionPage() {
             }
         });
         return text.trim();
+    }
+
+    function openEditMovimiento(mov: Movimiento) {
+        const currentDate = mov.fecha_movimiento || mov.fecha_hora.split('T')[0];
+        setNewFecha(currentDate);
+
+        const initialMonto = mov.monto || 0;
+        setEditMonto(initialMonto);
+
+        // Format initial display value (e.g. 123456 -> 123.456 or 1234.56 -> 1.234,56)
+        // We use 'es-AR' forcing standard decimal grouping
+        const formatted = new Intl.NumberFormat('es-AR', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+            useGrouping: true
+        }).format(initialMonto);
+
+        setDisplayMonto(formatted);
+
+        setEditMoneda(mov.moneda || 'ARS');
+        setEditingMov(mov);
+    }
+
+    async function handleUpdateMovimiento() {
+        if (!editingMov || !newFecha) return;
+
+        setSavingDate(true);
+        try {
+            const updates: any = {
+                fecha_movimiento: newFecha,
+                monto: editMonto,
+                moneda: editMoneda,
+                registro_editado: true // Mark as edited
+            };
+
+            // Recalculate USD equivalent if amount/currency changed or if it was null
+            if (editMoneda === 'USD') {
+                updates.usd_equivalente = editMonto;
+            } else if (editMoneda === 'ARS' && bnaRate?.venta) {
+                updates.usd_equivalente = editMonto / bnaRate.venta;
+            }
+
+            const { error } = await supabase
+                .from('caja_recepcion_movimientos')
+                .update(updates)
+                .eq('id', editingMov.id);
+
+            if (error) throw error;
+
+            // Reload data
+            await loadData();
+            setEditingMov(null);
+        } catch (err) {
+            console.error('Error updating movement:', err);
+            alert('Error al guardar los cambios');
+        } finally {
+            setSavingDate(false);
+        }
     }
 
     return (
@@ -370,6 +460,7 @@ export default function CajaRecepcionPage() {
                                         <th className="px-4 py-3 text-left">Método</th>
                                         <th className="px-4 py-3 text-right">Monto</th>
                                         <th className="px-4 py-3 text-center">Estado</th>
+                                        <th className="px-4 py-3 text-center">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -379,9 +470,33 @@ export default function CajaRecepcionPage() {
                                                 {new Date(mov.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                                             </td>
                                             <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                                                {mov.paciente ? `${mov.paciente.apellido}, ${mov.paciente.nombre}` : '-'}
+                                                {mov.paciente ? (
+                                                    <Link
+                                                        href={`/patients/${mov.paciente.id_paciente}?tab=financiamiento`}
+                                                        className="group flex flex-col items-start"
+                                                    >
+                                                        <span className="group-hover:text-blue-600 group-hover:underline transition-colors">
+                                                            {`${mov.paciente.apellido}, ${mov.paciente.nombre}`}
+                                                        </span>
+                                                        {mov.paciente.financ_estado === 'activo' && (
+                                                            <span className="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                                                Financiación Activa
+                                                            </span>
+                                                        )}
+                                                    </Link>
+                                                ) : '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{mov.concepto_nombre}</td>
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                                <div className="flex flex-col">
+                                                    <span>{mov.concepto_nombre}</span>
+                                                    {(mov as any).cuota_nro && (mov as any).cuota_nro > 0 && (
+                                                        <span className="text-[10px] text-gray-400">
+                                                            Cuota {(mov as any).cuota_nro} de {(mov as any).cuotas_total || '?'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-3 text-gray-500">{mov.metodo_pago}</td>
                                             <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
                                                 {formatCurrency(mov.usd_equivalente || mov.monto, 'USD')}
@@ -395,6 +510,34 @@ export default function CajaRecepcionPage() {
                                                 )}>
                                                     {mov.estado}
                                                 </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    {mov.registro_editado && (
+                                                        <span title="Este registro ha sido editado">
+                                                            <AlertTriangle size={16} className="text-amber-500" />
+                                                        </span>
+                                                    )}
+                                                    {mov.origen === 'importado_csv' && (
+                                                        <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 rounded">
+                                                            CSV
+                                                        </span>
+                                                    )}
+                                                    <button
+                                                        onClick={() => openEditMovimiento(mov)}
+                                                        className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+                                                        title="Editar movimiento (Monto, Fecha, Moneda)"
+                                                    >
+                                                        <Pencil size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setHistorialMovId(mov.id)}
+                                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                                        title="Ver historial de ediciones"
+                                                    >
+                                                        <History size={16} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -468,6 +611,141 @@ export default function CajaRecepcionPage() {
                 onSuccess={loadData}
                 bnaRate={bnaRate?.venta || 0}
             />
+
+            {/* Historial Ediciones Modal */}
+            <HistorialEdicionesModal
+                isOpen={!!historialMovId}
+                onClose={() => setHistorialMovId(null)}
+                registroId={historialMovId || ''}
+                tabla="caja_recepcion_movimientos"
+            />
+
+            {/* Edit Date Modal */}
+            {editingMov && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full">
+                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    Editar movimiento de ingreso
+                                </h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    {editingMov.paciente
+                                        ? `${editingMov.paciente.apellido}, ${editingMov.paciente.nombre}`
+                                        : editingMov.concepto_nombre}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setEditingMov(null)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            {/* Fecha */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    <Calendar size={14} className="inline mr-2" />
+                                    Fecha del movimiento
+                                </label>
+                                <input
+                                    type="date"
+                                    value={newFecha}
+                                    onChange={(e) => setNewFecha(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                            </div>
+
+                            {/* Monto y Moneda */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Monto
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={displayMonto}
+                                        onChange={(e) => {
+                                            // 1. Get raw input (digits and comma only)
+                                            let val = e.target.value.replace(/[^0-9,]/g, '');
+
+                                            // 2. Handle multiple commas (keep first)
+                                            const parts = val.split(',');
+                                            if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('');
+
+                                            // 3. Format integer part with dots
+                                            const integerPart = parts[0].replace(/\./g, '');
+                                            // Prevent leading zeros unless it's just "0"
+                                            const cleanInteger = integerPart === '' ? '' : Number(integerPart).toString();
+
+                                            const formattedInteger = cleanInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+                                            // 4. Reconstruct display value
+                                            let newDisplay = formattedInteger;
+                                            if (val.includes(',')) {
+                                                newDisplay += ',' + (parts[1] || '');
+                                            }
+
+                                            // 5. Update state
+                                            setDisplayMonto(newDisplay);
+
+                                            // 6. Update numeric value for logic
+                                            // ARS uses comma as decimal separator, JS uses dot.
+                                            const numericVal = parseFloat(val.replace(',', '.') || '0');
+                                            setEditMonto(numericVal);
+                                        }}
+                                        placeholder="0"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-1 font-mono text-lg"
+                                    />
+                                    <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                                        Equivalente: {
+                                            editMoneda === 'ARS' && bnaRate?.venta
+                                                ? formatCurrency(editMonto / bnaRate.venta, 'USD')
+                                                : formatCurrency(editMonto, 'USD')
+                                        }
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Moneda
+                                    </label>
+                                    <select
+                                        value={editMoneda}
+                                        onChange={(e) => setEditMoneda(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="ARS">Pesos (ARS)</option>
+                                        <option value="USD">Dólares (USD)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-lg flex items-start gap-2 text-sm text-yellow-800 dark:text-yellow-400">
+                                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                                <p>Editar el monto recalculará el equivalente en USD automáticamente. Esta acción quedará registrada en auditoría.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
+                            <button
+                                onClick={() => setEditingMov(null)}
+                                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleUpdateMovimiento}
+                                disabled={savingDate}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                            >
+                                {savingDate ? 'Guardando...' : 'Guardar Cambios'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

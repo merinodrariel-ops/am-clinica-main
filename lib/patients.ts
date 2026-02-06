@@ -18,6 +18,10 @@ export interface Paciente {
     link_historia_clinica?: string | null;
     link_google_slides?: string | null;
     presupuesto_total?: number | null;
+    // Financing fields
+    financ_estado?: string;
+    financ_monto_total?: number;
+    financ_cuotas_total?: number;
     // New fields
     whatsapp_pais_code?: string;
     whatsapp_numero?: string;

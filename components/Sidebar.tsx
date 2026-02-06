@@ -9,7 +9,8 @@ import {
     Wallet,
     Settings,
     LogOut,
-    UserCircle
+    UserCircle,
+    Upload
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -38,6 +39,12 @@ const MENU_ITEMS = [
         label: 'Caja Administración',
         href: '/caja-admin',
         roles: ['owner', 'admin', 'partner_viewer', 'developer']
+    },
+    {
+        icon: Upload,
+        label: 'Importador CSV',
+        href: '/importador-csv',
+        roles: ['owner', 'admin']
     },
 ];
 

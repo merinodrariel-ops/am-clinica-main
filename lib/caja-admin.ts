@@ -25,6 +25,7 @@ export interface CuentaFinanciera {
 export interface CajaAdminMovimiento {
     id: string;
     fecha_hora: string;
+    fecha_movimiento: string; // 'YYYY-MM-DD' - Date for reporting
     usuario?: string;
     sucursal_id: string;
     descripcion: string;
@@ -253,8 +254,8 @@ export async function getMovimientos(options: {
         const [year, month] = options.mes.split('-').map(Number);
         const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
         query = query
-            .gte('fecha_hora', startDate)
-            .lt('fecha_hora', firstDayNextMonth);
+            .gte('fecha_movimiento', startDate)
+            .lt('fecha_movimiento', firstDayNextMonth);
     }
 
     if (options.tipo) {
@@ -671,8 +672,8 @@ export async function getReporteMensual(
         const { data: ingresos } = await supabase
             .from('caja_recepcion_movimientos')
             .select('usd_equivalente')
-            .gte('fecha_hora', startDate)
-            .lt('fecha_hora', `${endDateStr}T23:59:59`)
+            .gte('fecha_movimiento', startDate)
+            .lte('fecha_movimiento', endDateStr)
             .neq('estado', 'Anulado');
 
         ingresosPacientesUsd = ingresos?.reduce((sum: number, i: { usd_equivalente: number }) => sum + (i.usd_equivalente || 0), 0) || 0;
@@ -683,8 +684,8 @@ export async function getReporteMensual(
             .select('usd_equivalente_total')
             .eq('sucursal_id', sucursalId)
             .eq('tipo_movimiento', 'INGRESO_PACIENTE')
-            .gte('fecha_hora', startDate)
-            .lt('fecha_hora', `${endDateStr}T23:59:59`)
+            .gte('fecha_movimiento', startDate)
+            .lte('fecha_movimiento', endDateStr)
             .neq('estado', 'Anulado');
 
         ingresosPacientesUsd = ingresos?.reduce((sum: number, i: { usd_equivalente_total: number }) => sum + (i.usd_equivalente_total || 0), 0) || 0;
@@ -696,8 +697,8 @@ export async function getReporteMensual(
         .select('usd_equivalente_total')
         .eq('sucursal_id', sucursalId)
         .eq('tipo_movimiento', 'EGRESO')
-        .gte('fecha_hora', startDate)
-        .lt('fecha_hora', `${endDateStr}T23:59:59`)
+        .gte('fecha_movimiento', startDate)
+        .lte('fecha_movimiento', endDateStr)
         .neq('estado', 'Anulado');
 
     egresosUsd = egresos?.reduce((sum: number, e: { usd_equivalente_total: number }) => sum + (e.usd_equivalente_total || 0), 0) || 0;
@@ -748,8 +749,8 @@ export async function getEgresosPorSubtipo(
         .select('subtipo, usd_equivalente_total')
         .eq('sucursal_id', sucursalId)
         .eq('tipo_movimiento', 'EGRESO')
-        .gte('fecha_hora', startDate)
-        .lt('fecha_hora', `${endDateStr}T23:59:59`)
+        .gte('fecha_movimiento', startDate)
+        .lte('fecha_movimiento', endDateStr)
         .neq('estado', 'Anulado');
 
     if (error || !data) return [];

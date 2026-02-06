@@ -13,7 +13,9 @@ import {
     X,
     ChevronDown,
     FileText,
-    Receipt
+    Receipt,
+    History,
+    AlertTriangle
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -27,6 +29,7 @@ import {
     SUBTIPOS_ADJUNTO_OBLIGATORIO
 } from '@/lib/caja-admin';
 import { useUserRole } from '@/hooks/useUserRole';
+import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 
 interface Props {
     sucursal: Sucursal;
@@ -55,6 +58,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     });
     const [searchTerm, setSearchTerm] = useState('');
     const [filterTipo, setFilterTipo] = useState<string>('');
+    const [historialMovId, setHistorialMovId] = useState<string | null>(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -432,6 +436,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Subtipo</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase">USD Equiv.</th>
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">Estado</th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -467,12 +472,41 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                             <X className="w-5 h-5 text-red-500 mx-auto" />
                                         )}
                                     </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            {(mov as { registro_editado?: boolean }).registro_editado && (
+                                                <span title="Este registro ha sido editado">
+                                                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                                                </span>
+                                            )}
+                                            {(mov as { origen?: string }).origen === 'importado_csv' && (
+                                                <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 rounded">
+                                                    CSV
+                                                </span>
+                                            )}
+                                            <button
+                                                onClick={() => setHistorialMovId(mov.id)}
+                                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                                                title="Ver historial de ediciones"
+                                            >
+                                                <History className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
                                 </motion.tr>
                             ))}
                         </tbody>
                     </table>
                 )}
             </div>
+
+            {/* Historial de Ediciones Modal */}
+            <HistorialEdicionesModal
+                isOpen={!!historialMovId}
+                onClose={() => setHistorialMovId(null)}
+                registroId={historialMovId || ''}
+                tabla="caja_admin_movimientos"
+            />
         </div>
     );
 }

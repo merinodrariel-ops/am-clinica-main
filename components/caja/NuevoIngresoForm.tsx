@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Search, User, DollarSign, Check, Loader2 } from 'lucide-react';
+import { X, Search, User, DollarSign, Check, Loader2, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase, TarifarioItem } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Paciente {
     id_paciente: string;
@@ -35,6 +36,9 @@ interface FormData {
     tipo_comprobante: 'Factura A' | 'Tipo C' | 'Sin factura' | 'Otro';
     estado: 'pagado' | 'pendiente';
     observaciones: string;
+    es_cuota: boolean;
+    cuota_nro: number;
+    cuotas_total: number;
 }
 
 const METODOS_PAGO = [
@@ -64,6 +68,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
     // const [tarifarioItems, setTarifarioItems] = useState<TarifarioItem[]>([]);
     const [tarifarioByCategoria, setTarifarioByCategoria] = useState<Record<string, TarifarioItem[]>>({});
 
+    // Historical load
+    const { user } = useAuth();
+    const canUseHistoricalLoad = user?.role === 'owner' || user?.role === 'admin';
+    const [cargaHistorica, setCargaHistorica] = useState(false);
+    const [fechaMovimiento, setFechaMovimiento] = useState(new Date().toISOString().split('T')[0]);
+
     // Form data
     const [formData, setFormData] = useState<FormData>({
         paciente_id: '',
@@ -79,6 +89,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         tipo_comprobante: 'Factura A',
         estado: 'pagado',
         observaciones: '',
+        es_cuota: false,
+        cuota_nro: 1,
+        cuotas_total: 1,
     });
 
     // Load tarifario on mount
@@ -218,6 +231,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                     tc_fecha_hora: formData.moneda === 'ARS' ? new Date().toISOString() : null,
                     usd_equivalente: usdEquivalente,
                     usuario: 'Recepción', // TODO: Get from auth
+                    // Dual date fields
+                    fecha_movimiento: cargaHistorica ? fechaMovimiento : new Date().toISOString().split('T')[0],
+                    origen: cargaHistorica ? 'carga_historica' : 'manual',
+                    cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
+                    cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
                 });
 
             if (error) throw error;
@@ -236,6 +254,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         setStep(1);
         setSearchQuery('');
         setPatients([]);
+        setCargaHistorica(false);
+        setFechaMovimiento(new Date().toISOString().split('T')[0]);
         setFormData({
             paciente_id: '',
             paciente_nombre: '',
@@ -250,6 +270,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
             tipo_comprobante: 'Factura A',
             estado: 'pagado',
             observaciones: '',
+            es_cuota: false,
+            cuota_nro: 1,
+            cuotas_total: 1,
         });
         onClose();
     }
@@ -427,6 +450,47 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 )}
                             </div>
 
+                            {/* Financiación / Cuotas */}
+                            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 space-y-3">
+                                <label className="flex items-center gap-2.5 text-sm font-medium text-gray-900 dark:text-white cursor-pointer w-fit">
+                                    <div className={`w-5 h-5 flex items-center justify-center rounded border transition-colors ${formData.es_cuota ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300 dark:border-gray-600 dark:bg-gray-800'}`}>
+                                        {formData.es_cuota && <Check size={14} className="text-white" />}
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.es_cuota}
+                                        onChange={(e) => setFormData({ ...formData, es_cuota: e.target.checked })}
+                                        className="sr-only"
+                                    />
+                                    <span>Es pago de financiación / cuota</span>
+                                </label>
+
+                                {formData.es_cuota && (
+                                    <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Cuota Nro.</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={formData.cuota_nro}
+                                                onChange={(e) => setFormData({ ...formData, cuota_nro: Math.max(1, parseInt(e.target.value) || 0) })}
+                                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">De un total de</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={formData.cuotas_total}
+                                                onChange={(e) => setFormData({ ...formData, cuotas_total: Math.max(1, parseInt(e.target.value) || 0) })}
+                                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Payment Method */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -506,6 +570,47 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 </div>
                             </div>
 
+                            {/* Historical Load Toggle - Only for admin/owner */}
+                            {canUseHistoricalLoad && (
+                                <div className="p-4 border border-amber-200 dark:border-amber-800 rounded-xl bg-amber-50 dark:bg-amber-900/20">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <p className="font-medium text-amber-800 dark:text-amber-300">Carga histórica</p>
+                                            <p className="text-xs text-amber-600 dark:text-amber-400">Registrar ingreso en fecha pasada</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setCargaHistorica(!cargaHistorica)}
+                                            className={clsx(
+                                                "w-12 h-6 rounded-full transition-colors relative",
+                                                cargaHistorica ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"
+                                            )}
+                                        >
+                                            <span
+                                                className={clsx(
+                                                    "absolute w-5 h-5 bg-white rounded-full top-0.5 transition-all shadow",
+                                                    cargaHistorica ? "right-0.5" : "left-0.5"
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
+                                    {cargaHistorica && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-amber-700 dark:text-amber-300 mb-2">
+                                                <Calendar size={14} className="inline mr-1" />
+                                                Fecha del movimiento
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={fechaMovimiento}
+                                                onChange={(e) => setFechaMovimiento(e.target.value)}
+                                                max={new Date().toISOString().split('T')[0]}
+                                                className="w-full px-4 py-2 border border-amber-300 dark:border-amber-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-amber-500"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <button
                                 onClick={() => setStep(4)}
                                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
@@ -547,6 +652,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                         {formatCurrency(formData.monto, formData.moneda)}
                                     </span>
                                 </div>
+                                {formData.es_cuota && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Cuota:</span>
+                                        <span className="font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-sm">
+                                            {formData.cuota_nro} de {formData.cuotas_total}
+                                        </span>
+                                    </div>
+                                )}
                                 {formData.moneda === 'ARS' && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Equivalente USD:</span>
@@ -611,6 +724,6 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

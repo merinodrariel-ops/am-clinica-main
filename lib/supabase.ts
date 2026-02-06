@@ -34,6 +34,7 @@ export interface TarifarioItem {
 export interface CajaMovimiento {
     id: string;
     fecha_hora: string;
+    fecha_movimiento: string; // 'YYYY-MM-DD' - Date for reporting
     usuario: string | null;
     paciente_id: string;
     concepto_id: string | null;
@@ -62,6 +63,16 @@ export interface CajaMovimiento {
     anulado_por: string | null;
     anulado_fecha_hora: string | null;
     created_at: string;
+    // Audit & Traceability fields
+    estado_registro: 'activo' | 'anulado';
+    origen: 'manual' | 'importado_csv' | 'sistema' | 'carga_historica';
+    importado_por: string | null;
+    fecha_importacion: string | null;
+    archivo_origen: string | null;
+    registro_editado: boolean;
+    created_by: string | null;
+    updated_by: string | null;
+    updated_at: string | null;
     // Joined data
     paciente?: {
         id_paciente: string;
@@ -114,3 +125,18 @@ export interface Paciente {
     email: string | null;
     documento: string | null;
 }
+
+export interface HistorialEdicion {
+    id: string;
+    id_registro: string;
+    tabla_origen: 'caja_recepcion_movimientos' | 'caja_admin_movimientos' | 'pacientes' | 'planes_tratamiento';
+    campo_modificado: string;
+    valor_anterior: string | null;
+    valor_nuevo: string | null;
+    usuario_editor: string | null;
+    usuario_email: string | null;
+    fecha_edicion: string;
+    motivo_edicion: string;
+    created_at: string;
+}
+

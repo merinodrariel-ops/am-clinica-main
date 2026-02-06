@@ -114,8 +114,7 @@ export async function getMovimientosDelDia(fecha?: string): Promise<CajaMovimien
             *,
             paciente:pacientes(id_paciente, nombre, apellido)
         `)
-        .gte('fecha_hora', `${targetDate}T00:00:00`)
-        .lt('fecha_hora', `${targetDate}T23:59:59`)
+        .eq('fecha_movimiento', targetDate)
         .order('fecha_hora', { ascending: false });
 
     if (error) throw error;
@@ -187,8 +186,7 @@ export async function cerrarCajaDelDia(
     const { data: movimientos } = await supabase
         .from('caja_recepcion_movimientos')
         .select('usd_equivalente')
-        .gte('fecha_hora', `${fecha}T00:00:00`)
-        .lt('fecha_hora', `${fecha}T23:59:59`)
+        .eq('fecha_movimiento', fecha)
         .is('cierre_id', null)
         .neq('estado', 'anulado');
 
@@ -285,8 +283,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const { data: movHoyRaw } = await supabase
         .from('caja_recepcion_movimientos')
         .select('usd_equivalente, metodo_pago, categoria, estado')
-        .gte('fecha_hora', `${today}T00:00:00`)
-        .lt('fecha_hora', `${today}T23:59:59`);
+        .eq('fecha_movimiento', today);
 
     const movHoy = movHoyRaw as unknown as {
         usd_equivalente: number;
@@ -299,7 +296,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const { data: movMes } = await supabase
         .from('caja_recepcion_movimientos')
         .select('usd_equivalente')
-        .gte('fecha_hora', `${firstDayOfMonth}T00:00:00`)
+        .gte('fecha_movimiento', firstDayOfMonth)
+        .lte('fecha_movimiento', today)
         .neq('estado', 'anulado');
 
     const pagadosHoy = (movHoy || []).filter((m) => m.estado !== 'anulado');

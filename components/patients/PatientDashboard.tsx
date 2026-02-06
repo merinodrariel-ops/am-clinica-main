@@ -17,10 +17,16 @@ import {
     Save,
     Plus,
     FileIcon,
-    ExternalLink
+    ExternalLink,
+    TrendingUp,
+    Check,
+    X,
+    AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
+import { supabase } from '@/lib/supabase';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
 
 interface Movement {
@@ -33,6 +39,8 @@ interface Movement {
     estado: string;
     usd_equivalente: number;
     observaciones?: string;
+    cuota_nro?: number;
+    cuotas_total?: number;
 }
 
 interface PatientDashboardProps {
@@ -45,13 +53,60 @@ interface PatientDashboardProps {
 const TABS = [
     { id: 'datos', label: 'Datos Personales', icon: User },
     { id: 'historia', label: 'Historia Clínica', icon: FileText },
+    { id: 'financiamiento', label: 'Financiación', icon: TrendingUp },
     { id: 'pagos', label: 'Historial de Pagos', icon: CreditCard },
-    { id: 'planes', label: 'Presupuesto/Plan', icon: DollarSign },
+    { id: 'planes', label: 'Planes (Presupuestos)', icon: DollarSign },
 ];
 
 export default function PatientDashboard({ patient, historiaClinica, planes, payments }: PatientDashboardProps) {
-    const [activeTab, setActiveTab] = useState('datos');
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'datos');
     const [isEditing, setIsEditing] = useState(false);
+
+    // Financing State
+    const [finData, setFinData] = useState({
+        estado: patient.financ_estado || 'inactivo',
+        monto: patient.financ_monto_total || 0,
+        cuotas: patient.financ_cuotas_total || 0
+    });
+    const [savingFin, setSavingFin] = useState(false);
+    const [isEditingFin, setIsEditingFin] = useState(false);
+
+    // Calculate financing progress
+    // We sum payments that are explicitly marked as installments (cuota_nro > 0)
+    // OR if financing is active, we could consider all payments, but using explicit flag is safer.
+    // For now, let's look for payments with 'cuota' in concept or explicitly set field if we had it.
+    // Checking the data, we will use cuota_nro > 0.
+    const totalPagadoFinanc = payments
+        .filter(p => p.estado !== 'Anulado' && (p.cuota_nro && p.cuota_nro > 0))
+        .reduce((sum, p) => sum + (p.usd_equivalente || 0), 0);
+
+    const porcentajePagado = (finData.monto > 0) ? (totalPagadoFinanc / finData.monto) * 100 : 0;
+    const saldoFinanc = Math.max(0, finData.monto - totalPagadoFinanc);
+
+    async function handleSaveFinancing() {
+        setSavingFin(true);
+        try {
+            const { error } = await supabase
+                .from('pacientes')
+                .update({
+                    financ_estado: finData.estado,
+                    financ_monto_total: finData.monto,
+                    financ_cuotas_total: finData.cuotas
+                })
+                .eq('id_paciente', patient.id_paciente);
+
+            if (error) throw error;
+            setIsEditingFin(false);
+            router.refresh();
+        } catch (err) {
+            console.error('Error updating financing:', err);
+            alert('Error al guardar configuración de financiación');
+        } finally {
+            setSavingFin(false);
+        }
+    }
 
     const age = calculateAge(patient.fecha_nacimiento);
     const whatsappNumber = patient.whatsapp_numero
@@ -458,11 +513,188 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     </div>
                                 )}
                             </div>
+
+                        )}
+
+                        {/* Tab: Financiación */}
+                        {activeTab === 'financiamiento' && (
+                            <div className="space-y-6">
+                                {/* Header / Config Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                                Plan de Financiación
+                                                {finData.estado === 'activo' && (
+                                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">Activo</span>
+                                                )}
+                                                {finData.estado === 'finalizado' && (
+                                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Completado</span>
+                                                )}
+                                                {finData.estado === 'inactivo' && (
+                                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full font-medium">Inactivo</span>
+                                                )}
+                                            </h2>
+                                            <p className="text-gray-500 text-sm mt-1">Gestión de cuotas y saldos</p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                if (isEditingFin) handleSaveFinancing();
+                                                else setIsEditingFin(true);
+                                            }}
+                                            disabled={savingFin}
+                                            className={clsx(
+                                                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                                                isEditingFin
+                                                    ? "bg-green-600 hover:bg-green-700 text-white"
+                                                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200"
+                                            )}
+                                        >
+                                            {isEditingFin ? (
+                                                <>{savingFin ? 'Guardando...' : <><Save size={16} /> Guardar Cambios</>}</>
+                                            ) : (
+                                                <><Edit2 size={16} /> Configurar Plan</>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {isEditingFin ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Estado del Plan</label>
+                                                <select
+                                                    value={finData.estado}
+                                                    onChange={(e) => setFinData({ ...finData, estado: e.target.value })}
+                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                                >
+                                                    <option value="inactivo">Inactivo</option>
+                                                    <option value="activo">Activo (En curso)</option>
+                                                    <option value="finalizado">Finalizado</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Monto Total a Financiar (USD)</label>
+                                                <div className="relative">
+                                                    <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                    <input
+                                                        type="number"
+                                                        value={finData.monto}
+                                                        onChange={(e) => setFinData({ ...finData, monto: Number(e.target.value) })}
+                                                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Cantidad de Cuotas</label>
+                                                <input
+                                                    type="number"
+                                                    value={finData.cuotas}
+                                                    onChange={(e) => setFinData({ ...finData, cuotas: Number(e.target.value) })}
+                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                                    placeholder="Ej: 3"
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                                <p className="text-sm text-gray-500 mb-1">Total Financiado</p>
+                                                <p className="text-2xl font-bold text-gray-900 dark:text-white">${finData.monto.toLocaleString('es-AR')}</p>
+                                            </div>
+                                            <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
+                                                <p className="text-sm text-green-600 dark:text-green-400 mb-1">Pagado hasta hoy</p>
+                                                <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                                                    ${totalPagadoFinanc.toLocaleString('es-AR')}
+                                                </p>
+                                            </div>
+                                            <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/30">
+                                                <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Saldo Restante</p>
+                                                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                                                    ${saldoFinanc.toLocaleString('es-AR')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Progress Bar */}
+                                    <div className="mt-8">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <div>
+                                                <p className="font-medium text-gray-900 dark:text-white">Progreso de Pagos</p>
+                                                <p className="text-xs text-gray-500">
+                                                    {((payments.filter(p => (p.cuota_nro || 0) > 0)).length)} pagos registrados como cuota
+                                                    {finData.cuotas > 0 && ` de ${finData.cuotas} pactadas`}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-2xl font-bold text-gray-900 dark:text-white">{porcentajePagado.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                        <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
+                                            <div
+                                                className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-1000 ease-out relative"
+                                                style={{ width: `${Math.min(porcentajePagado, 100)}%` }}
+                                            >
+                                                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Listado de Pagos de Cuotas */}
+                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+                                    <div className="p-5 border-b border-gray-100 dark:border-gray-800">
+                                        <h3 className="font-semibold text-gray-900 dark:text-white">Pagos de Cuotas Registrados</h3>
+                                        <p className="text-xs text-gray-500">Solo se muestran los pagos marcados explícitamente como cuota</p>
+                                    </div>
+                                    {payments.filter(p => (p.cuota_nro || 0) > 0).length === 0 ? (
+                                        <div className="p-10 text-center text-gray-500">
+                                            <CreditCard className="mx-auto mb-3 text-gray-300" size={32} />
+                                            <p>No hay pagos de cuotas registrados aún.</p>
+                                            <Link href="/caja-recepcion" className="text-blue-500 hover:underline text-sm mt-2 block">
+                                                Registrar nuevo pago de cuota
+                                            </Link>
+                                        </div>
+                                    ) : (
+                                        <table className="w-full text-sm">
+                                            <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800/50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left">Fecha</th>
+                                                    <th className="px-6 py-3 text-left">Cuota</th>
+                                                    <th className="px-6 py-3 text-right">Monto USD</th>
+                                                    <th className="px-6 py-3 text-center">Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                                {payments.filter(p => (p.cuota_nro || 0) > 0).map((p) => (
+                                                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                                        <td className="px-6 py-4">{new Date(p.fecha_hora).toLocaleDateString('es-AR')}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                                                Cuota {p.cuota_nro} {p.cuotas_total ? `/ ${p.cuotas_total}` : ''}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-medium">${p.usd_equivalente?.toFixed(2)}</td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <span className={clsx(
+                                                                "w-2 h-2 rounded-full inline-block mr-2",
+                                                                p.estado === 'pagado' ? "bg-green-500" : "bg-yellow-500"
+                                                            )}></span>
+                                                            {p.estado}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </motion.div>
                 </AnimatePresence>
             </div>
-        </div>
+        </div >
     );
 }
 
