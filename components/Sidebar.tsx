@@ -10,7 +10,9 @@ import {
     Settings,
     LogOut,
     UserCircle,
-    Upload
+    Upload,
+    Package,
+    FlaskConical
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -45,6 +47,18 @@ const MENU_ITEMS = [
         label: 'Importador CSV',
         href: '/importador-csv',
         roles: ['owner', 'admin']
+    },
+    {
+        icon: Package,
+        label: 'Inventario',
+        href: '/inventario',
+        roles: ['owner', 'admin', 'reception', 'developer']
+    },
+    {
+        icon: FlaskConical,
+        label: 'Laboratorio',
+        href: '/laboratorio',
+        roles: ['owner', 'admin', 'reception', 'developer']
     },
 ];
 

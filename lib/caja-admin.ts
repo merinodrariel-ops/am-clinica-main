@@ -286,6 +286,7 @@ export async function createMovimiento(
         .from('caja_admin_movimientos')
         .insert({
             ...movimiento,
+            fecha_movimiento: movimiento.fecha_movimiento || new Date().toISOString().split('T')[0],
             usd_equivalente_total: usdTotal,
             estado: 'Registrado',
             created_at: new Date().toISOString(),

@@ -174,7 +174,9 @@ export async function GET(request: Request) {
                             usd_equivalente: usdEquivalente,
                             tc_bna_venta: tc,
                             observaciones: `Importado de Notion. URL: ${externalUrl}`,
-                            usuario: 'Sistema' // Default user
+                            usuario: 'Sistema', // Default user
+                            fecha_movimiento: (fecha || new Date().toISOString()).split('T')[0],
+                            origen: 'importacion'
                         }, { onConflict: undefined }); // No unique constraint easily mapped for recepcion yet, usually just insert. 
                         // Note: upsert without ON CONFLICT works as INSERT if no PK match (UUID generated).
                         // To prevent duplicates, we'd need a unique field. Recepcion table might not have one for external_url.
@@ -240,7 +242,9 @@ export async function GET(request: Request) {
                             tc_bna_venta: tc || null,
                             external_url: page.url,
                             adjuntos: null,
-                            nota: nota
+                            nota: nota,
+                            fecha_movimiento: (fecha || new Date().toISOString()).split('T')[0],
+                            origen: 'importacion'
                         }, { onConflict: 'external_url' });
 
                         if (insertError) {

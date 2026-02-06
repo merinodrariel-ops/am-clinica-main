@@ -66,6 +66,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         subtipo: '',
         descripcion: '',
         nota: '',
+        fecha_movimiento: new Date().toISOString().split('T')[0],
     });
     const [formLineas, setFormLineas] = useState<MovimientoLinea[]>([]);
     const [formError, setFormError] = useState<string | null>(null);
@@ -152,6 +153,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 subtipo: formData.subtipo || undefined,
                 descripcion: formData.descripcion,
                 nota: formData.nota || undefined,
+                fecha_movimiento: formData.fecha_movimiento,
 
                 tc_fuente: tcBna ? 'BNA_AUTO' : 'N/A',
                 tc_fecha_hora: new Date().toISOString(),
@@ -168,7 +170,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
         // Reset form and reload
         setShowForm(false);
-        setFormData({ tipo_movimiento: 'EGRESO', subtipo: '', descripcion: '', nota: '' });
+        setFormData({
+            tipo_movimiento: 'EGRESO',
+            subtipo: '',
+            descripcion: '',
+            nota: '',
+            fecha_movimiento: new Date().toISOString().split('T')[0]
+        });
         setFormLineas([]);
         loadData();
     }
@@ -291,6 +299,23 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                Fecha del Movimiento *
+                            </label>
+                            <input
+                                type="date"
+                                value={formData.fecha_movimiento}
+                                onChange={(e) => setFormData({ ...formData, fecha_movimiento: e.target.value })}
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                required
+                            />
+                        </div>
+
+                        <div className="md:col-span-1">
+                            {/* Empty space or another field if needed */}
                         </div>
 
                         <div className="md:col-span-2">
