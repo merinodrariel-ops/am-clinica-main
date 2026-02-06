@@ -48,12 +48,7 @@ const METODOS_PAGO = [
     { value: 'Cripto', label: 'Cripto (USDT)', icon: '₿' },
 ];
 
-const CANALES = [
-    { value: 'Empresa', label: 'Empresa (Factura A)', comprobante: 'Factura A' },
-    { value: 'Personal', label: 'Personal (Tipo C)', comprobante: 'Tipo C' },
-    { value: 'MP', label: 'Mercado Pago', comprobante: 'Sin factura' },
-    { value: 'USDT', label: 'USDT', comprobante: 'Sin factura' },
-];
+
 
 export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }: NuevoIngresoFormProps) {
     const [step, setStep] = useState(1);
@@ -182,14 +177,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         setStep(3);
     }
 
-    function handleCanalChange(canal: string) {
-        const canalInfo = CANALES.find(c => c.value === canal);
-        setFormData({
-            ...formData,
-            canal_destino: canal as FormData['canal_destino'],
-            tipo_comprobante: (canalInfo?.comprobante || 'Sin factura') as FormData['tipo_comprobante'],
-        });
-    }
+
 
     function calculateUsdEquivalent(): number {
         if (formData.moneda === 'USD' || formData.moneda === 'USDT') {
@@ -515,30 +503,6 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 </div>
                             </div>
 
-                            {/* Channel/Destination */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Destino / Comprobante
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {CANALES.map((canal) => (
-                                        <button
-                                            key={canal.value}
-                                            onClick={() => handleCanalChange(canal.value)}
-                                            className={clsx(
-                                                "p-3 border rounded-xl text-left transition-colors",
-                                                formData.canal_destino === canal.value
-                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                                            )}
-                                        >
-                                            <p className="font-medium text-sm">{canal.label}</p>
-                                            <p className="text-xs text-gray-500">{canal.comprobante}</p>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
                             {/* Status */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -670,10 +634,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                     <span className="text-gray-500">Método:</span>
                                     <span>{formData.metodo_pago}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Destino:</span>
-                                    <span>{formData.canal_destino} ({formData.tipo_comprobante})</span>
-                                </div>
+
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Estado:</span>
                                     <span className={formData.estado === 'pagado' ? 'text-green-600' : 'text-yellow-600'}>

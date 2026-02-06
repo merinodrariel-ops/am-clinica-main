@@ -50,12 +50,12 @@ const MENU_ITEMS = [
 
 export default function Sidebar() {
     const pathname = usePathname();
-    const { profile, signOut, user } = useAuth();
+    const { role, profile, signOut, user } = useAuth();
 
     // Hide sidebar on login page or if not authenticated (optional, depends on layout)
     if (!user || pathname === '/login') return null;
 
-    const userRole = profile?.role || 'partner_viewer';
+    const userRole = role || 'partner_viewer';
 
     return (
         <aside className="fixed left-0 top-0 h-screen w-64 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 z-50 flex flex-col">

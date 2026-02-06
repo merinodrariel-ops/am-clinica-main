@@ -5,6 +5,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Providers from "@/components/Providers";
 import MainLayout from "@/components/MainLayout";
+import RoleSwitcher from "@/components/RoleSwitcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
           <MainLayout>
             {children}
           </MainLayout>
+          <RoleSwitcher />
         </Providers>
       </body>
     </html>

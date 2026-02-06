@@ -20,8 +20,12 @@ interface AuthContextType {
     profile: Profile | null;
     loading: boolean;
     signOut: () => Promise<void>;
+    role: Role | null;
     isAdmin: boolean;
     isOwner: boolean;
+    isRealOwner: boolean;
+    impersonatedRole: Role | null;
+    setImpersonatedRole: (role: Role | null) => void;
     canEdit: (module: string) => boolean;
 }
 
@@ -32,12 +36,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [impersonatedRole, setImpersonatedRole] = useState<Role | null>(null);
+
+    const isRealOwner = user?.email === 'dr.arielmerinopersonal@gmail.com' || profile?.role === 'owner';
+    const effectiveRole = (isRealOwner && impersonatedRole) ? impersonatedRole : profile?.role;
 
     const signOut = async () => {
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
         setSession(null);
+        setImpersonatedRole(null);
     };
 
     const fetchProfile = async (userId: string) => {
@@ -66,6 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // Load impersonated role from localStorage if exists
+        const savedRole = localStorage.getItem('impersonatedRole') as Role;
+        if (savedRole) setImpersonatedRole(savedRole);
+
         // Check active session
         supabase.auth.getSession().then((response: { data: { session: Session | null } }) => {
             const session = response.data.session;
@@ -94,25 +107,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
-    const isOwner = profile?.role === 'owner';
+    const handleSetImpersonatedRole = (role: Role | null) => {
+        setImpersonatedRole(role);
+        if (role) {
+            localStorage.setItem('impersonatedRole', role);
+        } else {
+            localStorage.removeItem('impersonatedRole');
+        }
+    };
+
+    const isAdmin = effectiveRole === 'admin' || effectiveRole === 'owner';
+    const isOwner = effectiveRole === 'owner';
 
     // Permission Logic (Simplified Default Rule)
     const canEdit = (module: string): boolean => {
-        if (!profile) return false;
-        if (profile.role === 'owner') return true;
-        if (profile.role === 'partner_viewer') return false;
+        const role = effectiveRole;
+        if (!role) return false;
+        if (role === 'owner') return true;
+        if (role === 'partner_viewer') return false;
 
         // Admin edits everything operational
-        if (profile.role === 'admin') return true;
+        if (role === 'admin') return true;
 
         // Reception
-        if (profile.role === 'reception') {
+        if (role === 'reception') {
             return ['turnos', 'pacientes', 'caja_recepcion'].includes(module);
         }
 
         // Pricing Manager
-        if (profile.role === 'pricing_manager') {
+        if (role === 'pricing_manager') {
             return ['tarifario', 'financiamiento'].includes(module);
         }
 
@@ -120,7 +143,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, profile, loading, signOut, isAdmin, isOwner, canEdit }}>
+        <AuthContext.Provider value={{
+            user,
+            session,
+            profile,
+            loading,
+            signOut,
+            role: effectiveRole || null,
+            isAdmin,
+            isOwner,
+            isRealOwner,
+            impersonatedRole,
+            setImpersonatedRole: handleSetImpersonatedRole,
+            canEdit
+        }}>
             {children}
         </AuthContext.Provider>
     );

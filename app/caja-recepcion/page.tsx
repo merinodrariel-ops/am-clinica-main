@@ -2,24 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import {
-    Plus,
-    Clock,
-    DollarSign,
-    TrendingUp,
-    CreditCard,
-    RefreshCw,
-    Copy,
-    ExternalLink,
-    CheckCircle,
-    ArrowRightLeft,
-    FileText,
-    AlertTriangle,
-    History,
-    Calendar,
-    Pencil,
-    X,
-} from 'lucide-react';
+import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
 import { supabase } from '@/lib/supabase';
@@ -27,9 +11,10 @@ import NuevoIngresoForm from '@/components/caja/NuevoIngresoForm';
 import ArqueoPanel from '@/components/caja/ArqueoPanel';
 import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
+import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
 
 // Types
-interface DashboardStats {
+interface Stats {
     totalDiaUsd: number;
     totalMesUsd: number;
     porMetodo: Record<string, number>;
@@ -61,7 +46,7 @@ interface Movimiento {
     origen?: string;
 }
 
-interface BNARate {
+interface BnaRate {
     venta: number;
     fecha: string;
     fuente: string;
@@ -70,52 +55,99 @@ interface BNARate {
 }
 
 // Payment data for copy functionality
-const PAYMENT_DATA = {
+// Payment data types and constant
+type PaymentCategory = 'banco' | 'mp' | 'cripto';
+
+interface PaymentMethod {
+    category: PaymentCategory;
+    group: string;
+    label: string;
+    details: Record<string, string>;
+    qrValue?: string; // Specific value for QR generation
+}
+
+const PAYMENT_DATA: Record<string, PaymentMethod> = {
     santander_empresa_ars: {
-        label: 'Santander Empresa PESOS (Factura A)',
-        cuenta: 'CC 760-014436/2',
-        cbu: '0720760220000001443622',
-        alias: 'amesteticadental',
-        razon_social: 'FULLESTHETIC SA',
-        cuit: '30717748421',
+        category: 'banco',
+        group: 'Empresa (Fullesthetic)',
+        label: 'SANTANDER EMPRESA PESOS (Factura A)',
+        details: {
+            'Cuenta': 'CC 760-014436/2',
+            'CBU': '0720760220000001443622',
+            'Alias': 'amesteticadental',
+            'Razón Social': 'FULLESTHETIC SA',
+            'CUIT': '30717748421'
+        },
+        qrValue: '0720760220000001443622' // CBU
     },
     santander_empresa_usd: {
-        label: 'Santander Empresa DÓLARES (Factura A)',
-        cuenta: 'CC 760-014785/9',
-        cbu: '0720760221000001478591',
-        alias: 'AMesteticaDentalUSD',
-        razon_social: 'FULLESTHETIC SA',
-        cuit: '30717748421',
+        category: 'banco',
+        group: 'Empresa (Fullesthetic)',
+        label: 'SANTANDER EMPRESA DÓLARES (Factura A)',
+        details: {
+            'Cuenta': 'CC 760-014785/9',
+            'CBU': '07207602210000001478591',
+            'Alias': 'AMesteticaDentalUSD',
+            'Razón Social': 'FULLESTHETIC SA',
+            'CUIT': '30717748421'
+        },
+        qrValue: '07207602210000001478591' // CBU
     },
     santander_personal: {
-        label: 'Santander Personal (Tipo C)',
-        titular: 'ARIEL ALEXIS MERINO BAHAMONDEZ',
-        cuit: '20-33447153-6',
-        cuenta: '760-011706/1',
-        cbu: '0720760288000001170618',
-        alias: 'dr.arielmerino',
-    },
-    cripto_usdt: {
-        label: 'Cripto – USDT TRC20',
-        direccion: 'TLYiSCFSHtqPySok77PofZ5YwiBwHJTCjU',
+        category: 'banco',
+        group: 'Personal',
+        label: 'SANTANDER PERSONAL (DÓLARES Y PESOS)',
+        details: {
+            'Titular': 'ARIEL ALEXIS MERINO BAHAMONDEZ',
+            'CUIT': '20-33447153-6',
+            'Cuenta': '760-011706/1',
+            'CBU': '0720760288000001170618',
+            'Alias': 'dr.arielmerino'
+        },
+        qrValue: '0720760288000001170618' // CBU
     },
     mp_ars: {
-        label: 'Mercado Pago PESOS',
-        alias: 'amdentalpesos',
-        cvu: '0000003100006597395484',
+        category: 'mp',
+        group: 'Mercado Pago',
+        label: 'MERCADO PAGO PESOS',
+        details: {
+            'Alias': 'amdentalpesos',
+            'CVU': '0000003100006597395484'
+        },
+        qrValue: '0000003100006597395484' // CVU
     },
     mp_usd: {
-        label: 'Mercado Pago DÓLARES',
-        alias: 'mozo.aceptas.catre',
-        cbu: '3220001888065006450017',
-        nota: 'Al transferir figura Banco Industrial (BIND)',
+        category: 'mp',
+        group: 'Mercado Pago',
+        label: 'MERCADO PAGO DÓLARES',
+        details: {
+            'Alias': 'mozo.aceptas.catre',
+            'CBU': '3220001888065006450017',
+            'Nota': 'Al transferir figura Banco Industrial (BIND)'
+        },
+        qrValue: '3220001888065006450017' // CBU/CVU
+    },
+    cripto_usdt: {
+        category: 'cripto',
+        group: 'Cripto',
+        label: 'CRIPTO – USDT TRC20',
+        details: {
+            'Dirección': 'TLYiSCFSHtqPySok77PofZ5YwiBwHJTCjU',
+            'Red': 'TRC20'
+        },
+        qrValue: 'TLYiSCFSHtqPySok77PofZ5YwiBwHJTCjU' // Dirección
     },
 };
 
 export default function CajaRecepcionPage() {
-    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [stats, setStats] = useState<Stats | null>(null);
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
-    const [bnaRate, setBnaRate] = useState<BNARate | null>(null);
+    const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().substring(0, 7));
+    const [showNuevoGasto, setShowNuevoGasto] = useState(false);
+    const [privacyMode, setPrivacyMode] = useState(false); // New Privacy Mode state
+
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
     const [showTransferencia, setShowTransferencia] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -130,6 +162,18 @@ export default function CajaRecepcionPage() {
     const [editMonto, setEditMonto] = useState<number>(0);
     const [displayMonto, setDisplayMonto] = useState<string>('');
     const [editMoneda, setEditMoneda] = useState<string>('ARS');
+
+    // QR Modal state
+    const [qrModal, setQrModal] = useState<{ open: boolean; value: string; title: string }>({
+        open: false,
+        value: '',
+        title: ''
+    });
+
+    function getWhatsappLink(text: string) {
+        return `https://wa.me/?text=${encodeURIComponent(text)}`;
+    }
+
 
     const loadData = useCallback(async () => {
         try {
@@ -220,13 +264,11 @@ export default function CajaRecepcionPage() {
 
     function formatPaymentData(key: keyof typeof PAYMENT_DATA): string {
         const data = PAYMENT_DATA[key];
-        let text = `${data.label}\n`;
-        Object.entries(data).forEach(([k, v]) => {
-            if (k !== 'label') {
-                text += `${k.charAt(0).toUpperCase() + k.slice(1).replace('_', ' ')}: ${v}\n`;
-            }
+        const lines = [data.label];
+        Object.entries(data.details).forEach(([label, value]) => {
+            lines.push(`${label}: ${value}`);
         });
-        return text.trim();
+        return lines.join('\n');
     }
 
     function openEditMovimiento(mov: Movimiento) {
@@ -287,6 +329,70 @@ export default function CajaRecepcionPage() {
         }
     }
 
+    // --- Helper for Privacy Mode ---
+    const formatPrivacy = (content: React.ReactNode) => {
+        if (!privacyMode) return content;
+        return <span className="blur-sm select-none">••••</span>;
+    };
+
+    // --- Helper for Daily Summary ---
+    const getDailySummary = () => {
+        const ingresosArs = movimientos.filter(m => m.moneda === 'ARS' && m.estado !== 'anulado' && m.categoria !== 'Egreso').reduce((a, b) => a + b.monto, 0);
+        const ingresosUsd = movimientos.filter(m => (m.moneda === 'USD' || m.moneda === 'USDT') && m.estado !== 'anulado' && m.categoria !== 'Egreso').reduce((a, b) => a + b.monto, 0);
+        const gastosArs = movimientos.filter(m => m.categoria === 'Egreso' && m.estado !== 'anulado').reduce((a, b) => a + Math.abs(b.monto), 0);
+        const movCount = movimientos.filter(m => m.estado !== 'anulado').length;
+        const pendingCount = movimientos.filter(m => m.estado === 'pendiente').length;
+
+        const summaryText = `📅 *Reporte Cierre - ${new Date().toLocaleDateString('es-AR')}*
+
+✅ *Ingresos:*
+• ARS: ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(ingresosArs)}
+• USD: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(ingresosUsd)}
+
+📉 *Gastos/Salidas:*
+• ARS: ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(gastosArs)}
+
+👥 *Movimientos:* ${movCount}
+⚠️ *Pendientes:* ${pendingCount}
+
+_Caja Recepción - AM Clínica_`;
+
+        return summaryText;
+    };
+
+    // --- Helper for Receipt ---
+    const getReceiptMessage = (mov: Movimiento) => {
+        const patientName = mov.paciente ? `${mov.paciente.nombre} ${mov.paciente.apellido}` : 'Paciente General';
+        const formattedAmount = new Intl.NumberFormat(mov.moneda === 'ARS' ? 'es-AR' : 'en-US', { style: 'currency', currency: mov.moneda }).format(mov.monto);
+
+        return `🧾 *Comprobante de Pago*
+📅 *Fecha:* ${new Date(mov.fecha_hora).toLocaleDateString('es-AR')}
+👤 *Paciente:* ${patientName}
+💰 *Monto:* ${formattedAmount}
+📝 *Concepto:* ${mov.concepto_nombre}
+
+✅ *Estado:* ${mov.estado.toUpperCase()}
+
+Gracias por su visita!
+_AM Clínica_`;
+    };
+
+    // --- Helper for Collection Reminder ---
+    const getCollectionMessage = (mov: Movimiento) => {
+        const formattedAmount = new Intl.NumberFormat(mov.moneda === 'ARS' ? 'es-AR' : 'en-US', { style: 'currency', currency: mov.moneda }).format(mov.monto);
+        const patientName = mov.paciente ? `${mov.paciente.nombre} ${mov.paciente.apellido}` : 'Paciente';
+
+        return `👋 *Hola ${patientName}! Recordatorio de Saldo*
+
+Te escribimos amablemente de *AM Estética Dental* para recordarte que quedó un saldo pendiente de tu última visita:
+
+🗓 *Fecha:* ${new Date(mov.fecha_hora).toLocaleDateString('es-AR')}
+🦷 *Concepto:* ${mov.concepto_nombre}
+💰 *Saldo Pendiente:* ${formattedAmount}
+
+Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
+    };
+
     return (
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
@@ -300,6 +406,27 @@ export default function CajaRecepcionPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Daily Summary Button */}
+                    <button
+                        onClick={() => {
+                            const summary = getDailySummary();
+                            window.open(`https://wa.me/?text=${encodeURIComponent(summary)}`, '_blank');
+                        }}
+                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors border border-transparent hover:border-green-200"
+                        title="Enviar Cierre del Día por WhatsApp"
+                    >
+                        <Share2 size={20} />
+                    </button>
+
+                    {/* Privacy Toggle */}
+                    <button
+                        onClick={() => setPrivacyMode(!privacyMode)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-transparent hover:border-blue-200"
+                        title={privacyMode ? "Mostrar montos" : "Ocultar montos (Modo Discreto)"}
+                    >
+                        {privacyMode ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+
                     <Link
                         href="/caja-recepcion/tarifario"
                         className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 font-medium transition-colors"
@@ -319,6 +446,19 @@ export default function CajaRecepcionPage() {
                     >
                         <ArrowRightLeft size={18} />
                         Transferir
+                    </button>
+                    <button
+                        onClick={() => setShowNuevoGasto(true)}
+                        disabled={isBoxClosed}
+                        className={clsx(
+                            "flex items-center gap-2 px-4 py-2.5 border border-red-200 dark:border-red-800 rounded-lg font-medium transition-colors",
+                            isBoxClosed
+                                ? "opacity-50 cursor-not-allowed text-gray-400 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+                                : "hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                        )}
+                    >
+                        <TrendingUp className="rotate-180" size={18} />
+                        Gasto
                     </button>
                     <button
                         onClick={() => setShowNuevoIngreso(true)}
@@ -389,7 +529,7 @@ export default function CajaRecepcionPage() {
                         <span className="text-sm text-gray-500">Ingresos Hoy</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(stats?.totalDiaUsd || 0, 'USD')}
+                        {formatPrivacy(formatCurrency(stats?.totalDiaUsd || 0, 'USD'))}
                     </p>
                 </div>
 
@@ -401,7 +541,7 @@ export default function CajaRecepcionPage() {
                         <span className="text-sm text-gray-500">Ingresos Mes</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(stats?.totalMesUsd || 0, 'USD')}
+                        {formatPrivacy(formatCurrency(stats?.totalMesUsd || 0, 'USD'))}
                     </p>
                 </div>
 
@@ -413,7 +553,7 @@ export default function CajaRecepcionPage() {
                         <span className="text-sm text-gray-500">Movimientos Hoy</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {stats?.movimientosHoy || 0}
+                        {formatPrivacy(stats?.movimientosHoy || 0)}
                     </p>
                 </div>
 
@@ -425,7 +565,7 @@ export default function CajaRecepcionPage() {
                         <span className="text-sm text-gray-500">Pendientes</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {stats?.pendientes || 0}
+                        {formatPrivacy(stats?.pendientes || 0)}
                     </p>
                 </div>
             </div>
@@ -470,22 +610,31 @@ export default function CajaRecepcionPage() {
                                                 {new Date(mov.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                                             </td>
                                             <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                                                {mov.paciente ? (
-                                                    <Link
-                                                        href={`/patients/${mov.paciente.id_paciente}?tab=financiamiento`}
-                                                        className="group flex flex-col items-start"
-                                                    >
-                                                        <span className="group-hover:text-blue-600 group-hover:underline transition-colors">
-                                                            {`${mov.paciente.apellido}, ${mov.paciente.nombre}`}
+                                                {mov.categoria === 'Egreso' ? (
+                                                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                                                        <span className="p-1 bg-red-100 dark:bg-red-900/30 rounded-full">
+                                                            <TrendingUp className="rotate-180" size={14} />
                                                         </span>
-                                                        {mov.paciente.financ_estado === 'activo' && (
-                                                            <span className="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                                                Financiación Activa
+                                                        <span>Gasto / Salida</span>
+                                                    </div>
+                                                ) : (
+                                                    mov.paciente ? (
+                                                        <Link
+                                                            href={`/patients/${mov.paciente.id_paciente}?tab=financiamiento`}
+                                                            className="group flex flex-col items-start"
+                                                        >
+                                                            <span className="group-hover:text-blue-600 group-hover:underline transition-colors">
+                                                                {`${mov.paciente.apellido}, ${mov.paciente.nombre}`}
                                                             </span>
-                                                        )}
-                                                    </Link>
-                                                ) : '-'}
+                                                            {mov.paciente.financ_estado === 'activo' && (
+                                                                <span className="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                                                    Financiación Activa
+                                                                </span>
+                                                            )}
+                                                        </Link>
+                                                    ) : '-'
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                                                 <div className="flex flex-col">
@@ -498,8 +647,12 @@ export default function CajaRecepcionPage() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-gray-500">{mov.metodo_pago}</td>
-                                            <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
-                                                {formatCurrency(mov.usd_equivalente || mov.monto, 'USD')}
+                                            <td className="px-4 py-3 text-right font-medium">
+                                                <span className={clsx(
+                                                    mov.categoria === 'Egreso' ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
+                                                )}>
+                                                    {formatPrivacy(formatCurrency(mov.usd_equivalente || mov.monto, 'USD'))}
+                                                </span>
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={clsx(
@@ -522,6 +675,25 @@ export default function CajaRecepcionPage() {
                                                         <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 rounded">
                                                             CSV
                                                         </span>
+                                                    )}
+
+                                                    {mov.categoria !== 'Egreso' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const isCollection = mov.estado === 'pendiente';
+                                                                const msg = isCollection ? getCollectionMessage(mov) : getReceiptMessage(mov);
+                                                                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                                                            }}
+                                                            className={clsx(
+                                                                "p-1.5 rounded-lg transition-colors",
+                                                                mov.estado === 'pendiente'
+                                                                    ? "hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500 hover:text-amber-600"
+                                                                    : "hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500 hover:text-green-600"
+                                                            )}
+                                                            title={mov.estado === 'pendiente' ? "Enviar Recordatorio de Cobro" : "Enviar Comprobante"}
+                                                        >
+                                                            <MessageCircle size={16} />
+                                                        </button>
                                                     )}
                                                     <button
                                                         onClick={() => openEditMovimiento(mov)}
@@ -555,32 +727,276 @@ export default function CajaRecepcionPage() {
                     </div>
 
                     <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
-                        {(Object.keys(PAYMENT_DATA) as Array<keyof typeof PAYMENT_DATA>).map((key) => {
-                            const data = PAYMENT_DATA[key];
-                            const isCopied = copiedKey === key;
-
-                            return (
-                                <div
-                                    key={key}
-                                    className="p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer transition-colors"
-                                    onClick={() => copyToClipboard(key, formatPaymentData(key))}
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                            {data.label}
-                                        </span>
-                                        {isCopied ? (
-                                            <CheckCircle size={16} className="text-green-500" />
-                                        ) : (
-                                            <Copy size={14} className="text-gray-400" />
-                                        )}
+                        <div className="space-y-6">
+                            {/* Bancos */}
+                            <div>
+                                <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                    <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                                        <Landmark size={18} className="text-red-600 dark:text-red-400" />
                                     </div>
-                                    <p className="text-xs text-gray-500 truncate">
-                                        {'alias' in data ? data.alias : ('direccion' in data ? data.direccion : '')}
-                                    </p>
+                                    Transferencias Bancarias
+                                </h4>
+                                <div className="space-y-4 pl-2 border-l-2 border-gray-100 dark:border-gray-700 ml-3">
+                                    {/* Empresa */}
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 pl-3">Empresa (Fullesthetic)</p>
+                                        <div className="space-y-2">
+                                            {['santander_empresa_ars', 'santander_empresa_usd'].map((key) => {
+                                                const data = PAYMENT_DATA[key];
+                                                if (!data) return null;
+                                                return (
+                                                    <div
+                                                        key={key}
+                                                        className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all ml-3"
+                                                    >
+                                                        <div
+                                                            className="flex-1 cursor-pointer"
+                                                            onClick={() => copyToClipboard(key, formatPaymentData(key))}
+                                                        >
+                                                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('SANTANDER EMPRESA ', '').replace(' (Factura A)', '')}</p>
+                                                            <p className="text-xs text-gray-500 mt-0.5">{data.details['Cuenta'] || data.details['Alias']}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            {data.qrValue && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setQrModal({ open: true, value: data.qrValue!, title: data.label });
+                                                                    }}
+                                                                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                    title="Ver QR"
+                                                                >
+                                                                    <QrCode size={18} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
+                                                                }}
+                                                                className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                title="Enviar por WhatsApp"
+                                                            >
+                                                                <MessageCircle size={18} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    copyToClipboard(key, formatPaymentData(key));
+                                                                }}
+                                                                className={clsx(
+                                                                    "p-2 rounded-lg transition-colors",
+                                                                    copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                )}
+                                                                title="Copiar datos"
+                                                            >
+                                                                {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Personal */}
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 pl-3">Personal</p>
+                                        <div className="space-y-2">
+                                            {['santander_personal'].map((key) => {
+                                                const data = PAYMENT_DATA[key];
+                                                if (!data) return null;
+                                                return (
+                                                    <div
+                                                        key={key}
+                                                        className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all ml-3"
+                                                    >
+                                                        <div
+                                                            className="flex-1 cursor-pointer"
+                                                            onClick={() => copyToClipboard(key, formatPaymentData(key))}
+                                                        >
+                                                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('SANTANDER PERSONAL ', '')}</p>
+                                                            <p className="text-xs text-gray-500 mt-0.5">{data.details['Alias']}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            {data.qrValue && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setQrModal({ open: true, value: data.qrValue!, title: data.label });
+                                                                    }}
+                                                                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                    title="Ver QR"
+                                                                >
+                                                                    <QrCode size={18} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
+                                                                }}
+                                                                className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                title="Enviar por WhatsApp"
+                                                            >
+                                                                <MessageCircle size={18} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    copyToClipboard(key, formatPaymentData(key));
+                                                                }}
+                                                                className={clsx(
+                                                                    "p-2 rounded-lg transition-colors",
+                                                                    copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                )}
+                                                                title="Copiar datos"
+                                                            >
+                                                                {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
-                            );
-                        })}
+                            </div>
+
+                            {/* Mercado Pago */}
+                            <div>
+                                <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                        <Smartphone size={18} className="text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    Mercado Pago
+                                </h4>
+                                <div className="space-y-2 pl-5">
+                                    {['mp_ars', 'mp_usd'].map((key) => {
+                                        const data = PAYMENT_DATA[key];
+                                        if (!data) return null;
+                                        return (
+                                            <div
+                                                key={key}
+                                                className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                                            >
+                                                <div
+                                                    className="flex-1 cursor-pointer"
+                                                    onClick={() => copyToClipboard(key, formatPaymentData(key))}
+                                                >
+                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('MERCADO PAGO ', '')}</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5">{data.details['Alias']}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {data.qrValue && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setQrModal({ open: true, value: data.qrValue!, title: data.label });
+                                                            }}
+                                                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                            title="Ver QR"
+                                                        >
+                                                            <QrCode size={18} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
+                                                        }}
+                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                        title="Enviar por WhatsApp"
+                                                    >
+                                                        <MessageCircle size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            copyToClipboard(key, formatPaymentData(key));
+                                                        }}
+                                                        className={clsx(
+                                                            "p-2 rounded-lg transition-colors",
+                                                            copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                        )}
+                                                        title="Copiar datos"
+                                                    >
+                                                        {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Cripto */}
+                            <div>
+                                <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                    <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                                        <Bitcoin size={18} className="text-green-600 dark:text-green-400" />
+                                    </div>
+                                    Cripto
+                                </h4>
+                                <div className="space-y-2 pl-5">
+                                    {['cripto_usdt'].map((key) => {
+                                        const data = PAYMENT_DATA[key];
+                                        if (!data) return null;
+                                        return (
+                                            <div
+                                                key={key}
+                                                className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                                            >
+                                                <div
+                                                    className="flex-1 cursor-pointer"
+                                                    onClick={() => copyToClipboard(key, formatPaymentData(key))}
+                                                >
+                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label}</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{data.details['Dirección']}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {data.qrValue && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setQrModal({ open: true, value: data.qrValue!, title: data.label });
+                                                            }}
+                                                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                            title="Ver QR"
+                                                        >
+                                                            <QrCode size={18} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
+                                                        }}
+                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                        title="Enviar por WhatsApp"
+                                                    >
+                                                        <MessageCircle size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            copyToClipboard(key, formatPaymentData(key));
+                                                        }}
+                                                        className={clsx(
+                                                            "p-2 rounded-lg transition-colors",
+                                                            copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                        )}
+                                                        title="Copiar datos"
+                                                    >
+                                                        {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="p-4 border-t border-gray-100 dark:border-gray-700">
@@ -597,6 +1013,15 @@ export default function CajaRecepcionPage() {
             </div>
 
             {/* Nuevo Ingreso Modal */}
+            {/* Expense Modal */}
+            <NuevoGastoForm
+                isOpen={showNuevoGasto}
+                onClose={() => setShowNuevoGasto(false)}
+                onSuccess={loadData}
+                bnaRate={bnaRate?.venta || 0}
+            />
+
+            {/* Existing Income Modal */}
             <NuevoIngresoForm
                 isOpen={showNuevoIngreso}
                 onClose={() => setShowNuevoIngreso(false)}
@@ -743,6 +1168,46 @@ export default function CajaRecepcionPage() {
                                 {savingDate ? 'Guardando...' : 'Guardar Cambios'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* QR Modal */}
+            {qrModal.open && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setQrModal({ ...qrModal, open: false })}>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-sm w-full p-6 text-center transform transition-all" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                                {qrModal.title}
+                            </h3>
+                            <button
+                                onClick={() => setQrModal({ ...qrModal, open: false })}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                            >
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl border-2 border-gray-100 dark:border-gray-700 inline-block mb-6 shadow-sm">
+                            <QRCodeSVG
+                                value={qrModal.value}
+                                size={200}
+                                level="H"
+                                includeMargin={true}
+                            />
+                        </div>
+
+                        <p className="text-sm text-gray-500 mb-6 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg break-all font-mono border border-gray-100 dark:border-gray-700">
+                            {qrModal.value}
+                        </p>
+
+                        <button
+                            onClick={() => copyToClipboard('qr', qrModal.value)}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors font-medium"
+                        >
+                            {copiedKey === 'qr' ? <CheckCircle size={18} /> : <Copy size={18} />}
+                            Copiar código de pago
+                        </button>
                     </div>
                 </div>
             )}
