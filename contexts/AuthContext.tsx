@@ -1,8 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
+
+const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 type Role = 'owner' | 'admin' | 'pricing_manager' | 'reception' | 'partner_viewer' | 'developer';
 
@@ -38,8 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [impersonatedRole, setImpersonatedRole] = useState<Role | null>(null);
 
-    const isRealOwner = user?.email === 'dr.arielmerinopersonal@gmail.com' || profile?.role === 'owner';
-    const effectiveRole = (isRealOwner && impersonatedRole) ? impersonatedRole : profile?.role;
+    const isRealOwner = user?.email?.toLowerCase() === 'dr.arielmerinopersonal@gmail.com'.toLowerCase() || profile?.role === 'owner';
+    const metadataRole = user?.user_metadata?.role as Role | undefined;
+    const effectiveRole = (isRealOwner && impersonatedRole) ? impersonatedRole : (profile?.role || metadataRole || null);
 
     const signOut = async () => {
         await supabase.auth.signOut();
@@ -51,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchProfile = async (userId: string) => {
         try {
+            console.log('Fetching profile for userId:', userId);
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
@@ -58,8 +65,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .single();
 
             if (error) {
-                console.error('Error fetching profile:', error);
+                console.warn('Error fetching profile from DB:', error.message);
+                // Fallback: If profile fetch fails, we can construct a minimal profile from auth user metadata
+                if (user) {
+                    setProfile({
+                        id: user.id,
+                        email: user.email || null,
+                        full_name: (user.user_metadata?.full_name as string) || null,
+                        role: (user.user_metadata?.role as Role) || 'partner_viewer',
+                        is_active: true
+                    });
+                }
             } else if (data) {
+                console.log('Profile fetched successfully:', data);
                 if (data.is_active === false) {
                     await signOut();
                     window.location.href = '/login?error=account_disabled';
@@ -80,12 +98,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (savedRole) setImpersonatedRole(savedRole);
 
         // Check active session
+        console.log('AuthContext: Checking session...');
         supabase.auth.getSession().then((response: { data: { session: Session | null } }) => {
             const session = response.data.session;
+            console.log('AuthContext: Session response:', {
+                hasSession: !!session,
+                userEmail: session?.user?.email
+            });
             setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchProfile(session.user.id);
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+
+
+            if (currentUser) {
+                // Pre-populate profile from metadata while fetching
+                setProfile({
+                    id: currentUser.id,
+                    email: currentUser.email || null,
+                    full_name: (currentUser.user_metadata?.full_name as string) || null,
+                    role: (currentUser.user_metadata?.role as Role) || 'partner_viewer',
+                    is_active: true
+                });
+                fetchProfile(currentUser.id);
             } else {
                 setLoading(false);
             }
@@ -94,9 +128,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Listen for changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
             setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchProfile(session.user.id);
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+
+            if (currentUser) {
+                // Pre-populate profile from metadata while fetching
+                setProfile({
+                    id: currentUser.id,
+                    email: currentUser.email || null,
+                    full_name: (currentUser.user_metadata?.full_name as string) || null,
+                    role: (currentUser.user_metadata?.role as Role) || 'partner_viewer',
+                    is_active: true
+                });
+                fetchProfile(currentUser.id);
             } else {
                 setProfile(null);
                 setLoading(false);
@@ -106,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => subscription.unsubscribe();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
 
     const handleSetImpersonatedRole = (role: Role | null) => {
         setImpersonatedRole(role);

@@ -33,6 +33,7 @@ export interface Paciente {
     observaciones_generales?: string;
     estado_paciente?: string;
     origen_registro?: string;
+    referencia_origen?: string;
     consentimiento_comunicacion?: boolean;
     is_deleted?: boolean;
     welcome_email_sent?: boolean; // tracks if welcome email was sent

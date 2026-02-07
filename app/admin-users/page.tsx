@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { resendUserAccessEmail } from '@/app/actions/user-management';
+import { createBrowserClient } from '@supabase/ssr';
+import { resendUserAccessEmail, inviteUser, suspendUser, reactivateUser } from '@/app/actions/user-management';
 import RoleGuard from '@/components/auth/RoleGuard';
 import {
     Mail,
@@ -10,7 +10,10 @@ import {
     Loader2,
     CheckCircle2,
     XCircle,
-    RefreshCw
+    RefreshCw,
+    Ban,
+    UserCheck,
+    MoreHorizontal
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,6 +27,10 @@ interface Profile {
 }
 
 export default function UserManagementPage() {
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
     const { session } = useAuth();
     const [users, setUsers] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
@@ -32,15 +39,16 @@ export default function UserManagementPage() {
     // Form state
     const [formData, setFormData] = useState({
         email: '',
-        password: '',
         fullName: '',
-        role: 'partner_viewer'
+        role: 'partner_viewer',
+        telefono: ''
     });
     const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
 
-    // Resend action state
+    // Resend/Suspend action state
     const [resendingId, setResendingId] = useState<string | null>(null);
+    const [suspendingId, setSuspendingId] = useState<string | null>(null);
     const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -67,6 +75,39 @@ export default function UserManagementPage() {
         }
     }
 
+    async function handleToggleStatus(user: Profile) {
+        if (!session?.user?.id) return;
+        if (user.role === 'owner' || user.email.toLowerCase().includes('dr.arielmerinopersonal@gmail.com')) {
+            setActionMessage({ type: 'error', text: 'No puedes suspender al dueño.' });
+            return;
+        }
+
+        setSuspendingId(user.id);
+        setActionMessage(null);
+
+        try {
+            const isAhuraActivo = user.is_active;
+            const result = isAhuraActivo
+                ? await suspendUser(user.id)
+                : await reactivateUser(user.id);
+
+            if (result.success) {
+                setActionMessage({
+                    type: 'success',
+                    text: isAhuraActivo ? 'Usuario suspendido.' : 'Usuario reactivado.'
+                });
+                loadUsers(); // Refresh list
+            } else {
+                setActionMessage({ type: 'error', text: result.error || 'Error al actualizar estado.' });
+            }
+        } catch (error) {
+            setActionMessage({ type: 'error', text: 'Error inesperado.' });
+        } finally {
+            setSuspendingId(null);
+            setTimeout(() => setActionMessage(null), 3000);
+        }
+    }
+
     async function loadUsers() {
         try {
             const { data, error } = await supabase
@@ -88,26 +129,23 @@ export default function UserManagementPage() {
         setErrorMessage('');
 
         try {
-            const res = await fetch('/api/admin/create-user', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`
-                },
-                body: JSON.stringify(formData)
-            });
+            const formDataToSend = new FormData();
+            formDataToSend.append('email', formData.email);
+            formDataToSend.append('fullName', formData.fullName);
+            formDataToSend.append('role', formData.role);
+            formDataToSend.append('telefono', formData.telefono);
 
-            const data = await res.json();
+            const result = await inviteUser(formDataToSend);
 
-            if (!res.ok) {
-                throw new Error(data.error || 'Error al crear usuario');
+            if (!result.success) {
+                throw new Error(result.error || 'Error al invitar usuario');
             }
 
             setInviteStatus('success');
             setTimeout(() => {
                 setShowInviteModal(false);
                 setInviteStatus('idle');
-                setFormData({ email: '', password: '', fullName: '', role: 'partner_viewer' });
+                setFormData({ email: '', fullName: '', role: 'partner_viewer', telefono: '' });
                 loadUsers();
             }, 1000);
         } catch (error: unknown) {
@@ -213,19 +251,41 @@ export default function UserManagementPage() {
                                             {new Date(user.created_at).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => handleResendAccess(user)}
-                                                disabled={resendingId === user.id}
-                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition-colors disabled:opacity-50"
-                                                title="Reenviar email de acceso / restablecer contraseña"
-                                            >
-                                                {resendingId === user.id ? (
-                                                    <Loader2 size={16} className="animate-spin" />
-                                                ) : (
-                                                    <RefreshCw size={16} />
-                                                )}
-                                                <span className="hidden sm:inline">Reenviar Acceso</span>
-                                            </button>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => handleToggleStatus(user)}
+                                                    disabled={suspendingId === user.id || user.role === 'owner'}
+                                                    className={`p-1.5 rounded-lg transition-colors ${user.is_active
+                                                        ? 'text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20'
+                                                        : 'text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20'
+                                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                    title={user.is_active ? "Suspender Usuario" : "Reactivar Usuario"}
+                                                >
+                                                    {suspendingId === user.id ? (
+                                                        <Loader2 size={16} className="animate-spin" />
+                                                    ) : user.is_active ? (
+                                                        <Ban size={16} />
+                                                    ) : (
+                                                        <UserCheck size={16} />
+                                                    )}
+                                                </button>
+
+                                                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+
+                                                <button
+                                                    onClick={() => handleResendAccess(user)}
+                                                    disabled={resendingId === user.id}
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition-colors disabled:opacity-50"
+                                                    title="Reenviar email de acceso / restablecer contraseña"
+                                                >
+                                                    {resendingId === user.id ? (
+                                                        <Loader2 size={16} className="animate-spin" />
+                                                    ) : (
+                                                        <RefreshCw size={16} />
+                                                    )}
+                                                    <span className="hidden sm:inline">Reenviar Acceso</span>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -277,13 +337,13 @@ export default function UserManagementPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contraseña Temporal</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
                                     <input
-                                        type="text"
+                                        type="tel"
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800"
-                                        placeholder="Generar contraseña segura..."
-                                        value={formData.password}
-                                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                        value={formData.telefono}
+                                        onChange={e => setFormData({ ...formData, telefono: e.target.value })}
+                                        placeholder="+54 9 ..."
                                     />
                                 </div>
 

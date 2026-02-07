@@ -110,10 +110,10 @@ export default function Sidebar() {
                 {/* Admin/Owner User Management Link */}
                 {userRole === 'owner' && (
                     <Link
-                        href="/settings/users"
+                        href="/admin-users"
                         className={clsx(
                             "flex items-center gap-3 px-4 py-2 mb-2 rounded-lg text-sm font-medium transition-colors",
-                            pathname.startsWith('/settings/users')
+                            pathname.startsWith('/admin-users')
                                 ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
                                 : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                         )}

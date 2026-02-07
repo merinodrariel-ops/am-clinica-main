@@ -15,7 +15,8 @@ import {
     FileText,
     Receipt,
     History,
-    AlertTriangle
+    AlertTriangle,
+    Pencil
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -25,6 +26,8 @@ import {
     getMovimientos,
     getCuentas,
     createMovimiento,
+    updateMovimientoAdmin,
+    logMovimientoEdit,
     SUBTIPOS_MOVIMIENTO,
     SUBTIPOS_ADJUNTO_OBLIGATORIO
 } from '@/lib/caja-admin';
@@ -59,6 +62,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterTipo, setFilterTipo] = useState<string>('');
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
+    const [editingMov, setEditingMov] = useState<CajaAdminMovimiento | null>(null);
+    const [editData, setEditData] = useState({
+        fecha: '',
+        descripcion: '',
+        motivo: ''
+    });
 
     // Form state
     const [formData, setFormData] = useState({
@@ -121,6 +130,54 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         }
 
         setFormLineas(newLineas);
+    }
+
+    async function handleUpdate() {
+        if (!editingMov || !editData.fecha || !editData.motivo) {
+            alert('Por favor complete la fecha y el motivo del cambio');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            // Log changes before updating
+            if (editData.fecha !== editingMov.fecha_movimiento) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_admin_movimientos',
+                    'fecha_movimiento',
+                    editingMov.fecha_movimiento,
+                    editData.fecha,
+                    editData.motivo
+                );
+            }
+            if (editData.descripcion !== editingMov.descripcion) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_admin_movimientos',
+                    'descripcion',
+                    editingMov.descripcion,
+                    editData.descripcion,
+                    editData.motivo
+                );
+            }
+
+            const { success, error } = await updateMovimientoAdmin(editingMov.id, {
+                fecha_movimiento: editData.fecha,
+                descripcion: editData.descripcion,
+                registro_editado: true
+            });
+
+            if (!success) throw new Error(error);
+
+            await loadData();
+            setEditingMov(null);
+        } catch (err) {
+            console.error('Error updating:', err);
+            alert('Error al actualizar');
+        } finally {
+            setSubmitting(false);
+        }
     }
 
     async function handleSubmit() {
@@ -516,6 +573,20 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                             >
                                                 <History className="w-4 h-4" />
                                             </button>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingMov(mov);
+                                                    setEditData({
+                                                        fecha: mov.fecha_movimiento,
+                                                        descripcion: mov.descripcion,
+                                                        motivo: ''
+                                                    });
+                                                }}
+                                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                title="Editar movimiento"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </td>
                                 </motion.tr>
@@ -532,6 +603,89 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 registroId={historialMovId || ''}
                 tabla="caja_admin_movimientos"
             />
+
+            {/* Modal de Edición */}
+            {editingMov && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+                    >
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                <History className="w-5 h-5 text-indigo-500" />
+                                Editar Movimiento
+                            </h3>
+                            <button
+                                onClick={() => setEditingMov(null)}
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                                <X size={20} className="text-slate-500" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Fecha del movimiento
+                                </label>
+                                <input
+                                    type="date"
+                                    value={editData.fecha}
+                                    onChange={(e) => setEditData({ ...editData, fecha: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Descripción
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editData.descripcion}
+                                    onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 font-bold text-red-500">
+                                    Motivo del cambio (Obligatorio)
+                                </label>
+                                <textarea
+                                    value={editData.motivo}
+                                    onChange={(e) => setEditData({ ...editData, motivo: e.target.value })}
+                                    placeholder="Explique por qué se realiza este cambio..."
+                                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white min-h-[80px]"
+                                />
+                            </div>
+
+                            <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg flex items-start gap-2 text-xs text-amber-800 dark:text-amber-400">
+                                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                <p>Este cambio quedará registrado permanentemente en el historial de auditoría.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                            <button
+                                onClick={() => setEditingMov(null)}
+                                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleUpdate}
+                                disabled={submitting || !editData.motivo}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                            >
+                                {submitting ? 'Guardando...' : 'Guardar Cambios'}
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 }

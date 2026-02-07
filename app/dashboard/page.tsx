@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { ArrowRight, Users, Banknote, BarChart3 } from 'lucide-react';
 import CajaAlerts from '@/components/dashboard/CajaAlerts';
 import UserAlerts from '@/components/dashboard/UserAlerts';
+import StatsGrid from '@/components/dashboard/StatsGrid';
+import ReferralChart from '@/components/dashboard/ReferralChart';
 
 export default function DashboardPage() {
     return (
@@ -16,42 +18,20 @@ export default function DashboardPage() {
             <UserAlerts />
             <CajaAlerts />
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                            <Users size={24} />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">Pacientes</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">943</p>
-                        </div>
-                    </div>
-                </div>
+            {/* Real-time Stats */}
+            <StatsGrid />
 
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
-                            <Banknote size={24} />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">Ingresos Hoy</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">$0 USD</p>
-                        </div>
+            {/* Analytics Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <ReferralChart />
+                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center items-center text-center">
+                    <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4">
+                        <BarChart3 size={24} />
                     </div>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                            <BarChart3 size={24} />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">Ingresos Mes</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">$0 USD</p>
-                        </div>
-                    </div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Análisis de Tratamientos</h3>
+                    <p className="text-sm text-gray-500 mt-2 max-w-[250px]">
+                        Próximamente: Gráficos de rentabilidad por especialidad y evolución de cobros.
+                    </p>
                 </div>
             </div>
 

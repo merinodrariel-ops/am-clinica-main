@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2 } from 'lucide-react';
+import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
@@ -12,6 +12,7 @@ import ArqueoPanel from '@/components/caja/ArqueoPanel';
 import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
+import { logMovimientoEdit } from '@/lib/caja-recepcion';
 
 // Types
 interface Stats {
@@ -144,9 +145,11 @@ export default function CajaRecepcionPage() {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
     const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);
     const [loading, setLoading] = useState(true);
-    const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().substring(0, 7));
+    const [mesActual, setMesActual] = useState(() => new Date().toISOString().substring(0, 7));
     const [showNuevoGasto, setShowNuevoGasto] = useState(false);
-    const [privacyMode, setPrivacyMode] = useState(false); // New Privacy Mode state
+    const [privacyMode, setPrivacyMode] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterMetodo, setFilterMetodo] = useState('');
 
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
     const [showTransferencia, setShowTransferencia] = useState(false);
@@ -162,6 +165,7 @@ export default function CajaRecepcionPage() {
     const [editMonto, setEditMonto] = useState<number>(0);
     const [displayMonto, setDisplayMonto] = useState<string>('');
     const [editMoneda, setEditMoneda] = useState<string>('ARS');
+    const [editMotivo, setEditMotivo] = useState('');
 
     // QR Modal state
     const [qrModal, setQrModal] = useState<{ open: boolean; value: string; title: string }>({
@@ -193,11 +197,13 @@ export default function CajaRecepcionPage() {
             const rateData = await rateRes.json();
             setBnaRate(rateData);
 
-            // Get today's date range
-            const firstDayOfMonth = `${today.substring(0, 7)}-01`;
+            // Range calculation for the month
+            const nextMonth = new Date(mesActual + '-01');
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            const nextMonthStr = nextMonth.toISOString().substring(0, 7);
 
-            // Fetch today's movements from Supabase
-            const { data: movHoyRaw, error: movError } = await supabase
+            // Fetch movements for selected month from Supabase
+            const { data: movMesRaw, error: movError } = await supabase
                 .from('caja_recepcion_movimientos')
                 .select(`
                     *,
@@ -210,33 +216,25 @@ export default function CajaRecepcionPage() {
                         financ_cuotas_total
                     )
                 `)
-                .gte('fecha_hora', `${today}T00:00:00`)
-                .lt('fecha_hora', `${today}T23:59:59`)
+                .gte('fecha_hora', `${mesActual}-01T00:00:00`)
+                .lt('fecha_hora', `${nextMonthStr}-01T00:00:00`)
                 .order('fecha_hora', { ascending: false });
 
             // Cast to Movimiento[] to avoid any
-            const movHoy = movHoyRaw as unknown as Movimiento[] | null;
+            const movs = movMesRaw as unknown as Movimiento[] | null;
 
             if (movError) {
                 console.error('Error fetching movements:', movError);
             } else {
-                setMovimientos(movHoy || []);
+                setMovimientos(movs || []);
             }
 
-            // Fetch month's totals
-            const { data: movMesRaw } = await supabase
-                .from('caja_recepcion_movimientos')
-                .select('usd_equivalente, estado')
-                .gte('fecha_hora', `${firstDayOfMonth}T00:00:00`)
-                .neq('estado', 'anulado');
-
-            const movMes = movMesRaw as unknown as Pick<Movimiento, 'usd_equivalente' | 'estado'>[] | null;
-
             // Calculate stats
-            const pagadosHoy = (movHoy || []).filter((m) => m.estado !== 'anulado');
-            const pendientesHoy = (movHoy || []).filter((m) => m.estado === 'pendiente');
+            const pagados = (movs || []).filter((m) => m.estado !== 'anulado');
+            const pagadosHoy = pagados.filter(m => m.fecha_hora.startsWith(today));
             const totalDiaUsd = pagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
-            const totalMesUsd = (movMes || []).reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
+            const totalMesUsd = pagados.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
+            const pendientes = (movs || []).filter((m) => m.estado === 'pendiente');
 
             setStats({
                 totalDiaUsd: Math.round(totalDiaUsd * 100) / 100,
@@ -244,7 +242,7 @@ export default function CajaRecepcionPage() {
                 porMetodo: {},
                 porCategoria: {},
                 movimientosHoy: pagadosHoy.length,
-                pendientes: pendientesHoy.length,
+                pendientes: pendientes.length,
             });
         } catch (error) {
             console.error('Error loading data:', error);
@@ -293,10 +291,45 @@ export default function CajaRecepcionPage() {
     }
 
     async function handleUpdateMovimiento() {
-        if (!editingMov || !newFecha) return;
+        if (!editingMov || !newFecha || !editMotivo) {
+            alert('Por favor complete la fecha y el motivo del cambio');
+            return;
+        }
 
         setSavingDate(true);
         try {
+            // Log changes before updating
+            if (newFecha !== editingMov.fecha_movimiento) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_recepcion_movimientos',
+                    'fecha_movimiento',
+                    editingMov.fecha_movimiento || null,
+                    newFecha,
+                    editMotivo
+                );
+            }
+            if (editMonto !== editingMov.monto) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_recepcion_movimientos',
+                    'monto',
+                    editingMov.monto.toString(),
+                    editMonto.toString(),
+                    editMotivo
+                );
+            }
+            if (editMoneda !== editingMov.moneda) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_recepcion_movimientos',
+                    'moneda',
+                    editingMov.moneda,
+                    editMoneda,
+                    editMotivo
+                );
+            }
+
             const updates: any = {
                 fecha_movimiento: newFecha,
                 monto: editMonto,
@@ -321,6 +354,7 @@ export default function CajaRecepcionPage() {
             // Reload data
             await loadData();
             setEditingMov(null);
+            setEditMotivo('');
         } catch (err) {
             console.error('Error updating movement:', err);
             alert('Error al guardar los cambios');
@@ -392,6 +426,16 @@ Te escribimos amablemente de *AM Estética Dental* para recordarte que quedó un
 
 Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
     };
+
+    const filteredMovimientos = movimientos.filter(mov => {
+        const matchesSearch = searchTerm === '' ||
+            `${mov.paciente?.nombre} ${mov.paciente?.apellido}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            mov.concepto_nombre.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesMetodo = filterMetodo === '' || mov.metodo_pago === filterMetodo;
+
+        return matchesSearch && matchesMetodo;
+    });
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
@@ -574,8 +618,52 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Movements Table */}
                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                    <div className="p-5 border-b border-gray-100 dark:border-gray-700">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Movimientos del Día</h3>
+                    <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-gray-50/50 dark:bg-gray-900/50">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+                            <h3 className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                                Movimientos
+                            </h3>
+
+                            {/* Notion-style Search Bar */}
+                            <div className="relative flex-1 max-w-sm">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar paciente o concepto..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                />
+                            </div>
+
+                            {/* Method Filter */}
+                            <div className="relative">
+                                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <select
+                                    value={filterMetodo}
+                                    onChange={(e) => setFilterMetodo(e.target.value)}
+                                    className="pl-10 pr-8 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
+                                >
+                                    <option value="">Todos los métodos</option>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="MercadoPago">Mercado Pago</option>
+                                    <option value="Cripto">Cripto</option>
+                                </select>
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+                            </div>
+                        </div>
+
+                        {/* Month Selector */}
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-4 py-2 border border-gray-200 dark:border-gray-700 shadow-sm">
+                            <Calendar size={18} className="text-blue-500" />
+                            <input
+                                type="month"
+                                value={mesActual}
+                                onChange={(e) => setMesActual(e.target.value)}
+                                className="bg-transparent border-none outline-none text-sm font-medium focus:ring-0 cursor-pointer"
+                            />
+                        </div>
                     </div>
 
                     {movimientos.length === 0 ? (
@@ -594,7 +682,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             <table className="w-full text-sm">
                                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-900">
                                     <tr>
-                                        <th className="px-4 py-3 text-left">Hora</th>
+                                        <th className="px-4 py-3 text-left">Fecha/Hora</th>
                                         <th className="px-4 py-3 text-left">Paciente</th>
                                         <th className="px-4 py-3 text-left">Concepto</th>
                                         <th className="px-4 py-3 text-left">Método</th>
@@ -604,10 +692,15 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {movimientos.map((mov) => (
+                                    {filteredMovimientos.map((mov: Movimiento) => (
                                         <tr key={mov.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50">
                                             <td className="px-4 py-3 text-gray-500">
-                                                {new Date(mov.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                                                <div className="flex flex-col">
+                                                    <span>{new Date(mov.fecha_hora).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}</span>
+                                                    <span className="text-[10px] opacity-60">
+                                                        {new Date(mov.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                                                 {mov.categoria === 'Egreso' ? (
@@ -1139,7 +1232,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     <select
                                         value={editMoneda}
                                         onChange={(e) => setEditMoneda(e.target.value)}
-                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[50px]"
                                     >
                                         <option value="ARS">Pesos (ARS)</option>
                                         <option value="USD">Dólares (USD)</option>
@@ -1147,9 +1240,21 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </div>
                             </div>
 
-                            <div className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-lg flex items-start gap-2 text-sm text-yellow-800 dark:text-yellow-400">
-                                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                                <p>Editar el monto recalculará el equivalente en USD automáticamente. Esta acción quedará registrada en auditoría.</p>
+                            <div>
+                                <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-2 font-bold">
+                                    Motivo del cambio (Obligatorio)
+                                </label>
+                                <textarea
+                                    value={editMotivo}
+                                    onChange={(e) => setEditMotivo(e.target.value)}
+                                    placeholder="Explique por qué se realiza este cambio..."
+                                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[80px]"
+                                />
+                            </div>
+
+                            <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg flex items-start gap-2 text-sm text-amber-800 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20">
+                                <History size={16} className="shrink-0 mt-0.5" />
+                                <p>Este cambio será recalculado y quedará registrado <strong>permanentemente</strong> en el historial de auditoría.</p>
                             </div>
                         </div>
 

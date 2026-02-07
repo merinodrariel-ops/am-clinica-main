@@ -13,7 +13,8 @@ import {
     MapPin,
     Trash2,
     AlertTriangle,
-    Loader2
+    Loader2,
+    Presentation
 } from 'lucide-react';
 import Link from 'next/link';
 import { Paciente, formatWhatsAppLink, formatMailtoLink, softDeletePaciente } from '@/lib/patients';
@@ -256,6 +257,19 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                 <span className="p-2 text-gray-300">
                                                     <Phone size={16} />
                                                 </span>
+                                            )}
+
+                                            {/* Google Slides Link */}
+                                            {patient.link_google_slides && (
+                                                <a
+                                                    href={patient.link_google_slides}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="p-2 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg"
+                                                    title="Ver Ficha Clínica (Google Slides)"
+                                                >
+                                                    <Presentation size={18} />
+                                                </a>
                                             )}
 
                                             {/* Email */}

@@ -23,6 +23,7 @@ export default function PatientsPage() {
     const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
+    const [syncing, setSyncing] = useState(false);
 
     const loadPatients = useCallback(async () => {
         setLoading(true);
@@ -40,9 +41,33 @@ export default function PatientsPage() {
         }
     }, [searchTerm, estadoFilter]);
 
+    const handleSyncSheets = useCallback(async (silent = false) => {
+        setSyncing(true);
+        try {
+            const res = await fetch('/api/sync-pacientes-sheets');
+            const data = await res.json();
+            if (data.success || data.stats) {
+                if (!silent) {
+                    const message = `Sincronización finalizada:\n- Nuevos: ${data.stats.newlyImported}\n- Duplicados saltados: ${data.stats.skippedDuplicates}\n- Errores: ${data.stats.errors}`;
+                    alert(message);
+                }
+                loadPatients();
+            } else if (!silent) {
+                alert(`Error en sincronización: ${data.error || 'Error desconocido'}`);
+            }
+        } catch (error) {
+            console.error('Error syncing:', error);
+            if (!silent) alert('Error de conexión al sincronizar con Google Sheets');
+        } finally {
+            setSyncing(false);
+        }
+    }, [loadPatients]);
+
     useEffect(() => {
         loadPatients();
-    }, [loadPatients]);
+        // Trigger silent sync on mount
+        handleSyncSheets(true);
+    }, [loadPatients, handleSyncSheets]);
 
     function handleSearch() {
         loadPatients();
@@ -74,6 +99,15 @@ export default function PatientsPage() {
                                 <ExternalLink size={18} />
                                 Formulario Online
                             </a>
+                            <button
+                                onClick={() => handleSyncSheets(false)}
+                                disabled={syncing}
+                                className="flex items-center gap-2 px-4 py-2.5 border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-lg font-medium transition-colors disabled:opacity-50"
+                                title="Sincronizar directamente con las respuestas de Google Form"
+                            >
+                                <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
+                                {syncing ? 'Sincronizando...' : 'Sincronizar Google Form'}
+                            </button>
                             <button
                                 onClick={() => setShowNuevoPaciente(true)}
                                 className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"

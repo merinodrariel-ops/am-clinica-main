@@ -9,6 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const NOTION_DATABASE_ID_ADMIN = process.env.NOTION_DB_ADMIN_ID;
 const NOTION_DATABASE_ID_RECEPCION = process.env.NOTION_DB_RECEPCION_ID;
+const NOTION_DATABASE_ID_INVENTARIO = process.env.NOTION_DB_INVENTARIO_ID;
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 
 const IMPORTACION_PACIENTE_ID = 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59'; // Placeholder ID for Recepcion imports
@@ -33,6 +34,9 @@ export async function GET(request: Request) {
 
         let targetDbId = NOTION_DATABASE_ID_ADMIN;
         if (source === 'recepcion') targetDbId = NOTION_DATABASE_ID_RECEPCION;
+        if (source === 'inventario') targetDbId = NOTION_DATABASE_ID_INVENTARIO;
+
+        const area = (searchParams.get('area') as 'CLINICA' | 'LABORATORIO') || 'CLINICA';
 
         if (!targetDbId) {
             return NextResponse.json({ error: `Missing Database ID for source: ${source}` }, { status: 500 });
@@ -188,7 +192,7 @@ export async function GET(request: Request) {
                             processed.push({ id: page.id, status: 'imported_recepcion' });
                         }
 
-                    } else {
+                    } else if (source === 'admin' || !source) {
                         // === ADMIN MAPPING ===
                         fecha = props['Fecha']?.date?.start || new Date().toISOString();
                         descripcion = props['Descripcion']?.title?.[0]?.plain_text || 'Sin descripción - Importado';
@@ -251,6 +255,29 @@ export async function GET(request: Request) {
                             errors.push({ id: page.id, error: insertError });
                         } else {
                             processed.push({ id: page.id, status: 'imported_admin' });
+                        }
+                    } else if (source === 'inventario') {
+                        // === INVENTARIO MAPPING ===
+                        const nombre = props['Nombre']?.title?.[0]?.plain_text || props['Name']?.title?.[0]?.plain_text || 'Item Sin Nombre';
+                        const categoria = props['Categoria']?.select?.name || props['Category']?.select?.name || 'General';
+                        const stockActual = props['Stock Actual']?.number || props['Stock']?.number || 0;
+                        const stockMinimo = props['Stock Minimo']?.number || props['Min Stock']?.number || 0;
+                        const unidad = props['Unidad']?.select?.name || props['Unit']?.select?.name || 'unidades';
+
+                        const { error: insertError } = await supabase.from('inventario_items').upsert({
+                            nombre,
+                            categoria,
+                            stock_actual: stockActual,
+                            stock_minimo: stockMinimo,
+                            unidad_medida: unidad,
+                            area: area, // Use the area from query param
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'nombre' }); // Assuming name is unique within the context of import or we want to update
+
+                        if (insertError) {
+                            errors.push({ id: page.id, error: insertError });
+                        } else {
+                            processed.push({ id: page.id, status: 'imported_inventario' });
                         }
                     }
 

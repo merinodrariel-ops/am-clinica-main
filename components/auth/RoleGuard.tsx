@@ -11,45 +11,46 @@ interface RoleGuardProps {
 }
 
 export default function RoleGuard({ children, allowedRoles, requireOwner }: RoleGuardProps) {
-    const { user, profile, loading } = useAuth();
+    const { user, profile, loading, role } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
+        console.log('RoleGuard state:', { loading, userEmail: user?.email, role, requireOwner });
         if (!loading) {
-            if (!user) {
-                // Redirect to login if not authenticated
-                router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
-                return;
-            }
 
-            if (profile) {
-                if (requireOwner && profile.role !== 'owner') {
+            if (!user) {
+                router.push('/login');
+            } else if (role) {
+                if (requireOwner && role !== 'owner') {
                     router.push('/dashboard?error=unauthorized');
                     return;
                 }
 
-                if (allowedRoles && !allowedRoles.includes(profile.role) && profile.role !== 'owner') {
-                    // Owner always access
-                    // Note: allowedRoles should include 'admin' if admin is allowed
+                if (allowedRoles && role !== 'owner' && !allowedRoles.includes(role)) {
                     router.push('/dashboard?error=unauthorized');
-                    return;
+                }
+            } else if (!role && !loading) {
+                // If we have a user but no role/profile, and it's not the hardcoded owner, something is wrong
+                if (!user.email?.includes('dr.arielmerinopersonal@gmail.com')) {
+                    router.push('/dashboard?error=profile_not_found');
                 }
             }
         }
-    }, [user, profile, loading, router, pathname, allowedRoles, requireOwner]);
+    }, [user, role, loading, requireOwner, allowedRoles, router]);
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <div className="flex bg-gray-50 dark:bg-gray-900 items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
         );
     }
 
-    if (!user || (requireOwner && profile?.role !== 'owner') || (allowedRoles && profile?.role !== 'owner' && !allowedRoles.includes(profile?.role || ''))) {
+    if (!user || (requireOwner && role !== 'owner') || (allowedRoles && role !== 'owner' && !allowedRoles.includes(role || ''))) {
         return null; // Don't render content while redirecting
     }
+
 
     return <>{children}</>;
 }

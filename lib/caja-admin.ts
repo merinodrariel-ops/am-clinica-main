@@ -315,6 +315,43 @@ export async function createMovimiento(
     return { data: mov, error: null };
 }
 
+export async function updateMovimientoAdmin(
+    id: string,
+    updates: any
+): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabase
+        .from('caja_admin_movimientos')
+        .update({
+            ...updates,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+    return { success: true };
+}
+
+export async function logMovimientoEdit(
+    registroId: string,
+    tabla: string,
+    campo: string,
+    valorAnterior: string | null,
+    valorNuevo: string | null,
+    motivo: string
+) {
+    const { error } = await supabase.rpc('log_field_edit', {
+        p_registro_id: registroId,
+        p_tabla: tabla,
+        p_campo: campo,
+        p_valor_anterior: valorAnterior,
+        p_valor_nuevo: valorNuevo,
+        p_motivo: motivo
+    });
+    if (error) console.error('Error logging edit:', error);
+}
+
 export async function anularMovimiento(
     id: string,
     motivo: string,

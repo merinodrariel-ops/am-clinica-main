@@ -35,6 +35,7 @@ export default function InventarioPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('Todos');
+    const [areaFilter, setAreaFilter] = useState<'CLINICA' | 'LABORATORIO'>('CLINICA');
     const [showNuevoItem, setShowNuevoItem] = useState(false);
     const [showHistorial, setShowHistorial] = useState(false);
     const [showMovimiento, setShowMovimiento] = useState({
@@ -66,11 +67,13 @@ export default function InventarioPage() {
 
     const categories = ['Todos', ...new Set(items.map(i => i.categoria))];
 
-    const filteredItems = items.filter(i =>
-        (i.nombre.toLowerCase().includes(search.toLowerCase()) ||
-            i.categoria?.toLowerCase().includes(search.toLowerCase())) &&
-        (categoryFilter === 'Todos' || i.categoria === categoryFilter)
-    );
+    const filteredItems = items.filter(i => {
+        const itemArea = (i as any).area || 'CLINICA';
+        return itemArea === areaFilter &&
+            (i.nombre.toLowerCase().includes(search.toLowerCase()) ||
+                i.categoria?.toLowerCase().includes(search.toLowerCase())) &&
+            (categoryFilter === 'Todos' || i.categoria === categoryFilter);
+    });
 
     const lowStockCount = items.filter(i => i.stock_actual <= i.stock_minimo).length;
 
@@ -101,6 +104,32 @@ export default function InventarioPage() {
                         Nuevo Item
                     </button>
                 </div>
+            </div>
+
+            {/* Area Tabs */}
+            <div className="flex p-1 bg-gray-100 dark:bg-gray-800/50 rounded-2xl w-full md:w-fit">
+                <button
+                    onClick={() => { setAreaFilter('CLINICA'); setCategoryFilter('Todos'); }}
+                    className={clsx(
+                        "flex-1 md:px-8 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
+                        areaFilter === 'CLINICA'
+                            ? "bg-white dark:bg-gray-700 text-blue-600 shadow-sm"
+                            : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    )}
+                >
+                    🏥 CLÍNICA
+                </button>
+                <button
+                    onClick={() => { setAreaFilter('LABORATORIO'); setCategoryFilter('Todos'); }}
+                    className={clsx(
+                        "flex-1 md:px-8 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
+                        areaFilter === 'LABORATORIO'
+                            ? "bg-white dark:bg-gray-700 text-indigo-600 shadow-sm"
+                            : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    )}
+                >
+                    🔬 LABORATORIO
+                </button>
             </div>
 
             {/* Stats Grid */}

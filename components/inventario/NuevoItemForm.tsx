@@ -17,7 +17,8 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
         categoria: 'Insumos Clínicos',
         stock_actual: 0,
         unidad_medida: 'unidades',
-        stock_minimo: 5
+        stock_minimo: 5,
+        area: 'CLINICA' as 'CLINICA' | 'LABORATORIO'
     });
 
     const CATEGORIAS = [
@@ -51,7 +52,8 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                     categoria: formData.categoria,
                     stock_actual: formData.stock_actual,
                     unidad_medida: formData.unidad_medida,
-                    stock_minimo: formData.stock_minimo
+                    stock_minimo: formData.stock_minimo,
+                    area: formData.area
                 })
                 .select()
                 .single();
@@ -76,7 +78,8 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                 categoria: 'Insumos Clínicos',
                 stock_actual: 0,
                 unidad_medida: 'unidades',
-                stock_minimo: 5
+                stock_minimo: 5,
+                area: 'CLINICA'
             });
         } catch (error) {
             console.error('Error saving item:', error);
@@ -120,7 +123,7 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
                         <div className="space-y-2">
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Categoría</label>
                             <div className="relative">
@@ -134,15 +137,29 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                                 </select>
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Unidad de Medida</label>
-                            <select
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl appearance-none focus:ring-2 focus:ring-blue-500 outline-none"
-                                value={formData.unidad_medida}
-                                onChange={(e) => setFormData(prev => ({ ...prev, unidad_medida: e.target.value }))}
-                            >
-                                {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
-                            </select>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Área / Destino *</label>
+                                <select
+                                    className="w-full px-4 py-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl appearance-none focus:ring-2 focus:ring-blue-500 outline-none font-bold text-indigo-700 dark:text-indigo-300"
+                                    value={formData.area}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, area: e.target.value as any }))}
+                                >
+                                    <option value="CLINICA">🏥 CLÍNICA GENERAL</option>
+                                    <option value="LABORATORIO">🔬 LABORATORIO PROPIO</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Unidad de Medida</label>
+                                <select
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl appearance-none focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={formData.unidad_medida}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, unidad_medida: e.target.value }))}
+                                >
+                                    {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                            </div>
                         </div>
                     </div>
 

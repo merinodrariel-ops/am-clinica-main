@@ -347,3 +347,22 @@ export async function getDiasSinCierreRecepcion(): Promise<DiaSinCierre[]> {
     }
     return data || [];
 }
+
+export async function logMovimientoEdit(
+    registroId: string,
+    tabla: string,
+    campo: string,
+    valorAnterior: string | null,
+    valorNuevo: string | null,
+    motivo: string
+) {
+    const { error } = await supabase.rpc('log_field_edit', {
+        p_registro_id: registroId,
+        p_tabla: tabla,
+        p_campo: campo,
+        p_valor_anterior: valorAnterior,
+        p_valor_nuevo: valorNuevo,
+        p_motivo: motivo
+    });
+    if (error) console.error('Error logging edit:', error);
+}

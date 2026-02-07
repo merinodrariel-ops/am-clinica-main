@@ -124,6 +124,7 @@ export interface Paciente {
     telefono: string | null;
     email: string | null;
     documento: string | null;
+    referencia_origen?: string | null;
 }
 
 export interface HistorialEdicion {
