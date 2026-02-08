@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { ArrowRight, Users, Banknote, BarChart3 } from 'lucide-react';
+import { ArrowRight, Users, Banknote, Calendar, TrendingUp } from 'lucide-react';
 import CajaAlerts from '@/components/dashboard/CajaAlerts';
 import UserAlerts from '@/components/dashboard/UserAlerts';
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import ReferralChart from '@/components/dashboard/ReferralChart';
+import NewPatientsCard from '@/components/dashboard/NewPatientsCard';
 
 export default function DashboardPage() {
     return (
@@ -21,52 +22,62 @@ export default function DashboardPage() {
             {/* Real-time Stats */}
             <StatsGrid />
 
-            {/* Analytics Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <ReferralChart />
-                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center items-center text-center">
-                    <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4">
-                        <BarChart3 size={24} />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Análisis de Tratamientos</h3>
-                    <p className="text-sm text-gray-500 mt-2 max-w-[250px]">
-                        Próximamente: Gráficos de rentabilidad por especialidad y evolución de cobros.
-                    </p>
+            {/* Analytics Section - Redesigned */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                {/* Pacientes Nuevos - Principal */}
+                <div className="lg:col-span-2">
+                    <NewPatientsCard />
+                </div>
+
+                {/* Origen de Pacientes - Compacto */}
+                <div className="lg:col-span-1">
+                    <ReferralChart />
                 </div>
             </div>
 
             {/* Quick Links */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Link href="/patients" className="group">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 rounded-xl bg-blue-500 flex items-center justify-center text-white">
-                                    <Users size={24} />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-900 dark:text-white">Pacientes</h3>
-                                    <p className="text-sm text-gray-500">Gestión de pacientes y fichas</p>
-                                </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-blue-500 flex items-center justify-center text-white">
+                                <Users size={20} />
                             </div>
-                            <ArrowRight className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Pacientes</h3>
+                                <p className="text-xs text-gray-500 truncate">Gestión y fichas</p>
+                            </div>
+                            <ArrowRight size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
                         </div>
                     </div>
                 </Link>
 
                 <Link href="/caja-recepcion" className="group">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 rounded-xl bg-green-500 flex items-center justify-center text-white">
-                                    <Banknote size={24} />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-900 dark:text-white">Caja Recepción</h3>
-                                    <p className="text-sm text-gray-500">Ingresos y cobros de pacientes</p>
-                                </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-green-200 dark:hover:border-green-800 transition-all">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-green-500 flex items-center justify-center text-white">
+                                <Banknote size={20} />
                             </div>
-                            <ArrowRight className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Caja Recepción</h3>
+                                <p className="text-xs text-gray-500 truncate">Ingresos y cobros</p>
+                            </div>
+                            <ArrowRight size={16} className="text-gray-400 group-hover:text-green-500 transition-colors" />
+                        </div>
+                    </div>
+                </Link>
+
+                <Link href="/agenda" className="group">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-purple-200 dark:hover:border-purple-800 transition-all">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-purple-500 flex items-center justify-center text-white">
+                                <Calendar size={20} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Agenda</h3>
+                                <p className="text-xs text-gray-500 truncate">Citas y turnos</p>
+                            </div>
+                            <ArrowRight size={16} className="text-gray-400 group-hover:text-purple-500 transition-colors" />
                         </div>
                     </div>
                 </Link>

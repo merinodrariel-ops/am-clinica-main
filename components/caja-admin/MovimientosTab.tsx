@@ -31,8 +31,9 @@ import {
     SUBTIPOS_MOVIMIENTO,
     SUBTIPOS_ADJUNTO_OBLIGATORIO
 } from '@/lib/caja-admin';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
+import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 
 interface Props {
     sucursal: Sucursal;
@@ -50,7 +51,7 @@ const TIPOS_MOVIMIENTO = [
 ];
 
 export default function MovimientosTab({ sucursal, tcBna }: Props) {
-    const { role } = useUserRole();
+    const { role } = useAuth();
     const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
     const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
     const [loading, setLoading] = useState(true);
@@ -79,7 +80,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     });
     const [formLineas, setFormLineas] = useState<MovimientoLinea[]>([]);
     const [formError, setFormError] = useState<string | null>(null);
+    const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
 
     async function loadData() {
         setLoading(true);
@@ -235,8 +238,10 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             fecha_movimiento: new Date().toISOString().split('T')[0]
         });
         setFormLineas([]);
+        setComprobanteUrl(null);
         loadData();
     }
+
 
     const filteredMovimientos = movimientos.filter(m => {
         if (searchTerm && !m.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -297,7 +302,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     </div>
                 </div>
 
-                {role === 'owner' && (
+                {(role === 'owner' || role === 'admin') && (
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -469,6 +474,24 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                             </span>
                         </div>
                     )}
+
+                    {/* Comprobante Upload */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Adjuntar Comprobante (opcional)
+                        </label>
+                        <ComprobanteUpload
+                            area="caja-admin"
+                            onUploadComplete={(result) => {
+                                setComprobanteUrl(result.url);
+                            }}
+                        />
+                        {comprobanteUrl && (
+                            <p className="mt-2 text-sm text-green-600 dark:text-green-400">
+                                ✓ Comprobante adjuntado correctamente
+                            </p>
+                        )}
+                    </div>
 
                     {formError && (
                         <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl mb-4">

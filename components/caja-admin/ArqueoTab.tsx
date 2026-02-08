@@ -13,7 +13,7 @@ import {
     getUltimoCierreAdmin,
     cerrarCajaAdmin
 } from '@/lib/caja-admin';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
     sucursal: Sucursal;
@@ -148,7 +148,7 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
         }
     }
 
-    const { role } = useUserRole();
+    const { role } = useAuth();
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando...</div>;
 

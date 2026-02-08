@@ -12,7 +12,8 @@ import {
     UserCircle,
     Upload,
     Package,
-    FlaskConical
+    FlaskConical,
+    CalendarDays
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -23,6 +24,12 @@ const MENU_ITEMS = [
         label: 'Dashboard',
         href: '/dashboard',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer']
+    },
+    {
+        icon: CalendarDays,
+        label: 'Agenda 360',
+        href: '/agenda',
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer']
     },
     {
         icon: Users,
@@ -136,11 +143,15 @@ export default function Sidebar() {
                         </p>
                     </div>
                     <button
-                        onClick={signOut}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        onClick={async () => {
+                            await signOut();
+                            window.location.href = '/login';
+                        }}
+                        className="flex items-center gap-2 text-gray-500 hover:text-red-600 transition-colors text-sm font-medium"
                         title="Cerrar Sesión"
                     >
                         <LogOut size={18} />
+                        <span className="hidden sm:inline">Salir</span>
                     </button>
                 </div>
             </div>

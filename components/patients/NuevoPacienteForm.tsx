@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { createPaciente, logEmail } from '@/lib/patients';
 import { supabase } from '@/lib/supabase';
-import { sendWelcomeEmail, generateWelcomeMessage } from '@/lib/emailjs';
+import { sendWelcomeEmailAction } from '@/app/actions/email';
 
 interface NuevoPacienteFormProps {
     isOpen: boolean;
@@ -181,11 +181,10 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
 
             // Send welcome email if consent and valid email
             if (form.consentimiento_comunicacion && emailCompleto && data) {
-                const emailResult = await sendWelcomeEmail({
-                    to_email: emailCompleto,
-                    to_name: `${form.nombre} ${form.apellido}`,
-                    message: generateWelcomeMessage(form.nombre),
-                });
+                const emailResult = await sendWelcomeEmailAction(
+                    `${form.nombre} ${form.apellido}`,
+                    emailCompleto
+                );
 
                 await logEmail(
                     data.id_paciente,

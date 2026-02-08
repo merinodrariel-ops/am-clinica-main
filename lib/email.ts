@@ -1,73 +1,67 @@
-
-import emailjs from '@emailjs/nodejs';
-
-const PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY;
-const PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY;
-
-// You need to get these IDs from your EmailJS dashboard
-const SERVICE_ID = process.env.EMAILJS_SERVICE_ID || 'contact_service';
-const TEMPLATE_ID_WELCOME = process.env.EMAILJS_TEMPLATE_ID_WELCOME || 'welcome_template';
+import { sendEmail } from '@/lib/nodemailer';
 
 export async function sendWelcomeEmail(toName: string, toEmail: string, whatsapp?: string) {
-    if (!PUBLIC_KEY || !PRIVATE_KEY) {
-        console.warn('EmailJS keys missing. Skipping email.');
-        return;
-    }
-
     try {
-        const templateParams = {
-            to_name: toName,
-            to_email: toEmail,
-            whatsapp_link: whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, '')}` : '',
-            message: 'Bienvenido a AM Clínica. Estamos felices de acompañarte en tu tratamiento.',
-        };
+        const whatsappLink = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, '')}` : '';
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <h2>Bienvenido a AM Clínica</h2>
+                <p>Hola ${toName},</p>
+                <p>Estamos felices de acompañarte en tu tratamiento.</p>
+                ${whatsappLink ? `<p>WhatsApp: <a href="${whatsappLink}">${whatsappLink}</a></p>` : ''}
+            </body>
+            </html>
+        `;
 
-        const response = await emailjs.send(
-            SERVICE_ID,
-            TEMPLATE_ID_WELCOME,
-            templateParams,
-            {
-                publicKey: PUBLIC_KEY,
-                privateKey: PRIVATE_KEY,
-            }
-        );
+        const response = await sendEmail({
+            to: toEmail,
+            subject: 'Bienvenido a AM Clínica',
+            html
+        });
 
-        console.log('Welcome Email Sent!', response.status, response.text);
-        return { success: true, response };
+        if (response.success) {
+            console.log('Welcome Email Sent!', response.messageId);
+            return { success: true };
+        } else {
+            console.error('Failed to send email:', response.error);
+            return { success: false, error: String(response.error) };
+        }
     } catch (error) {
         console.error('Failed to send email:', error);
         return { success: false, error };
     }
 }
 
-/**
- * Send a payment confirmation email.
- * Uses the EMAILJS_TEMPLATE_ID_PAYMENT environment variable.
- */
 export async function sendPaymentEmail(toName: string, toEmail: string, amountUsd: number, description?: string) {
-    if (!PUBLIC_KEY || !PRIVATE_KEY) {
-        console.warn('EmailJS keys missing. Skipping email.');
-        return;
-    }
-    const TEMPLATE_ID_PAYMENT = process.env.EMAILJS_TEMPLATE_ID_PAYMENT || 'payment_template_placeholder';
     try {
-        const templateParams = {
-            to_name: toName,
-            to_email: toEmail,
-            amount_usd: amountUsd.toString(),
-            description: description || '',
-        };
-        const response = await emailjs.send(
-            SERVICE_ID,
-            TEMPLATE_ID_PAYMENT,
-            templateParams,
-            {
-                publicKey: PUBLIC_KEY,
-                privateKey: PRIVATE_KEY,
-            }
-        );
-        console.log('Payment Email Sent!', response.status, response.text);
-        return { success: true, response };
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <h2>Confirmación de Pago</h2>
+                <p>Hola ${toName},</p>
+                <p>Hemos recibido tu pago de <strong>USD ${amountUsd}</strong>.</p>
+                ${description ? `<p>Concepto: ${description}</p>` : ''}
+                <p>Gracias por confiar en nosotros.</p>
+            </body>
+            </html>
+        `;
+
+        const response = await sendEmail({
+            to: toEmail,
+            subject: 'Comprobante de Pago - AM Clínica',
+            html
+        });
+
+        if (response.success) {
+            console.log('Payment Email Sent!', response.messageId);
+            return { success: true };
+        } else {
+            console.error('Failed to send payment email:', response.error);
+            return { success: false, error: String(response.error) };
+        }
     } catch (error) {
         console.error('Failed to send payment email:', error);
         return { success: false, error };

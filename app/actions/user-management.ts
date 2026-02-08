@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { sendInvitationEmail } from '@/lib/emailjs';
 
 // Initialize Admin Client securely
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -91,16 +92,36 @@ export async function inviteUser(formData: FormData) {
     const telefono = formData.get('telefono') as string;
 
     try {
-        // 1. Invite via Supabase Auth
-        const { data: authData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-            data: {
-                full_name: fullName,
-                role: role,
-            },
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password` // Redirect to set password
+        // 1. Generate Invite Link (Manual)
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'invite',
+            email: email,
+            options: {
+                data: { full_name: fullName, role: role },
+                redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password`
+            }
         });
 
-        if (inviteError) throw inviteError;
+        if (linkError) throw linkError;
+        if (!linkData.user) throw new Error('No user created');
+
+        // 2. Send Custom Email via EmailJS
+        const emailResult = await sendInvitationEmail({
+            to_email: email,
+            to_name: fullName,
+            action_link: linkData.properties.action_link
+        });
+
+        if (!emailResult.success) {
+            console.error('Email sending failed:', emailResult.error);
+            // Optionally delete the user if email failed? No, improved DX is to return error but keep user.
+            // But for now, let's return error so UI shows it.
+            return { success: false, error: `Usuario creado pero falló el email: ${emailResult.error}` };
+        }
+
+        const authData = linkData; // Adaptation for existing code
+
+        // if (inviteError) throw inviteError; // Removed
 
         if (!authData.user) throw new Error('No user created');
 
@@ -257,10 +278,26 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
 
         // 3. Determine Action
         if (!targetUser.email_confirmed_at) {
-            // Case A: User never confirmed -> Resend Invite
-            // inviteUserByEmail triggers the magic link again
-            const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(targetUser.email!);
-            if (inviteError) throw inviteError;
+            // Case A: User never confirmed -> Resend Invite via EmailJS
+            const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+                type: 'invite',
+                email: targetUser.email!,
+                options: {
+                    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password`
+                }
+            });
+
+            if (linkError) throw linkError;
+
+            // Send manual email
+            const emailRes = await sendInvitationEmail({
+                to_email: targetUser.email!,
+                to_name: targetUser.user_metadata?.full_name || 'Usuario',
+                action_link: linkData.properties.action_link
+            });
+
+            if (!emailRes.success) throw new Error(`Email failed: ${emailRes.error}`);
+
             actionType = 'resend_invite';
         } else {
             // Case B: User confirmed -> Send Password Reset

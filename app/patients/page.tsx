@@ -63,12 +63,19 @@ export default function PatientsPage() {
         }
     }, [loadPatients]);
 
+    // Initial load only on mount
     useEffect(() => {
         loadPatients();
-        // Trigger silent sync on mount
-        handleSyncSheets(true);
-    }, [loadPatients, handleSyncSheets]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Intentionally only on mount
 
+    // Trigger silent sync only once on first mount
+    useEffect(() => {
+        handleSyncSheets(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Intentionally only on mount
+
+    // Reload when filters change (debounced manually by user pressing Enter or button)
     function handleSearch() {
         loadPatients();
     }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown } from 'lucide-react';
+import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
@@ -12,7 +12,9 @@ import ArqueoPanel from '@/components/caja/ArqueoPanel';
 import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
+import { ReciboGenerator, generateReciboNumber } from '@/components/caja/ReciboGenerator';
 import { logMovimientoEdit } from '@/lib/caja-recepcion';
+
 
 // Types
 interface Stats {
@@ -174,8 +176,12 @@ export default function CajaRecepcionPage() {
         title: ''
     });
 
+    // Recibo Modal state
+    const [reciboMov, setReciboMov] = useState<Movimiento | null>(null);
+
     function getWhatsappLink(text: string) {
         return `https://wa.me/?text=${encodeURIComponent(text)}`;
+
     }
 
 
@@ -771,22 +777,33 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                     )}
 
                                                     {mov.categoria !== 'Egreso' && (
-                                                        <button
-                                                            onClick={() => {
-                                                                const isCollection = mov.estado === 'pendiente';
-                                                                const msg = isCollection ? getCollectionMessage(mov) : getReceiptMessage(mov);
-                                                                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-                                                            }}
-                                                            className={clsx(
-                                                                "p-1.5 rounded-lg transition-colors",
-                                                                mov.estado === 'pendiente'
-                                                                    ? "hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500 hover:text-amber-600"
-                                                                    : "hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500 hover:text-green-600"
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    const isCollection = mov.estado === 'pendiente';
+                                                                    const msg = isCollection ? getCollectionMessage(mov) : getReceiptMessage(mov);
+                                                                    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                                                                }}
+                                                                className={clsx(
+                                                                    "p-1.5 rounded-lg transition-colors",
+                                                                    mov.estado === 'pendiente'
+                                                                        ? "hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-500 hover:text-amber-600"
+                                                                        : "hover:bg-green-50 dark:hover:bg-green-900/20 text-green-500 hover:text-green-600"
+                                                                )}
+                                                                title={mov.estado === 'pendiente' ? "Enviar Recordatorio de Cobro" : "Enviar Comprobante (texto)"}
+                                                            >
+                                                                <MessageCircle size={16} />
+                                                            </button>
+                                                            {mov.estado === 'pagado' && (
+                                                                <button
+                                                                    onClick={() => setReciboMov(mov)}
+                                                                    className="p-1.5 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg text-purple-500 hover:text-purple-600 transition-colors"
+                                                                    title="Generar Recibo Visual (imagen)"
+                                                                >
+                                                                    <FileImage size={16} />
+                                                                </button>
                                                             )}
-                                                            title={mov.estado === 'pendiente' ? "Enviar Recordatorio de Cobro" : "Enviar Comprobante"}
-                                                        >
-                                                            <MessageCircle size={16} />
-                                                        </button>
+                                                        </>
                                                     )}
                                                     <button
                                                         onClick={() => openEditMovimiento(mov)}
@@ -1138,7 +1155,52 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 tabla="caja_recepcion_movimientos"
             />
 
+            {/* Recibo Visual Modal */}
+            {reciboMov && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <FileImage size={20} className="text-purple-500" />
+                                    Recibo de Pago
+                                </h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Genera una imagen del recibo para compartir
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setReciboMov(null)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            <ReciboGenerator
+                                data={{
+                                    numero: generateReciboNumber(),
+                                    fecha: new Date(reciboMov.fecha_hora),
+                                    paciente: reciboMov.paciente
+                                        ? `${reciboMov.paciente.nombre} ${reciboMov.paciente.apellido}`
+                                        : 'Paciente General',
+                                    concepto: reciboMov.concepto_nombre,
+                                    monto: reciboMov.usd_equivalente || reciboMov.monto,
+                                    metodoPago: reciboMov.metodo_pago,
+                                    atendidoPor: 'AM Clínica',
+                                }}
+                                onGenerated={(result) => {
+                                    console.log('Recibo generado:', result.imageUrl);
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Edit Date Modal */}
+
             {editingMov && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full">
