@@ -105,12 +105,23 @@ export async function deleteAppointment(id: string) {
 
 export async function searchPatients(query: string) {
     const supabase = await createClient();
-    const { data } = await supabase
-        .from('patients')
-        .select('id, full_name, phone')
-        .ilike('full_name', `%${query}%`)
+    const { data, error } = await supabase
+        .from('pacientes')
+        .select('id_paciente, nombre, apellido, telefono')
+        .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`)
+        .eq('is_deleted', false)
         .limit(10);
-    return data || [];
+
+    if (error) {
+        console.error('Error searching patients:', error);
+        return [];
+    }
+
+    return (data || []).map((p: any) => ({
+        id: p.id_paciente,
+        full_name: `${p.nombre} ${p.apellido}`,
+        phone: p.telefono
+    }));
 }
 
 export async function getDoctors() {

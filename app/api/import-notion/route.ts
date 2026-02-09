@@ -8,8 +8,9 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PU
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const NOTION_DATABASE_ID_ADMIN = process.env.NOTION_DB_ADMIN_ID;
-const NOTION_DATABASE_ID_RECEPCION = process.env.NOTION_DB_RECEPCION_ID;
-const NOTION_DATABASE_ID_INVENTARIO = process.env.NOTION_DB_INVENTARIO_ID;
+const NOTION_DB_RECEPCION_ID = process.env.NOTION_DB_RECEPCION_ID;
+const NOTION_DB_INVENTARIO_ID = process.env.NOTION_DB_INVENTARIO_ID;
+const NOTION_DB_LABORATORIO_ID = process.env.NOTION_DB_LABORATORIO_ID;
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 
 const IMPORTACION_PACIENTE_ID = 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59'; // Placeholder ID for Recepcion imports
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Missing NOTION_API_KEY' }, { status: 500 });
         }
 
+
         const { searchParams } = new URL(request.url);
         // If limit is not provided, fetch ALL (handled via loop)
         const limitParam = searchParams.get('limit');
@@ -32,11 +34,19 @@ export async function GET(request: Request) {
         const source = searchParams.get('source') || 'admin';
         const debug = searchParams.get('debug') === 'true';
 
-        let targetDbId = NOTION_DATABASE_ID_ADMIN;
-        if (source === 'recepcion') targetDbId = NOTION_DATABASE_ID_RECEPCION;
-        if (source === 'inventario') targetDbId = NOTION_DATABASE_ID_INVENTARIO;
+        if (debug) console.log('DEBUG: API Key loaded:', NOTION_API_KEY.substring(0, 5) + '...');
 
         const area = (searchParams.get('area') as 'CLINICA' | 'LABORATORIO') || 'CLINICA';
+
+        let targetDbId = NOTION_DATABASE_ID_ADMIN;
+        if (source === 'recepcion') targetDbId = NOTION_DB_RECEPCION_ID;
+        if (source === 'inventario') {
+            if (area === 'LABORATORIO') {
+                targetDbId = NOTION_DB_LABORATORIO_ID;
+            } else {
+                targetDbId = NOTION_DB_INVENTARIO_ID;
+            }
+        }
 
         if (!targetDbId) {
             return NextResponse.json({ error: `Missing Database ID for source: ${source}` }, { status: 500 });
@@ -70,6 +80,7 @@ export async function GET(request: Request) {
 
         // Pagination Loop
         while (hasMore) {
+
             // Stop if we reached explicit limit
             if (explicitLimit && fetchedCount >= explicitLimit) {
                 break;
@@ -80,7 +91,7 @@ export async function GET(request: Request) {
                 page_size: explicitLimit ? Math.min(explicitLimit - fetchedCount, 100) : 100,
                 sorts: [
                     {
-                        property: source === 'recepcion' ? 'FECHA' : 'Fecha',
+                        timestamp: 'created_time',
                         direction: 'descending',
                     }
                 ]
@@ -115,6 +126,10 @@ export async function GET(request: Request) {
 
             for (const page of results) {
                 if (!('properties' in page)) continue;
+
+                if (debug && processed.length === 0) {
+                    console.log('DEBUG: First Page Properties:', JSON.stringify(page.properties, null, 2));
+                }
 
                 try {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -258,11 +273,34 @@ export async function GET(request: Request) {
                         }
                     } else if (source === 'inventario') {
                         // === INVENTARIO MAPPING ===
-                        const nombre = props['Nombre']?.title?.[0]?.plain_text || props['Name']?.title?.[0]?.plain_text || 'Item Sin Nombre';
-                        const categoria = props['Categoria']?.select?.name || props['Category']?.select?.name || 'General';
-                        const stockActual = props['Stock Actual']?.number || props['Stock']?.number || 0;
-                        const stockMinimo = props['Stock Minimo']?.number || props['Min Stock']?.number || 0;
-                        const unidad = props['Unidad']?.select?.name || props['Unit']?.select?.name || 'unidades';
+                        let nombre = 'Item Sin Nombre';
+                        let categoria = 'General';
+                        let stockActual = 0;
+                        let stockMinimo = 0;
+                        let unidad = 'unidades';
+
+                        if (area === 'LABORATORIO') {
+                            nombre = props['Nombre ']?.title?.[0]?.plain_text || props['Nombre']?.title?.[0]?.plain_text || 'Item Sin Nombre';
+                            categoria = props['Área']?.multi_select?.[0]?.name || props['Categoria']?.select?.name || 'General';
+                            stockActual = props['Stock']?.number || 0;
+                            stockMinimo = props['Fijar alerta']?.number || 0;
+                        } else {
+                            // CLINICA Defaults (Updated based on "Elementos" DB Schema)
+                            nombre = props['Nombre ']?.title?.[0]?.plain_text || props['Nombre']?.title?.[0]?.plain_text || props['Name']?.title?.[0]?.plain_text || 'Item Sin Nombre';
+
+                            // "Área" is a multi_select in the Elements DB, serve as Category
+                            const areaProp = props['Área']?.multi_select;
+                            if (areaProp && areaProp.length > 0) {
+                                categoria = areaProp.map((o: any) => o.name).join(', ');
+                            } else {
+                                categoria = props['Categoria']?.select?.name || props['Category']?.select?.name || 'General';
+                            }
+
+                            stockActual = props['Stock']?.number || props['Stock Actual']?.number || 0;
+                            stockMinimo = props['Fijar alerta']?.number || props['Stock Minimo']?.number || props['Min Stock']?.number || 0;
+                            unidad = props['Unidad']?.select?.name || props['Unit']?.select?.name || 'unidades';
+                        }
+
 
                         const { error: insertError } = await supabase.from('inventario_items').upsert({
                             nombre,
@@ -272,7 +310,7 @@ export async function GET(request: Request) {
                             unidad_medida: unidad,
                             area: area, // Use the area from query param
                             updated_at: new Date().toISOString()
-                        }, { onConflict: 'nombre' }); // Assuming name is unique within the context of import or we want to update
+                        }, { onConflict: 'nombre, area' });
 
                         if (insertError) {
                             errors.push({ id: page.id, error: insertError });
@@ -280,7 +318,6 @@ export async function GET(request: Request) {
                             processed.push({ id: page.id, status: 'imported_inventario' });
                         }
                     }
-
                 } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
                     errors.push({ id: page.id, error: e.message });
                 }

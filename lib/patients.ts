@@ -115,6 +115,39 @@ export async function getPacientes(options?: {
     return data || [];
 }
 
+export async function getTotalPatientsCount(options?: {
+    search?: string;
+    estado?: string;
+    ciudad?: string;
+}): Promise<number> {
+    let query = supabase
+        .from('pacientes')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_deleted', false);
+
+    if (options?.search) {
+        const searchTerm = `%${options.search}%`;
+        query = query.or(`apellido.ilike.${searchTerm},nombre.ilike.${searchTerm},email.ilike.${searchTerm},documento.ilike.${searchTerm},telefono.ilike.${searchTerm}`);
+    }
+
+    if (options?.estado) {
+        query = query.eq('estado_paciente', options.estado);
+    }
+
+    if (options?.ciudad) {
+        query = query.eq('ciudad', options.ciudad);
+    }
+
+    const { count, error } = await query;
+
+    if (error) {
+        console.error('Error counting pacientes:', error);
+        return 0;
+    }
+
+    return count || 0;
+}
+
 export async function getPacienteById(id: string): Promise<Paciente | null> {
     const { data, error } = await supabase
         .from('pacientes')

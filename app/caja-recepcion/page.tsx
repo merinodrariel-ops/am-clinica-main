@@ -1378,6 +1378,13 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     </div>
                 </div>
             )}
+            {/* Historial Ediciones Modal */}
+            <HistorialEdicionesModal
+                isOpen={!!historialMovId}
+                onClose={() => setHistorialMovId(null)}
+                registroId={historialMovId || ''}
+                tabla="caja_recepcion_movimientos"
+            />
         </div>
     );
 }

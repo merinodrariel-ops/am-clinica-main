@@ -154,15 +154,47 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         }
     }
 
-    function selectPatient(patient: Paciente) {
-        setFormData({
-            ...formData,
+    async function selectPatient(patient: Paciente) {
+        // Optimistic UI update
+        setFormData(prev => ({
+            ...prev,
             paciente_id: patient.id_paciente,
             paciente_nombre: `${patient.apellido}, ${patient.nombre}`,
-        });
+        }));
         setSearchQuery('');
         setPatients([]);
-        setStep(2);
+        setStep(2); // Move to next step immediately
+
+        // Background fetch for financing data
+        try {
+            const { data: pData } = await supabase
+                .from('pacientes')
+                .select('financ_estado, financ_cuotas_total, financ_monto_total')
+                .eq('id_paciente', patient.id_paciente)
+                .single();
+
+            if (pData?.financ_estado === 'activo') {
+                const { count } = await supabase
+                    .from('caja_recepcion_movimientos')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('paciente_id', patient.id_paciente)
+                    .neq('estado', 'Anulado')
+                    .gt('cuota_nro', 0);
+
+                const nextQuota = (count || 0) + 1;
+
+                if (nextQuota <= (pData.financ_cuotas_total || 0)) {
+                    setFormData(prev => ({
+                        ...prev,
+                        es_cuota: true,
+                        cuota_nro: nextQuota,
+                        cuotas_total: pData.financ_cuotas_total || 0
+                    }));
+                }
+            }
+        } catch (e) {
+            console.error('Error fetching financing data:', e);
+        }
     }
 
     function selectConcepto(item: TarifarioItem) {

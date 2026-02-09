@@ -74,7 +74,7 @@ export default function Sidebar() {
     const { role, profile, signOut, user } = useAuth();
 
     // Hide sidebar on login page or if not authenticated (optional, depends on layout)
-    if (!user || pathname === '/login') return null;
+    if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional')) return null;
 
     const userRole = role || 'partner_viewer';
 

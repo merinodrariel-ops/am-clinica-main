@@ -177,7 +177,7 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                             </p>
                         </div>
                     </div>
-                    {!cierreHoy && role === 'owner' && (
+                    {!cierreHoy && (role === 'owner' || role === 'admin') && (
                         <button
                             onClick={() => setShowCerrarModal(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"

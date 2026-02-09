@@ -9,15 +9,15 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 interface HistorialItem {
     id: string;
-    tabla_afectada: string;
-    registro_id: string;
+    tabla_origen: string;
+    id_registro: string;
     campo_modificado: string;
     valor_anterior: string | null;
     valor_nuevo: string | null;
     fecha_edicion: string;
-    editado_por: string;
+    usuario_editor: string;
+    usuario_email: string | null;
     motivo_edicion: string | null;
-    ip_address: string | null;
     profiles?: {
         full_name: string;
     };
@@ -57,10 +57,10 @@ export default function HistorialEdicionesModal({
             .from('historial_ediciones')
             .select(`
                 *,
-                profiles:editado_por (full_name)
+                profiles:usuario_editor (full_name)
             `)
-            .eq('registro_id', registroId)
-            .eq('tabla_afectada', tabla)
+            .eq('id_registro', registroId)
+            .eq('tabla_origen', tabla)
             .order('fecha_edicion', { ascending: false });
 
         if (fetchError) {
@@ -153,7 +153,7 @@ export default function HistorialEdicionesModal({
                                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                             <User className="w-4 h-4" />
                                             <span className="font-medium">
-                                                {item.profiles?.full_name || 'Usuario desconocido'}
+                                                {item.profiles?.full_name || item.usuario_email || 'Usuario desconocido'}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-gray-500">

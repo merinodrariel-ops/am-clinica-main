@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import PatientList from '@/components/patients/PatientList';
 import NuevoPacienteForm from '@/components/patients/NuevoPacienteForm';
-import { getPacientes, Paciente } from '@/lib/patients';
+import { getPacientes, getTotalPatientsCount, Paciente } from '@/lib/patients';
 import RoleGuard from '@/components/auth/RoleGuard';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -19,6 +19,7 @@ const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSexSoCAmFdYp1k
 export default function PatientsPage() {
     const { canEdit } = useAuth();
     const [patients, setPatients] = useState<Paciente[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +35,13 @@ export default function PatientsPage() {
                 limit: 1000,
             });
             setPatients(data);
+
+            // Get accurate count
+            const count = await getTotalPatientsCount({
+                search: searchTerm || undefined,
+                estado: estadoFilter || undefined,
+            });
+            setTotalCount(count);
         } catch (error) {
             console.error('Error loading patients:', error);
         } finally {
@@ -90,7 +98,7 @@ export default function PatientsPage() {
                             Pacientes
                         </h1>
                         <p className="text-gray-500 mt-1">
-                            {patients.length} pacientes registrados
+                            {totalCount} pacientes registrados
                         </p>
                     </div>
 

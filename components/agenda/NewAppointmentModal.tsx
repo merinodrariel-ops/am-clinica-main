@@ -104,11 +104,18 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         const timeoutId = setTimeout(async () => {
             if (searchTerm.length > 2) {
                 setSearching(true);
-                const results = await searchPatients(searchTerm);
-                setPatients(results);
-                setSearching(false);
+                try {
+                    const results = await searchPatients(searchTerm);
+                    setPatients(results);
+                } catch (error) {
+                    console.error('Error searching:', error);
+                    setPatients([]);
+                } finally {
+                    setSearching(false);
+                }
             } else {
                 setPatients([]);
+                setSearching(false);
             }
         }, 300); // Faster debounce
 
@@ -236,7 +243,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 )}
 
                                 {/* Search Results Dropdown */}
-                                {patients.length > 0 && (
+                                {patients.length > 0 ? (
                                     <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 max-h-60 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
                                         {patients.map(p => (
                                             <button
@@ -261,6 +268,12 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                             </button>
                                         ))}
                                     </div>
+                                ) : (
+                                    searchTerm.length > 2 && !searching && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                            No se encontraron pacientes.
+                                        </div>
+                                    )
                                 )}
                             </div>
                         )}

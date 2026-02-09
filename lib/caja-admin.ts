@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 
 // =============================================
 // Types
@@ -29,7 +31,7 @@ export interface CajaAdminMovimiento {
     usuario?: string;
     sucursal_id: string;
     descripcion: string;
-    tipo_movimiento: 'INGRESO_ADMIN' | 'INGRESO_PACIENTE' | 'EGRESO' | 'CAMBIO_MONEDA' | 'RETIRO' | 'TRANSFERENCIA' | 'AJUSTE_CAJA';
+    tipo_movimiento: 'INGRESO_ADMIN' | 'INGRESO_PACIENTE' | 'EGRESO' | 'CAMBIO_MONEDA' | 'RETIRO' | 'TRANSFERENCIA' | 'AJUSTE_CAJA' | 'APORTE_CAPITAL';
     subtipo?: string;
     nota?: string;
     adjuntos?: string[];
@@ -41,6 +43,7 @@ export interface CajaAdminMovimiento {
     paciente_id?: string;
     estado: 'Registrado' | 'Anulado';
     lineas?: MovimientoLinea[];
+    caja_admin_movimiento_lineas?: MovimientoLinea[];
 }
 
 export interface MovimientoLinea {
@@ -105,9 +108,47 @@ export interface Prestacion {
 export interface Personal {
     id: string;
     nombre: string;
+    apellido?: string;
+    tipo: 'empleado' | 'profesional';
+    area: string;
     rol: string;
+    email?: string;
+    whatsapp?: string;
+    documento?: string;
+    dni_frente_url?: string;
+    dni_dorso_url?: string;
+    direccion?: string;
+    barrio_localidad?: string;
+    condicion_afip?: 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro';
+    foto_url?: string;
+    fecha_ingreso?: string;
+    descripcion?: string;
     valor_hora_ars: number;
     activo: boolean;
+    pagado_mes_actual?: boolean;
+    ultimo_pago_fecha?: string;
+    ultimo_pago_monto?: number;
+    // Professional specific
+    matricula_provincial?: string;
+    especialidad?: string;
+    poliza_url?: string;
+    poliza_vencimiento?: string;
+    consentimientos_urls?: string[];
+    sanciones_notas?: string;
+    porcentaje_honorarios?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface PersonalArea {
+    id: string;
+    nombre: string;
+    descripcion?: string;
+    tipo_personal: 'empleado' | 'profesional' | 'ambos';
+    color: string;
+    icono: string;
+    activo: boolean;
+    orden: number;
 }
 
 export type EstadoRegistro = 'Registrado' | 'Observado' | 'Resuelto' | 'Anulado';
@@ -341,15 +382,42 @@ export async function logMovimientoEdit(
     valorNuevo: string | null,
     motivo: string
 ) {
-    const { error } = await supabase.rpc('log_field_edit', {
-        p_registro_id: registroId,
-        p_tabla: tabla,
-        p_campo: campo,
-        p_valor_anterior: valorAnterior,
-        p_valor_nuevo: valorNuevo,
-        p_motivo: motivo
-    });
-    if (error) console.error('Error logging edit:', error);
+    try {
+        // Get current user info
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const insertData = {
+            id_registro: registroId,
+            tabla_origen: tabla,
+            campo_modificado: campo,
+            valor_anterior: valorAnterior,
+            valor_nuevo: valorNuevo,
+            usuario_editor: user?.id || null,
+            usuario_email: user?.email || null,
+            motivo_edicion: motivo
+        };
+
+        const { error } = await supabase
+            .from('historial_ediciones')
+            .insert(insertData);
+
+        if (error) {
+            // If error is Foreign Key Violation (user exists in auth but not in profiles), retry without user_id
+            if (error.code === '23503') {
+                console.warn('Logging edit without linking to profile due to FK violation (missing profile). Email:', user?.email);
+                await supabase
+                    .from('historial_ediciones')
+                    .insert({
+                        ...insertData,
+                        usuario_editor: null
+                    });
+            } else {
+                console.error('Error logging edit:', error);
+            }
+        }
+    } catch (err) {
+        console.error('Error in logMovimientoEdit:', err);
+    }
 }
 
 export async function anularMovimiento(
@@ -365,6 +433,42 @@ export async function anularMovimiento(
             anulado_por: usuario,
             anulado_fecha_hora: new Date().toISOString(),
         })
+        .eq('id', id);
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+    return { success: true };
+}
+
+export async function deleteMovimiento(
+    id: string,
+    usuarioId: string,
+    motivo: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { error: logError } = await supabase
+            .from('historial_ediciones')
+            .insert({
+                id_registro: id,
+                tabla_origen: 'caja_admin_movimientos',
+                campo_modificado: 'REGISTRO_ELIMINADO',
+                valor_anterior: 'ACTIVO',
+                valor_nuevo: 'ELIMINADO',
+                usuario_editor: usuarioId,
+                motivo_edicion: motivo
+            });
+
+        if (logError) {
+            console.error('Error logging deletion:', logError);
+        }
+    } catch (e) {
+        console.error('Error in deletion audit:', e);
+    }
+
+    const { error } = await supabase
+        .from('caja_admin_movimientos')
+        .delete()
         .eq('id', id);
 
     if (error) {
@@ -537,18 +641,145 @@ export async function createPrestacion(
 // Personal & Liquidaciones
 // =============================================
 
-export async function getPersonal(): Promise<Personal[]> {
-    const { data, error } = await supabase
+export async function getPersonal(options?: {
+    tipo?: 'empleado' | 'profesional';
+    area?: string;
+    includeInactive?: boolean;
+}): Promise<Personal[]> {
+    let query = supabase
         .from('personal')
         .select('*')
-        .eq('activo', true)
+        .order('tipo')
         .order('nombre');
+
+    if (!options?.includeInactive) {
+        query = query.eq('activo', true);
+    }
+    if (options?.tipo) {
+        query = query.eq('tipo', options.tipo);
+    }
+    if (options?.area) {
+        query = query.eq('area', options.area);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         console.error('Error fetching personal:', error);
         return [];
     }
     return data || [];
+}
+
+export async function getPersonalById(id: string): Promise<Personal | null> {
+    const { data, error } = await supabase
+        .from('personal')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null;
+        console.error('Error fetching personal by id:', error);
+        return null;
+    }
+    return data;
+}
+
+export async function getPersonalAreas(): Promise<PersonalArea[]> {
+    const { data, error } = await supabase
+        .from('personal_areas')
+        .select('*')
+        .eq('activo', true)
+        .order('orden');
+
+    if (error) {
+        console.error('Error fetching personal areas:', error);
+        return [];
+    }
+    return data || [];
+}
+
+export interface CreatePersonalInput {
+    nombre: string;
+    apellido?: string;
+    tipo: 'empleado' | 'profesional';
+    area: string;
+    rol?: string;
+    email?: string;
+    whatsapp?: string;
+    documento?: string;
+    direccion?: string;
+    barrio_localidad?: string;
+    condicion_afip?: 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro';
+    valor_hora_ars?: number;
+    descripcion?: string;
+    fecha_ingreso?: string;
+    // Professional fields
+    matricula_provincial?: string;
+    especialidad?: string;
+    porcentaje_honorarios?: number;
+}
+
+export async function createPersonal(input: CreatePersonalInput): Promise<{ data: Personal | null; error: Error | null }> {
+    const { data, error } = await supabase
+        .from('personal')
+        .insert({
+            ...input,
+            rol: input.rol || (input.tipo === 'profesional' ? 'Doctor' : 'Empleado'),
+            valor_hora_ars: input.valor_hora_ars || 0,
+            activo: true,
+            fecha_ingreso: input.fecha_ingreso || new Date().toISOString().split('T')[0],
+        })
+        .select()
+        .single();
+
+    if (error) {
+        return { data: null, error: new Error(error.message) };
+    }
+    return { data, error: null };
+}
+
+export async function updatePersonal(
+    id: string,
+    updates: Partial<Personal>
+): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabase
+        .from('personal')
+        .update(updates)
+        .eq('id', id);
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+    return { success: true };
+}
+
+export async function togglePersonalActivo(id: string, activo: boolean): Promise<{ success: boolean; error?: string }> {
+    return updatePersonal(id, { activo });
+}
+
+export async function uploadPersonalDocument(
+    personalId: string,
+    file: File,
+    documentType: 'dni_frente' | 'dni_dorso' | 'foto' | 'poliza' | 'consentimiento'
+): Promise<{ url: string | null; error: Error | null }> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${personalId}/${documentType}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('personal-documents')
+        .upload(fileName, file, { upsert: true });
+
+    if (uploadError) {
+        return { url: null, error: new Error(uploadError.message) };
+    }
+
+    const { data: urlData } = supabase.storage
+        .from('personal-documents')
+        .getPublicUrl(fileName);
+
+    return { url: urlData.publicUrl, error: null };
 }
 
 export async function getRegistroHoras(options: {
@@ -1046,4 +1277,71 @@ export async function getDiasSinCierreAdmin(sucursalId: string): Promise<DiaSinC
         return [];
     }
     return data || [];
+}
+export async function updateMovimientoAdminWithLines(
+    id: string,
+    updates: {
+        fecha_movimiento?: string;
+        descripcion?: string;
+        nota?: string;
+        registro_editado?: boolean;
+    },
+    lines: MovimientoLinea[]
+): Promise<{ success: boolean; error?: string }> {
+    const supabase = createClient();
+
+    // 1. Update main movement fields & total
+    const usdTotal = lines.reduce((sum, l) => sum + (l.usd_equivalente || 0), 0);
+
+    const { error: mainError } = await supabase
+        .from('caja_admin_movimientos')
+        .update({
+            ...updates,
+            usd_equivalente_total: usdTotal,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+    if (mainError) return { success: false, error: mainError.message };
+
+    // 2. Handle Lines
+    // Strategy: Delete all existing lines directly linked to this movement and re-insert? 
+    // Or Upsert?
+    // Delete + Insert is safer for "full replacement" of lines state.
+    // However, we want to keep IDs if possible?
+    // If we re-insert, we lose old line IDs. 
+    // Let's try to keeping it smart: 
+    //  - If line has ID, update it.
+    //  - If line has no ID, insert it.
+    //  - If line in DB is not in new list, delete it.
+
+    // A simple approach for this app iteration: Delete all and Insert new is robust but assumes no foreign keys to lines (which is true for now).
+    // Let's go with: Delete all lines for this movement -> Insert new lines.
+
+    // DELETE existing lines
+    const { error: deleteError } = await supabase
+        .from('caja_admin_movimiento_lineas')
+        .delete()
+        .eq('admin_movimiento_id', id);
+
+    if (deleteError) return { success: false, error: 'Error clearing old lines: ' + deleteError.message };
+
+    // INSERT new lines
+    const linesToInsert = lines.map(l => ({
+        admin_movimiento_id: id,
+        cuenta_id: l.cuenta_id,
+        importe: l.importe,
+        moneda: l.moneda,
+        usd_equivalente: l.usd_equivalente
+    }));
+
+    if (linesToInsert.length > 0) {
+        const { error: insertError } = await supabase
+            .from('caja_admin_movimiento_lineas')
+            .insert(linesToInsert);
+
+        if (insertError) return { success: false, error: 'Error inserting new lines: ' + insertError.message };
+    }
+
+    return { success: true };
 }

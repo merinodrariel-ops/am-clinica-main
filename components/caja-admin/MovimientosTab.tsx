@@ -16,7 +16,11 @@ import {
     Receipt,
     History,
     AlertTriangle,
-    Pencil
+    Pencil,
+    Eye,
+    EyeOff,
+    Share2,
+    Trash2
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -27,10 +31,13 @@ import {
     getCuentas,
     createMovimiento,
     updateMovimientoAdmin,
+    updateMovimientoAdminWithLines,
     logMovimientoEdit,
+    deleteMovimiento,
     SUBTIPOS_MOVIMIENTO,
     SUBTIPOS_ADJUNTO_OBLIGATORIO
 } from '@/lib/caja-admin';
+import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
@@ -48,6 +55,7 @@ const TIPOS_MOVIMIENTO = [
     { value: 'RETIRO', label: 'Retiro' },
     { value: 'TRANSFERENCIA', label: 'Transferencia' },
     { value: 'AJUSTE_CAJA', label: 'Ajuste de Caja' },
+    { value: 'APORTE_CAPITAL', label: 'Aporte de Capital (No Ingreso)' },
 ];
 
 export default function MovimientosTab({ sucursal, tcBna }: Props) {
@@ -62,12 +70,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     });
     const [searchTerm, setSearchTerm] = useState('');
     const [filterTipo, setFilterTipo] = useState<string>('');
+    const [privacyMode, setPrivacyMode] = useState(false);
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
+    const [deletingMovId, setDeletingMovId] = useState<string | null>(null);
+    const [deletionConfirmation, setDeletionConfirmation] = useState('');
+    const [deletionReason, setDeletionReason] = useState('');
     const [editingMov, setEditingMov] = useState<CajaAdminMovimiento | null>(null);
     const [editData, setEditData] = useState({
         fecha: '',
         descripcion: '',
-        motivo: ''
+        motivo: '',
+        lines: [] as MovimientoLinea[]
     });
 
     // Form state
@@ -134,7 +147,6 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
         setFormLineas(newLineas);
     }
-
     async function handleUpdate() {
         if (!editingMov || !editData.fecha || !editData.motivo) {
             alert('Por favor complete la fecha y el motivo del cambio');
@@ -164,12 +176,15 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     editData.motivo
                 );
             }
+            // Log amount changes?
+            // Simple log: "Montos actualizados" if lines changed.
+            // For now, let's rely on the mandatory "motivo" for audit.
 
-            const { success, error } = await updateMovimientoAdmin(editingMov.id, {
+            const { success, error } = await updateMovimientoAdminWithLines(editingMov.id, {
                 fecha_movimiento: editData.fecha,
                 descripcion: editData.descripcion,
                 registro_editado: true
-            });
+            }, editData.lines);
 
             if (!success) throw new Error(error);
 
@@ -257,6 +272,63 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         !t.onlyUnificada || sucursal.modo_caja === 'UNIFICADA'
     );
 
+    // --- Helper for Privacy Mode ---
+    const formatPrivacy = (content: React.ReactNode) => {
+        if (!privacyMode) return content;
+        return <span className="blur-sm select-none">••••</span>;
+    };
+
+    // --- Helper for Monthly Summary ---
+    // --- Helper for Monthly Summary ---
+    const getMonthlySummary = () => {
+        const [year, month] = mesActual.split('-');
+        const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+
+        const egresos = movimientos.filter(m => m.tipo_movimiento === 'EGRESO' && m.estado !== 'Anulado');
+        const ingresosPacientes = movimientos.filter(m => m.tipo_movimiento === 'INGRESO_PACIENTE' && m.estado !== 'Anulado');
+        const ingresosAdmin = movimientos.filter(m => m.tipo_movimiento === 'INGRESO_ADMIN' && m.estado !== 'Anulado');
+        const aportesCapital = movimientos.filter(m => m.tipo_movimiento === 'APORTE_CAPITAL' && m.estado !== 'Anulado');
+
+        const totalEgresosUsd = egresos.reduce((acc, m) => acc + m.usd_equivalente_total, 0);
+        const totalIngresosUsd = ingresosPacientes.reduce((acc, m) => acc + m.usd_equivalente_total, 0) +
+            ingresosAdmin.reduce((acc, m) => acc + m.usd_equivalente_total, 0);
+        const totalAportesUsd = aportesCapital.reduce((acc, m) => acc + m.usd_equivalente_total, 0);
+
+        // Balance Operativo (Ingresos - Egresos)
+        const balanceOperativo = totalIngresosUsd - totalEgresosUsd;
+
+        // Cashflow Real (Balance Operativo + Aportes)
+        const cashflowReal = balanceOperativo + totalAportesUsd;
+
+        let summaryText = `📊 *Reporte Caja Administración*
+📅 *Período:* ${monthName}
+🏢 *Sucursal:* ${sucursal.nombre}
+
+💸 *Egresos:*
+• Cantidad: ${egresos.length}
+• Total USD: $${totalEgresosUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+
+💰 *Ingresos Operativos:*
+• Pacientes: ${ingresosPacientes.length} mov.
+• Administración: ${ingresosAdmin.length} mov.
+• Total USD: $${totalIngresosUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+        if (aportesCapital.length > 0) {
+            summaryText += `\n\n🏦 *Aportes de Capital (No Ingreso/No Venta):*
+• Cantidad: ${aportesCapital.length}
+• Total USD: $${totalAportesUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        }
+
+        summaryText += `\n\n📈 *Balance Operativo:* $${balanceOperativo.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD`;
+
+        if (aportesCapital.length > 0) {
+            summaryText += `\n💵 *Cashflow Real (c/ Aportes):* $${cashflowReal.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD`;
+        }
+
+        summaryText += `\n\n_AM Clínica - Caja Administración_`;
+
+        return summaryText;
+    };
     return (
         <div className="space-y-6">
             {/* Header with Actions */}
@@ -300,6 +372,27 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                         </select>
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
+
+                    {/* Share Summary Button */}
+                    <button
+                        onClick={() => {
+                            const summary = getMonthlySummary();
+                            window.open(`https://wa.me/?text=${encodeURIComponent(summary)}`, '_blank');
+                        }}
+                        className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors border border-transparent hover:border-green-200"
+                        title="Enviar Resumen del Mes por WhatsApp"
+                    >
+                        <Share2 className="w-5 h-5" />
+                    </button>
+
+                    {/* Privacy Toggle */}
+                    <button
+                        onClick={() => setPrivacyMode(!privacyMode)}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-transparent hover:border-blue-200"
+                        title={privacyMode ? "Mostrar montos" : "Ocultar montos (Modo Discreto)"}
+                    >
+                        {privacyMode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
                 </div>
 
                 {(role === 'owner' || role === 'admin') && (
@@ -560,7 +653,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                             ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                             : mov.tipo_movimiento.includes('INGRESO')
                                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                : mov.tipo_movimiento === 'APORTE_CAPITAL'
+                                                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                             }`}>
                                             {mov.tipo_movimiento.replace('_', ' ')}
                                         </span>
@@ -568,7 +663,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                     <td className="px-6 py-4 text-sm font-medium">{mov.descripcion}</td>
                                     <td className="px-6 py-4 text-sm text-slate-500">{mov.subtipo || '-'}</td>
                                     <td className="px-6 py-4 text-sm text-right font-mono">
-                                        ${mov.usd_equivalente_total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        {formatPrivacy(`$${mov.usd_equivalente_total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`)}
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         {mov.estado === 'Registrado' ? (
@@ -602,7 +697,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                                     setEditData({
                                                         fecha: mov.fecha_movimiento,
                                                         descripcion: mov.descripcion,
-                                                        motivo: ''
+                                                        motivo: '',
+                                                        lines: mov.caja_admin_movimiento_lineas || [] // Use lineas from relation
                                                     });
                                                 }}
                                                 className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -610,6 +706,19 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </button>
+                                            {(role === 'admin' || role === 'owner') && (
+                                                <button
+                                                    onClick={() => {
+                                                        setDeletingMovId(mov.id);
+                                                        setDeletionConfirmation('');
+                                                        setDeletionReason('');
+                                                    }}
+                                                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                                    title="Eliminar movimiento"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </motion.tr>
@@ -618,6 +727,104 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     </table>
                 )}
             </div>
+
+            {/* Modal de Confirmación de Eliminación */}
+            {deletingMovId && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-red-100 dark:border-red-900/30"
+                    >
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4 text-red-600 dark:text-red-400">
+                                <AlertTriangle className="w-8 h-8" />
+                                <h3 className="text-xl font-bold">¡Advertencia Crítica!</h3>
+                            </div>
+
+                            <p className="text-slate-600 dark:text-slate-300 mb-4">
+                                Está a punto de eliminar un registro financiero. Esta acción es <strong>IRREVERSIBLE</strong> y quedará registrada en el historial de auditoría.
+                            </p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                                        Motivo de la eliminación (Obligatorio)
+                                    </label>
+                                    <textarea
+                                        value={deletionReason}
+                                        onChange={(e) => setDeletionReason(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                        rows={2}
+                                        placeholder="Ej: Error de carga, registro duplicado..."
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                                        Para confirmar, escriba <span className="font-mono font-bold select-all">ELIMINAR</span> abajo:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={deletionConfirmation}
+                                        onChange={(e) => setDeletionConfirmation(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                                        placeholder="ELIMINAR"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-8">
+                                <button
+                                    onClick={() => setDeletingMovId(null)}
+                                    className="px-4 py-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        if (deletionConfirmation !== 'ELIMINAR' || !deletionReason.trim()) return;
+
+                                        // Since we are in the component, we need the user ID. 
+                                        // The component likely doesn't have it directly exposed or we need to pass it.
+                                        // But deleteMovimiento is a server action or library function? 
+                                        // It's a client-side function importing supabase client.
+                                        // We need the user ID for the log.
+                                        // We can get it from supabase.auth.getUser() inside deleteMovimiento or pass it.
+                                        // The updated deleteMovimiento takes (id, usuarioId, motivo).
+                                        // So we need to pass usuarioId.
+                                        // We don't have user object here easily unless we add useAuth hook or similar.
+                                        // Wait, we have `role` passed as prop. Do we have user ID?
+                                        // Looking at file content... it doesn't seem to have `user` prop.
+                                        // But checking imports... it uses `createClient` inside `loadData`.
+                                        // I should get the user in the component.
+
+                                        // Temporary: fetch user here.
+                                        const { data: { user } } = await createClient().auth.getUser();
+                                        if (!user) {
+                                            alert('Sesión no válida');
+                                            return;
+                                        }
+
+                                        const { success, error } = await deleteMovimiento(deletingMovId, user.id, deletionReason);
+                                        if (success) {
+                                            setDeletingMovId(null);
+                                            loadData();
+                                        } else {
+                                            alert('Error al eliminar: ' + error);
+                                        }
+                                    }}
+                                    disabled={deletionConfirmation !== 'ELIMINAR' || !deletionReason.trim()}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-lg shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Confirmar Eliminación
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
 
             {/* Historial de Ediciones Modal */}
             <HistorialEdicionesModal
@@ -688,6 +895,44 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                             <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg flex items-start gap-2 text-xs text-amber-800 dark:text-amber-400">
                                 <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                                 <p>Este cambio quedará registrado permanentemente en el historial de auditoría.</p>
+                            </div>
+
+                            {/* Lines Editing */}
+                            <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Montos / Líneas
+                                </label>
+                                <div className="space-y-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl max-h-48 overflow-y-auto">
+                                    {editData.lines.map((line, idx) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                            <span className="text-xs font-mono text-slate-500 w-12">{line.moneda}</span>
+                                            <input
+                                                type="number"
+                                                value={line.importe}
+                                                onChange={(e) => {
+                                                    const newImporte = parseFloat(e.target.value) || 0;
+                                                    const newLines = [...editData.lines];
+                                                    newLines[idx] = {
+                                                        ...newLines[idx],
+                                                        importe: newImporte,
+                                                        // Recalculate USD equivalent if needed
+                                                        usd_equivalente: line.moneda === 'USD' ? newImporte : (newImporte / (tcBna || 1))
+                                                    };
+                                                    setEditData({ ...editData, lines: newLines });
+                                                }}
+                                                className="flex-1 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                                            />
+                                            {line.moneda !== 'USD' && (
+                                                <span className="text-xs text-green-600">
+                                                    ≈ ${line.usd_equivalente?.toFixed(2)} USD
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {editData.lines.length === 0 && (
+                                        <p className="text-xs text-slate-400 text-center py-2">No hay líneas para editar</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

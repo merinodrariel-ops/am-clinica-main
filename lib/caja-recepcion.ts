@@ -1,4 +1,7 @@
-import { supabase, CajaMovimiento, TarifarioItem, CajaArqueo, TransferenciaCaja, Paciente } from './supabase';
+import { CajaMovimiento, TarifarioItem, CajaArqueo, TransferenciaCaja, Paciente } from './supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 
 /**
  * Caja Recepción Business Logic
@@ -356,13 +359,40 @@ export async function logMovimientoEdit(
     valorNuevo: string | null,
     motivo: string
 ) {
-    const { error } = await supabase.rpc('log_field_edit', {
-        p_registro_id: registroId,
-        p_tabla: tabla,
-        p_campo: campo,
-        p_valor_anterior: valorAnterior,
-        p_valor_nuevo: valorNuevo,
-        p_motivo: motivo
-    });
-    if (error) console.error('Error logging edit:', error);
+    try {
+        // Get current user info
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const insertData = {
+            id_registro: registroId,
+            tabla_origen: tabla,
+            campo_modificado: campo,
+            valor_anterior: valorAnterior,
+            valor_nuevo: valorNuevo,
+            usuario_editor: user?.id || null,
+            usuario_email: user?.email || null,
+            motivo_edicion: motivo
+        };
+
+        const { error } = await supabase
+            .from('historial_ediciones')
+            .insert(insertData);
+
+        if (error) {
+            // If error is Foreign Key Violation (user exists in auth but not in profiles), retry without user_id
+            if (error.code === '23503') {
+                console.warn('Logging edit without linking to profile due to FK violation (missing profile). Email:', user?.email);
+                await supabase
+                    .from('historial_ediciones')
+                    .insert({
+                        ...insertData,
+                        usuario_editor: null
+                    });
+            } else {
+                console.error('Error logging edit:', error);
+            }
+        }
+    } catch (err) {
+        console.error('Error in logMovimientoEdit:', err);
+    }
 }

@@ -53,7 +53,7 @@ interface PatientDashboardProps {
 const TABS = [
     { id: 'datos', label: 'Datos Personales', icon: User },
     { id: 'historia', label: 'Historia Clínica', icon: FileText },
-    { id: 'financiamiento', label: 'Financiación', icon: TrendingUp },
+    { id: 'financiamiento', label: 'Plan de Pagos', icon: TrendingUp },
     { id: 'pagos', label: 'Historial de Pagos', icon: CreditCard },
     { id: 'planes', label: 'Planes (Presupuestos)', icon: DollarSign },
 ];
@@ -617,28 +617,69 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         </div>
                                     )}
 
-                                    {/* Progress Bar */}
+                                    {/* Quotas Visual Grid */}
                                     <div className="mt-8">
-                                        <div className="flex justify-between items-end mb-2">
-                                            <div>
-                                                <p className="font-medium text-gray-900 dark:text-white">Progreso de Pagos</p>
-                                                <p className="text-xs text-gray-500">
-                                                    {((payments.filter(p => (p.cuota_nro || 0) > 0)).length)} pagos registrados como cuota
-                                                    {finData.cuotas > 0 && ` de ${finData.cuotas} pactadas`}
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-2xl font-bold text-gray-900 dark:text-white">{porcentajePagado.toFixed(1)}%</span>
-                                            </div>
+                                        <div className="flex justify-between items-end mb-4">
+                                            <h3 className="font-medium text-gray-900 dark:text-white">Estado de Cuotas</h3>
+                                            <span className="text-sm text-gray-500">
+                                                {((payments.filter(p => (p.cuota_nro || 0) > 0)).length)} pagadas de {finData.cuotas || 0}
+                                            </span>
                                         </div>
-                                        <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-1000 ease-out relative"
-                                                style={{ width: `${Math.min(porcentajePagado, 100)}%` }}
-                                            >
-                                                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+
+                                        {finData.cuotas > 0 ? (
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                                                {Array.from({ length: finData.cuotas }).map((_, i) => {
+                                                    const quotaNum = i + 1;
+                                                    const paidPayment = payments.find(p => p.cuota_nro === quotaNum && p.estado !== 'Anulado');
+                                                    const isPaid = !!paidPayment;
+                                                    const isNext = !isPaid && quotaNum === ((payments.filter(p => (p.cuota_nro || 0) > 0).length) + 1);
+
+                                                    return (
+                                                        <div
+                                                            key={quotaNum}
+                                                            className={clsx(
+                                                                "relative p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all",
+                                                                isPaid
+                                                                    ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+                                                                    : isNext
+                                                                        ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200 dark:bg-blue-900/20 dark:border-blue-400 dark:ring-blue-900"
+                                                                        : "bg-gray-50 border-gray-100 text-gray-400 dark:bg-gray-800 dark:border-gray-700"
+                                                            )}
+                                                        >
+                                                            <span className="text-xs font-semibold mb-1">Cuota {quotaNum}</span>
+                                                            {isPaid ? (
+                                                                <Check size={20} className="mb-1" />
+                                                            ) : (
+                                                                <span className="text-lg font-bold text-gray-300 dark:text-gray-600">
+                                                                    {i + 1}
+                                                                </span>
+                                                            )}
+
+                                                            {isPaid && (
+                                                                <span className="text-[10px] leading-tight opacity-75">
+                                                                    {new Date(paidPayment.fecha_hora).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                                                </span>
+                                                            )}
+                                                            {isNext && (
+                                                                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm">
+                                                                    Próxima
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <div className="p-6 text-center bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
+                                                <p className="text-gray-500">No hay cuotas configuradas.</p>
+                                                <button
+                                                    onClick={() => setIsEditingFin(true)}
+                                                    className="mt-2 text-blue-600 font-medium hover:underline text-sm"
+                                                >
+                                                    Configurar Plan
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
