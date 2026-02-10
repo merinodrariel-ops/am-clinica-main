@@ -75,12 +75,20 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     const [deletingMovId, setDeletingMovId] = useState<string | null>(null);
     const [deletionConfirmation, setDeletionConfirmation] = useState('');
     const [deletionReason, setDeletionReason] = useState('');
+    const [adjuntos, setAdjuntos] = useState<string[]>([]);
     const [editingMov, setEditingMov] = useState<CajaAdminMovimiento | null>(null);
-    const [editData, setEditData] = useState({
+    const [editData, setEditData] = useState<{
+        fecha: string;
+        descripcion: string;
+        motivo: string;
+        lines: MovimientoLinea[];
+        adjuntos: string[];
+    }>({
         fecha: '',
         descripcion: '',
         motivo: '',
-        lines: [] as MovimientoLinea[]
+        lines: [],
+        adjuntos: []
     });
 
     // Form state
@@ -93,7 +101,6 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     });
     const [formLineas, setFormLineas] = useState<MovimientoLinea[]>([]);
     const [formError, setFormError] = useState<string | null>(null);
-    const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
 
@@ -136,6 +143,11 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             if (cuenta) {
                 newLineas[index].moneda = cuenta.moneda;
             }
+        }
+
+        // Enforce positive values
+        if (updates.importe !== undefined) {
+            newLineas[index].importe = Math.abs(newLineas[index].importe);
         }
 
         // Calculate USD equivalent
@@ -183,8 +195,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             const { success, error } = await updateMovimientoAdminWithLines(editingMov.id, {
                 fecha_movimiento: editData.fecha,
                 descripcion: editData.descripcion,
+                adjuntos: editData.adjuntos,
                 registro_editado: true
-            }, editData.lines);
+            }, editData.lines.map(l => ({
+                ...l,
+                id: undefined, // Strip ID to force new insertion logic in backend if needed
+                created_at: undefined
+            })));
 
             if (!success) throw new Error(error);
 
@@ -229,7 +246,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 descripcion: formData.descripcion,
                 nota: formData.nota || undefined,
                 fecha_movimiento: formData.fecha_movimiento,
-
+                adjuntos: adjuntos,
                 tc_fuente: tcBna ? 'BNA_AUTO' : 'N/A',
                 tc_fecha_hora: new Date().toISOString(),
             },
@@ -253,7 +270,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             fecha_movimiento: new Date().toISOString().split('T')[0]
         });
         setFormLineas([]);
-        setComprobanteUrl(null);
+        setAdjuntos([]);
         loadData();
     }
 
@@ -536,8 +553,10 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                         <input
                                             type="number"
                                             value={linea.importe}
-                                            onChange={(e) => updateLinea(idx, { importe: parseFloat(e.target.value) || 0 })}
+                                            onChange={(e) => updateLinea(idx, { importe: Math.abs(parseFloat(e.target.value) || 0) })}
                                             placeholder="Importe"
+                                            min="0"
+                                            step="0.01"
                                             className="w-32 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
                                         />
                                         <span className="text-sm text-slate-500 w-12">{linea.moneda}</span>
@@ -571,19 +590,43 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     {/* Comprobante Upload */}
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Adjuntar Comprobante (opcional)
+                            Adjuntar Comprobantes (opcional)
                         </label>
+
+                        {/* Lista de adjuntos */}
+                        {adjuntos.length > 0 && (
+                            <div className="mb-3 space-y-2">
+                                {adjuntos.map((url, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            <Paperclip className="w-4 h-4 text-slate-400" />
+                                            <a
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-indigo-600 hover:text-indigo-500 truncate"
+                                            >
+                                                Ver adjunto {idx + 1}
+                                            </a>
+                                        </div>
+                                        <button
+                                            onClick={() => setAdjuntos(adjuntos.filter((_, i) => i !== idx))}
+                                            className="text-red-500 hover:text-red-600 p-1"
+                                            title="Eliminar adjunto"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         <ComprobanteUpload
                             area="caja-admin"
                             onUploadComplete={(result) => {
-                                setComprobanteUrl(result.url);
+                                setAdjuntos([...adjuntos, result.url]);
                             }}
                         />
-                        {comprobanteUrl && (
-                            <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                                ✓ Comprobante adjuntado correctamente
-                            </p>
-                        )}
                     </div>
 
                     {formError && (
@@ -698,7 +741,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                                         fecha: mov.fecha_movimiento,
                                                         descripcion: mov.descripcion,
                                                         motivo: '',
-                                                        lines: mov.caja_admin_movimiento_lineas || [] // Use lineas from relation
+                                                        lines: mov.caja_admin_movimiento_lineas || mov.lineas || [],
+                                                        adjuntos: mov.adjuntos || ((mov as any).url_comprobante ? [(mov as any).url_comprobante] : [])
                                                     });
                                                 }}
                                                 className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -910,7 +954,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                                 type="number"
                                                 value={line.importe}
                                                 onChange={(e) => {
-                                                    const newImporte = parseFloat(e.target.value) || 0;
+                                                    const newImporte = Math.abs(parseFloat(e.target.value) || 0);
                                                     const newLines = [...editData.lines];
                                                     newLines[idx] = {
                                                         ...newLines[idx],
@@ -920,6 +964,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                                     };
                                                     setEditData({ ...editData, lines: newLines });
                                                 }}
+                                                min="0"
+                                                step="0.01"
                                                 className="flex-1 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
                                             />
                                             {line.moneda !== 'USD' && (

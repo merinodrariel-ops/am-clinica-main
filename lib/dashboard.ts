@@ -1,9 +1,14 @@
 import { supabase } from './supabase';
+import { getGlobalAdminCashBalance } from './caja-admin';
 
 export interface DashboardStats {
     patientsCount: number;
     todayIncome: number;
     monthIncome: number;
+    adminCash: {
+        ars: number;
+        usd: number;
+    };
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -50,17 +55,22 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         if (mError) throw mError;
         const monthIncome = monthMovs?.reduce((sum, m) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
 
+        // 3. Admin Cash Balance (Last Closure)
+        const adminCash = await getGlobalAdminCashBalance();
+
         return {
             patientsCount: patientsCount || 0,
             todayIncome: Math.round(todayIncome),
-            monthIncome: Math.round(monthIncome)
+            monthIncome: Math.round(monthIncome),
+            adminCash
         };
     } catch (error) {
         console.error('Error in getDashboardStats:', error);
         return {
             patientsCount: 0,
             todayIncome: 0,
-            monthIncome: 0
+            monthIncome: 0,
+            adminCash: { ars: 0, usd: 0 }
         };
     }
 }

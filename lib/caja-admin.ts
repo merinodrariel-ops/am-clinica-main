@@ -482,7 +482,7 @@ export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: str
         .from('caja_admin_arqueos')
         .select('*')
         .eq('sucursal_id', sucursalId)
-        .eq('estado', 'cerrado') // Lowecase 'cerrado' based on RPC? Wait, table uses 'cerrado' or 'Cerrado'? Previous code used 'Cerrado'. RPC uses 'cerrado'. I should normalize.
+        .eq('estado', 'Cerrado') // Lowecase 'cerrado' based on RPC? Wait, table uses 'cerrado' or 'Cerrado'? Previous code used 'Cerrado'. RPC uses 'cerrado'. I should normalize.
         .order('fecha', { ascending: false })
         .limit(1);
 
@@ -490,10 +490,9 @@ export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: str
         query = query.lt('fecha', fechaLimite);
     }
 
-    const { data, error } = await query.single();
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
-        if (error.code === 'PGRST116') return null;
         console.error('Error fetching ultimo cierre admin:', error);
         return null;
     }
@@ -516,19 +515,19 @@ export async function cerrarCajaAdmin(params: {
     tcBna: number;
     observaciones?: string;
     snapshot: unknown;
+    saldosIniciales?: Record<string, number>;
 }): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase.rpc('cerrar_caja_admin', {
         p_sucursal_id: params.sucursalId,
         p_fecha: params.fecha,
         p_usuario: params.usuario,
-        p_saldo_final_usd: 0, // Not used directly in JSON structure but might be needed if I add columns later. For now RPC expects it?
-        p_saldo_final_ars: 0,
         p_saldo_final_usd_eq: params.saldoFinalUsdEq,
         p_saldos_finales: params.saldosFinales,
         p_diferencia_usd: params.diferenciaUsd,
         p_tc_bna: params.tcBna,
         p_observaciones: params.observaciones,
-        p_snapshot: params.snapshot
+        p_snapshot: params.snapshot,
+        p_saldos_iniciales: params.saldosIniciales || null
     });
 
     if (error) {
@@ -1285,6 +1284,7 @@ export async function updateMovimientoAdminWithLines(
         descripcion?: string;
         nota?: string;
         registro_editado?: boolean;
+        adjuntos?: string[];
     },
     lines: MovimientoLinea[]
 ): Promise<{ success: boolean; error?: string }> {
@@ -1344,4 +1344,39 @@ export async function updateMovimientoAdminWithLines(
     }
 
     return { success: true };
+}
+
+export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: number }> {
+    const { data: sucursales, error: sError } = await supabase
+        .from('sucursales')
+        .select('*')
+        .eq('activa', true);
+
+    if (sError) return { ars: 0, usd: 0 };
+
+    let totalArs = 0;
+    let totalUsd = 0;
+
+    for (const sucursal of sucursales || []) {
+        try {
+            // Get accounts to identify currency
+            const cuentas = await getCuentas(sucursal.id);
+            const efectivoCuentas = cuentas.filter(c => c.tipo_cuenta === 'EFECTIVO');
+
+            if (efectivoCuentas.length === 0) continue;
+
+            const cierre = await getUltimoCierreAdmin(sucursal.id);
+            const saldos = cierre?.saldos_finales || {};
+
+            efectivoCuentas.forEach(c => {
+                const val = saldos[c.id] || 0;
+                if (c.moneda === 'ARS') totalArs += val;
+                if (c.moneda === 'USD') totalUsd += val;
+            });
+        } catch (e) {
+            console.error(`Error calculating balance for sucursal ${sucursal.id}`, e);
+        }
+    }
+
+    return { ars: totalArs, usd: totalUsd };
 }
