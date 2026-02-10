@@ -192,6 +192,32 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                         </button>
                     )}
                 </div>
+
+                {cierreHoy && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">Saldos de Cierre</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {cuentas.filter(c => c.tipo_cuenta === 'EFECTIVO').map(cuenta => (
+                                <div key={cuenta.id} className="flex justify-between items-center bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{cuenta.nombre_cuenta}</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                        {new Intl.NumberFormat('es-AR', { style: 'currency', currency: cuenta.moneda }).format(cierreHoy.saldos_finales[cuenta.id] || 0)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                        {cierreHoy.saldo_final_usd_equivalente && (
+                            <div className="mt-2 text-right">
+                                <span className="text-xs text-gray-400">Total Eq: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cierreHoy.saldo_final_usd_equivalente)}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Modal Closure */}

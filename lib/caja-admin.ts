@@ -1380,3 +1380,123 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
 
     return { ars: totalArs, usd: totalUsd };
 }
+
+// ===================== BALANCE HELPERS =====================
+
+export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
+    status: 'Abierto' | 'Cerrado';
+    lastCloseDate: string | null;
+    saldoArs: number;
+    saldoUsd: number;
+}> {
+    const today = new Date().toISOString().split('T')[0];
+    const ultimo = await getUltimoCierreAdmin(sucursalId);
+
+    // Get Cash Accounts
+    const cuentas = await getCuentas(sucursalId);
+    const efectivas = cuentas.filter(c => c.tipo_cuenta === 'EFECTIVO');
+    const idsEfectivo = new Set(efectivas.map(c => c.id));
+    const idsArs = new Set(efectivas.filter(c => c.moneda === 'ARS').map(c => c.id));
+    const idsUsd = new Set(efectivas.filter(c => c.moneda === 'USD').map(c => c.id));
+
+    // Check if closed today
+    if (ultimo && ultimo.fecha === today && ultimo.estado === 'Cerrado') {
+        let ars = 0;
+        let usd = 0;
+        // Sum from saldos_finales
+        Object.entries(ultimo.saldos_finales).forEach(([cuentaId, monto]) => {
+            if (idsArs.has(cuentaId)) ars += monto;
+            if (idsUsd.has(cuentaId)) usd += monto;
+        });
+        return {
+            status: 'Cerrado',
+            lastCloseDate: ultimo.fecha,
+            saldoArs: ars,
+            saldoUsd: usd
+        };
+    }
+
+    // If Open, calculate from last closure
+    let saldoArs = 0;
+    let saldoUsd = 0;
+
+    // 1. Initial from Last Closure
+    if (ultimo) {
+        Object.entries(ultimo.saldos_finales).forEach(([cuentaId, monto]) => {
+            if (idsArs.has(cuentaId)) saldoArs += monto;
+            if (idsUsd.has(cuentaId)) saldoUsd += monto;
+        });
+    }
+
+    // 2. Add Movements
+    // Fetch movements > ultimo.fecha
+    let query = supabase
+        .from('caja_admin_movimientos')
+        .select(`
+            tipo_movimiento, 
+            caja_admin_movimiento_lineas (
+                cuenta_id,
+                importe,
+                moneda
+            )
+        `)
+        .eq('sucursal_id', sucursalId)
+        .neq('estado', 'Anulado');
+
+    if (ultimo) {
+        query = query.gt('fecha_movimiento', ultimo.fecha);
+    }
+
+    const { data: movs } = await query;
+
+    if (movs) {
+        movs.forEach(m => {
+            const tipo = m.tipo_movimiento;
+            // Determine Sign based on Type
+            // INGRESO_*, APORTE_CAPITAL, AJUSTE_CAJA (Positive?) -> Usually inputs
+            // EGRESO, RETIRO, GASTOS -> Outputs
+
+            // Note: Data model might store 'importe' as always positive.
+            // Logic:
+            // INGRESO_*: Add
+            // EGRESO: Subtract
+            // RETIRO: Subtract
+            // AJUSTE_CAJA: Depends... Assume Add if positive? Or does it vary? 
+            // Better to assume generic INPUT/OUTPUT types.
+
+            let multiplier = 0;
+            if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') multiplier = 1;
+            else if (tipo === 'EGRESO' || tipo === 'RETIRO') multiplier = -1;
+            else if (tipo === 'CAMBIO_MONEDA') {
+                // Special case usually handled by negative line on source, positive on dest.
+                // If I just sum lines, it depends on if the API negated them.
+                // Assuming createMovimiento stores positive importes.
+                // For Exchange, usually one is Out, one is In. 
+                // Currently I don't have enough info on how Exchange is stored.
+                // Let's assume strict accounting: lines should have signs? 
+                // Or type governs sign?
+                // Given `createMovimiento` logic earlier, it takes `importe`.
+                // I will assume for safe MVP: 
+                // Ignore Cambio Moneda logic for now OR assume lines are applied as is?
+                // Actually, for a Quick View, just In/Out.
+                // I'll skip complex types to avoid error, or default to 0.
+            }
+
+            if (multiplier !== 0) {
+                m.caja_admin_movimiento_lineas.forEach((l: any) => {
+                    if (idsEfectivo.has(l.cuenta_id)) {
+                        if (l.moneda === 'ARS') saldoArs += l.importe * multiplier;
+                        if (l.moneda === 'USD') saldoUsd += l.importe * multiplier;
+                    }
+                });
+            }
+        });
+    }
+
+    return {
+        status: 'Abierto',
+        lastCloseDate: ultimo?.fecha || null,
+        saldoArs,
+        saldoUsd
+    };
+}

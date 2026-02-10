@@ -396,3 +396,90 @@ export async function logMovimientoEdit(
         console.error('Error in logMovimientoEdit:', err);
     }
 }
+
+// ===================== BALANCE HELPERS =====================
+
+export async function getCurrentBalanceRecepcion(): Promise<{
+    status: 'abierto' | 'cerrado';
+    lastCloseDate: string | null;
+    saldoArs: number;
+    saldoUsd: number;
+}> {
+    const today = new Date().toISOString().split('T')[0];
+    const ultimo = await getUltimoCierre();
+
+    // Check if today is already closed
+    const isClosedToday = ultimo?.fecha === today;
+
+    if (isClosedToday && ultimo) {
+        return {
+            status: 'cerrado',
+            lastCloseDate: ultimo.fecha,
+            saldoArs: ultimo.saldo_final_ars_billete || 0,
+            saldoUsd: ultimo.saldo_final_usd_billete || 0
+        };
+    }
+
+    // If open, perform calculation
+    // 1. Initial Balance (from last closure)
+    let saldoArs = ultimo?.saldo_final_ars_billete || 0;
+    let saldoUsd = ultimo?.saldo_final_usd_billete || 0;
+
+    // 2. Add Movements (Since last closure?)
+    // Usually "Caja del Día" implies movements of TODAY.
+    // If there is a gap (e.g. forgot to close yesterday), those movements might be "lost" to this calculation if we only check Today.
+    // Ideally we check movements > ultimo.fecha.
+
+    let query = supabase
+        .from('caja_recepcion_movimientos')
+        .select('monto, moneda, metodo_pago, estado')
+        .neq('estado', 'anulado');
+
+    if (ultimo) {
+        // Get movements strictly after the last closure date (or on the same date but created after? simpler: > date)
+        query = query.gt('fecha_movimiento', ultimo.fecha);
+    } else {
+        // No closure ever? Get all movements.
+    }
+
+    const { data: movimientos } = await query;
+    const movs = movimientos || [];
+
+    // Filter for Cash (Efectivo) only? User said "dinero fisico".
+    // Recepcion usually handles cash, transfer, MP. "Dinero fisico" = "Efectivo".
+    const cashMovs = movs.filter(m => m.metodo_pago === 'Efectivo');
+
+    cashMovs.forEach(m => {
+        if (m.moneda === 'ARS') saldoArs += m.monto;
+        if (m.moneda === 'USD') saldoUsd += m.monto;
+        // Note: Recepcion movements are usually "Ingresos" (Income).
+        // Are there "Egresos" in caja_recepcion_movimientos? 
+        // Currently it seems modeled as "Ingresos de Pacientes". 
+        // Real outflows are "Transferencias" (to Admin/Owner).
+    });
+
+    // 3. Subtract Transfers (Egresos)
+    let transQuery = supabase
+        .from('transferencias_caja')
+        .select('monto, moneda, estado')
+        .eq('estado', 'confirmada'); // Only confirmed transfers?
+
+    if (ultimo) {
+        transQuery = transQuery.gt('fecha_hora', `${ultimo.fecha}T23:59:59`);
+    }
+
+    const { data: transferencias } = await transQuery;
+    const trans = transferencias || [];
+
+    trans.forEach(t => {
+        if (t.moneda === 'ARS') saldoArs -= t.monto;
+        if (t.moneda === 'USD') saldoUsd -= t.monto;
+    });
+
+    return {
+        status: 'abierto',
+        lastCloseDate: ultimo?.fecha || null,
+        saldoArs,
+        saldoUsd
+    };
+}

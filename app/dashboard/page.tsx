@@ -5,6 +5,7 @@ import UserAlerts from '@/components/dashboard/UserAlerts';
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import ReferralChart from '@/components/dashboard/ReferralChart';
 import NewPatientsCard from '@/components/dashboard/NewPatientsCard';
+import FinancialOverview from '@/components/dashboard/FinancialOverview';
 
 export default function DashboardPage() {
     return (
@@ -16,8 +17,12 @@ export default function DashboardPage() {
                 <p className="text-gray-500 mt-1">AM Clínica – Operativa 360</p>
             </div>
 
+
             <UserAlerts />
             <CajaAlerts />
+
+            {/* Financial Overview */}
+            <FinancialOverview />
 
             {/* Real-time Stats */}
             <StatsGrid />
