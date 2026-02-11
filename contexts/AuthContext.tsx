@@ -9,7 +9,7 @@ const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-type Role = 'owner' | 'admin' | 'pricing_manager' | 'reception' | 'partner_viewer' | 'developer';
+type Role = 'owner' | 'admin' | 'pricing_manager' | 'reception' | 'partner_viewer' | 'developer' | 'laboratorio';
 
 interface Profile {
     id: string;
@@ -43,9 +43,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [impersonatedRole, setImpersonatedRole] = useState<Role | null>(null);
 
-    const isRealOwner = user?.email?.toLowerCase() === 'dr.arielmerinopersonal@gmail.com'.toLowerCase() || profile?.role === 'owner';
+    const isHardcodedOwner = user?.email?.toLowerCase() === 'dr.arielmerinopersonal@gmail.com'.toLowerCase();
+    const isRealOwner = isHardcodedOwner || profile?.role === 'owner';
     const metadataRole = user?.user_metadata?.role as Role | undefined;
-    const effectiveRole = (isRealOwner && impersonatedRole) ? impersonatedRole : (profile?.role || metadataRole || null);
+
+    // Calculate effective role:
+    // 1. If impersonating, use that.
+    // 2. If hardcoded owner, force 'owner' (unless impersonating).
+    // 3. Otherwise use profile role or metadata.
+    const effectiveRole = (isRealOwner && impersonatedRole)
+        ? impersonatedRole
+        : (isHardcodedOwner ? 'owner' : (profile?.role || metadataRole || null));
 
     const signOut = async () => {
         await supabase.auth.signOut();
@@ -182,6 +190,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Pricing Manager
         if (role === 'pricing_manager') {
             return ['tarifario', 'financiamiento'].includes(module);
+        }
+
+        // Laboratorio
+        if (role === 'laboratorio') {
+            return ['inventario', 'laboratorio', 'pacientes'].includes(module);
         }
 
         return false;

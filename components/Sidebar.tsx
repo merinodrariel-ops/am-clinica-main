@@ -13,7 +13,8 @@ import {
     Upload,
     Package,
     FlaskConical,
-    CalendarDays
+    CalendarDays,
+    EyeOff
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -35,7 +36,7 @@ const MENU_ITEMS = [
         icon: Users,
         label: 'Pacientes',
         href: '/patients',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']
     },
     {
         icon: Banknote,
@@ -59,19 +60,19 @@ const MENU_ITEMS = [
         icon: Package,
         label: 'Inventario',
         href: '/inventario',
-        roles: ['owner', 'admin', 'reception', 'developer']
+        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio']
     },
     {
         icon: FlaskConical,
         label: 'Laboratorio',
         href: '/laboratorio',
-        roles: ['owner', 'admin', 'reception', 'developer']
+        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio']
     },
 ];
 
 export default function Sidebar() {
     const pathname = usePathname();
-    const { role, profile, signOut, user } = useAuth();
+    const { role, profile, signOut, user, isRealOwner, impersonatedRole, setImpersonatedRole } = useAuth();
 
     // Hide sidebar on login page or if not authenticated (optional, depends on layout)
     if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional')) return null;
@@ -113,13 +114,14 @@ export default function Sidebar() {
             </nav>
 
             {/* User Profile & Actions */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-                {/* Admin/Owner User Management Link */}
-                {userRole === 'owner' && (
+            <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+
+                {/* Always Show Admin Link for Real Owner or Active Admin */}
+                {(isRealOwner || userRole === 'owner' || userRole === 'admin') && (
                     <Link
                         href="/admin-users"
                         className={clsx(
-                            "flex items-center gap-3 px-4 py-2 mb-2 rounded-lg text-sm font-medium transition-colors",
+                            "flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                             pathname.startsWith('/admin-users')
                                 ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
                                 : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -128,6 +130,17 @@ export default function Sidebar() {
                         <Settings size={18} />
                         <span>Gestión de Usuarios</span>
                     </Link>
+                )}
+
+                {/* Stop Impersonating Button */}
+                {impersonatedRole && (
+                    <button
+                        onClick={() => setImpersonatedRole(null)}
+                        className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+                    >
+                        <EyeOff size={18} />
+                        <span>Dejar de Imitar</span>
+                    </button>
                 )}
 
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -140,6 +153,7 @@ export default function Sidebar() {
                         </p>
                         <p className="text-xs text-gray-500 capitalize truncate">
                             {userRole.replace('_', ' ')}
+                            {impersonatedRole && <span className="ml-1 text-amber-600">(Imitando)</span>}
                         </p>
                     </div>
                     <button

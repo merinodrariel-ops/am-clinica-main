@@ -330,6 +330,7 @@ export default function UserManagementPage() {
                                     >
                                         <option value="partner_viewer">Partner Viewer (Solo Lectura)</option>
                                         <option value="reception">Recepción</option>
+                                        <option value="laboratorio">Laboratorio</option>
                                         <option value="admin">Administrador</option>
                                         <option value="pricing_manager">Pricing Manager</option>
                                         <option value="owner">Owner (Dueño)</option>

@@ -14,10 +14,12 @@ import {
     Calendar,
     User,
     ChevronRight,
-    Loader2
+    Loader2,
+    Package
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import clsx from 'clsx';
+import Link from 'next/link';
 import NuevoTrabajoForm from '@/components/laboratorio/NuevoTrabajoForm';
 import DetalleTrabajoModal from '@/components/laboratorio/DetalleTrabajoModal';
 
@@ -104,13 +106,22 @@ export default function LaboratorioPage() {
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400">Control de prótesis, coronas y alineadores</p>
                 </div>
-                <button
-                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
-                    onClick={() => setShowNuevoTrabajo(true)}
-                >
-                    <Plus size={20} />
-                    Nuevo Trabajo
-                </button>
+                <div className="flex gap-2">
+                    <Link
+                        href="/inventario?area=LABORATORIO"
+                        className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                    >
+                        <Package size={20} />
+                        Ver Inventario
+                    </Link>
+                    <button
+                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                        onClick={() => setShowNuevoTrabajo(true)}
+                    >
+                        <Plus size={20} />
+                        Nuevo Trabajo
+                    </button>
+                </div>
             </div>
 
             {/* Stats Grid */}

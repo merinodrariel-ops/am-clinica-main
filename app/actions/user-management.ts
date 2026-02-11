@@ -85,11 +85,29 @@ export async function getUsers() {
     }
 }
 
+// Helper to determine the correct public URL
+function getAppPublicUrl() {
+    // 1. Explicit Env Var (Best for custom domains)
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+        return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, ''); // Remove trailing slash
+    }
+
+    // 2. Vercel System Env Var (Automatic on Vercel)
+    if (process.env.VERCEL_URL) {
+        return `https://${process.env.VERCEL_URL}`;
+    }
+
+    // 3. Fallback (Hardcoded production URL provided by user)
+    return 'https://am-clinica-main.vercel.app';
+}
+
 export async function inviteUser(formData: FormData) {
     const email = formData.get('email') as string;
     const fullName = formData.get('fullName') as string;
     const role = formData.get('role') as string;
     const telefono = formData.get('telefono') as string;
+
+    const publicUrl = getAppPublicUrl();
 
     try {
         // 1. Generate Invite Link (Manual)
@@ -98,7 +116,7 @@ export async function inviteUser(formData: FormData) {
             email: email,
             options: {
                 data: { full_name: fullName, role: role },
-                redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password`
+                redirectTo: `${publicUrl}/auth/update-password`
             }
         });
 
@@ -152,13 +170,14 @@ export async function inviteUser(formData: FormData) {
 }
 
 export async function resendInvitation(email: string) {
+    // This function seems unused in favor of resendUserAccessEmail, but limiting scope for now.
+    // If used, it needs similar fix. 
     try {
-        // Just calling invite again resends the email for unconfirmed users
-        const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
+        const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+            redirectTo: `${getAppPublicUrl()}/auth/update-password`
+        });
         if (error) throw error;
 
-        // Update timestamp
-        // Need to find ID first or update by email (profiles has email)
         await supabaseAdmin.from('profiles')
             .update({ invitation_sent_at: new Date().toISOString() })
             .eq('email', email);
@@ -275,6 +294,7 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
         if (userError || !targetUser) throw new Error('User not found');
 
         let actionType = '';
+        const publicUrl = getAppPublicUrl();
 
         // 3. Determine Action
         if (!targetUser.email_confirmed_at) {
@@ -283,7 +303,7 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
                 type: 'invite',
                 email: targetUser.email!,
                 options: {
-                    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password`
+                    redirectTo: `${publicUrl}/auth/update-password`
                 }
             });
 
@@ -302,7 +322,7 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
         } else {
             // Case B: User confirmed -> Send Password Reset
             const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(targetUser.email!, {
-                redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password`
+                redirectTo: `${publicUrl}/auth/update-password`
             });
             if (resetError) throw resetError;
             actionType = 'send_reset_password';
@@ -334,7 +354,7 @@ export async function resetUserPassword(email: string) {
     try {
         // Send recovery email
         const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/update-password`
+            redirectTo: `${getAppPublicUrl()}/auth/update-password`
         });
 
         if (error) throw error;

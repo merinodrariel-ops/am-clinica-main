@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Package, Loader2, Save, Tag, BarChart3 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/ssr';
+import clsx from 'clsx';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NuevoItemFormProps {
     isOpen: boolean;
@@ -11,6 +13,13 @@ interface NuevoItemFormProps {
 }
 
 export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemFormProps) {
+    const { role } = useAuth();
+    const isLabUser = role === 'laboratorio';
+
+    const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
     const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         nombre: '',
@@ -18,8 +27,15 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
         stock_actual: 0,
         unidad_medida: 'unidades',
         stock_minimo: 5,
-        area: 'CLINICA' as 'CLINICA' | 'LABORATORIO'
+        area: (isLabUser ? 'LABORATORIO' : 'CLINICA') as 'CLINICA' | 'LABORATORIO'
     });
+
+    // Effect to enforce Lab role defaults
+    useEffect(() => {
+        if (isLabUser) {
+            setFormData(prev => ({ ...prev, area: 'LABORATORIO', categoria: 'Prótesis / Laboratorio' }));
+        }
+    }, [isLabUser, isOpen]);
 
     const CATEGORIAS = [
         'Insumos Clínicos',
@@ -53,7 +69,7 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                     stock_actual: formData.stock_actual,
                     unidad_medida: formData.unidad_medida,
                     stock_minimo: formData.stock_minimo,
-                    area: formData.area
+                    area: isLabUser ? 'LABORATORIO' : formData.area
                 })
                 .select()
                 .single();
@@ -75,11 +91,11 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
             onClose();
             setFormData({
                 nombre: '',
-                categoria: 'Insumos Clínicos',
+                categoria: isLabUser ? 'Prótesis / Laboratorio' : 'Insumos Clínicos',
                 stock_actual: 0,
                 unidad_medida: 'unidades',
                 stock_minimo: 5,
-                area: 'CLINICA'
+                area: isLabUser ? 'LABORATORIO' : 'CLINICA'
             });
         } catch (error) {
             console.error('Error saving item:', error);
@@ -142,9 +158,15 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                             <div className="space-y-2">
                                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Área / Destino *</label>
                                 <select
-                                    className="w-full px-4 py-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl appearance-none focus:ring-2 focus:ring-blue-500 outline-none font-bold text-indigo-700 dark:text-indigo-300"
+                                    className={clsx(
+                                        "w-full px-4 py-3 border rounded-xl appearance-none focus:ring-2 focus:ring-blue-500 outline-none font-bold",
+                                        isLabUser
+                                            ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 cursor-not-allowed"
+                                            : "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300"
+                                    )}
                                     value={formData.area}
                                     onChange={(e) => setFormData(prev => ({ ...prev, area: e.target.value as any }))}
+                                    disabled={isLabUser}
                                 >
                                     <option value="CLINICA">🏥 CLÍNICA GENERAL</option>
                                     <option value="LABORATORIO">🔬 LABORATORIO PROPIO</option>
