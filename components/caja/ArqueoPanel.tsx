@@ -18,6 +18,9 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
     const [loading, setLoading] = useState(true);
     const [showCerrarModal, setShowCerrarModal] = useState(false);
 
+    // Expected balances for comparison
+    const [saldosEsperados, setSaldosEsperados] = useState<{ ars: number, usd: number }>({ ars: 0, usd: 0 });
+
     // Form state for closing
     const [saldoFinalUsd, setSaldoFinalUsd] = useState(0);
     const [saldoFinalArs, setSaldoFinalArs] = useState(0);
@@ -39,25 +42,42 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                 .select('*')
                 .eq('fecha', today)
                 .eq('estado', 'cerrado')
-                .single();
+                .maybeSingle();
 
             if (hoy) {
                 setCierreHoy(hoy);
-                setUltimoCierre(null); // Not needed if closed
+                setUltimoCierre(null);
             } else {
                 setCierreHoy(null);
                 // 2. Get last closure (for start balance info) only if today is open
                 const ultimo = await getUltimoCierre(today);
                 setUltimoCierre(ultimo);
+
+                // Fetch expected balances logic
+                // Importing logic from lib would be better but for speed we'll do basic fetch here or use a helper
+                // actually we have a helper in lib/caja-recepcion.ts "getCurrentBalanceRecepcion"
             }
 
-        } catch {
-            // PGRST116 is no rows, which is expected
-            // console.error('Error checking caja:', error);
+        } catch (error) {
+            console.error('Error checking caja:', error);
         } finally {
             setLoading(false);
         }
     }
+
+    // Fetch expected balances when modal opens
+    useEffect(() => {
+        if (showCerrarModal) {
+            import('@/lib/caja-recepcion').then(m => {
+                m.getCurrentBalanceRecepcion().then(res => {
+                    setSaldosEsperados({ ars: res.saldoArs, usd: res.saldoUsd });
+                    // Auto-fill with expected to make it easier (Admin style)
+                    setSaldoFinalArs(res.saldoArs);
+                    setSaldoFinalUsd(res.saldoUsd);
+                });
+            });
+        }
+    }, [showCerrarModal]);
 
     async function handleCerrarCaja() {
         setSaving(true);
@@ -139,6 +159,41 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                         </button>
                     )}
                 </div>
+
+                {cierreHoy && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-sm font-medium text-gray-400 uppercase tracking-wider text-[10px]">Saldos de Cierre Confirmados</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="flex justify-between items-center bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo ARS</span>
+                                </div>
+                                <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                    {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(cierreHoy.saldo_final_ars_billete || 0)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo USD</span>
+                                </div>
+                                <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cierreHoy.saldo_final_usd_billete || 0)}
+                                </span>
+                            </div>
+                        </div>
+                        {cierreHoy.saldo_final_usd_equivalente !== null && (
+                            <div className="mt-3 text-right">
+                                <span className="text-[10px] text-gray-400 font-medium uppercase tracking-tight">
+                                    Total Equivalente: {formatCurrency(cierreHoy.saldo_final_usd_equivalente, 'USD')}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Modal Cerrar Caja */}
@@ -172,55 +227,74 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                        Recuento Efectivo USD
-                                    </label>
+                                    <div className="flex justify-between items-end mb-1.5">
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                            Efectivo USD
+                                        </label>
+                                        <span className="text-[10px] text-gray-400 font-medium">SISTEMA: {formatCurrency(saldosEsperados.usd, 'USD')}</span>
+                                    </div>
                                     <div className="relative">
                                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                         <input
                                             type="number"
                                             value={saldoFinalUsd || ''}
                                             onChange={(e) => setSaldoFinalUsd(parseFloat(e.target.value) || 0)}
-                                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            className={clsx(
+                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold",
+                                                (saldoFinalUsd === saldosEsperados.usd) ? "border-gray-200 dark:border-gray-700" : "border-amber-200 dark:border-amber-800 ring-amber-500/10"
+                                            )}
                                             placeholder="0.00"
                                         />
                                     </div>
+                                    {saldoFinalUsd !== saldosEsperados.usd && (
+                                        <p className={clsx("text-[10px] mt-1 font-bold text-right", saldoFinalUsd > saldosEsperados.usd ? "text-green-600" : "text-red-600")}>
+                                            Diferencia: {formatCurrency(saldoFinalUsd - saldosEsperados.usd, 'USD')}
+                                        </p>
+                                    )}
                                 </div>
+
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                        Recuento Efectivo ARS
-                                    </label>
+                                    <div className="flex justify-between items-end mb-1.5">
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                            Efectivo ARS
+                                        </label>
+                                        <span className="text-[10px] text-gray-400 font-medium">SISTEMA: {formatCurrency(saldosEsperados.ars, 'ARS')}</span>
+                                    </div>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">$</span>
                                         <input
                                             type="number"
                                             value={saldoFinalArs || ''}
                                             onChange={(e) => setSaldoFinalArs(parseFloat(e.target.value) || 0)}
-                                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            className={clsx(
+                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold",
+                                                (saldoFinalArs === saldosEsperados.ars) ? "border-gray-200 dark:border-gray-700" : "border-amber-200 dark:border-amber-800 ring-amber-500/10"
+                                            )}
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    {bnaRate > 0 && saldoFinalArs > 0 && (
-                                        <p className="text-xs text-gray-500 mt-1.5 text-right">
-                                            ≈ {formatCurrency(saldoFinalArs / bnaRate, 'USD')}
+                                    {saldoFinalArs !== saldosEsperados.ars && (
+                                        <p className={clsx("text-[10px] mt-1 font-bold text-right", saldoFinalArs > saldosEsperados.ars ? "text-green-600" : "text-red-600")}>
+                                            Diferencia: {formatCurrency(saldoFinalArs - saldosEsperados.ars, 'ARS')}
                                         </p>
                                     )}
                                 </div>
-                                <div>
+
+                                <div className="pt-2">
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                         Observaciones
                                     </label>
                                     <textarea
                                         value={observaciones}
                                         onChange={(e) => setObservaciones(e.target.value)}
-                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 resize-none focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                         rows={2}
-                                        placeholder="Detalles sobre diferencias o billetes..."
+                                        placeholder="Ej: Diferencia por billetes chicos, etc..."
                                     />
                                 </div>
                             </div>
                         </div>
-                        <div className="p-5 border-t border-gray-100 dark:border-gray-700 flex gap-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-b-2xl">
+                        <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex gap-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-b-2xl">
                             <button
                                 onClick={() => setShowCerrarModal(false)}
                                 className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-white dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800"

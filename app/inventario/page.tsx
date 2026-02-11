@@ -19,13 +19,15 @@ import {
     List as ListIcon,
     ArrowUp,
     ArrowDown,
-    XCircle
+    XCircle,
+    Edit // Import Edit icon
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import NuevoItemForm from '@/components/inventario/NuevoItemForm';
+import EditarItemModal from '@/components/inventario/EditarItemModal'; // Import Modal
 import MovimientoStockForm from '@/components/inventario/MovimientoStockForm';
 import HistorialMovimientosModal from '@/components/inventario/HistorialMovimientosModal';
 
@@ -56,11 +58,15 @@ function InventarioContent() {
     const [areaFilter, setAreaFilter] = useState<'CLINICA' | 'LABORATORIO'>(initialArea);
     const [showNuevoItem, setShowNuevoItem] = useState(false);
     const [showHistorial, setShowHistorial] = useState(false);
+    const [editingItem, setEditingItem] = useState<Item | null>(null); // State for editing
     const [showMovimiento, setShowMovimiento] = useState({
         isOpen: false,
         item: null as Item | null,
         tipo: 'ENTRADA' as 'ENTRADA' | 'SALIDA' | 'AJUSTE'
     });
+
+    // Smart Filter State (Dashboard Interaction)
+    const [smartFilter, setSmartFilter] = useState<'ALL' | 'LOW_STOCK'>('ALL');
 
     // Add useAuth
     const { loading: authLoading, role } = useAuth();
@@ -131,7 +137,8 @@ function InventarioContent() {
 
         return itemArea === areaFilter &&
             matchesSearch &&
-            (categoryFilter === 'Todos' || i.categoria === categoryFilter);
+            (categoryFilter === 'Todos' || i.categoria === categoryFilter) &&
+            (smartFilter === 'ALL' || (smartFilter === 'LOW_STOCK' && i.stock_actual <= i.stock_minimo));
     });
 
     // SORTING LOGIC
@@ -147,11 +154,14 @@ function InventarioContent() {
         return sortOrder === 'ASC' ? cmp : -cmp;
     });
 
-    const lowStockCount = items.filter(i => i.stock_actual <= i.stock_minimo).length;
-
     // DASHBOARD TOTALS
+    const relevantItemsForStats = isLabUser ? items.filter(i => i.area === 'LABORATORIO') : items;
+    const lowStockCount = relevantItemsForStats.filter(i => i.stock_actual <= i.stock_minimo).length;
+
+    // Total counts by area
     const totalClinica = items.filter(i => (i.area || 'CLINICA') === 'CLINICA').length;
     const totalLaboratorio = items.filter(i => i.area === 'LABORATORIO').length;
+    const totalRelevant = isLabUser ? totalLaboratorio : items.length;
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -233,36 +243,61 @@ function InventarioContent() {
                 </div>
             )}
 
-            {/* Stats Grid */}
+            {/* Dashboard Stats Grid (Interactive) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* ... (Same stats cards as before, no changes needed here but including for context if needed, or I can skip replacing this part if I target carefully) */}
-                {/* Actually I will replace the whole return block to ensuring structure integrity */}
-                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                <button
+                    onClick={() => { setSmartFilter('ALL'); setSearch(''); setCategoryFilter('Todos'); }}
+                    className={clsx(
+                        "text-left p-5 rounded-2xl border shadow-sm transition-all group",
+                        smartFilter === 'ALL'
+                            ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 ring-2 ring-blue-500/20"
+                            : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-700"
+                    )}
+                >
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg flex items-center justify-center">
+                        <div className={clsx(
+                            "h-10 w-10 rounded-lg flex items-center justify-center transition-colors",
+                            smartFilter === 'ALL' ? "bg-blue-500 text-white" : "bg-blue-100 dark:bg-blue-900/30 text-blue-600"
+                        )}>
                             <Package size={20} />
                         </div>
                         <div className="flex-1">
                             <p className="text-sm text-gray-500 font-medium">Items Totales</p>
                             <div className="flex justify-between items-baseline">
-                                <span className="text-xl font-bold text-gray-900 dark:text-white">{isLabUser ? totalLaboratorio : totalClinica + totalLaboratorio}</span>
+                                <span className="text-xl font-bold text-gray-900 dark:text-white">{totalRelevant}</span>
                                 {!isLabUser && <span className="text-xs text-gray-400">🏥 {totalClinica} | 🔬 {totalLaboratorio}</span>}
                             </div>
                         </div>
                     </div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                </button>
+
+                <button
+                    onClick={() => setSmartFilter('LOW_STOCK')}
+                    className={clsx(
+                        "text-left p-5 rounded-2xl border shadow-sm transition-all group",
+                        smartFilter === 'LOW_STOCK'
+                            ? "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800 ring-2 ring-red-500/20"
+                            : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-red-200 dark:hover:border-red-700"
+                    )}
+                >
                     <div className="flex items-center gap-3">
-                        <div className={clsx("h-10 w-10 rounded-lg flex items-center justify-center", lowStockCount > 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600")}>
+                        <div className={clsx(
+                            "h-10 w-10 rounded-lg flex items-center justify-center transition-colors",
+                            smartFilter === 'LOW_STOCK' ? "bg-red-500 text-white" : (lowStockCount > 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600")
+                        )}>
                             <AlertTriangle size={20} />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500 font-medium">Stock Crítico</p>
-                            <p className={clsx("text-2xl font-bold", lowStockCount > 0 ? "text-red-600" : "text-emerald-600")}>{lowStockCount}</p>
+                            <p className="text-sm text-gray-500 font-medium">{lowStockCount > 0 ? 'Stock Crítico' : 'Stock Saludable'}</p>
+                            <p className={clsx("text-2xl font-bold", lowStockCount > 0 ? "text-red-600" : "text-emerald-600")}>
+                                {lowStockCount}
+                                {lowStockCount > 0 && <span className="text-sm font-normal text-gray-400 ml-2">items faltantes</span>}
+                            </p>
                         </div>
                     </div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                </button>
+
+                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm cursor-default">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-lg flex items-center justify-center">
                             <TrendingUp size={20} />
@@ -399,6 +434,7 @@ function InventarioContent() {
                                             <div className="text-xs text-gray-500">Min: {item.stock_minimo}</div>
                                         </div>
                                         <div className="flex gap-2">
+                                            <button className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" onClick={() => setEditingItem(item)} title="Editar Detalles"><Edit size={18} /></button>
                                             <button className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={18} /></button>
                                             <button className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={18} /></button>
                                         </div>
@@ -442,6 +478,7 @@ function InventarioContent() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2">
+                                                    <button className="p-1.5 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" title="Editar" onClick={() => setEditingItem(item)}><Edit size={16} /></button>
                                                     <button className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="Entrada" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={16} /></button>
                                                     <button className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Salida" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={16} /></button>
                                                 </div>
@@ -459,6 +496,13 @@ function InventarioContent() {
             <NuevoItemForm
                 isOpen={showNuevoItem}
                 onClose={() => setShowNuevoItem(false)}
+                onSuccess={loadItems}
+            />
+
+            <EditarItemModal
+                isOpen={!!editingItem}
+                item={editingItem}
+                onClose={() => setEditingItem(null)}
                 onSuccess={loadItems}
             />
 

@@ -1,13 +1,35 @@
+'use client';
+
 import Link from 'next/link';
-import { ArrowRight, Users, Banknote, Calendar, TrendingUp } from 'lucide-react';
+import { ArrowRight, Users, Banknote, Calendar, TrendingUp, Loader2 } from 'lucide-react';
 import CajaAlerts from '@/components/dashboard/CajaAlerts';
 import UserAlerts from '@/components/dashboard/UserAlerts';
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import ReferralChart from '@/components/dashboard/ReferralChart';
 import NewPatientsCard from '@/components/dashboard/NewPatientsCard';
 import FinancialOverview from '@/components/dashboard/FinancialOverview';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function DashboardPage() {
+    const { role, loading } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!loading && role === 'laboratorio') {
+            router.replace('/inventario');
+        }
+    }, [role, loading, router]);
+
+    if (loading || role === 'laboratorio') {
+        return (
+            <div className="flex h-[80vh] items-center justify-center">
+                <Loader2 className="animate-spin text-blue-600" size={40} />
+            </div>
+        );
+    }
+
     return (
         <div className="p-8 max-w-7xl mx-auto">
             <div className="mb-8">

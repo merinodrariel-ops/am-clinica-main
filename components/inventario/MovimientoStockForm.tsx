@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { X, ArrowUpCircle, ArrowDownCircle, Loader2, Save, MessageSquare } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import clsx from 'clsx';
+import { useAuth } from '@/contexts/AuthContext';
+import { registrarMovimiento } from '@/app/actions/inventory';
 
 interface Item {
     id: string;
@@ -21,34 +22,43 @@ interface MovimientoStockFormProps {
 }
 
 export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuccess }: MovimientoStockFormProps) {
+    const { user } = useAuth();
     const [saving, setSaving] = useState(false);
     const [cantidad, setCantidad] = useState(0);
     const [motivo, setMotivo] = useState('');
+    const [error, setError] = useState<string | null>(null); // Error state
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!item || cantidad <= 0) return;
 
-        setSaving(true);
-        try {
-            const { error } = await supabase
-                .from('inventario_movimientos')
-                .insert({
-                    item_id: item.id,
-                    tipo_movimiento: tipo,
-                    cantidad: cantidad,
-                    motivo: motivo || (tipo === 'ENTRADA' ? 'Carga de stock' : 'Consumo / Salida'),
-                    usuario: 'Sistema' // TODO: get from auth
-                });
+        if (!user) {
+            setError("No estás autenticado");
+            return;
+        }
 
-            if (error) throw error;
+        setSaving(true);
+        setError(null);
+        try {
+            const result = await registrarMovimiento({
+                item_id: item.id,
+                tipo_movimiento: tipo,
+                cantidad: cantidad,
+                motivo: motivo || (tipo === 'ENTRADA' ? 'Carga de stock' : 'Consumo / Salida'),
+                userId: user.id
+            });
+
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+
             onSuccess();
             onClose();
             setCantidad(0);
             setMotivo('');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving movement:', error);
-            alert('Error al registrar el movimiento');
+            setError(error.message || 'Error al registrar el movimiento');
         } finally {
             setSaving(false);
         }
@@ -86,6 +96,11 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                    {error && (
+                        <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl flex items-center gap-3 text-sm font-medium">
+                            <span className="text-xl">⚠️</span> {error}
+                        </div>
+                    )}
                     <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700">
                         <p className="text-xs text-gray-500 font-bold uppercase mb-1">Stock Actual</p>
                         <p className="text-2xl font-black text-gray-900 dark:text-white">

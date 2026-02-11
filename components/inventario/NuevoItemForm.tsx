@@ -5,6 +5,7 @@ import { X, Package, Loader2, Save, Tag, BarChart3 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
+import { crearItem } from '@/app/actions/inventory-create';
 
 interface NuevoItemFormProps {
     isOpen: boolean;
@@ -13,7 +14,7 @@ interface NuevoItemFormProps {
 }
 
 export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemFormProps) {
-    const { role } = useAuth();
+    const { role, user } = useAuth();
     const isLabUser = role === 'laboratorio';
 
     const supabase = createBrowserClient(
@@ -29,6 +30,7 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
         stock_minimo: 5,
         area: (isLabUser ? 'LABORATORIO' : 'CLINICA') as 'CLINICA' | 'LABORATORIO'
     });
+    const [error, setError] = useState<string | null>(null); // Error state
 
     // Effect to enforce Lab role defaults
     useEffect(() => {
@@ -58,33 +60,28 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!formData.nombre) return;
-
         setSaving(true);
+        setError(null); // Clear previous errors
+
+        if (!user) {
+            setError("No estás autenticado");
+            setSaving(false);
+            return;
+        }
+
         try {
-            const { error: itemError, data: itemData } = await supabase
-                .from('inventario_items')
-                .insert({
-                    nombre: formData.nombre,
-                    categoria: formData.categoria,
-                    stock_actual: formData.stock_actual,
-                    unidad_medida: formData.unidad_medida,
-                    stock_minimo: formData.stock_minimo,
-                    area: isLabUser ? 'LABORATORIO' : formData.area
-                })
-                .select()
-                .single();
+            const result = await crearItem({
+                nombre: formData.nombre,
+                categoria: formData.categoria,
+                stock_actual: formData.stock_actual,
+                unidad_medida: formData.unidad_medida,
+                stock_minimo: formData.stock_minimo,
+                area: isLabUser ? 'LABORATORIO' : formData.area,
+                userId: user.id
+            });
 
-            if (itemError) throw itemError;
-
-            // Optional: Register the initial stock as an 'AJUSTE' movement
-            if (formData.stock_actual > 0) {
-                await supabase.from('inventario_movimientos').insert({
-                    item_id: itemData.id,
-                    tipo_movimiento: 'AJUSTE',
-                    cantidad: formData.stock_actual,
-                    motivo: 'Carga inicial de stock',
-                    usuario: 'Sistema'
-                });
+            if (!result.success) {
+                throw new Error(result.error);
             }
 
             onSuccess();
@@ -97,9 +94,9 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                 stock_minimo: 5,
                 area: isLabUser ? 'LABORATORIO' : 'CLINICA'
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving item:', error);
-            alert('Error al guardar el item');
+            setError(error.message || 'Error al guardar el item');
         } finally {
             setSaving(false);
         }
@@ -124,6 +121,13 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                         <X size={20} className="text-gray-400" />
                     </button>
                 </div>
+
+                {error && (
+                    <div className="mx-6 mt-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl flex items-center gap-3">
+                        <Package size={20} className="text-red-500" />
+                        <p className="text-sm font-medium">{error}</p>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
                     <div className="space-y-2">
@@ -233,6 +237,6 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                     </div>
                 </form>
             </div>
-        </div>
+        </div >
     );
 }
