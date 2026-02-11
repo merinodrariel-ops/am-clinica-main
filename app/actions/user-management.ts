@@ -87,9 +87,16 @@ export async function getUsers() {
 
 // Helper to determine the correct public URL
 function getAppPublicUrl() {
+    let url = process.env.NEXT_PUBLIC_APP_URL;
+
+    // If the configured URL is localhost, ignore it in favor of Vercel URL if available
+    if (url && url.includes('localhost') && process.env.VERCEL_URL) {
+        url = undefined;
+    }
+
     // 1. Explicit Env Var (Best for custom domains)
-    if (process.env.NEXT_PUBLIC_APP_URL) {
-        return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, ''); // Remove trailing slash
+    if (url) {
+        return url.replace(/\/$/, ''); // Remove trailing slash
     }
 
     // 2. Vercel System Env Var (Automatic on Vercel)
