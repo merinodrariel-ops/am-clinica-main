@@ -144,14 +144,19 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Categoría</label>
                             <div className="relative">
                                 <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <select
-                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl appearance-none focus:ring-2 focus:ring-blue-500 outline-none"
+                                <input
+                                    type="text"
+                                    list="category-options"
+                                    placeholder="Seleccionar o escribir nueva..."
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                     value={formData.categoria}
                                     onChange={(e) => setFormData(prev => ({ ...prev, categoria: e.target.value }))}
-                                >
-                                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                                />
+                                <datalist id="category-options">
+                                    {CATEGORIAS.map(c => <option key={c} value={c} />)}
+                                </datalist>
                             </div>
+                            <p className="text-xs text-gray-500 pl-1">Escribí una nueva categoría o seleccioná una existente.</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

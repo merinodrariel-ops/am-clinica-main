@@ -370,3 +370,44 @@ export async function resetUserPassword(email: string) {
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
+
+export async function setUserPassword(targetUserId: string, newPassword: string, requesterId: string) {
+    try {
+        // 1. Verify Requestor is Owner or Admin
+        const { data: requestorProfile, error: reqError } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', requesterId)
+            .single();
+
+        if (reqError || !['owner', 'admin'].includes(requestorProfile.role)) {
+            throw new Error('Unauthorized: Only owners or admins can perform this action');
+        }
+
+        // 2. Update User Password
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+            password: newPassword
+        });
+
+        if (updateError) throw updateError;
+
+        // 3. Audit Log
+        await supabaseAdmin.from('audit_logs').insert({
+            user_id: requesterId,
+            user_email: requestorProfile.email,
+            role: requestorProfile.role,
+            action: 'manual_password_reset',
+            table_name: 'auth.users',
+            record_id: targetUserId,
+            metadata: {
+                timestamp: new Date().toISOString(),
+                performed_by: requestorProfile.email
+            }
+        });
+
+        return { success: true, message: 'Contraseña actualizada correctamente' };
+    } catch (error) {
+        console.error('Error setting password:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}

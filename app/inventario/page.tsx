@@ -14,7 +14,12 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     History,
-    ExternalLink
+    ExternalLink,
+    LayoutGrid,
+    List as ListIcon,
+    ArrowUp,
+    ArrowDown,
+    XCircle
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useSearchParams } from 'next/navigation';
@@ -105,14 +110,41 @@ function InventarioContent() {
         }
     }, [searchParams, isLabUser]);
 
-    const categories = ['Todos', ...new Set(items.map(i => i.categoria))];
+    // State for View Mode and Sort
+    const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
+    const [sortBy, setSortBy] = useState<'NOMBRE' | 'STOCK' | 'CATEGORIA'>('NOMBRE');
+    const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('ASC');
 
+    const categories = ['Todos', ...Array.from(new Set(items.map(i => i.categoria))).filter(Boolean).sort()];
+
+    // EXPANDED SEARCH LOGIC
     const filteredItems = items.filter(i => {
         const itemArea = i.area || 'CLINICA';
+        const term = search.toLowerCase();
+
+        const matchesSearch =
+            i.nombre.toLowerCase().includes(term) ||
+            i.categoria?.toLowerCase().includes(term) ||
+            i.marca?.toLowerCase().includes(term) ||
+            i.proveedor?.toLowerCase().includes(term) ||
+            i.descripcion?.toLowerCase().includes(term);
+
         return itemArea === areaFilter &&
-            (i.nombre.toLowerCase().includes(search.toLowerCase()) ||
-                i.categoria?.toLowerCase().includes(search.toLowerCase())) &&
+            matchesSearch &&
             (categoryFilter === 'Todos' || i.categoria === categoryFilter);
+    });
+
+    // SORTING LOGIC
+    const sortedItems = [...filteredItems].sort((a, b) => {
+        let cmp = 0;
+        if (sortBy === 'NOMBRE') {
+            cmp = a.nombre.localeCompare(b.nombre);
+        } else if (sortBy === 'STOCK') {
+            cmp = a.stock_actual - b.stock_actual;
+        } else if (sortBy === 'CATEGORIA') {
+            cmp = (a.categoria || '').localeCompare(b.categoria || '');
+        }
+        return sortOrder === 'ASC' ? cmp : -cmp;
     });
 
     const lowStockCount = items.filter(i => i.stock_actual <= i.stock_minimo).length;
@@ -133,24 +165,47 @@ function InventarioContent() {
                     <p className="text-gray-500 dark:text-gray-400">Control de stock de insumos y materiales</p>
                 </div>
                 <div className="flex gap-2">
+                    <div className="flex bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
+                        <button
+                            onClick={() => setViewMode('GRID')}
+                            className={clsx(
+                                "p-2 rounded-lg transition-all",
+                                viewMode === 'GRID' ? "bg-gray-100 dark:bg-gray-700 text-blue-600" : "text-gray-400 hover:text-gray-600"
+                            )}
+                            title="Vista Cuadrícula"
+                        >
+                            <LayoutGrid size={20} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('LIST')}
+                            className={clsx(
+                                "p-2 rounded-lg transition-all",
+                                viewMode === 'LIST' ? "bg-gray-100 dark:bg-gray-700 text-blue-600" : "text-gray-400 hover:text-gray-600"
+                            )}
+                            title="Vista Lista"
+                        >
+                            <ListIcon size={20} />
+                        </button>
+                    </div>
+
                     <button
                         className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
                         onClick={() => setShowHistorial(true)}
                     >
                         <History size={20} />
-                        Historial
+                        <span className="hidden sm:inline">Historial</span>
                     </button>
                     <button
                         className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
                         onClick={() => setShowNuevoItem(true)}
                     >
                         <Plus size={20} />
-                        Nuevo Item
+                        <span className="hidden sm:inline">Nuevo Item</span>
                     </button>
                 </div>
             </div>
 
-            {/* Area Tabs - Hidden for Lab User */}
+            {/* Area Tabs */}
             {!isLabUser && (
                 <div className="flex p-1 bg-gray-100 dark:bg-gray-800/50 rounded-2xl w-full md:w-fit">
                     <button
@@ -180,7 +235,9 @@ function InventarioContent() {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md">
+                {/* ... (Same stats cards as before, no changes needed here but including for context if needed, or I can skip replacing this part if I target carefully) */}
+                {/* Actually I will replace the whole return block to ensuring structure integrity */}
+                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg flex items-center justify-center">
                             <Package size={20} />
@@ -188,39 +245,24 @@ function InventarioContent() {
                         <div className="flex-1">
                             <p className="text-sm text-gray-500 font-medium">Items Totales</p>
                             <div className="flex justify-between items-baseline">
-                                <div>
-                                    <span className="text-xl font-bold text-gray-900 dark:text-white">{isLabUser ? totalLaboratorio : totalClinica + totalLaboratorio}</span>
-                                </div>
-                                {!isLabUser && (
-                                    <div className="text-xs text-gray-400 flex gap-2">
-                                        <span>🏥 {totalClinica}</span>
-                                        <span>🔬 {totalLaboratorio}</span>
-                                    </div>
-                                )}
+                                <span className="text-xl font-bold text-gray-900 dark:text-white">{isLabUser ? totalLaboratorio : totalClinica + totalLaboratorio}</span>
+                                {!isLabUser && <span className="text-xs text-gray-400">🏥 {totalClinica} | 🔬 {totalLaboratorio}</span>}
                             </div>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md">
+                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className={clsx(
-                            "h-10 w-10 rounded-lg flex items-center justify-center",
-                            lowStockCount > 0 ? "bg-red-100 text-red-600 dark:bg-red-900/30" : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30"
-                        )}>
+                        <div className={clsx("h-10 w-10 rounded-lg flex items-center justify-center", lowStockCount > 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600")}>
                             <AlertTriangle size={20} />
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 font-medium">Stock Crítico</p>
-                            <p className={clsx(
-                                "text-2xl font-bold",
-                                lowStockCount > 0 ? "text-red-600" : "text-emerald-600"
-                            )}>
-                                {lowStockCount}
-                            </p>
+                            <p className={clsx("text-2xl font-bold", lowStockCount > 0 ? "text-red-600" : "text-emerald-600")}>{lowStockCount}</p>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-md">
+                <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-lg flex items-center justify-center">
                             <TrendingUp size={20} />
@@ -233,51 +275,78 @@ function InventarioContent() {
                 </div>
             </div>
 
-
-            {/* Filters & Search */}
-            <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                <div className="relative flex-1">
+            {/* Filters & Search & Sort */}
+            <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm items-center">
+                <div className="relative flex-1 w-full">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                         type="text"
-                        placeholder="Buscar item o categoría..."
-                        className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                        placeholder="Buscar por nombre, marca, proveedor..."
+                        className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 transition-all outline-none"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
-                </div>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
-                    {categories.map(cat => (
+                    {search && (
                         <button
-                            key={cat || 'unassigned'}
-                            onClick={() => setCategoryFilter(cat)}
-                            className={clsx(
-                                "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
-                                categoryFilter === cat
-                                    ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
-                                    : "bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-700"
-                            )}
+                            onClick={() => setSearch('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
-                            {cat}
+                            <XCircle size={16} />
                         </button>
-                    ))}
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+                    <select
+                        className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm outline-none"
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as any)}
+                    >
+                        <option value="NOMBRE">Nombre</option>
+                        <option value="STOCK">Stock</option>
+                        <option value="CATEGORIA">Categoría</option>
+                    </select>
+                    <button
+                        onClick={() => setSortOrder(prev => prev === 'ASC' ? 'DESC' : 'ASC')}
+                        className="p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-100"
+                    >
+                        {sortOrder === 'ASC' ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
+                    </button>
                 </div>
             </div>
 
-            {/* Content List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {loading ? (
-                    Array(6).fill(0).map((_, i) => (
-                        <div key={i} className="animate-pulse bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 h-40"></div>
-                    ))
-                ) : filteredItems.length === 0 ? (
-                    <div className="col-span-full py-20 text-center text-gray-500 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                        <Package className="mx-auto mb-4 text-gray-200" size={64} strokeWidth={1} />
-                        <p className="text-lg font-medium">No hay productos en inventario</p>
-                        <p className="text-sm">Agregá tu primer item para empezar el control.</p>
-                    </div>
-                ) : (
-                    filteredItems.map((item) => {
+            {/* Configurable Category Tags */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {categories.map(cat => (
+                    <button
+                        key={cat || 'unassigned'}
+                        onClick={() => setCategoryFilter(cat)}
+                        className={clsx(
+                            "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
+                            categoryFilter === cat
+                                ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
+                                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700"
+                        )}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </div>
+
+            {/* Content List / Grid */}
+            {loading ? (
+                <div className="flex justify-center py-20">
+                    <Loader2 className="animate-spin text-blue-600" size={40} />
+                </div>
+            ) : sortedItems.length === 0 ? (
+                <div className="col-span-full py-20 text-center text-gray-500 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <Package className="mx-auto mb-4 text-gray-200" size={64} strokeWidth={1} />
+                    <p className="text-lg font-medium">No se encontraron productos</p>
+                    <p className="text-sm">Intenta con otro término de búsqueda.</p>
+                </div>
+            ) : viewMode === 'GRID' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {sortedItems.map((item) => {
                         const isLow = item.stock_actual <= item.stock_minimo;
                         return (
                             <div key={item.id} className="group flex flex-col justify-between bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:border-blue-200 dark:hover:border-blue-900 transition-all h-full">
@@ -312,86 +381,81 @@ function InventarioContent() {
                                                 </p>
                                             )}
                                         </div>
-                                        <div className="flex flex-col gap-1 items-end">
-                                            <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400">
-                                                <MoreVertical size={16} />
-                                            </button>
-                                            {item.link && (
-                                                <a
-                                                    href={item.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                                    title="Ver producto original"
-                                                >
-                                                    <ExternalLink size={16} />
-                                                </a>
-                                            )}
-                                        </div>
+                                        {item.link && (
+                                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg">
+                                                <ExternalLink size={16} />
+                                            </a>
+                                        )}
                                     </div>
-
-                                    {item.descripcion && (
-                                        <p className="text-xs text-gray-400 mb-4 line-clamp-2 italic">
-                                            {item.descripcion}
-                                        </p>
-                                    )}
+                                    {item.descripcion && <p className="text-xs text-gray-400 mb-4 line-clamp-2 italic">{item.descripcion}</p>}
                                 </div>
-
                                 <div>
                                     <div className="flex items-end justify-between mt-auto">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className={clsx(
-                                                    "text-3xl font-black",
-                                                    isLow ? "text-red-500" : "text-gray-900 dark:text-white"
-                                                )}>
-                                                    {item.stock_actual}
-                                                </span>
-                                                <span className="text-sm text-gray-500 font-medium self-end mb-1">
-                                                    {item.unidad_medida}
-                                                </span>
+                                                <span className={clsx("text-3xl font-black", isLow ? "text-red-500" : "text-gray-900 dark:text-white")}>{item.stock_actual}</span>
+                                                <span className="text-sm text-gray-500 font-medium self-end mb-1">{item.unidad_medida}</span>
                                             </div>
-                                            <div className="flex justify-between items-center gap-4 text-xs text-gray-500">
-                                                <span>Min: {item.stock_minimo}</span>
-                                                {item.costo_unitario && item.costo_unitario > 0 && (
-                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">
-                                                        ${item.costo_unitario} /u
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <div className="text-xs text-gray-500">Min: {item.stock_minimo}</div>
                                         </div>
-                                        <div className="flex flex-col gap-2">
-                                            <button
-                                                className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors border border-emerald-100"
-                                                title="Entrada"
-                                                onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}
-                                            >
-                                                <ArrowUpRight size={18} />
-                                            </button>
-                                            <button
-                                                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors border border-red-100"
-                                                title="Salida"
-                                                onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}
-                                            >
-                                                <ArrowDownRight size={18} />
-                                            </button>
+                                        <div className="flex gap-2">
+                                            <button className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={18} /></button>
+                                            <button className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={18} /></button>
                                         </div>
                                     </div>
-
-                                    {isLow && (
-                                        <div className="mt-3 flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-100 dark:border-red-900/40">
-                                            <AlertTriangle size={14} />
-                                            REPOSICIÓN NECESARIA
-                                        </div>
-                                    )}
+                                    {isLow && <div className="mt-3 text-xs font-bold text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100 flex items-center gap-2"><AlertTriangle size={14} /> REPOSICIÓN NECESARIA</div>}
                                 </div>
                             </div>
                         );
-                    })
-                )}
-            </div>
+                    })}
+                </div>
+            ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50">
+                                <tr>
+                                    <th className="px-6 py-3">Item</th>
+                                    <th className="px-6 py-3">Categoría</th>
+                                    <th className="px-6 py-3">Stock</th>
+                                    <th className="px-6 py-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedItems.map((item) => {
+                                    const isLow = item.stock_actual <= item.stock_minimo;
+                                    return (
+                                        <tr key={item.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-gray-900 dark:text-white uppercase">{item.nombre}</div>
+                                                <div className="text-xs text-gray-500">{item.marca}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium">{item.categoria}</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={clsx("font-bold text-lg", isLow ? "text-red-500" : "text-gray-900 dark:text-white")}>{item.stock_actual}</span>
+                                                    <span className="text-xs text-gray-500">{item.unidad_medida}</span>
+                                                    {isLow && <AlertTriangle size={14} className="text-red-500" />}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <button className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="Entrada" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={16} /></button>
+                                                    <button className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Salida" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={16} /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
-            {/* Modals */}
+            {/* Modals remain same ... */}
             <NuevoItemForm
                 isOpen={showNuevoItem}
                 onClose={() => setShowNuevoItem(false)}
@@ -410,7 +474,7 @@ function InventarioContent() {
                 isOpen={showHistorial}
                 onClose={() => setShowHistorial(false)}
             />
-        </div >
+        </div>
     );
 }
 

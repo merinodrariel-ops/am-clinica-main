@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { resendUserAccessEmail, inviteUser, suspendUser, reactivateUser } from '@/app/actions/user-management';
+import { resendUserAccessEmail, inviteUser, setUserPassword } from '@/app/actions/user-management';
 import RoleGuard from '@/components/auth/RoleGuard';
 import {
     Mail,
@@ -11,9 +11,9 @@ import {
     CheckCircle2,
     XCircle,
     RefreshCw,
-    Ban,
-    UserCheck,
-    MoreHorizontal
+    MoreHorizontal,
+    Key,
+    Lock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -46,10 +46,14 @@ export default function UserManagementPage() {
     const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
 
-    // Resend/Suspend action state
     const [resendingId, setResendingId] = useState<string | null>(null);
-    const [suspendingId, setSuspendingId] = useState<string | null>(null);
     const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    // Password Reset Manual State
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [selectedUserForPassword, setSelectedUserForPassword] = useState<Profile | null>(null);
+    const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+    const [passwordStatus, setPasswordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
     useEffect(() => {
         loadUsers();
@@ -75,37 +79,54 @@ export default function UserManagementPage() {
         }
     }
 
-    async function handleToggleStatus(user: Profile) {
-        if (!session?.user?.id) return;
-        if (user.role === 'owner' || user.email.toLowerCase().includes('dr.arielmerinopersonal@gmail.com')) {
-            setActionMessage({ type: 'error', text: 'No puedes suspender al dueño.' });
+
+
+    async function handlePasswordSubmit() {
+        if (!selectedUserForPassword || !session?.user?.id) return;
+
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            setPasswordStatus('error');
+            setErrorMessage('Las contraseñas no coinciden.');
             return;
         }
 
-        setSuspendingId(user.id);
-        setActionMessage(null);
+        if (passwordData.newPassword.length < 6) {
+            setPasswordStatus('error');
+            setErrorMessage('La contraseña debe tener al menos 6 caracteres.');
+            return;
+        }
+
+        setPasswordStatus('loading');
+        setErrorMessage('');
 
         try {
-            const isAhuraActivo = user.is_active;
-            const result = isAhuraActivo
-                ? await suspendUser(user.id)
-                : await reactivateUser(user.id);
+            const result = await setUserPassword(selectedUserForPassword.id, passwordData.newPassword, session.user.id);
 
             if (result.success) {
-                setActionMessage({
-                    type: 'success',
-                    text: isAhuraActivo ? 'Usuario suspendido.' : 'Usuario reactivado.'
-                });
-                loadUsers(); // Refresh list
+                setPasswordStatus('success');
+                setActionMessage({ type: 'success', text: 'Contraseña actualizada correctamente.' });
+                setTimeout(() => {
+                    setShowPasswordModal(false);
+                    setPasswordStatus('idle');
+                    setPasswordData({ newPassword: '', confirmPassword: '' });
+                    setSelectedUserForPassword(null);
+                }, 1500);
             } else {
-                setActionMessage({ type: 'error', text: result.error || 'Error al actualizar estado.' });
+                setPasswordStatus('error');
+                setErrorMessage(result.error || 'Error al actualizar contraseña.');
             }
         } catch (error) {
-            setActionMessage({ type: 'error', text: 'Error inesperado.' });
-        } finally {
-            setSuspendingId(null);
-            setTimeout(() => setActionMessage(null), 3000);
+            setPasswordStatus('error');
+            setErrorMessage('Error inesperado.');
         }
+    }
+
+    function openPasswordModal(user: Profile) {
+        setSelectedUserForPassword(user);
+        setPasswordData({ newPassword: '', confirmPassword: '' });
+        setPasswordStatus('idle');
+        setErrorMessage('');
+        setShowPasswordModal(true);
     }
 
     async function loadUsers() {
@@ -253,26 +274,6 @@ export default function UserManagementPage() {
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
-                                                    onClick={() => handleToggleStatus(user)}
-                                                    disabled={suspendingId === user.id || user.role === 'owner'}
-                                                    className={`p-1.5 rounded-lg transition-colors ${user.is_active
-                                                        ? 'text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20'
-                                                        : 'text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20'
-                                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                                    title={user.is_active ? "Suspender Usuario" : "Reactivar Usuario"}
-                                                >
-                                                    {suspendingId === user.id ? (
-                                                        <Loader2 size={16} className="animate-spin" />
-                                                    ) : user.is_active ? (
-                                                        <Ban size={16} />
-                                                    ) : (
-                                                        <UserCheck size={16} />
-                                                    )}
-                                                </button>
-
-                                                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
-
-                                                <button
                                                     onClick={() => handleResendAccess(user)}
                                                     disabled={resendingId === user.id}
                                                     className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition-colors disabled:opacity-50"
@@ -284,6 +285,16 @@ export default function UserManagementPage() {
                                                         <RefreshCw size={16} />
                                                     )}
                                                     <span className="hidden sm:inline">Reenviar Acceso</span>
+                                                </button>
+
+                                                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+
+                                                <button
+                                                    onClick={() => openPasswordModal(user)}
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 dark:text-purple-400 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 rounded-lg transition-colors"
+                                                    title="Establecer contraseña manualmente"
+                                                >
+                                                    <Key size={16} />
                                                 </button>
                                             </div>
                                         </td>
@@ -375,6 +386,83 @@ export default function UserManagementPage() {
                                 >
                                     {inviteStatus === 'loading' && <Loader2 className="animate-spin w-4 h-4" />}
                                     Crear Usuario
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Password Modal */}
+                {showPasswordModal && selectedUserForPassword && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                            <div className="p-6 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Key className="text-purple-600" size={20} />
+                                    Nueva Contraseña
+                                </h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Para: <span className="font-semibold">{selectedUserForPassword.full_name || selectedUserForPassword.email}</span>
+                                </p>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nueva Contraseña</label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                        <input
+                                            type="password"
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 outline-none"
+                                            value={passwordData.newPassword}
+                                            onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                            placeholder="Mínimo 6 caracteres"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirmar Contraseña</label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                        <input
+                                            type="password"
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 outline-none"
+                                            value={passwordData.confirmPassword}
+                                            onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                            placeholder="Repite la contraseña"
+                                        />
+                                    </div>
+                                </div>
+
+                                {passwordStatus === 'error' && (
+                                    <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                                        <XCircle size={16} />
+                                        {errorMessage}
+                                    </div>
+                                )}
+                                {passwordStatus === 'success' && (
+                                    <div className="p-3 bg-green-50 text-green-600 text-sm rounded-lg flex items-center gap-2">
+                                        <CheckCircle2 size={16} />
+                                        Contraseña actualizada.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-6 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900/50">
+                                <button
+                                    onClick={() => setShowPasswordModal(false)}
+                                    className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                                    disabled={passwordStatus === 'loading'}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handlePasswordSubmit}
+                                    disabled={passwordStatus === 'loading'}
+                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-70"
+                                >
+                                    {passwordStatus === 'loading' && <Loader2 className="animate-spin w-4 h-4" />}
+                                    Guardar Cambios
                                 </button>
                             </div>
                         </div>
