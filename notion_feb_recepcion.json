@@ -1,0 +1,317 @@
+[
+  {
+    "desc": "Melisa Engstfeld",
+    "fecha": "2026-02-02",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": 500
+  },
+  {
+    "desc": "Antonella Mascioli ",
+    "fecha": "2026-02-02",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": 438000,
+    "usd": null
+  },
+  {
+    "desc": "Leandro Miguel",
+    "fecha": "2026-02-02",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": 146000,
+    "usd": null
+  },
+  {
+    "desc": "INICIO CAJA MES 0 ARS / 0 USD",
+    "fecha": "2026-02-02",
+    "cat": "Inicio caja mes",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Cierre de Caja 0ars / 500usd",
+    "fecha": "2026-02-02",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Inicio de Caja 0ars/ 500 usd ",
+    "fecha": "2026-02-03",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Melisa Engstfeld",
+    "fecha": "2026-02-03",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": 1200
+  },
+  {
+    "desc": "Cierre de Caja 0ars/ 1700 usd",
+    "fecha": "2026-02-03",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Leandro Miguel",
+    "fecha": "2026-02-04",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": 200
+  },
+  {
+    "desc": "Cierre de Caja 0ars/ 1900usd",
+    "fecha": "2026-02-04",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Inicio de Caja 0ars/ 1700usd",
+    "fecha": "2026-02-04",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Melina Fernández",
+    "fecha": "2026-02-05",
+    "cat": "Ingreso",
+    "arg": 950000,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Inicio de Caja 0ars/ 1900usd",
+    "fecha": "2026-02-05",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Santiago Debus",
+    "fecha": "2026-02-05",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": 144500,
+    "usd": null
+  },
+  {
+    "desc": "Milo ",
+    "fecha": "2026-02-05",
+    "cat": "Ingreso",
+    "arg": 19000,
+    "mp": null,
+    "banco": null,
+    "usd": 820
+  },
+  {
+    "desc": "Cierre de Caja  969.000ars/ 2.720usd",
+    "fecha": "2026-02-05",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Nicolas Andalaft",
+    "fecha": "2026-02-06",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": 100000,
+    "usd": null
+  },
+  {
+    "desc": "Lourdes Mendez",
+    "fecha": "2026-02-06",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": 200
+  },
+  {
+    "desc": "Melisa Engstfeld",
+    "fecha": "2026-02-06",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": 1600
+  },
+  {
+    "desc": "Inicio de Caja 969.000ars/ 2.710usd",
+    "fecha": "2026-02-06",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Debus Santiago",
+    "fecha": "2026-02-06",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": 430500,
+    "usd": null
+  },
+  {
+    "desc": "Martin Jofre",
+    "fecha": "2026-02-06",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Pase Caja Administración",
+    "fecha": "2026-02-06",
+    "cat": "Administracion",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": -20
+  },
+  {
+    "desc": "Camila Castro",
+    "fecha": "2026-02-06",
+    "cat": "Ingreso",
+    "arg": 81000,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Cierre de Caja 1.050.000ars /4.500usd",
+    "fecha": "2026-02-06",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Inicio de Caja 1.050.000ars/ 4.500usd",
+    "fecha": "2026-02-09",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Cierre de Caja 1.050.000ars/ 4.500usd",
+    "fecha": "2026-02-09",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Inicio de Caja 1.050.000ars/ 4.500usd",
+    "fecha": "2026-02-10",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Mazzuca Magali",
+    "fecha": "2026-02-10",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": 200
+  },
+  {
+    "desc": "Cierre de Caja 1.050.000 ars /7.200usd",
+    "fecha": "2026-02-10",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Lijo Angeles ",
+    "fecha": "2026-02-10",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": 2500
+  },
+  {
+    "desc": "Molina Eugenia",
+    "fecha": "2026-02-11",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": 143500,
+    "usd": null
+  },
+  {
+    "desc": "Ventriglia German ",
+    "fecha": "2026-02-11",
+    "cat": "Ingreso",
+    "arg": null,
+    "mp": null,
+    "banco": 430500,
+    "usd": null
+  },
+  {
+    "desc": "Cierre de Caja 1.050.000ars / 7.200usd ",
+    "fecha": "2026-02-11",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  },
+  {
+    "desc": "Inicio de Caja 1.050.000ars/ 7.200usd",
+    "fecha": "2026-02-11",
+    "cat": "Caja",
+    "arg": null,
+    "mp": null,
+    "banco": null,
+    "usd": null
+  }
+]

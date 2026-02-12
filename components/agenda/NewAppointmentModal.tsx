@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
-import { X, Loader2, Search, User, Calendar, Clock, FileText, Trash2, Check, UserPlus } from 'lucide-react';
+import { X, Loader2, Search, User, Calendar, Clock, FileText, Trash2, Check, UserPlus, Stethoscope } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase, type TarifarioItem } from '@/lib/supabase';
 
 interface Patient {
     id: string;
@@ -28,6 +29,7 @@ interface AppointmentData {
     type: string;
     notes: string;
     patient?: { full_name: string };
+    doctor?: { full_name: string };
 }
 
 interface NewAppointmentModalProps {
@@ -59,14 +61,32 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [selectedPatientName, setSelectedPatientName] = useState('');
     const { user } = useAuth();
 
+    // Tarifario Search State
+    const [tarifarioItems, setTarifarioItems] = useState<TarifarioItem[]>([]);
+    const [showTarifarioResults, setShowTarifarioResults] = useState(false);
+    const [tarifarioSearch, setTarifarioSearch] = useState('');
+
+    // Doctor Search State
+    const [doctorSearch, setDoctorSearch] = useState('');
+    const [showDoctorResults, setShowDoctorResults] = useState(false);
+
     useEffect(() => {
         if (isOpen) {
             loadDoctors();
+            loadTarifario();
             if (initialData) {
                 // Edit Mode
                 setTitle(initialData.title || '');
                 setPatientId(initialData.patientId || '');
                 setDoctorId(initialData.doctorId || '');
+                if (initialData.doctor) {
+                    setDoctorId(initialData.doctorId || '');
+                    setDoctorSearch(initialData.doctor.full_name || '');
+                } else if (doctors.length > 0) {
+                    // Find the doctor name if only id is available locally
+                    const doc = doctors.find(d => d.id === initialData.doctorId);
+                    if (doc) setDoctorSearch(doc.full_name);
+                }
                 // Ensure dates are valid Date objects
                 const start = initialData.start instanceof Date ? initialData.start : new Date(initialData.start);
                 const end = initialData.end instanceof Date ? initialData.end : new Date(initialData.end);
@@ -82,6 +102,10 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                 setTitle('');
                 setPatientId('');
                 setDoctorId('');
+                setDoctorSearch('');
+                setSelectedPatientName('');
+                setSearchTerm('');
+                setTarifarioSearch('');
 
                 // For single click, initialDate is the start time
                 const start = new Date(initialDate);
@@ -125,6 +149,33 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const loadDoctors = async () => {
         const docs = await getDoctors();
         setDoctors(docs);
+    };
+
+    const loadTarifario = async () => {
+        try {
+            const { data } = await supabase
+                .from('tarifario_items')
+                .select(`*, tarifario_versiones!inner(estado)`)
+                .eq('tarifario_versiones.estado', 'vigente')
+                .eq('activo', true)
+                .order('concepto_nombre');
+            setTarifarioItems(data || []);
+        } catch (error) {
+            console.error('Error loading tarifario:', error);
+        }
+    };
+
+    const selectTarifarioItem = (item: TarifarioItem) => {
+        setTitle(item.concepto_nombre);
+        setTarifarioSearch(item.concepto_nombre);
+        setShowTarifarioResults(false);
+        if (item.categoria.toLowerCase().includes('cirugia')) {
+            setType('cirugia');
+        } else if (item.categoria.toLowerCase().includes('control')) {
+            setType('control');
+        } else {
+            setType('tratamiento');
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -279,17 +330,62 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                         )}
                     </div>
 
-                    {/* Title Input */}
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Título</label>
-                        <input
-                            type="text"
-                            required
-                            placeholder="Ej: Limpieza Dental"
-                            className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                        />
+                    {/* Title Input with Search */}
+                    <div className="relative">
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Título / Tratamiento</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                required
+                                placeholder="Ej: Limpieza Dental"
+                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                                value={title}
+                                onChange={(e) => {
+                                    setTitle(e.target.value);
+                                    setTarifarioSearch(e.target.value);
+                                    setShowTarifarioResults(true);
+                                }}
+                                onFocus={() => setShowTarifarioResults(true)}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Stethoscope size={16} className="text-gray-400" />
+                            </div>
+                        </div>
+
+                        {/* Tarifario Search Results */}
+                        {showTarifarioResults && tarifarioSearch.length >= 2 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 max-h-48 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
+                                {tarifarioItems
+                                    .filter(item =>
+                                        item.concepto_nombre.toLowerCase().includes(tarifarioSearch.toLowerCase()) ||
+                                        item.categoria.toLowerCase().includes(tarifarioSearch.toLowerCase())
+                                    )
+                                    .slice(0, 8)
+                                    .map(item => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-between"
+                                            onClick={() => selectTarifarioItem(item)}
+                                        >
+                                            <div>
+                                                <div className="font-medium text-sm text-gray-900 dark:text-white">{item.concepto_nombre}</div>
+                                                <div className="text-[10px] text-gray-500 uppercase">{item.categoria}</div>
+                                            </div>
+                                            <div className="text-[10px] font-bold text-blue-500">Ref: USD {item.precio_base_usd}</div>
+                                        </button>
+                                    ))
+                                }
+                                {tarifarioItems.filter(item =>
+                                    item.concepto_nombre.toLowerCase().includes(tarifarioSearch.toLowerCase()) ||
+                                    item.categoria.toLowerCase().includes(tarifarioSearch.toLowerCase())
+                                ).length === 0 && (
+                                        <div className="px-4 py-3 text-xs text-gray-500 italic">
+                                            No se encontraron servicios exactos. Puedes usar un concepto libre.
+                                        </div>
+                                    )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Date Time Row */}
@@ -318,18 +414,59 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
                     {/* Doctor & Type Row */}
                     <div className="grid grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Doctor</label>
-                            <select
-                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm appearance-none"
-                                value={doctorId}
-                                onChange={(e) => setDoctorId(e.target.value)}
-                            >
-                                <option value="">Asignar Doctor...</option>
-                                {doctors.map(d => (
-                                    <option key={d.id} value={d.id}>{d.full_name}</option>
-                                ))}
-                            </select>
+                        <div className="relative">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Doctor / Profesional</label>
+                            <div className="relative">
+                                <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar doctor..."
+                                    className="block w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                                    value={doctorSearch}
+                                    onChange={(e) => {
+                                        setDoctorSearch(e.target.value);
+                                        setShowDoctorResults(true);
+                                        if (doctorId) setDoctorId(''); // Clear selection if typing
+                                    }}
+                                    onFocus={() => setShowDoctorResults(true)}
+                                />
+                                {doctorId && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        <Check className="w-4 h-4 text-green-500" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Doctor Search Results */}
+                            {showDoctorResults && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 max-h-48 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
+                                    {doctors
+                                        .filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase()))
+                                        .map(d => (
+                                            <button
+                                                key={d.id}
+                                                type="button"
+                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+                                                onClick={() => {
+                                                    setDoctorId(d.id);
+                                                    setDoctorSearch(d.full_name);
+                                                    setShowDoctorResults(false);
+                                                }}
+                                            >
+                                                <div className="w-7 h-7 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                                                    <User className="w-4 h-4 text-blue-500" />
+                                                </div>
+                                                <div className="font-medium text-sm text-gray-900 dark:text-white">{d.full_name}</div>
+                                            </button>
+                                        ))
+                                    }
+                                    {doctors.filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase())).length === 0 && (
+                                        <div className="px-4 py-3 text-xs text-gray-500 italic">
+                                            No se encontraron doctores.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Tipo</label>

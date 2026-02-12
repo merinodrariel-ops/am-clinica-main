@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage } from 'lucide-react';
+import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
 import { supabase } from '@/lib/supabase';
@@ -14,6 +15,8 @@ import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
 import { ReciboGenerator, generateReciboNumber } from '@/components/caja/ReciboGenerator';
 import { logMovimientoEdit } from '@/lib/caja-recepcion';
+import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
+import { sendSecurityAlertAction } from '@/app/actions/email';
 
 
 // Types
@@ -46,6 +49,7 @@ interface Movimiento {
     estado: string;
     usd_equivalente: number | null;
     registro_editado?: boolean;
+    comprobante_url?: string | null;
     origen?: string;
 }
 
@@ -157,17 +161,23 @@ export default function CajaRecepcionPage() {
     const [showTransferencia, setShowTransferencia] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
+    const [showSidebar, setShowSidebar] = useState(true);
 
-    const [isBoxClosed, setIsBoxClosed] = useState(false);
+    const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
     // Edit date modal state
     const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
-    const [newFecha, setNewFecha] = useState('');
+    const [editMonto, setEditMonto] = useState(0);
+    const [displayMonto, setDisplayMonto] = useState("");
+    const [editMoneda, setEditMoneda] = useState("ARS");
+    const [editMetodo, setEditMetodo] = useState("");
+    const [editConcepto, setEditConcepto] = useState("");
+    const [editCategoria, setEditCategoria] = useState("");
+    const [editEstado, setEditEstado] = useState("");
+    const [newFecha, setNewFecha] = useState("");
+    const [editMotivo, setEditMotivo] = useState("");
+    const [editComprobanteUrl, setEditComprobanteUrl] = useState<string | null>(null);
     const [savingDate, setSavingDate] = useState(false);
-    const [editMonto, setEditMonto] = useState<number>(0);
-    const [displayMonto, setDisplayMonto] = useState<string>('');
-    const [editMoneda, setEditMoneda] = useState<string>('ARS');
-    const [editMotivo, setEditMotivo] = useState('');
 
     // QR Modal state
     const [qrModal, setQrModal] = useState<{ open: boolean; value: string; title: string }>({
@@ -187,17 +197,6 @@ export default function CajaRecepcionPage() {
 
     const loadData = useCallback(async () => {
         try {
-            // Check closure status for today
-            const today = new Date().toISOString().split('T')[0];
-            const { data: cierre } = await supabase
-                .from('caja_recepcion_arqueos')
-                .select('id')
-                .eq('fecha', today)
-                .eq('estado', 'cerrado')
-                .maybeSingle();
-
-            setIsBoxClosed(!!cierre);
-
             // Fetch BNA rate
             const rateRes = await fetch('/api/bna-cotizacion');
             const rateData = await rateRes.json();
@@ -232,14 +231,74 @@ export default function CajaRecepcionPage() {
             if (movError) {
                 console.error('Error fetching movements:', movError);
             } else {
-                setMovimientos(movs || []);
+                // If there are Notion imports, try to find matching patients
+                const hasNotionImports = (movs || []).some(m => m.paciente?.id_paciente === 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59');
+
+                if (hasNotionImports) {
+                    const { data: allPacientes } = await supabase
+                        .from('pacientes')
+                        .select('id_paciente, nombre, apellido, financ_estado, financ_monto_total, financ_cuotas_total');
+
+                    if (allPacientes) {
+                        const enrichedMovs = (movs || []).map(m => {
+                            if (m.paciente?.id_paciente === 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59') {
+                                const concepto = m.concepto_nombre.toLowerCase().trim();
+
+                                // Ignore system entries
+                                if (concepto.includes('cierre') || concepto.includes('inicio')) return m;
+
+                                // Try to find a patient whose name + apellido or vice versa is in concepto_nombre
+                                const found = allPacientes.find(p => {
+                                    const fullName = `${p.nombre} ${p.apellido}`.toLowerCase();
+                                    const reverseName = `${p.apellido} ${p.nombre}`.toLowerCase();
+                                    const lastName = p.apellido.toLowerCase();
+                                    const firstName = p.nombre.toLowerCase();
+
+                                    return (
+                                        concepto.includes(fullName) ||
+                                        concepto.includes(reverseName) ||
+                                        (concepto.includes(lastName) && concepto.includes(firstName))
+                                    );
+                                });
+
+                                if (found) {
+                                    return {
+                                        ...m,
+                                        paciente: {
+                                            id_paciente: found.id_paciente,
+                                            nombre: found.nombre,
+                                            apellido: found.apellido,
+                                            financ_estado: found.financ_estado,
+                                            financ_monto_total: found.financ_monto_total,
+                                            financ_cuotas_total: found.financ_cuotas_total
+                                        }
+                                    };
+                                }
+                            }
+                            return m;
+                        });
+                        setMovimientos(enrichedMovs);
+                    } else {
+                        setMovimientos(movs || []);
+                    }
+                } else {
+                    setMovimientos(movs || []);
+                }
             }
 
-            // Calculate stats
+            // Calculate stats - GROSS INCOME (Ingresos Brutos)
+            // We only sum positive amounts for "Ingresos". Negative amounts are "Egresos" or "Transfers".
             const pagados = (movs || []).filter((m) => m.estado !== 'anulado');
-            const pagadosHoy = pagados.filter(m => m.fecha_hora.startsWith(today));
-            const totalDiaUsd = pagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
-            const totalMesUsd = pagados.reduce((sum, m) => sum + (m.usd_equivalente || 0), 0);
+
+            const pagadosHoy = pagados.filter(m => {
+                const datePart = m.fecha_movimiento || m.fecha_hora.split('T')[0];
+                return datePart === today;
+            });
+
+            // Sum only positive values for Inkome
+            const totalDiaUsd = pagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
+            const totalMesUsd = pagados.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
+
             const pendientes = (movs || []).filter((m) => m.estado === 'pendiente');
 
             setStats({
@@ -253,10 +312,9 @@ export default function CajaRecepcionPage() {
         } catch (error) {
             console.error('Error loading data:', error);
         }
-    }, []);
+    }, [mesActual, today]);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         loadData();
     }, [loadData]);
 
@@ -276,36 +334,46 @@ export default function CajaRecepcionPage() {
     }
 
     function openEditMovimiento(mov: Movimiento) {
-        const currentDate = mov.fecha_movimiento || mov.fecha_hora.split('T')[0];
-        setNewFecha(currentDate);
-
-        const initialMonto = mov.monto || 0;
-        setEditMonto(initialMonto);
-
-        // Format initial display value (e.g. 123456 -> 123.456 or 1234.56 -> 1.234,56)
-        // We use 'es-AR' forcing standard decimal grouping
-        const formatted = new Intl.NumberFormat('es-AR', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2,
-            useGrouping: true
-        }).format(initialMonto);
-
-        setDisplayMonto(formatted);
-
-        setEditMoneda(mov.moneda || 'ARS');
         setEditingMov(mov);
+        setEditMonto(mov.monto);
+        setEditMoneda(mov.moneda);
+        setEditMetodo(mov.metodo_pago);
+        setEditConcepto(mov.concepto_nombre);
+        setEditCategoria(mov.categoria || "");
+        setEditEstado(mov.estado);
+        setNewFecha(new Date(mov.fecha_movimiento || mov.fecha_hora).toISOString().split('T')[0]);
+        setEditMotivo("");
+        setEditComprobanteUrl(mov.comprobante_url || null);
+
+        // Format display monto
+        const valStr = mov.monto.toString().replace('.', ',');
+        const parts = valStr.split(',');
+        const formattedInteger = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        setDisplayMonto(formattedInteger + (parts[1] ? ',' + parts[1] : ''));
     }
 
     async function handleUpdateMovimiento() {
-        if (!editingMov || !newFecha || !editMotivo) {
-            alert('Por favor complete la fecha y el motivo del cambio');
+        if (!editingMov) return;
+        if (!editMotivo.trim()) {
+            // Assuming toast is available, otherwise use alert
+            // toast.error("Debe ingresar un motivo para el cambio");
+            alert("Debe ingresar un motivo para el cambio");
             return;
         }
 
         setSavingDate(true);
         try {
+            // Recalcular USD si cambió ARS
+            let usd_equiv = editingMov.usd_equivalente;
+            if (editMoneda === 'ARS' && bnaRate?.venta) {
+                usd_equiv = editMonto / bnaRate.venta;
+            } else if (editMoneda === 'USD') {
+                usd_equiv = editMonto;
+            }
+
             // Log changes before updating
-            if (newFecha !== editingMov.fecha_movimiento) {
+            const currentMovDate = editingMov.fecha_movimiento || editingMov.fecha_hora.split('T')[0];
+            if (newFecha !== currentMovDate) {
                 await logMovimientoEdit(
                     editingMov.id,
                     'caja_recepcion_movimientos',
@@ -335,12 +403,78 @@ export default function CajaRecepcionPage() {
                     editMotivo
                 );
             }
+            if (editMetodo !== editingMov.metodo_pago) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_recepcion_movimientos',
+                    'metodo_pago',
+                    editingMov.metodo_pago,
+                    editMetodo,
+                    editMotivo
+                );
+            }
+            if (editConcepto !== editingMov.concepto_nombre) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_recepcion_movimientos',
+                    'concepto_nombre',
+                    editingMov.concepto_nombre,
+                    editConcepto,
+                    editMotivo
+                );
+            }
+            if (editCategoria !== (editingMov.categoria || "")) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_recepcion_movimientos',
+                    'categoria',
+                    editingMov.categoria || null,
+                    editCategoria,
+                    editMotivo
+                );
+            }
+            if (editEstado !== editingMov.estado) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_recepcion_movimientos',
+                    'estado',
+                    editingMov.estado,
+                    editEstado,
+                    editMotivo
+                );
+            }
+
+            // Security Alert Trigger (if amount or status changed)
+            try {
+                const isCriticalChange = (editMonto !== editingMov.monto) || (editEstado !== editingMov.estado) || (editMoneda !== editingMov.moneda);
+                const isHighAmount = (editMoneda === 'USD' && editMonto >= 50) || (editMoneda === 'ARS' && editMonto >= 10000);
+
+                if (isCriticalChange || isHighAmount) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    await sendSecurityAlertAction({
+                        userName: user?.email || 'Usuario Desconocido',
+                        movementId: editingMov.id,
+                        field: editMonto !== editingMov.monto ? 'Monto' : (editEstado !== editingMov.estado ? 'Estado' : 'Moneda'),
+                        oldValue: `${editingMov.monto} ${editingMov.moneda} (${editingMov.estado})`,
+                        newValue: `${editMonto} ${editMoneda} (${editEstado})`,
+                        reason: editMotivo,
+                        patientName: editingMov.paciente ? `${editingMov.paciente.apellido}, ${editingMov.paciente.nombre}` : undefined
+                    });
+                }
+            } catch (alertErr) {
+                console.error('Error sending security alert:', alertErr);
+            }
 
             const updates: any = {
                 fecha_movimiento: newFecha,
                 monto: editMonto,
                 moneda: editMoneda,
-                registro_editado: true // Mark as edited
+                metodo_pago: editMetodo,
+                concepto_nombre: editConcepto,
+                categoria: editCategoria,
+                estado: editEstado,
+                registro_editado: true, // Mark as edited
+                comprobante_url: editComprobanteUrl
             };
 
             // Recalculate USD equivalent if amount/currency changed or if it was null
@@ -406,7 +540,7 @@ _Caja Recepción - AM Clínica_`;
         const formattedAmount = new Intl.NumberFormat(mov.moneda === 'ARS' ? 'es-AR' : 'en-US', { style: 'currency', currency: mov.moneda }).format(mov.monto);
 
         return `🧾 *Comprobante de Pago*
-📅 *Fecha:* ${new Date(mov.fecha_hora).toLocaleDateString('es-AR')}
+📅 *Fecha:* ${new Date(mov.fecha_movimiento || mov.fecha_hora).toLocaleDateString('es-AR')}
 👤 *Paciente:* ${patientName}
 💰 *Monto:* ${formattedAmount}
 📝 *Concepto:* ${mov.concepto_nombre}
@@ -426,7 +560,7 @@ _AM Clínica_`;
 
 Te escribimos amablemente de *AM Estética Dental* para recordarte que quedó un saldo pendiente de tu última visita:
 
-🗓 *Fecha:* ${new Date(mov.fecha_hora).toLocaleDateString('es-AR')}
+🗓 *Fecha:* ${new Date(mov.fecha_movimiento || mov.fecha_hora).toLocaleDateString('es-AR')}
 🦷 *Concepto:* ${mov.concepto_nombre}
 💰 *Saldo Pendiente:* ${formattedAmount}
 
@@ -486,39 +620,21 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     </Link>
                     <button
                         onClick={() => setShowTransferencia(true)}
-                        disabled={isBoxClosed}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2.5 border border-orange-200 dark:border-orange-800 rounded-lg font-medium transition-colors",
-                            isBoxClosed
-                                ? "opacity-50 cursor-not-allowed text-gray-400 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
-                                : "hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400"
-                        )}
+                        className="flex items-center gap-2 px-4 py-2.5 border border-orange-200 dark:border-orange-800 rounded-lg font-medium transition-colors hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400"
                     >
                         <ArrowRightLeft size={18} />
                         Transferir
                     </button>
                     <button
                         onClick={() => setShowNuevoGasto(true)}
-                        disabled={isBoxClosed}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2.5 border border-red-200 dark:border-red-800 rounded-lg font-medium transition-colors",
-                            isBoxClosed
-                                ? "opacity-50 cursor-not-allowed text-gray-400 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
-                                : "hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
-                        )}
+                        className="flex items-center gap-2 px-4 py-2.5 border border-red-200 dark:border-red-800 rounded-lg font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
                     >
                         <TrendingUp className="rotate-180" size={18} />
                         Gasto
                     </button>
                     <button
                         onClick={() => setShowNuevoIngreso(true)}
-                        disabled={isBoxClosed}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors",
-                            isBoxClosed
-                                ? "bg-gray-300 cursor-not-allowed text-gray-500"
-                                : "bg-blue-600 hover:bg-blue-700 text-white"
-                        )}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm bg-blue-600 hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] text-white"
                     >
                         <Plus size={20} />
                         Nuevo Ingreso
@@ -570,60 +686,86 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
             )}
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                            <DollarSign size={20} className="text-green-600 dark:text-green-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="group relative bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-all hover:shadow-md hover:-translate-y-1">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 to-transparent dark:from-green-900/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="h-12 w-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center transition-transform group-hover:scale-110">
+                                <DollarSign size={24} className="text-green-600 dark:text-green-400" />
+                            </div>
+                            <span className="text-xs font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/40 px-2 py-1 rounded-full uppercase">Hoy</span>
                         </div>
-                        <span className="text-sm text-gray-500">Ingresos Hoy</span>
+                        <p className="text-sm font-medium text-gray-500 mb-1">Ingresos Hoy</p>
+                        <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                            {formatPrivacy(formatCurrency(stats?.totalDiaUsd || 0, 'USD'))}
+                        </p>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatPrivacy(formatCurrency(stats?.totalDiaUsd || 0, 'USD'))}
-                    </p>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                            <TrendingUp size={20} className="text-blue-600 dark:text-blue-400" />
+                <div className="group relative bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-all hover:shadow-md hover:-translate-y-1">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent dark:from-blue-900/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center transition-transform group-hover:scale-110">
+                                <TrendingUp size={24} className="text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-2 py-1 rounded-full uppercase">Mes</span>
                         </div>
-                        <span className="text-sm text-gray-500">Ingresos Mes</span>
+                        <p className="text-sm font-medium text-gray-500 mb-1">Ingresos Mes</p>
+                        <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                            {formatPrivacy(formatCurrency(stats?.totalMesUsd || 0, 'USD'))}
+                        </p>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatPrivacy(formatCurrency(stats?.totalMesUsd || 0, 'USD'))}
-                    </p>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                            <CreditCard size={20} className="text-purple-600 dark:text-purple-400" />
+                <div className="group relative bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-all hover:shadow-md hover:-translate-y-1">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 to-transparent dark:from-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="h-12 w-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center transition-transform group-hover:scale-110">
+                                <CreditCard size={24} className="text-purple-600 dark:text-purple-400" />
+                            </div>
                         </div>
-                        <span className="text-sm text-gray-500">Movimientos Hoy</span>
+                        <p className="text-sm font-medium text-gray-500 mb-1">Movimientos Hoy</p>
+                        <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                            {formatPrivacy(stats?.movimientosHoy || 0)}
+                        </p>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatPrivacy(stats?.movimientosHoy || 0)}
-                    </p>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="h-10 w-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                            <Clock size={20} className="text-yellow-600 dark:text-yellow-400" />
+                <div className="group relative bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-all hover:shadow-md hover:-translate-y-1">
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-50/50 to-transparent dark:from-yellow-900/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="h-12 w-12 rounded-xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center transition-transform group-hover:scale-110">
+                                <Clock size={24} className="text-yellow-600 dark:text-yellow-400" />
+                            </div>
+                            {stats && stats.pendientes > 0 && (
+                                <span className="flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-yellow-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                                </span>
+                            )}
                         </div>
-                        <span className="text-sm text-gray-500">Pendientes</span>
+                        <p className="text-sm font-medium text-gray-500 mb-1">Pendientes</p>
+                        <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                            {formatPrivacy(stats?.pendientes || 0)}
+                        </p>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatPrivacy(stats?.pendientes || 0)}
-                    </p>
                 </div>
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className={clsx(
+                "grid grid-cols-1 gap-6 transition-all duration-300",
+                showSidebar ? "lg:grid-cols-3" : "grid-cols-1"
+            )}>
                 {/* Movements Table */}
-                <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className={clsx(
+                    "bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-300",
+                    showSidebar ? "lg:col-span-2" : "col-span-1"
+                )}>
                     <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-gray-50/50 dark:bg-gray-900/50">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
                             <h3 className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">
@@ -670,6 +812,28 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 className="bg-transparent border-none outline-none text-sm font-medium focus:ring-0 cursor-pointer"
                             />
                         </div>
+
+                        {/* Sidebar Toggle */}
+                        <button
+                            onClick={() => setShowSidebar(!showSidebar)}
+                            className={clsx(
+                                "flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all shadow-sm",
+                                showSidebar
+                                    ? "bg-blue-50 text-blue-600 border-blue-200"
+                                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                            )}
+                            title={showSidebar ? "Ocultar panel de cobro" : "Mostrar panel de cobro"}
+                        >
+                            <div className="relative">
+                                <Layout size={18} />
+                                {!showSidebar && (
+                                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                                )}
+                            </div>
+                            <span className="hidden sm:inline">
+                                {showSidebar ? 'Contraer' : 'Expandir'}
+                            </span>
+                        </button>
                     </div>
 
                     {movimientos.length === 0 ? (
@@ -702,7 +866,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                         <tr key={mov.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50">
                                             <td className="px-4 py-3 text-gray-500">
                                                 <div className="flex flex-col">
-                                                    <span>{new Date(mov.fecha_hora).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}</span>
+                                                    <span>{new Date(mov.fecha_movimiento || mov.fecha_hora).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}</span>
                                                     <span className="text-[10px] opacity-60">
                                                         {new Date(mov.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
@@ -716,13 +880,20 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                         </span>
                                                         <span>Gasto / Salida</span>
                                                     </div>
+                                                ) : mov.categoria === 'Caja' || mov.concepto_nombre.toLowerCase().includes('cierre') || mov.concepto_nombre.toLowerCase().includes('inicio') ? (
+                                                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold italic">
+                                                        <span className="p-1 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                                                            <RefreshCw size={14} />
+                                                        </span>
+                                                        <span>OPERACIÓN CAJA</span>
+                                                    </div>
                                                 ) : (
                                                     mov.paciente ? (
                                                         <Link
                                                             href={`/patients/${mov.paciente.id_paciente}?tab=financiamiento`}
                                                             className="group flex flex-col items-start"
                                                         >
-                                                            <span className="group-hover:text-blue-600 group-hover:underline transition-colors">
+                                                            <span className="group-hover:text-blue-600 group-hover:underline transition-colors text-blue-600 dark:text-blue-400">
                                                                 {`${mov.paciente.apellido}, ${mov.paciente.nombre}`}
                                                             </span>
                                                             {mov.paciente.financ_estado === 'activo' && (
@@ -737,7 +908,14 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                             </td>
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                                                 <div className="flex flex-col">
-                                                    <span>{mov.concepto_nombre}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{mov.concepto_nombre}</span>
+                                                        {mov.registro_editado && (
+                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800" title="Registro editado manualmente">
+                                                                <Pencil size={8} /> EDITADO
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     {(mov as any).cuota_nro && (mov as any).cuota_nro > 0 && (
                                                         <span className="text-[10px] text-gray-400">
                                                             Cuota {(mov as any).cuota_nro} de {(mov as any).cuotas_total || '?'}
@@ -755,12 +933,18 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={clsx(
-                                                    "px-2 py-1 rounded-full text-xs font-medium",
-                                                    mov.estado === 'pagado' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-                                                    mov.estado === 'pendiente' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-                                                    mov.estado === 'anulado' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                                    "px-2 py-1 rounded-full text-xs font-semibold uppercase tracking-wider",
+                                                    (mov.categoria === 'Caja' || mov.concepto_nombre.toLowerCase().includes('cierre') || mov.concepto_nombre.toLowerCase().includes('inicio'))
+                                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                                        : (
+                                                            mov.estado === 'pagado' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                                                                mov.estado === 'pendiente' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                                                                    "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                                        )
                                                 )}>
-                                                    {mov.estado}
+                                                    {(mov.categoria === 'Caja' || mov.concepto_nombre.toLowerCase().includes('cierre') || mov.concepto_nombre.toLowerCase().includes('inicio'))
+                                                        ? (mov.concepto_nombre.toLowerCase().includes('cierre') ? 'Cierre' : 'Inicio')
+                                                        : mov.estado}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-center">
@@ -774,6 +958,17 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                         <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 rounded">
                                                             CSV
                                                         </span>
+                                                    )}
+                                                    {mov.comprobante_url && (
+                                                        <a
+                                                            href={mov.comprobante_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg text-green-600 hover:text-green-700 transition-colors"
+                                                            title="Ver comprobante adjunto"
+                                                        >
+                                                            <FileText size={16} />
+                                                        </a>
                                                     )}
 
                                                     {mov.categoria !== 'Egreso' && (
@@ -830,102 +1025,186 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 </div>
 
                 {/* Payment Data Panel */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="p-5 border-b border-gray-100 dark:border-gray-700">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Datos para Cobro</h3>
-                        <p className="text-xs text-gray-500 mt-1">Click para copiar</p>
-                    </div>
+                <AnimatePresence>
+                    {showSidebar && (
+                        <motion.div
+                            initial={{ opacity: 0, x: 20, width: 0 }}
+                            animate={{ opacity: 1, x: 0, width: 'auto' }}
+                            exit={{ opacity: 0, x: 20, width: 0 }}
+                            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 h-fit sticky top-6 overflow-hidden"
+                        >
+                            <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">Datos para Cobro</h3>
+                                    <p className="text-xs text-gray-500 mt-1">Click para copiar</p>
+                                </div>
+                                <button
+                                    onClick={() => setShowSidebar(false)}
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
 
-                    <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
-                        <div className="space-y-6">
-                            {/* Bancos */}
-                            <div>
-                                <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
-                                    <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                                        <Landmark size={18} className="text-red-600 dark:text-red-400" />
-                                    </div>
-                                    Transferencias Bancarias
-                                </h4>
-                                <div className="space-y-4 pl-2 border-l-2 border-gray-100 dark:border-gray-700 ml-3">
-                                    {/* Empresa */}
+                            <div className="p-4 space-y-3 max-h-[calc(100vh-250px)] overflow-y-auto custom-scrollbar">
+                                <div className="space-y-6">
+                                    {/* Bancos */}
                                     <div>
-                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 pl-3">Empresa (Fullesthetic)</p>
-                                        <div className="space-y-2">
-                                            {['santander_empresa_ars', 'santander_empresa_usd'].map((key) => {
-                                                const data = PAYMENT_DATA[key];
-                                                if (!data) return null;
-                                                return (
-                                                    <div
-                                                        key={key}
-                                                        className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all ml-3"
-                                                    >
-                                                        <div
-                                                            className="flex-1 cursor-pointer"
-                                                            onClick={() => copyToClipboard(key, formatPaymentData(key))}
-                                                        >
-                                                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('SANTANDER EMPRESA ', '').replace(' (Factura A)', '')}</p>
-                                                            <p className="text-xs text-gray-500 mt-0.5">{data.details['Cuenta'] || data.details['Alias']}</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            {data.qrValue && (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setQrModal({ open: true, value: data.qrValue!, title: data.label });
-                                                                    }}
-                                                                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                                                    title="Ver QR"
+                                        <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                            <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                                                <Landmark size={18} className="text-red-600 dark:text-red-400" />
+                                            </div>
+                                            Transferencias Bancarias
+                                        </h4>
+                                        <div className="space-y-3 pl-2 border-l-2 border-gray-100 dark:border-gray-700 ml-3">
+                                            {/* Empresa */}
+                                            <div>
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 pl-3">Empresa (Fullesthetic)</p>
+                                                <div className="space-y-2">
+                                                    {['santander_empresa_ars', 'santander_empresa_usd'].map((key) => {
+                                                        const data = PAYMENT_DATA[key];
+                                                        if (!data) return null;
+                                                        return (
+                                                            <div
+                                                                key={key}
+                                                                className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all ml-3"
+                                                            >
+                                                                <div
+                                                                    className="flex-1 cursor-pointer"
+                                                                    onClick={() => copyToClipboard(key, formatPaymentData(key))}
                                                                 >
-                                                                    <QrCode size={18} />
-                                                                </button>
-                                                            )}
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
-                                                                }}
-                                                                className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                                                                title="Enviar por WhatsApp"
+                                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('SANTANDER EMPRESA ', '').replace(' (Factura A)', '')}</p>
+                                                                    <p className="text-xs text-gray-500 mt-0.5">{data.details['Cuenta'] || data.details['Alias']}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    {data.qrValue && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setQrModal({ open: true, value: data.qrValue!, title: data.label });
+                                                                            }}
+                                                                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                            title="Ver QR"
+                                                                        >
+                                                                            <QrCode size={18} />
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
+                                                                        }}
+                                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                        title="Enviar por WhatsApp"
+                                                                    >
+                                                                        <MessageCircle size={18} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            copyToClipboard(key, formatPaymentData(key));
+                                                                        }}
+                                                                        className={clsx(
+                                                                            "p-2 rounded-lg transition-colors",
+                                                                            copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                        )}
+                                                                        title="Copiar datos"
+                                                                    >
+                                                                        {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Personal */}
+                                            <div>
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 pl-3">Personal</p>
+                                                <div className="space-y-2">
+                                                    {['santander_personal'].map((key) => {
+                                                        const data = PAYMENT_DATA[key];
+                                                        if (!data) return null;
+                                                        return (
+                                                            <div
+                                                                key={key}
+                                                                className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all ml-3"
                                                             >
-                                                                <MessageCircle size={18} />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    copyToClipboard(key, formatPaymentData(key));
-                                                                }}
-                                                                className={clsx(
-                                                                    "p-2 rounded-lg transition-colors",
-                                                                    copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                                                )}
-                                                                title="Copiar datos"
-                                                            >
-                                                                {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                                <div
+                                                                    className="flex-1 cursor-pointer"
+                                                                    onClick={() => copyToClipboard(key, formatPaymentData(key))}
+                                                                >
+                                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('SANTANDER PERSONAL ', '')}</p>
+                                                                    <p className="text-xs text-gray-500 mt-0.5">{data.details['Alias']}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    {data.qrValue && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setQrModal({ open: true, value: data.qrValue!, title: data.label });
+                                                                            }}
+                                                                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                            title="Ver QR"
+                                                                        >
+                                                                            <QrCode size={18} />
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
+                                                                        }}
+                                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                        title="Enviar por WhatsApp"
+                                                                    >
+                                                                        <MessageCircle size={18} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            copyToClipboard(key, formatPaymentData(key));
+                                                                        }}
+                                                                        className={clsx(
+                                                                            "p-2 rounded-lg transition-colors",
+                                                                            copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                        )}
+                                                                        title="Copiar datos"
+                                                                    >
+                                                                        {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Personal */}
+                                    {/* Mercado Pago */}
                                     <div>
-                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 pl-3">Personal</p>
-                                        <div className="space-y-2">
-                                            {['santander_personal'].map((key) => {
+                                        <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                            <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                                <Smartphone size={18} className="text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            Mercado Pago
+                                        </h4>
+                                        <div className="space-y-2 pl-5">
+                                            {['mp_ars', 'mp_usd'].map((key) => {
                                                 const data = PAYMENT_DATA[key];
                                                 if (!data) return null;
                                                 return (
                                                     <div
                                                         key={key}
-                                                        className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all ml-3"
+                                                        className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
                                                     >
                                                         <div
                                                             className="flex-1 cursor-pointer"
                                                             onClick={() => copyToClipboard(key, formatPaymentData(key))}
                                                         >
-                                                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('SANTANDER PERSONAL ', '')}</p>
+                                                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('MERCADO PAGO ', '')}</p>
                                                             <p className="text-xs text-gray-500 mt-0.5">{data.details['Alias']}</p>
                                                         </div>
                                                         <div className="flex items-center gap-1">
@@ -970,156 +1249,89 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                             })}
                                         </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            {/* Mercado Pago */}
-                            <div>
-                                <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
-                                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                        <Smartphone size={18} className="text-blue-600 dark:text-blue-400" />
-                                    </div>
-                                    Mercado Pago
-                                </h4>
-                                <div className="space-y-2 pl-5">
-                                    {['mp_ars', 'mp_usd'].map((key) => {
-                                        const data = PAYMENT_DATA[key];
-                                        if (!data) return null;
-                                        return (
-                                            <div
-                                                key={key}
-                                                className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
-                                            >
-                                                <div
-                                                    className="flex-1 cursor-pointer"
-                                                    onClick={() => copyToClipboard(key, formatPaymentData(key))}
-                                                >
-                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label.replace('MERCADO PAGO ', '')}</p>
-                                                    <p className="text-xs text-gray-500 mt-0.5">{data.details['Alias']}</p>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    {data.qrValue && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setQrModal({ open: true, value: data.qrValue!, title: data.label });
-                                                            }}
-                                                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                                            title="Ver QR"
-                                                        >
-                                                            <QrCode size={18} />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
-                                                        }}
-                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                                                        title="Enviar por WhatsApp"
-                                                    >
-                                                        <MessageCircle size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            copyToClipboard(key, formatPaymentData(key));
-                                                        }}
-                                                        className={clsx(
-                                                            "p-2 rounded-lg transition-colors",
-                                                            copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                                        )}
-                                                        title="Copiar datos"
-                                                    >
-                                                        {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
-                                                    </button>
-                                                </div>
+                                    {/* Cripto */}
+                                    <div>
+                                        <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                            <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                                                <Bitcoin size={18} className="text-green-600 dark:text-green-400" />
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Cripto */}
-                            <div>
-                                <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
-                                    <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                                        <Bitcoin size={18} className="text-green-600 dark:text-green-400" />
-                                    </div>
-                                    Cripto
-                                </h4>
-                                <div className="space-y-2 pl-5">
-                                    {['cripto_usdt'].map((key) => {
-                                        const data = PAYMENT_DATA[key];
-                                        if (!data) return null;
-                                        return (
-                                            <div
-                                                key={key}
-                                                className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
-                                            >
-                                                <div
-                                                    className="flex-1 cursor-pointer"
-                                                    onClick={() => copyToClipboard(key, formatPaymentData(key))}
-                                                >
-                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label}</p>
-                                                    <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{data.details['Dirección']}</p>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    {data.qrValue && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setQrModal({ open: true, value: data.qrValue!, title: data.label });
-                                                            }}
-                                                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                                            title="Ver QR"
+                                            Cripto
+                                        </h4>
+                                        <div className="space-y-2 pl-5">
+                                            {['cripto_usdt'].map((key) => {
+                                                const data = PAYMENT_DATA[key];
+                                                if (!data) return null;
+                                                return (
+                                                    <div
+                                                        key={key}
+                                                        className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                                                    >
+                                                        <div
+                                                            className="flex-1 cursor-pointer"
+                                                            onClick={() => copyToClipboard(key, formatPaymentData(key))}
                                                         >
-                                                            <QrCode size={18} />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
-                                                        }}
-                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                                                        title="Enviar por WhatsApp"
-                                                    >
-                                                        <MessageCircle size={18} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            copyToClipboard(key, formatPaymentData(key));
-                                                        }}
-                                                        className={clsx(
-                                                            "p-2 rounded-lg transition-colors",
-                                                            copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                                        )}
-                                                        title="Copiar datos"
-                                                    >
-                                                        {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{data.label}</p>
+                                                            <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{data.details['Dirección']}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            {data.qrValue && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setQrModal({ open: true, value: data.qrValue!, title: data.label });
+                                                                    }}
+                                                                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                    title="Ver QR"
+                                                                >
+                                                                    <QrCode size={18} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    window.open(getWhatsappLink(formatPaymentData(key)), '_blank');
+                                                                }}
+                                                                className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                title="Enviar por WhatsApp"
+                                                            >
+                                                                <MessageCircle size={18} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    copyToClipboard(key, formatPaymentData(key));
+                                                                }}
+                                                                className={clsx(
+                                                                    "p-2 rounded-lg transition-colors",
+                                                                    copiedKey === key ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                )}
+                                                                title="Copiar datos"
+                                                            >
+                                                                {copiedKey === key ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <div className="p-4 border-t border-gray-100 dark:border-gray-700">
-                        <p className="text-xs text-gray-500 mb-2">Mensaje base:</p>
-                        <div
-                            className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-xs text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                            onClick={() => copyToClipboard('msg', 'Te paso los datos para realizar la transferencia. Por favor enviá el comprobante luego del pago.')}
-                        >
-                            &quot;Te paso los datos para realizar la transferencia. Por favor enviá el comprobante luego del pago.&quot;
-                            {copiedKey === 'msg' && <CheckCircle size={14} className="inline ml-2 text-green-500" />}
-                        </div>
-                    </div>
-                </div>
+                            <div className="p-4 border-t border-gray-100 dark:border-gray-700">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Mensaje base:</p>
+                                <div
+                                    className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-xs text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    onClick={() => copyToClipboard('msg', 'Te paso los datos para realizar la transferencia. Por favor enviá el comprobante luego del pago.')}
+                                >
+                                    &quot;Te paso los datos para realizar la transferencia. Por favor enviá el comprobante luego del pago.&quot;
+                                    {copiedKey === 'msg' && <CheckCircle size={14} className="inline ml-2 text-green-500" />}
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* Nuevo Ingreso Modal */}
@@ -1302,6 +1514,67 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </div>
                             </div>
 
+                            {/* Método de Pago */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Método de Pago
+                                    </label>
+                                    <select
+                                        value={editMetodo}
+                                        onChange={(e) => setEditMetodo(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[50px]"
+                                    >
+                                        <option value="Efectivo">Efectivo</option>
+                                        <option value="Transferencia">Transferencia</option>
+                                        <option value="MercadoPago">Mercado Pago</option>
+                                        <option value="Cripto">Cripto</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Estado
+                                    </label>
+                                    <select
+                                        value={editEstado}
+                                        onChange={(e) => setEditEstado(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[50px]"
+                                    >
+                                        <option value="pagado">Pagado</option>
+                                        <option value="pendiente">Pendiente</option>
+                                        <option value="anulado">Anulado</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Concepto y Categoría */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Concepto
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editConcepto}
+                                        onChange={(e) => setEditConcepto(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Ej: Consulta"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Categoría
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editCategoria}
+                                        onChange={(e) => setEditCategoria(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Ej: Ortodoncia"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-2 font-bold">
                                     Motivo del cambio (Obligatorio)
@@ -1317,6 +1590,36 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg flex items-start gap-2 text-sm text-amber-800 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20">
                                 <History size={16} className="shrink-0 mt-0.5" />
                                 <p>Este cambio será recalculado y quedará registrado <strong>permanentemente</strong> en el historial de auditoría.</p>
+                            </div>
+
+                            {/* Ticket Attachment Section */}
+                            <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-xl bg-blue-50/30 dark:bg-blue-900/10 mt-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <FileText size={16} className="text-blue-600" />
+                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Comprobante de operación
+                                    </label>
+                                </div>
+
+                                <ComprobanteUpload
+                                    area="caja-recepcion"
+                                    onUploadComplete={(res) => setEditComprobanteUrl(res.url)}
+                                    className="w-full"
+                                />
+
+                                {editComprobanteUrl && (
+                                    <div className="mt-2 flex items-center justify-between">
+                                        <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                            <Check size={12} /> Comprobante adjuntado
+                                        </p>
+                                        <button
+                                            onClick={() => window.open(editComprobanteUrl, '_blank')}
+                                            className="text-xs text-blue-600 hover:underline"
+                                        >
+                                            Ver actual
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

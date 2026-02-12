@@ -49,7 +49,8 @@ export default function AgendaCalendar() {
             notes: event.extendedProps.notes,
             patientId: event.extendedProps.patient_id,
             doctorId: event.extendedProps.doctor_id,
-            patient: event.extendedProps.patient
+            patient: event.extendedProps.patient,
+            doctor: event.extendedProps.doctor
         };
 
         setSelectedEvent(appointmentData);
@@ -88,7 +89,8 @@ export default function AgendaCalendar() {
                     notes: apt.notes,
                     patient_id: apt.patient_id,
                     doctor_id: apt.doctor_id,
-                    patient: apt.patient
+                    patient: apt.patient,
+                    doctor: apt.doctor
                 }
             }));
             successCallback(events);

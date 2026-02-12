@@ -8,7 +8,9 @@ import {
     Stethoscope,
     FileText,
     Check,
-    X
+    X,
+    Search,
+    User
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -37,17 +39,21 @@ export default function ProfesionalesTab({ tcBna }: Props) {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     });
-    const [pacientes, setPacientes] = useState<{ id_paciente: string; nombre: string; apellido: string }[]>([]);
-
     // Form state
     const [formData, setFormData] = useState({
         profesional_id: '',
         paciente_id: '',
         tratamiento: '',
         precio: 0,
-        moneda: 'ARS',
+        moneda: 'ARS' as 'ARS' | 'USD'
     });
     const [selectedHonorario, setSelectedHonorario] = useState<HonorarioItem | null>(null);
+
+    // Search states
+    const [patientSearch, setPatientSearch] = useState('');
+    const [patientResults, setPatientResults] = useState<{ id_paciente: string; nombre: string; apellido: string }[]>([]);
+    const [treatmentSearch, setTreatmentSearch] = useState('');
+    const [searchingPatients, setSearchingPatients] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     const loadData = useCallback(async () => {
@@ -61,18 +67,28 @@ export default function ProfesionalesTab({ tcBna }: Props) {
         setProfesionales(profData);
         setPrestaciones(prestData);
         setHonorarios(honorariosData);
-
-        // Load patients for selector
-        const { data: pacientesData } = await supabase
-            .from('pacientes')
-            .select('id_paciente, nombre, apellido')
-            .eq('is_deleted', false)
-            .order('apellido')
-            .limit(100);
-        setPacientes(pacientesData || []);
-
         setLoading(false);
     }, [mesActual]);
+
+    // Dynamic patient search
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (patientSearch.length >= 2) {
+                setSearchingPatients(true);
+                const { data } = await supabase
+                    .from('pacientes')
+                    .select('id_paciente, nombre, apellido')
+                    .eq('is_deleted', false)
+                    .or(`nombre.ilike.%${patientSearch}%,apellido.ilike.%${patientSearch}%`)
+                    .limit(10);
+                setPatientResults(data || []);
+                setSearchingPatients(false);
+            } else {
+                setPatientResults([]);
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [patientSearch]);
 
     useEffect(() => {
         loadData();
@@ -80,17 +96,21 @@ export default function ProfesionalesTab({ tcBna }: Props) {
     }, [mesActual]);
 
 
-    function handleHonorarioSelect(itemId: string) {
-        const item = honorarios.find(h => h.id === itemId);
-        if (item) {
-            setSelectedHonorario(item);
-            setFormData({
-                ...formData,
-                tratamiento: item.tratamiento,
-                precio: item.precio,
-                moneda: item.moneda,
-            });
-        }
+    function handleHonorarioSelect(item: HonorarioItem) {
+        setSelectedHonorario(item);
+        setTreatmentSearch(item.tratamiento);
+        setFormData({
+            ...formData,
+            tratamiento: item.tratamiento,
+            precio: item.precio,
+            moneda: item.moneda as 'ARS' | 'USD',
+        });
+    }
+
+    function selectPatient(p: { id_paciente: string; nombre: string; apellido: string }) {
+        setFormData({ ...formData, paciente_id: p.id_paciente });
+        setPatientResults([]);
+        setPatientSearch(`${p.apellido}, ${p.nombre}`);
     }
 
     async function handleSubmit() {
@@ -117,6 +137,8 @@ export default function ProfesionalesTab({ tcBna }: Props) {
         setShowForm(false);
         setFormData({ profesional_id: profesionales[0]?.id || '', paciente_id: '', tratamiento: '', precio: 0, moneda: 'ARS' });
         setSelectedHonorario(null);
+        setPatientSearch('');
+        setTreatmentSearch('');
         loadData();
     }
 
@@ -179,93 +201,150 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                        {/* Profesional */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                 Profesional *
                             </label>
-                            <select
-                                value={formData.profesional_id}
-                                onChange={(e) => setFormData({ ...formData, profesional_id: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                            >
-                                {profesionales.map(p => (
-                                    <option key={p.id} value={p.id}>{p.nombre} - {p.especialidad}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                <select
+                                    value={formData.profesional_id}
+                                    onChange={(e) => setFormData({ ...formData, profesional_id: e.target.value })}
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                >
+                                    <option value="">Seleccionar profesional...</option>
+                                    {profesionales.map(p => (
+                                        <option key={p.id} value={p.id}>{p.nombre} - {p.especialidad}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        {/* Paciente con Búsqueda */}
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                 Paciente
                             </label>
-                            <select
-                                value={formData.paciente_id}
-                                onChange={(e) => setFormData({ ...formData, paciente_id: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                            >
-                                <option value="">Seleccionar paciente...</option>
-                                {pacientes.map(p => (
-                                    <option key={p.id_paciente} value={p.id_paciente}>
-                                        {p.apellido}, {p.nombre}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar paciente por nombre o apellido..."
+                                    value={patientSearch}
+                                    onChange={(e) => {
+                                        setPatientSearch(e.target.value);
+                                        if (formData.paciente_id) setFormData({ ...formData, paciente_id: '' });
+                                    }}
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                />
+                                {searchingPatients && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Resultados Paciente */}
+                            {patientResults.length > 0 && (
+                                <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                    {patientResults.map(p => (
+                                        <button
+                                            key={p.id_paciente}
+                                            onClick={() => selectPatient(p)}
+                                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 text-left border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                                                <User className="w-4 h-4 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{p.apellido}, {p.nombre}</p>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-tighter">ID: {p.id_paciente.slice(0, 8)}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                Tratamiento del Catálogo
+                        {/* Tratamiento / Catálogo */}
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                Tratamiento / Catálogo
                             </label>
-                            <select
-                                value={selectedHonorario?.id || ''}
-                                onChange={(e) => handleHonorarioSelect(e.target.value)}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                            >
-                                <option value="">Seleccionar del catálogo...</option>
-                                {honorarios.map(h => (
-                                    <option key={h.id} value={h.id}>
-                                        {h.tratamiento} - {h.moneda} {h.precio.toLocaleString('es-AR')}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar en catálogo o escribir..."
+                                    value={treatmentSearch}
+                                    onChange={(e) => {
+                                        setTreatmentSearch(e.target.value);
+                                        setFormData({ ...formData, tratamiento: e.target.value });
+                                        if (selectedHonorario) setSelectedHonorario(null);
+                                    }}
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                />
+                            </div>
+
+                            {/* Resultados Catálogo (Solo si hay búsqueda y no está seleccionado) */}
+                            {treatmentSearch && !selectedHonorario && (
+                                <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                    {honorarios
+                                        .filter(h => h.tratamiento.toLowerCase().includes(treatmentSearch.toLowerCase()))
+                                        .map(h => (
+                                            <button
+                                                key={h.id}
+                                                onClick={() => handleHonorarioSelect(h)}
+                                                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 text-left border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors"
+                                            >
+                                                <span className="text-sm font-medium">{h.tratamiento}</span>
+                                                <span className="text-xs font-mono text-indigo-500">{h.moneda} {h.precio.toLocaleString('es-AR')}</span>
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                            )}
                         </div>
 
+                        {/* Tratamiento Manual */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                Tratamiento *
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                Tratamiento (Confirmación) *
                             </label>
                             <input
                                 type="text"
                                 value={formData.tratamiento}
                                 onChange={(e) => setFormData({ ...formData, tratamiento: e.target.value })}
                                 placeholder="Nombre del tratamiento"
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                             />
                         </div>
 
+                        {/* Precio */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                 Precio
                             </label>
                             <div className="flex gap-2">
                                 <input
                                     type="number"
-                                    value={formData.precio}
+                                    value={formData.precio || ''}
                                     onChange={(e) => setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })}
-                                    className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                 />
                                 <select
                                     value={formData.moneda}
-                                    onChange={(e) => setFormData({ ...formData, moneda: e.target.value })}
-                                    className="w-24 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                    onChange={(e) => setFormData({ ...formData, moneda: e.target.value as any })}
+                                    className="w-24 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none"
                                 >
                                     <option value="ARS">ARS</option>
                                     <option value="USD">USD</option>
                                 </select>
                             </div>
                             {formData.moneda === 'ARS' && tcBna && formData.precio > 0 && (
-                                <p className="text-xs text-green-600 mt-1">
+                                <p className="text-[10px] text-green-600 mt-1 font-medium ml-1">
                                     ≈ ${(formData.precio / tcBna).toFixed(2)} USD
                                 </p>
                             )}

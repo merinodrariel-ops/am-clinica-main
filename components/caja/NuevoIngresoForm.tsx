@@ -61,6 +61,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
     const [patients, setPatients] = useState<Paciente[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
 
+    // Concept/Product search
+    const [conceptoSearch, setConceptoSearch] = useState('');
+
     // Tarifario
     // const [tarifarioItems, setTarifarioItems] = useState<TarifarioItem[]>([]);
     const [tarifarioByCategoria, setTarifarioByCategoria] = useState<Record<string, TarifarioItem[]>>({});
@@ -201,14 +204,17 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
     }
 
     function selectConcepto(item: TarifarioItem) {
-        setFormData({
-            ...formData,
+        setFormData(prev => ({
+            ...prev,
             concepto_id: item.id,
             concepto_nombre: item.concepto_nombre,
             categoria: item.categoria,
             precio_lista_usd: item.precio_base_usd,
-            monto: item.precio_base_usd,
-        });
+            // Only set monto if not already entered in Step 1
+            monto: prev.monto > 0 ? prev.monto : item.precio_base_usd,
+            // If we are defaulting to the reference price, use USD
+            moneda: prev.monto > 0 ? prev.moneda : 'USD'
+        }));
         setStep(3);
     }
 
@@ -298,6 +304,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
             cuota_nro: 1,
             cuotas_total: 1,
         });
+        setConceptoSearch('');
         onClose();
     }
 
@@ -332,119 +339,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
 
                 {/* Content */}
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-                    {/* Step 1: Select Patient */}
+                    {/* Step 1: Amount and Patient */}
                     {step === 1 && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Buscar Paciente *
-                            </label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Nombre, apellido o documento..."
-                                    className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    autoFocus
-                                />
-                                {searchLoading && (
-                                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" size={20} />
-                                )}
-                            </div>
-
-                            {patients.length > 0 && (
-                                <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                                    {patients.map((patient) => (
-                                        <button
-                                            key={patient.id_paciente}
-                                            onClick={() => selectPatient(patient)}
-                                            className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-left"
-                                        >
-                                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                                <User size={20} className="text-blue-600 dark:text-blue-400" />
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-900 dark:text-white">
-                                                    {patient.apellido}, {patient.nombre}
-                                                </p>
-                                                <p className="text-sm text-gray-500">
-                                                    {patient.documento || 'Sin documento'} • {patient.telefono || 'Sin teléfono'}
-                                                </p>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {searchQuery.length >= 2 && patients.length === 0 && !searchLoading && (
-                                <p className="mt-4 text-center text-gray-500">No se encontraron pacientes</p>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Step 2: Select Concept */}
-                    {step === 2 && (
-                        <div>
-                            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Paciente:</p>
-                                <p className="font-medium text-gray-900 dark:text-white">{formData.paciente_nombre}</p>
-                            </div>
-
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                Seleccionar Concepto *
-                            </label>
-
-                            <div className="space-y-4">
-                                {Object.entries(tarifarioByCategoria).map(([categoria, items]) => (
-                                    <div key={categoria}>
-                                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                                            {categoria}
-                                        </h4>
-                                        <div className="grid grid-cols-1 gap-2">
-                                            {items.map((item) => (
-                                                <button
-                                                    key={item.id}
-                                                    onClick={() => selectConcepto(item)}
-                                                    className="p-3 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="font-medium text-gray-900 dark:text-white">
-                                                            {item.concepto_nombre}
-                                                        </span>
-                                                        <span className="text-sm text-gray-500">
-                                                            {item.precio_base_usd > 0 ? formatCurrency(item.precio_base_usd, 'USD') : 'Variable'}
-                                                        </span>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <button
-                                onClick={() => setStep(1)}
-                                className="mt-4 text-sm text-blue-600 hover:underline"
-                            >
-                                ← Cambiar paciente
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Step 3: Amount and Method */}
-                    {step === 3 && (
                         <div className="space-y-6">
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    {formData.paciente_nombre} • {formData.concepto_nombre}
-                                </p>
-                            </div>
-
-                            {/* Amount */}
+                            {/* Amount and Currency - NOW FIRST */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Monto *
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                    Monto del Ingreso *
                                 </label>
                                 <div className="flex gap-3">
                                     <div className="relative flex-1">
@@ -453,25 +354,230 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                             type="number"
                                             value={formData.monto || ''}
                                             onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
-                                            className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                                            className="w-full pl-10 pr-4 py-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 text-2xl font-bold"
                                             placeholder="0.00"
+                                            autoFocus
                                         />
                                     </div>
-                                    <select
-                                        value={formData.moneda}
-                                        onChange={(e) => setFormData({ ...formData, moneda: e.target.value as FormData['moneda'] })}
-                                        className="px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900"
-                                    >
-                                        <option value="USD">USD</option>
-                                        <option value="ARS">ARS</option>
-                                        <option value="USDT">USDT</option>
-                                    </select>
+                                    <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                                        {['ARS', 'USD'].map((m) => (
+                                            <button
+                                                key={m}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, moneda: m as any })}
+                                                className={clsx(
+                                                    "px-4 py-2 text-sm font-bold transition-colors",
+                                                    formData.moneda === m
+                                                        ? "bg-blue-600 text-white"
+                                                        : "bg-white dark:bg-gray-800 text-gray-500"
+                                                )}
+                                            >
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 {formData.moneda === 'ARS' && bnaRate > 0 && (
-                                    <p className="mt-2 text-sm text-gray-500">
-                                        ≈ {formatCurrency(calculateUsdEquivalent(), 'USD')} (TC: ${bnaRate.toLocaleString('es-AR')})
+                                    <p className="mt-2 text-sm text-gray-500 font-medium">
+                                        ≈ {formatCurrency(calculateUsdEquivalent(), 'USD')} (TC BNA: ${bnaRate})
                                     </p>
                                 )}
+                            </div>
+
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Buscar Paciente *
+                                </label>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Nombre, apellido o documento..."
+                                        className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    {searchLoading && (
+                                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" size={20} />
+                                    )}
+                                </div>
+
+                                {patients.length > 0 && (
+                                    <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm max-h-[300px] overflow-y-auto">
+                                        {patients.map((patient) => (
+                                            <button
+                                                key={patient.id_paciente}
+                                                onClick={() => selectPatient(patient)}
+                                                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-left"
+                                            >
+                                                <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                                    <User size={20} className="text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">
+                                                        {patient.apellido}, {patient.nombre}
+                                                    </p>
+                                                    <p className="text-sm text-gray-500">
+                                                        {patient.documento || 'Sin documento'}
+                                                    </p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2: Concept and Categorization */}
+                    {step === 2 && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
+                                <div>
+                                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase">Monto Seleccionado</p>
+                                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                        {formatCurrency(formData.monto, formData.moneda)}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase">Paciente</p>
+                                    <p className="font-medium text-blue-900 dark:text-white">{formData.paciente_nombre}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 text-center">
+                                    ¿A qué corresponde este ingreso?
+                                </label>
+
+                                {/* Manual entry and SEARCH option */}
+                                <div className="mb-6 space-y-3">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar servicio o escribir concepto libre..."
+                                            value={conceptoSearch}
+                                            onChange={(e) => {
+                                                setConceptoSearch(e.target.value);
+                                                setFormData({ ...formData, concepto_nombre: e.target.value, concepto_id: '' });
+                                            }}
+                                            className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    {conceptoSearch && !Object.values(tarifarioByCategoria).some(items => items.some(item => item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()))) && (
+                                        <p className="text-xs text-amber-600 font-medium px-1">
+                                            ✨ No hay coincidencias exactas. Se registrará como concepto libre.
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                                    {Object.entries(tarifarioByCategoria).map(([categoria, items]) => {
+                                        const filteredItems = items.filter(item =>
+                                            item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()) ||
+                                            categoria.toLowerCase().includes(conceptoSearch.toLowerCase())
+                                        );
+
+                                        if (filteredItems.length === 0) return null;
+
+                                        return (
+                                            <div key={categoria} className="animate-in fade-in duration-300">
+                                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 dark:border-gray-700 pb-1 flex justify-between">
+                                                    <span>{categoria}</span>
+                                                    <span className="text-[9px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{filteredItems.length}</span>
+                                                </h4>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {filteredItems.map((item) => (
+                                                        <button
+                                                            key={item.id}
+                                                            onClick={() => {
+                                                                selectConcepto(item);
+                                                                setConceptoSearch(item.concepto_nombre);
+                                                            }}
+                                                            className={clsx(
+                                                                "p-3 text-left border rounded-xl transition-all group",
+                                                                formData.concepto_id === item.id
+                                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm"
+                                                                    : "border-gray-100 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/5"
+                                                            )}
+                                                        >
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-medium text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                                    {item.concepto_nombre}
+                                                                </span>
+                                                                <span className="text-[10px] font-bold text-gray-400 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors">
+                                                                    REF: {formatCurrency(item.precio_base_usd, 'USD')}
+                                                                </span>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setStep(1)}
+                                    className="flex-1 py-3 border border-gray-200 dark:border-gray-700 rounded-xl font-medium text-gray-600 dark:text-gray-400"
+                                >
+                                    Atrás
+                                </button>
+                                <button
+                                    onClick={() => setStep(3)}
+                                    disabled={!formData.concepto_nombre}
+                                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-medium transition-colors"
+                                >
+                                    Continuar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 3: Payment Method and Details */}
+                    {step === 3 && (
+                        <div className="space-y-6">
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-700 flex justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                        <FileText size={18} className="text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-gray-900 dark:text-white">{formatCurrency(formData.monto, formData.moneda)}</p>
+                                        <p className="text-xs text-gray-500">{formData.concepto_nombre}</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] text-gray-500 uppercase">Paciente</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">{formData.paciente_nombre}</p>
+                                </div>
+                            </div>
+
+                            {/* Payment Method */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Método de Pago
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {METODOS_PAGO.map((metodo) => (
+                                        <button
+                                            key={metodo.value}
+                                            onClick={() => setFormData({ ...formData, metodo_pago: metodo.value as FormData['metodo_pago'] })}
+                                            className={clsx(
+                                                "p-3 border rounded-xl text-left transition-colors",
+                                                formData.metodo_pago === metodo.value
+                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                                            )}
+                                        >
+                                            <span className="mr-2">{metodo.icon}</span>
+                                            {metodo.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Financiación / Cuotas */}
@@ -513,30 +619,6 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                         </div>
                                     </div>
                                 )}
-                            </div>
-
-                            {/* Payment Method */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Método de Pago
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {METODOS_PAGO.map((metodo) => (
-                                        <button
-                                            key={metodo.value}
-                                            onClick={() => setFormData({ ...formData, metodo_pago: metodo.value as FormData['metodo_pago'] })}
-                                            className={clsx(
-                                                "p-3 border rounded-xl text-left transition-colors",
-                                                formData.metodo_pago === metodo.value
-                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                                            )}
-                                        >
-                                            <span className="mr-2">{metodo.icon}</span>
-                                            {metodo.label}
-                                        </button>
-                                    ))}
-                                </div>
                             </div>
 
                             {/* Ticket Upload for non-cash payments */}
