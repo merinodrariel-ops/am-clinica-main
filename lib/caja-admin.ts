@@ -1291,6 +1291,23 @@ export async function updateMovimientoAdminWithLines(
 ): Promise<{ success: boolean; error?: string }> {
     const supabase = createClient();
 
+    const normalizeLine = (line: MovimientoLinea) => {
+        const importe = Math.max(0, Number(line.importe || 0));
+        const moneda = (line.moneda || '').toUpperCase();
+        const usdEquivalenteRaw = line.usd_equivalente;
+        const usdEquivalente = Number.isFinite(Number(usdEquivalenteRaw))
+            ? Number(usdEquivalenteRaw)
+            : (moneda === 'USD' ? importe : 0);
+
+        return {
+            ...line,
+            cuenta_id: String(line.cuenta_id || ''),
+            importe,
+            moneda,
+            usd_equivalente: Math.max(0, usdEquivalente),
+        };
+    };
+
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) {
         return { success: false, error: 'Sesion invalida. Vuelve a iniciar sesion.' };
@@ -1311,8 +1328,10 @@ export async function updateMovimientoAdminWithLines(
     // 1. Update main movement fields & total
     let usdTotal: number;
 
-    if (lines.length > 0) {
-        usdTotal = lines.reduce((sum, l) => sum + (l.usd_equivalente || 0), 0);
+    const sanitizedLines = (lines || []).map(normalizeLine);
+
+    if (sanitizedLines.length > 0) {
+        usdTotal = sanitizedLines.reduce((sum, l) => sum + (l.usd_equivalente || 0), 0);
     } else if (typeof usdTotalOverride === 'number' && Number.isFinite(usdTotalOverride)) {
         usdTotal = Math.max(0, usdTotalOverride);
     } else {
@@ -1341,7 +1360,7 @@ export async function updateMovimientoAdminWithLines(
     if (mainError) return { success: false, error: mainError.message };
 
     // 2. Handle Lines (without hard delete)
-    if (lines.length === 0) {
+    if (sanitizedLines.length === 0) {
         return { success: true };
     }
 
@@ -1354,8 +1373,8 @@ export async function updateMovimientoAdminWithLines(
         return { success: false, error: `Error leyendo lineas actuales: ${currentLinesError.message}` };
     }
 
-    const existingLines = lines.filter((line) => Boolean(line.id));
-    const newLines = lines.filter((line) => !line.id);
+    const existingLines = sanitizedLines.filter((line) => Boolean(line.id));
+    const newLines = sanitizedLines.filter((line) => !line.id);
 
     const incomingLineIds = new Set(
         existingLines
@@ -1379,25 +1398,35 @@ export async function updateMovimientoAdminWithLines(
         }
     }
 
-    for (const line of existingLines) {
-        const { error: updateLineError } = await supabase
+    const applyFullReplace = async () => {
+        const rpcPayload = sanitizedLines.map((line) => ({
+            cuenta_id: line.cuenta_id,
+            importe: line.importe,
+            moneda: line.moneda,
+            usd_equivalente: line.usd_equivalente,
+        }));
+
+        const { error: rpcError } = await supabase.rpc('upsert_caja_admin_movimiento_lineas', {
+            p_movimiento_id: id,
+            p_lineas: rpcPayload,
+        });
+
+        if (!rpcError) {
+            return { success: true };
+        }
+
+        console.warn('RPC upsert fallback unavailable, trying direct delete/insert:', rpcError.message);
+
+        const { error: hardDeleteError } = await supabase
             .from('caja_admin_movimiento_lineas')
-            .update({
-                cuenta_id: line.cuenta_id,
-                importe: line.importe,
-                moneda: line.moneda,
-                usd_equivalente: line.usd_equivalente,
-            })
-            .eq('id', line.id as string)
+            .delete()
             .eq('admin_movimiento_id', id);
 
-        if (updateLineError) {
-            return { success: false, error: `Error actualizando linea: ${updateLineError.message}` };
+        if (hardDeleteError) {
+            return { success: false, error: `Error reemplazando lineas (delete): ${hardDeleteError.message}` };
         }
-    }
 
-    if (newLines.length > 0) {
-        const linesToInsert = newLines.map((line) => ({
+        const linesToInsert = sanitizedLines.map((line) => ({
             admin_movimiento_id: id,
             cuenta_id: line.cuenta_id,
             importe: line.importe,
@@ -1405,13 +1434,57 @@ export async function updateMovimientoAdminWithLines(
             usd_equivalente: line.usd_equivalente,
         }));
 
-        const { error: insertError } = await supabase
+        const { error: hardInsertError } = await supabase
             .from('caja_admin_movimiento_lineas')
             .insert(linesToInsert);
 
-        if (insertError) {
-            return { success: false, error: `Error insertando nueva linea: ${insertError.message}` };
+        if (hardInsertError) {
+            return { success: false, error: `Error reemplazando lineas (insert): ${hardInsertError.message}` };
         }
+
+        return { success: true };
+    };
+
+    try {
+        for (const line of existingLines) {
+            const { error: updateLineError } = await supabase
+                .from('caja_admin_movimiento_lineas')
+                .update({
+                    cuenta_id: line.cuenta_id,
+                    importe: line.importe,
+                    moneda: line.moneda,
+                    usd_equivalente: line.usd_equivalente,
+                })
+                .eq('id', line.id as string)
+                .eq('admin_movimiento_id', id);
+
+            if (updateLineError) {
+                console.warn('Line update failed, fallback to full replace:', updateLineError.message);
+                return await applyFullReplace();
+            }
+        }
+
+        if (newLines.length > 0) {
+            const linesToInsert = newLines.map((line) => ({
+                admin_movimiento_id: id,
+                cuenta_id: line.cuenta_id,
+                importe: line.importe,
+                moneda: line.moneda,
+                usd_equivalente: line.usd_equivalente,
+            }));
+
+            const { error: insertError } = await supabase
+                .from('caja_admin_movimiento_lineas')
+                .insert(linesToInsert);
+
+            if (insertError) {
+                console.warn('Line insert failed, fallback to full replace:', insertError.message);
+                return await applyFullReplace();
+            }
+        }
+    } catch (error) {
+        console.warn('Line update flow failed, fallback to full replace:', error);
+        return await applyFullReplace();
     }
 
     return { success: true };

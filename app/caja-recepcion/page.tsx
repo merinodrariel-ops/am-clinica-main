@@ -38,6 +38,8 @@ interface Movimiento {
         nombre: string;
         apellido: string;
         id_paciente: string;
+        telefono?: string | null;
+        email?: string | null;
         financ_estado?: string;
         financ_monto_total?: number;
         financ_cuotas_total?: number;
@@ -173,7 +175,16 @@ export default function CajaRecepcionPage() {
     const [showTransferencia, setShowTransferencia] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
-    const [showSidebar, setShowSidebar] = useState(true);
+    const [showSidebar, setShowSidebar] = useState(false);
+
+    useEffect(() => {
+        const saved = localStorage.getItem('am.caja-recepcion.sidebar.visible');
+        if (saved === '1') setShowSidebar(true);
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('am.caja-recepcion.sidebar.visible', showSidebar ? '1' : '0');
+    }, [showSidebar]);
 
     const today = useMemo(() => getLocalISODate(), []);
 
@@ -200,6 +211,21 @@ export default function CajaRecepcionPage() {
 
     // Recibo Modal state
     const [reciboMov, setReciboMov] = useState<Movimiento | null>(null);
+    const [isReciboMinimized, setIsReciboMinimized] = useState(false);
+
+    useEffect(() => {
+        if (!reciboMov) return;
+
+        const handleEsc = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setReciboMov(null);
+                setIsReciboMinimized(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [reciboMov]);
 
     function getWhatsappLink(text: string) {
         return `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -228,6 +254,8 @@ export default function CajaRecepcionPage() {
                         id_paciente, 
                         nombre, 
                         apellido,
+                        telefono,
+                        email,
                         financ_estado,
                         financ_monto_total,
                         financ_cuotas_total
@@ -249,7 +277,7 @@ export default function CajaRecepcionPage() {
                 if (hasNotionImports) {
                     const { data: allPacientes } = await supabase
                         .from('pacientes')
-                        .select('id_paciente, nombre, apellido, financ_estado, financ_monto_total, financ_cuotas_total');
+                        .select('id_paciente, nombre, apellido, telefono, email, financ_estado, financ_monto_total, financ_cuotas_total');
 
                     if (allPacientes) {
                         const enrichedMovs = (movs || []).map(m => {
@@ -280,6 +308,8 @@ export default function CajaRecepcionPage() {
                                             id_paciente: found.id_paciente,
                                             nombre: found.nombre,
                                             apellido: found.apellido,
+                                            telefono: found.telefono,
+                                            email: found.email,
                                             financ_estado: found.financ_estado,
                                             financ_monto_total: found.financ_monto_total,
                                             financ_cuotas_total: found.financ_cuotas_total
@@ -1117,7 +1147,10 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                             </button>
                                                             {mov.estado === 'pagado' && (
                                                                 <button
-                                                                    onClick={() => setReciboMov(mov)}
+                                                                    onClick={() => {
+                                                                        setReciboMov(mov);
+                                                                        setIsReciboMinimized(false);
+                                                                    }}
                                                                     className="p-1.5 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg text-purple-500 hover:text-purple-600 transition-colors"
                                                                     title="Generar Recibo Visual (imagen)"
                                                                 >
@@ -1494,9 +1527,15 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
             />
 
             {/* Recibo Visual Modal */}
-            {reciboMov && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
+            {reciboMov && !isReciboMinimized && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    onClick={() => setReciboMov(null)}
+                >
+                    <div
+                        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-xl w-full max-h-[92vh] overflow-hidden flex flex-col"
+                        onClick={(event) => event.stopPropagation()}
+                    >
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1507,15 +1546,23 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     Genera una imagen del recibo para compartir
                                 </p>
                             </div>
-                            <button
-                                onClick={() => setReciboMov(null)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                            >
-                                <X size={20} className="text-gray-500" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setIsReciboMinimized(true)}
+                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                                >
+                                    Minimizar
+                                </button>
+                                <button
+                                    onClick={() => setReciboMov(null)}
+                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                >
+                                    <X size={20} className="text-gray-500" />
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="p-6">
+                        <div className="p-4 md:p-6 overflow-y-auto">
                             <ReciboGenerator
                                 data={{
                                     numero: generateReciboNumber(),
@@ -1531,9 +1578,39 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 onGenerated={(result) => {
                                     console.log('Recibo generado:', result.imageUrl);
                                 }}
+                                recipientPhone={reciboMov.paciente?.telefono || null}
+                                recipientEmail={reciboMov.paciente?.email || null}
                             />
                         </div>
                     </div>
+                </div>
+            )}
+
+            {reciboMov && isReciboMinimized && (
+                <div className="fixed bottom-4 right-4 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-[280px]">
+                    <div className="flex items-start justify-between gap-2">
+                        <div>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Recibo minimizado</p>
+                            <p className="text-xs text-gray-500 truncate">
+                                {reciboMov.paciente
+                                    ? `${reciboMov.paciente.nombre} ${reciboMov.paciente.apellido}`
+                                    : 'Paciente General'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setReciboMov(null)}
+                            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                        >
+                            <X size={16} className="text-gray-500" />
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={() => setIsReciboMinimized(false)}
+                        className="mt-3 w-full px-3 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                        Restaurar recibo
+                    </button>
                 </div>
             )}
 

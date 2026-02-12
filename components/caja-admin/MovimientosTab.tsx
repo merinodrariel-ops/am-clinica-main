@@ -268,7 +268,6 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             const { success, error } = await updateMovimientoAdminWithLines(editingMov.id, {
                 fecha_movimiento: editData.fecha,
                 descripcion: editData.descripcion,
-                adjuntos: editData.adjuntos,
                 registro_editado: true
             }, editData.lines, editData.totalUsd);
 
@@ -1051,6 +1050,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                     </button>
                                 </div>
                                 <div className="space-y-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl max-h-48 overflow-y-auto">
+                                    <p className="text-[11px] text-slate-500">
+                                        Para cambiar metodo de pago (ej. Efectivo a Transferencia), cambia la cuenta de la linea.
+                                    </p>
                                     {editData.lines.map((line, idx) => (
                                         <div key={idx} className="flex items-center gap-2">
                                             <select

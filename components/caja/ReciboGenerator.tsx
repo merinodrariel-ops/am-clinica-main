@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { uploadToStorage } from '@/lib/supabase-storage';
+import { sendReciboEmailAction } from '@/app/actions/email';
 
 interface ReciboData {
     numero: string;
@@ -17,12 +18,25 @@ interface ReciboGeneratorProps {
     data: ReciboData;
     onGenerated?: (result: { imageUrl: string; storageUrl?: string }) => void;
     autoSave?: boolean;
+    recipientPhone?: string | null;
+    recipientEmail?: string | null;
 }
 
-export function ReciboGenerator({ data, onGenerated, autoSave = true }: ReciboGeneratorProps) {
+export function ReciboGenerator({
+    data,
+    onGenerated,
+    autoSave = true,
+    recipientPhone,
+    recipientEmail,
+}: ReciboGeneratorProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+    const [storageImageUrl, setStorageImageUrl] = useState<string | null>(null);
+    const [whatsappTarget, setWhatsappTarget] = useState(recipientPhone || '');
+    const [emailTarget, setEmailTarget] = useState(recipientEmail || '');
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const [emailStatus, setEmailStatus] = useState<string | null>(null);
 
     const generateRecibo = async () => {
         setIsGenerating(true);
@@ -164,6 +178,7 @@ export function ReciboGenerator({ data, onGenerated, autoSave = true }: ReciboGe
                 );
                 if (result.success) {
                     storageUrl = result.publicUrl;
+                    setStorageImageUrl(result.publicUrl || null);
                 }
             }
 
@@ -201,6 +216,54 @@ export function ReciboGenerator({ data, onGenerated, autoSave = true }: ReciboGe
         } else {
             // Fallback: download
             downloadImage();
+        }
+    };
+
+    const openWhatsAppWeb = () => {
+        if (!generatedImage) return;
+
+        const digits = (whatsappTarget || '').replace(/\D/g, '');
+        const baseMessage = [
+            `Hola! Te compartimos tu comprobante de pago de AM Clinica.`,
+            `Recibo: ${data.numero}`,
+            `Concepto: ${data.concepto}`,
+            `Monto: ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(data.monto)}`,
+            storageImageUrl ? `Comprobante online: ${storageImageUrl}` : 'Adjunto: comprobante en imagen.',
+        ].join('\n');
+
+        const encoded = encodeURIComponent(baseMessage);
+        const targetUrl = digits
+            ? `https://web.whatsapp.com/send?phone=${digits}&text=${encoded}`
+            : `https://web.whatsapp.com/send?text=${encoded}`;
+
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    const sendByEmail = async () => {
+        if (!generatedImage) return;
+
+        setEmailStatus(null);
+        setSendingEmail(true);
+        try {
+            const result = await sendReciboEmailAction({
+                toEmail: emailTarget,
+                pacienteNombre: data.paciente,
+                reciboNumero: data.numero,
+                concepto: data.concepto,
+                monto: data.monto,
+                imageDataUrl: generatedImage,
+                storageUrl: storageImageUrl || undefined,
+            });
+
+            if (result.success) {
+                setEmailStatus('Email enviado correctamente');
+            } else {
+                setEmailStatus(result.error || 'No se pudo enviar el email');
+            }
+        } catch (error) {
+            setEmailStatus(error instanceof Error ? error.message : 'Error inesperado al enviar email');
+        } finally {
+            setSendingEmail(false);
         }
     };
 
@@ -249,14 +312,55 @@ export function ReciboGenerator({ data, onGenerated, autoSave = true }: ReciboGe
                         alt="Comprobante"
                         style={{
                             maxWidth: '100%',
+                            maxHeight: '52vh',
+                            objectFit: 'contain',
                             borderRadius: '12px',
                             boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                         }}
                     />
 
+                    <div style={{ display: 'grid', gap: '10px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563' }}>WhatsApp destino (opcional)</label>
+                        <input
+                            type="text"
+                            value={whatsappTarget}
+                            onChange={(event) => setWhatsappTarget(event.target.value)}
+                            placeholder="Ej: +54911..."
+                            style={{
+                                width: '100%',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '8px',
+                                padding: '10px 12px',
+                                fontSize: '14px',
+                            }}
+                        />
+                    </div>
+
+                    <div style={{ display: 'grid', gap: '10px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563' }}>Email destino (Gmail)</label>
+                        <input
+                            type="email"
+                            value={emailTarget}
+                            onChange={(event) => setEmailTarget(event.target.value)}
+                            placeholder="paciente@email.com"
+                            style={{
+                                width: '100%',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '8px',
+                                padding: '10px 12px',
+                                fontSize: '14px',
+                            }}
+                        />
+                        {emailStatus && (
+                            <p style={{ fontSize: '12px', margin: 0, color: emailStatus.includes('correctamente') ? '#059669' : '#b91c1c' }}>
+                                {emailStatus}
+                            </p>
+                        )}
+                    </div>
+
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                         <button
-                            onClick={shareViaWhatsApp}
+                            onClick={openWhatsAppWeb}
                             style={{
                                 flex: 1,
                                 padding: '12px 20px',
@@ -269,7 +373,43 @@ export function ReciboGenerator({ data, onGenerated, autoSave = true }: ReciboGe
                                 fontWeight: 'bold',
                             }}
                         >
-                            📱 Compartir WhatsApp
+                            💬 WhatsApp Web
+                        </button>
+
+                        <button
+                            onClick={shareViaWhatsApp}
+                            style={{
+                                flex: 1,
+                                padding: '12px 20px',
+                                backgroundColor: '#0ea5e9',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                fontWeight: 'bold',
+                            }}
+                        >
+                            📱 Compartir archivo
+                        </button>
+
+                        <button
+                            onClick={sendByEmail}
+                            disabled={sendingEmail}
+                            style={{
+                                flex: 1,
+                                padding: '12px 20px',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: sendingEmail ? 'not-allowed' : 'pointer',
+                                fontSize: '14px',
+                                fontWeight: 'bold',
+                                opacity: sendingEmail ? 0.7 : 1,
+                            }}
+                        >
+                            {sendingEmail ? '⏳ Enviando email...' : '✉️ Enviar por Gmail'}
                         </button>
 
                         <button
