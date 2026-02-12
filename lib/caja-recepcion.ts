@@ -177,6 +177,89 @@ export async function getUltimoCierre(fechaLimite?: string): Promise<CajaArqueo 
     return data;
 }
 
+export async function getAperturaDelDia(fecha?: string): Promise<CajaArqueo | null> {
+    const targetDate = fecha || getLocalISODate();
+
+    const { data, error } = await supabase
+        .from('caja_recepcion_arqueos')
+        .select('*')
+        .eq('fecha', targetDate)
+        .eq('estado', 'abierto')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw error;
+    }
+
+    return data || null;
+}
+
+export async function abrirCajaDelDia(
+    fecha: string,
+    usuario: string,
+    tcBnaVenta?: number | null
+): Promise<CajaArqueo> {
+    const { data: closedToday, error: closedError } = await supabase
+        .from('caja_recepcion_arqueos')
+        .select('id')
+        .eq('fecha', fecha)
+        .eq('estado', 'cerrado')
+        .maybeSingle();
+
+    if (closedError && closedError.code !== 'PGRST116') {
+        throw closedError;
+    }
+
+    if (closedToday?.id) {
+        throw new Error('La caja de hoy ya fue cerrada.');
+    }
+
+    const aperturaExistente = await getAperturaDelDia(fecha);
+    if (aperturaExistente) {
+        return aperturaExistente;
+    }
+
+    const ultimoCierre = await getUltimoCierre(fecha);
+    const saldoInicialUsd = ultimoCierre?.saldo_final_usd_billete || 0;
+    const saldoInicialArs = ultimoCierre?.saldo_final_ars_billete || 0;
+    const saldoInicialEq =
+        ultimoCierre?.saldo_final_usd_equivalente ??
+        (tcBnaVenta && tcBnaVenta > 0 ? saldoInicialUsd + (saldoInicialArs / tcBnaVenta) : saldoInicialUsd);
+
+    const { data, error } = await supabase
+        .from('caja_recepcion_arqueos')
+        .insert({
+            fecha,
+            usuario,
+            hora_inicio: new Date().toISOString(),
+            hora_cierre: null,
+            saldo_inicial_usd_billete: saldoInicialUsd,
+            saldo_inicial_ars_billete: saldoInicialArs,
+            saldo_inicial_usd_equivalente: Math.round((saldoInicialEq || 0) * 100) / 100,
+            saldo_final_usd_billete: null,
+            saldo_final_ars_billete: null,
+            saldo_final_usd_equivalente: null,
+            tc_bna_venta_dia: tcBnaVenta || null,
+            total_ingresos_dia_usd: 0,
+            total_transferencias_admin_usd: 0,
+            diferencia_usd: 0,
+            observaciones: 'Apertura automatica',
+            estado: 'abierto',
+            snapshot_datos: {
+                apertura_automatica: true,
+                origen: 'sistema',
+            },
+        })
+        .select('*')
+        .single();
+
+    if (error) throw error;
+    return data as CajaArqueo;
+}
+
 export async function cerrarCajaDelDia(
     fecha: string,
     usuario: string,

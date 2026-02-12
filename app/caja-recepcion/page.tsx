@@ -64,6 +64,14 @@ interface BnaRate {
     error?: boolean;
 }
 
+interface AperturaAudit {
+    fecha: string;
+    usuario: string;
+    hora_inicio: string | null;
+    created_at: string;
+    estado: 'abierto' | 'cerrado';
+}
+
 // Payment data for copy functionality
 // Payment data types and constant
 type PaymentCategory = 'banco' | 'mp' | 'cripto';
@@ -154,6 +162,7 @@ export default function CajaRecepcionPage() {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
     const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);
     const [loading, setLoading] = useState(true);
+    const [aperturaAudit, setAperturaAudit] = useState<AperturaAudit | null>(null);
     const [mesActual, setMesActual] = useState(() => getLocalYearMonth());
     const [showNuevoGasto, setShowNuevoGasto] = useState(false);
     const [privacyMode, setPrivacyMode] = useState(false);
@@ -288,6 +297,16 @@ export default function CajaRecepcionPage() {
                     setMovimientos(movs || []);
                 }
             }
+
+            const { data: aperturaRaw } = await supabase
+                .from('caja_recepcion_arqueos')
+                .select('fecha, usuario, hora_inicio, created_at, estado')
+                .eq('fecha', today)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            setAperturaAudit((aperturaRaw as AperturaAudit | null) || null);
 
             // Calculate stats - GROSS INCOME (Ingresos Brutos)
             // We only sum positive amounts for "Ingresos". Negative amounts are "Egresos" or "Transfers".
@@ -824,6 +843,37 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     "bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-300",
                     showSidebar ? "lg:col-span-2" : "col-span-1"
                 )}>
+                    <div className="px-5 py-3 border-b border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-900/20">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                    Auditoria express
+                                </span>
+                                <span className="text-indigo-700 dark:text-indigo-300">Apertura de caja (hoy)</span>
+                            </div>
+
+                            {aperturaAudit ? (
+                                <div className="flex items-center gap-2 text-indigo-800 dark:text-indigo-200">
+                                    <span className="font-semibold">{aperturaAudit.usuario || 'Usuario'}</span>
+                                    <span>•</span>
+                                    <span>
+                                        {new Date(aperturaAudit.hora_inicio || aperturaAudit.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    <span className={clsx(
+                                        'px-1.5 py-0.5 rounded text-[10px] font-bold border',
+                                        aperturaAudit.estado === 'abierto'
+                                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700'
+                                            : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/40 dark:text-gray-300 dark:border-gray-700'
+                                    )}>
+                                        {aperturaAudit.estado.toUpperCase()}
+                                    </span>
+                                </div>
+                            ) : (
+                                <span className="text-amber-700 dark:text-amber-300 font-medium">Sin apertura registrada hoy</span>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-gray-50/50 dark:bg-gray-900/50">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
                             <h3 className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, DollarSign, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, DollarSign, Lock, CheckCircle, AlertTriangle, PlayCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase, CajaArqueo } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
-import { getUltimoCierre, cerrarCajaDelDia } from '@/lib/caja-recepcion';
+import { getUltimoCierre, cerrarCajaDelDia, abrirCajaDelDia } from '@/lib/caja-recepcion';
 import { formatDateForLocale, getLocalISODate } from '@/lib/local-date';
 
 interface ArqueoPanelProps {
@@ -15,9 +15,11 @@ interface ArqueoPanelProps {
 
 export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProps) {
     const [cierreHoy, setCierreHoy] = useState<CajaArqueo | null>(null);
+    const [aperturaHoy, setAperturaHoy] = useState<CajaArqueo | null>(null);
     const [ultimoCierre, setUltimoCierre] = useState<CajaArqueo | null>(null);
     const [loading, setLoading] = useState(true);
     const [showCerrarModal, setShowCerrarModal] = useState(false);
+    const [showAbrirModal, setShowAbrirModal] = useState(false);
 
     // Expected balances for comparison
     const [saldosEsperados, setSaldosEsperados] = useState<{ ars: number, usd: number }>({ ars: 0, usd: 0 });
@@ -27,6 +29,7 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
     const [saldoFinalArs, setSaldoFinalArs] = useState(0);
     const [observaciones, setObservaciones] = useState('');
     const [saving, setSaving] = useState(false);
+    const [opening, setOpening] = useState(false);
 
     useEffect(() => {
         checkEstadoCaja();
@@ -37,32 +40,57 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
         try {
             const today = getLocalISODate();
 
-            // 1. Check if today is closed
-            const { data: hoy } = await supabase
-                .from('caja_recepcion_arqueos')
-                .select('*')
-                .eq('fecha', today)
-                .eq('estado', 'cerrado')
-                .maybeSingle();
+            const [{ data: cierreData }, { data: aperturaData }] = await Promise.all([
+                supabase
+                    .from('caja_recepcion_arqueos')
+                    .select('*')
+                    .eq('fecha', today)
+                    .eq('estado', 'cerrado')
+                    .maybeSingle(),
+                supabase
+                    .from('caja_recepcion_arqueos')
+                    .select('*')
+                    .eq('fecha', today)
+                    .eq('estado', 'abierto')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle(),
+            ]);
 
-            if (hoy) {
-                setCierreHoy(hoy);
+            if (cierreData) {
+                setCierreHoy(cierreData);
+                setAperturaHoy(null);
                 setUltimoCierre(null);
-            } else {
-                setCierreHoy(null);
-                // 2. Get last closure (for start balance info) only if today is open
-                const ultimo = await getUltimoCierre(today);
-                setUltimoCierre(ultimo);
-
-                // Fetch expected balances logic
-                // Importing logic from lib would be better but for speed we'll do basic fetch here or use a helper
-                // actually we have a helper in lib/caja-recepcion.ts "getCurrentBalanceRecepcion"
+                return;
             }
+
+            setCierreHoy(null);
+            setAperturaHoy((aperturaData || null) as CajaArqueo | null);
+
+            const ultimo = await getUltimoCierre(today);
+            setUltimoCierre(ultimo);
 
         } catch (error) {
             console.error('Error checking caja:', error);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleAbrirCaja() {
+        setOpening(true);
+        try {
+            const today = getLocalISODate();
+            await abrirCajaDelDia(today, 'Recepcion', bnaRate || null);
+            setShowAbrirModal(false);
+            await checkEstadoCaja();
+            onArqueoChange?.();
+        } catch (error: unknown) {
+            console.error('Error abriendo caja:', error);
+            const message = error instanceof Error ? error.message : 'Error desconocido';
+            alert('Error al abrir caja: ' + message);
+        } finally {
+            setOpening(false);
         }
     }
 
@@ -119,7 +147,12 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
         );
     }
 
-    const saldoInicialEq = ultimoCierre ? ultimoCierre.saldo_final_usd_equivalente : 0;
+    const saldoInicialEq = aperturaHoy
+        ? aperturaHoy.saldo_inicial_usd_equivalente
+        : (ultimoCierre ? ultimoCierre.saldo_final_usd_equivalente : 0);
+    const aperturaSugeridaUsd = ultimoCierre?.saldo_final_usd_billete || 0;
+    const aperturaSugeridaArs = ultimoCierre?.saldo_final_ars_billete || 0;
+    const aperturaSugeridaEq = ultimoCierre?.saldo_final_usd_equivalente || 0;
 
     return (
         <>
@@ -133,30 +166,49 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                     <div className="flex items-center gap-3">
                         {cierreHoy ? (
                             <CheckCircle className="text-gray-500" size={24} />
+                        ) : aperturaHoy ? (
+                            <CheckCircle className="text-green-600 dark:text-green-400" size={24} />
                         ) : (
                             <AlertTriangle className="text-blue-600 dark:text-blue-400" size={24} />
                         )}
                         <div>
                             <p className="font-medium text-gray-900 dark:text-white">
-                                {cierreHoy ? 'Caja Cerrada' : 'Caja Activa - Cierre Pendiente'}
+                                {cierreHoy
+                                    ? 'Caja Cerrada'
+                                    : aperturaHoy
+                                        ? 'Jornada Abierta'
+                                        : 'Caja sin iniciar'}
                             </p>
                             <p className="text-xs text-gray-500">
                                 {cierreHoy
                                     ? `Cerrado el ${formatDateForLocale(cierreHoy.fecha)} por ${cierreHoy.usuario}`
-                                    : ultimoCierre
-                                        ? `Último cierre: ${formatDateForLocale(ultimoCierre.fecha)} • Saldo Inicial: ${formatCurrency(saldoInicialEq || 0, 'USD')}`
-                                        : 'Sin cierres previos (Saldo inicial: $0)'}
+                                    : aperturaHoy
+                                        ? `Abierta ${aperturaHoy.hora_inicio ? new Date(aperturaHoy.hora_inicio).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : ''} • Saldo inicial: ${formatCurrency(aperturaHoy.saldo_inicial_usd_equivalente || 0, 'USD')}`
+                                        : ultimoCierre
+                                            ? `Ultimo cierre: ${formatDateForLocale(ultimoCierre.fecha)} • Apertura sugerida: ${formatCurrency(saldoInicialEq || 0, 'USD')}`
+                                            : 'Sin cierres previos (Saldo inicial: $0)'}
                             </p>
                         </div>
                     </div>
 
-                    {!cierreHoy && (
+                    {!cierreHoy && aperturaHoy && (
                         <button
                             onClick={() => setShowCerrarModal(true)}
                             className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
                         >
                             <Lock size={18} />
                             Cerrar Caja del Día
+                        </button>
+                    )}
+
+                    {!cierreHoy && !aperturaHoy && (
+                        <button
+                            onClick={() => setShowAbrirModal(true)}
+                            disabled={opening}
+                            className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60"
+                        >
+                            {opening ? <Loader2 size={18} className="animate-spin" /> : <PlayCircle size={18} />}
+                            Iniciar Jornada
                         </button>
                     )}
                 </div>
@@ -196,6 +248,66 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                     </div>
                 )}
             </div>
+
+            {/* Modal Abrir Caja */}
+            {showAbrirModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in duration-200">
+                        <div className="p-5 border-b border-gray-100 dark:border-gray-700">
+                            <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <PlayCircle size={20} className="text-emerald-500" />
+                                Iniciar Jornada
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Se heredara automaticamente el saldo final del ultimo cierre como saldo inicial de hoy.
+                            </p>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <div className="rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+                                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide mb-2">
+                                    Saldo inicial sugerido
+                                </p>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between text-gray-700 dark:text-gray-200">
+                                        <span>Efectivo USD</span>
+                                        <span className="font-semibold">{formatCurrency(aperturaSugeridaUsd, 'USD')}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-700 dark:text-gray-200">
+                                        <span>Efectivo ARS</span>
+                                        <span className="font-semibold">{formatCurrency(aperturaSugeridaArs, 'ARS')}</span>
+                                    </div>
+                                    <div className="flex justify-between pt-2 border-t border-emerald-200 dark:border-emerald-800 text-gray-900 dark:text-white">
+                                        <span>Total equivalente</span>
+                                        <span className="font-bold">{formatCurrency(aperturaSugeridaEq, 'USD')}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-gray-500">
+                                Luego de abrir, podras cargar ingresos normalmente. El cierre solo consolida saldos al final del dia.
+                            </p>
+                        </div>
+
+                        <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex gap-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-b-2xl">
+                            <button
+                                onClick={() => setShowAbrirModal(false)}
+                                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-white dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleAbrirCaja}
+                                disabled={opening}
+                                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                {opening ? <Loader2 size={18} className="animate-spin" /> : <PlayCircle size={18} />}
+                                Confirmar apertura
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal Cerrar Caja */}
             {showCerrarModal && (
