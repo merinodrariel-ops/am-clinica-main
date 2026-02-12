@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Search, User, DollarSign, Check, Loader2, Calendar } from 'lucide-react';
+import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon } from 'lucide-react';
+import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import clsx from 'clsx';
 import { supabase, TarifarioItem } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
@@ -39,6 +40,7 @@ interface FormData {
     es_cuota: boolean;
     cuota_nro: number;
     cuotas_total: number;
+    comprobante_url?: string;
 }
 
 const METODOS_PAGO = [
@@ -87,6 +89,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         es_cuota: false,
         cuota_nro: 1,
         cuotas_total: 1,
+        comprobante_url: '',
     });
 
     // Load tarifario on mount
@@ -256,6 +259,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                     origen: cargaHistorica ? 'carga_historica' : 'manual',
                     cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
                     cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
+                    comprobante_url: formData.comprobante_url || null,
                 });
 
             if (error) throw error;
@@ -535,6 +539,30 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 </div>
                             </div>
 
+                            {/* Ticket Upload for non-cash payments */}
+                            {formData.metodo_pago !== 'Efectivo' && (
+                                <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-xl bg-blue-50/30 dark:bg-blue-900/10">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <FileText size={16} className="text-blue-600" />
+                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Comprobante de operación
+                                        </label>
+                                    </div>
+
+                                    <ComprobanteUpload
+                                        area="caja-recepcion"
+                                        onUploadComplete={(res) => setFormData(prev => ({ ...prev, comprobante_url: res.url }))}
+                                        className="w-full"
+                                    />
+
+                                    {formData.comprobante_url && (
+                                        <p className="mt-2 text-xs text-green-600 font-medium flex items-center gap-1">
+                                            <Check size={12} /> Comprobante adjuntado correctamente
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Status */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -673,6 +701,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                         {formData.estado === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'}
                                     </span>
                                 </div>
+                                {formData.comprobante_url && (
+                                    <div className="flex justify-between items-center py-2">
+                                        <span className="text-gray-500">Comprobante:</span>
+                                        <div className="flex items-center gap-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs">
+                                            <ImageIcon size={14} /> Adjunto
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Observations */}

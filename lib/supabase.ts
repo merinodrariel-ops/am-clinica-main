@@ -62,6 +62,7 @@ export interface CajaMovimiento {
     motivo_anulacion: string | null;
     anulado_por: string | null;
     anulado_fecha_hora: string | null;
+    comprobante_url?: string | null;
     created_at: string;
     // Audit & Traceability fields
     estado_registro: 'activo' | 'anulado';

@@ -39,10 +39,10 @@ export function ComprobanteUpload({
                 // Compress image
                 setProgress(30);
                 const compressed = await compressImage(file, {
-                    maxWidth: 1920,
-                    maxHeight: 1920,
-                    quality: 0.85,
-                    maxSizeKB: 800,
+                    maxWidth: 1600,
+                    maxHeight: 1600,
+                    quality: 0.7,
+                    maxSizeKB: 250,
                 });
 
                 setCompressionInfo(
