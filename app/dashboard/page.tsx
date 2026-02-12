@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Users, Banknote, Calendar, TrendingUp, Loader2 } from 'lucide-react';
+import { ArrowRight, Users, Banknote, Calendar, Loader2 } from 'lucide-react';
 import CajaAlerts from '@/components/dashboard/CajaAlerts';
 import UserAlerts from '@/components/dashboard/UserAlerts';
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import ReferralChart from '@/components/dashboard/ReferralChart';
 import NewPatientsCard from '@/components/dashboard/NewPatientsCard';
 import FinancialOverview from '@/components/dashboard/FinancialOverview';
+import ExecutiveCommandCenter from '@/components/dashboard/ExecutiveCommandCenter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -42,6 +43,8 @@ export default function DashboardPage() {
 
             <UserAlerts />
             <CajaAlerts />
+
+            <ExecutiveCommandCenter />
 
             {/* Financial Overview */}
             <FinancialOverview />

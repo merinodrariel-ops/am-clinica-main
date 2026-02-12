@@ -11,6 +11,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     let historiaClinica;
     let planes;
     let payments;
+    let appointments;
     let errorMsg;
 
     try {
@@ -27,11 +28,17 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                     .select('*')
                     .eq('paciente_id', id)
                     .order('fecha_hora', { ascending: false }),
+                supabase
+                    .from('agenda_appointments')
+                    .select('id, patient_id, doctor_id, start_time, status, type')
+                    .eq('patient_id', id)
+                    .order('start_time', { ascending: false }),
             ]);
 
             historiaClinica = relatedData[0];
             planes = relatedData[1];
             payments = relatedData[2].data || [];
+            appointments = relatedData[3].data || [];
         }
     } catch (error) {
         console.error('Error fetching patient details:', error);
@@ -63,6 +70,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             historiaClinica={historiaClinica || []}
             planes={planes || []}
             payments={payments || []}
+            appointments={appointments || []}
         />
     );
 }

@@ -358,7 +358,7 @@ export async function createMovimiento(
 
 export async function updateMovimientoAdmin(
     id: string,
-    updates: any
+    updates: Partial<CajaAdminMovimiento>
 ): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase
         .from('caja_admin_movimientos')
@@ -1286,12 +1286,48 @@ export async function updateMovimientoAdminWithLines(
         registro_editado?: boolean;
         adjuntos?: string[];
     },
-    lines: MovimientoLinea[]
+    lines: MovimientoLinea[],
+    usdTotalOverride?: number
 ): Promise<{ success: boolean; error?: string }> {
     const supabase = createClient();
 
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+        return { success: false, error: 'Sesion invalida. Vuelve a iniciar sesion.' };
+    }
+
+    const metadataRole = authData.user.user_metadata?.role as string | undefined;
+    const { data: profileData } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+    const effectiveRole = (profileData?.role || metadataRole || '').toLowerCase();
+    if (effectiveRole !== 'owner' && effectiveRole !== 'admin') {
+        return { success: false, error: 'Permiso denegado: solo Admin/Dueno puede editar montos de Caja Administracion.' };
+    }
+
     // 1. Update main movement fields & total
-    const usdTotal = lines.reduce((sum, l) => sum + (l.usd_equivalente || 0), 0);
+    let usdTotal: number;
+
+    if (lines.length > 0) {
+        usdTotal = lines.reduce((sum, l) => sum + (l.usd_equivalente || 0), 0);
+    } else if (typeof usdTotalOverride === 'number' && Number.isFinite(usdTotalOverride)) {
+        usdTotal = Math.max(0, usdTotalOverride);
+    } else {
+        const { data: current, error: currentError } = await supabase
+            .from('caja_admin_movimientos')
+            .select('usd_equivalente_total')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (currentError) {
+            return { success: false, error: currentError.message };
+        }
+
+        usdTotal = Number(current?.usd_equivalente_total || 0);
+    }
 
     const { error: mainError } = await supabase
         .from('caja_admin_movimientos')
@@ -1304,43 +1340,78 @@ export async function updateMovimientoAdminWithLines(
 
     if (mainError) return { success: false, error: mainError.message };
 
-    // 2. Handle Lines
-    // Strategy: Delete all existing lines directly linked to this movement and re-insert? 
-    // Or Upsert?
-    // Delete + Insert is safer for "full replacement" of lines state.
-    // However, we want to keep IDs if possible?
-    // If we re-insert, we lose old line IDs. 
-    // Let's try to keeping it smart: 
-    //  - If line has ID, update it.
-    //  - If line has no ID, insert it.
-    //  - If line in DB is not in new list, delete it.
+    // 2. Handle Lines (without hard delete)
+    if (lines.length === 0) {
+        return { success: true };
+    }
 
-    // A simple approach for this app iteration: Delete all and Insert new is robust but assumes no foreign keys to lines (which is true for now).
-    // Let's go with: Delete all lines for this movement -> Insert new lines.
-
-    // DELETE existing lines
-    const { error: deleteError } = await supabase
+    const { data: currentLineRows, error: currentLinesError } = await supabase
         .from('caja_admin_movimiento_lineas')
-        .delete()
+        .select('id')
         .eq('admin_movimiento_id', id);
 
-    if (deleteError) return { success: false, error: 'Error clearing old lines: ' + deleteError.message };
+    if (currentLinesError) {
+        return { success: false, error: `Error leyendo lineas actuales: ${currentLinesError.message}` };
+    }
 
-    // INSERT new lines
-    const linesToInsert = lines.map(l => ({
-        admin_movimiento_id: id,
-        cuenta_id: l.cuenta_id,
-        importe: l.importe,
-        moneda: l.moneda,
-        usd_equivalente: l.usd_equivalente
-    }));
+    const existingLines = lines.filter((line) => Boolean(line.id));
+    const newLines = lines.filter((line) => !line.id);
 
-    if (linesToInsert.length > 0) {
+    const incomingLineIds = new Set(
+        existingLines
+            .map((line) => line.id)
+            .filter((lineId): lineId is string => typeof lineId === 'string' && lineId.length > 0)
+    );
+
+    const linesToDelete = (currentLineRows || [])
+        .map((row) => row.id)
+        .filter((rowId): rowId is string => typeof rowId === 'string' && !incomingLineIds.has(rowId));
+
+    if (linesToDelete.length > 0) {
+        const { error: deleteLinesError } = await supabase
+            .from('caja_admin_movimiento_lineas')
+            .delete()
+            .in('id', linesToDelete)
+            .eq('admin_movimiento_id', id);
+
+        if (deleteLinesError) {
+            return { success: false, error: `Error eliminando lineas removidas: ${deleteLinesError.message}` };
+        }
+    }
+
+    for (const line of existingLines) {
+        const { error: updateLineError } = await supabase
+            .from('caja_admin_movimiento_lineas')
+            .update({
+                cuenta_id: line.cuenta_id,
+                importe: line.importe,
+                moneda: line.moneda,
+                usd_equivalente: line.usd_equivalente,
+            })
+            .eq('id', line.id as string)
+            .eq('admin_movimiento_id', id);
+
+        if (updateLineError) {
+            return { success: false, error: `Error actualizando linea: ${updateLineError.message}` };
+        }
+    }
+
+    if (newLines.length > 0) {
+        const linesToInsert = newLines.map((line) => ({
+            admin_movimiento_id: id,
+            cuenta_id: line.cuenta_id,
+            importe: line.importe,
+            moneda: line.moneda,
+            usd_equivalente: line.usd_equivalente,
+        }));
+
         const { error: insertError } = await supabase
             .from('caja_admin_movimiento_lineas')
             .insert(linesToInsert);
 
-        if (insertError) return { success: false, error: 'Error inserting new lines: ' + insertError.message };
+        if (insertError) {
+            return { success: false, error: `Error insertando nueva linea: ${insertError.message}` };
+        }
     }
 
     return { success: true };
@@ -1483,10 +1554,10 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
             }
 
             if (multiplier !== 0) {
-                m.caja_admin_movimiento_lineas.forEach((l: any) => {
+                m.caja_admin_movimiento_lineas.forEach((l: MovimientoLinea) => {
                     if (idsEfectivo.has(l.cuenta_id)) {
-                        if (l.moneda === 'ARS') saldoArs += l.importe * multiplier;
-                        if (l.moneda === 'USD') saldoUsd += l.importe * multiplier;
+                        if (l.moneda === 'ARS') saldoArs += Number(l.importe || 0) * multiplier;
+                        if (l.moneda === 'USD') saldoUsd += Number(l.importe || 0) * multiplier;
                     }
                 });
             }

@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { supabase, CajaArqueo } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
 import { getUltimoCierre, cerrarCajaDelDia } from '@/lib/caja-recepcion';
+import { formatDateForLocale, getLocalISODate } from '@/lib/local-date';
 
 interface ArqueoPanelProps {
     bnaRate: number;
@@ -34,7 +35,7 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
     async function checkEstadoCaja() {
         setLoading(true);
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getLocalISODate();
 
             // 1. Check if today is closed
             const { data: hoy } = await supabase
@@ -82,7 +83,7 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
     async function handleCerrarCaja() {
         setSaving(true);
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getLocalISODate();
             // TODO: Get real user from auth context if available
 
             await cerrarCajaDelDia(
@@ -141,9 +142,9 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                             </p>
                             <p className="text-xs text-gray-500">
                                 {cierreHoy
-                                    ? `Cerrado el ${new Date(cierreHoy.fecha).toLocaleDateString()} por ${cierreHoy.usuario}`
+                                    ? `Cerrado el ${formatDateForLocale(cierreHoy.fecha)} por ${cierreHoy.usuario}`
                                     : ultimoCierre
-                                        ? `Último cierre: ${new Date(ultimoCierre.fecha).toLocaleDateString()} • Saldo Inicial: ${formatCurrency(saldoInicialEq || 0, 'USD')}`
+                                        ? `Último cierre: ${formatDateForLocale(ultimoCierre.fecha)} • Saldo Inicial: ${formatCurrency(saldoInicialEq || 0, 'USD')}`
                                         : 'Sin cierres previos (Saldo inicial: $0)'}
                             </p>
                         </div>

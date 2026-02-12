@@ -12,9 +12,9 @@ import {
     UserCircle,
     Upload,
     Package,
-    FlaskConical,
     CalendarDays,
-    EyeOff
+    EyeOff,
+    GitGraph
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -63,9 +63,9 @@ const MENU_ITEMS = [
         roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio']
     },
     {
-        icon: FlaskConical,
-        label: 'Laboratorio',
-        href: '/laboratorio',
+        icon: GitGraph, // Using GitGraph as a metaphor for workflows/branches
+        label: 'Workflows',
+        href: '/workflows',
         roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio']
     },
 ];

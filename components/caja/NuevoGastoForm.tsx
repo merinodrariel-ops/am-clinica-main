@@ -5,6 +5,7 @@ import { X, DollarSign, Check, Loader2, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
+import { getLocalISODate } from '@/lib/local-date';
 // import { useAuth } from '@/contexts/AuthContext';
 
 interface NuevoGastoFormProps {
@@ -68,7 +69,7 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                     tc_fecha_hora: formData.moneda === 'ARS' ? new Date().toISOString() : null,
                     usd_equivalente: usdEquivalente,
                     usuario: 'Recepción',
-                    fecha_movimiento: new Date().toISOString().split('T')[0],
+                    fecha_movimiento: getLocalISODate(),
                     origen: 'manual',
                     // Nullable fields (hopefully)
                     paciente_id: null,
@@ -152,7 +153,7 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                             </div>
                             <select
                                 value={formData.moneda}
-                                onChange={(e) => setFormData({ ...formData, moneda: e.target.value as any })}
+                                onChange={(e) => setFormData({ ...formData, moneda: e.target.value as ExpenseData['moneda'] })}
                                 className="px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-red-500"
                             >
                                 <option value="ARS">ARS</option>

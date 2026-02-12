@@ -20,14 +20,13 @@ import {
     ExternalLink,
     TrendingUp,
     Check,
-    X,
-    AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { supabase } from '@/lib/supabase';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
+import PatientCommandCenter from './PatientCommandCenter';
 
 interface Movement {
     id: string;
@@ -43,11 +42,21 @@ interface Movement {
     cuotas_total?: number;
 }
 
+interface AppointmentSignal {
+    id: string;
+    patient_id?: string;
+    doctor_id?: string;
+    start_time: string;
+    status?: string;
+    type?: string;
+}
+
 interface PatientDashboardProps {
     patient: Paciente;
     historiaClinica: HistoriaClinica[];
     planes: PlanTratamiento[];
     payments: Movement[];
+    appointments: AppointmentSignal[];
 }
 
 const TABS = [
@@ -58,7 +67,7 @@ const TABS = [
     { id: 'planes', label: 'Planes (Presupuestos)', icon: DollarSign },
 ];
 
-export default function PatientDashboard({ patient, historiaClinica, planes, payments }: PatientDashboardProps) {
+export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'datos');
@@ -82,7 +91,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
         .filter(p => p.estado !== 'Anulado' && (p.cuota_nro && p.cuota_nro > 0))
         .reduce((sum, p) => sum + (p.usd_equivalente || 0), 0);
 
-    const porcentajePagado = (finData.monto > 0) ? (totalPagadoFinanc / finData.monto) * 100 : 0;
     const saldoFinanc = Math.max(0, finData.monto - totalPagadoFinanc);
 
     async function handleSaveFinancing() {
@@ -201,6 +209,14 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
 
             {/* Content */}
             <div className="max-w-5xl mx-auto p-6">
+                <PatientCommandCenter
+                    patient={patient}
+                    payments={payments}
+                    appointments={appointments.map(appointment => ({
+                        start_time: appointment.start_time,
+                        status: appointment.status,
+                    }))}
+                />
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={activeTab}

@@ -43,7 +43,7 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     const path = request.nextUrl.pathname;
-    const isPublicRoute = path === '/login' || path.startsWith('/auth') || path === '/' || path.startsWith('/forgot-password') || path.startsWith('/api/sync-') || path.startsWith('/api/import-') || path === '/api/setup-sucursales' || path === '/api/check-sucursales' || path === '/api/check-profiles';
+    const isPublicRoute = path === '/login' || path.startsWith('/auth') || path === '/' || path.startsWith('/forgot-password') || path.startsWith('/api/sync-') || path.startsWith('/api/import-') || path.startsWith('/api/workflows/') || path === '/api/setup-sucursales' || path === '/api/check-sucursales' || path === '/api/check-profiles';
 
     // NOTE: If '/' is the landing page and public, keep it here. 
     // If '/' is expected to be protected (redirect to dashboard), remove it from public.

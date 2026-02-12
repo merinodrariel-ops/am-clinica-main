@@ -17,6 +17,7 @@ import { ReciboGenerator, generateReciboNumber } from '@/components/caja/ReciboG
 import { logMovimientoEdit } from '@/lib/caja-recepcion';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
+import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
 
 
 // Types
@@ -48,6 +49,8 @@ interface Movimiento {
     metodo_pago: string;
     estado: string;
     usd_equivalente: number | null;
+    cuota_nro?: number | null;
+    cuotas_total?: number | null;
     registro_editado?: boolean;
     comprobante_url?: string | null;
     origen?: string;
@@ -151,7 +154,7 @@ export default function CajaRecepcionPage() {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
     const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);
     const [loading, setLoading] = useState(true);
-    const [mesActual, setMesActual] = useState(() => new Date().toISOString().substring(0, 7));
+    const [mesActual, setMesActual] = useState(() => getLocalYearMonth());
     const [showNuevoGasto, setShowNuevoGasto] = useState(false);
     const [privacyMode, setPrivacyMode] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -163,7 +166,7 @@ export default function CajaRecepcionPage() {
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(true);
 
-    const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+    const today = useMemo(() => getLocalISODate(), []);
 
     // Edit date modal state
     const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
@@ -205,7 +208,7 @@ export default function CajaRecepcionPage() {
             // Range calculation for the month
             const nextMonth = new Date(mesActual + '-01');
             nextMonth.setMonth(nextMonth.getMonth() + 1);
-            const nextMonthStr = nextMonth.toISOString().substring(0, 7);
+            const nextMonthStr = getLocalYearMonth(nextMonth);
 
             // Fetch movements for selected month from Supabase
             const { data: movMesRaw, error: movError } = await supabase
@@ -221,8 +224,8 @@ export default function CajaRecepcionPage() {
                         financ_cuotas_total
                     )
                 `)
-                .gte('fecha_hora', `${mesActual}-01T00:00:00`)
-                .lt('fecha_hora', `${nextMonthStr}-01T00:00:00`)
+                .gte('fecha_movimiento', `${mesActual}-01`)
+                .lt('fecha_movimiento', `${nextMonthStr}-01`)
                 .order('fecha_hora', { ascending: false });
 
             // Cast to Movimiento[] to avoid any
@@ -341,7 +344,7 @@ export default function CajaRecepcionPage() {
         setEditConcepto(mov.concepto_nombre);
         setEditCategoria(mov.categoria || "");
         setEditEstado(mov.estado);
-        setNewFecha(new Date(mov.fecha_movimiento || mov.fecha_hora).toISOString().split('T')[0]);
+        setNewFecha(toDateInputValue(mov.fecha_movimiento || mov.fecha_hora));
         setEditMotivo("");
         setEditComprobanteUrl(mov.comprobante_url || null);
 
@@ -465,7 +468,18 @@ export default function CajaRecepcionPage() {
                 console.error('Error sending security alert:', alertErr);
             }
 
-            const updates: any = {
+            const updates: {
+                fecha_movimiento: string;
+                monto: number;
+                moneda: string;
+                metodo_pago: string;
+                concepto_nombre: string;
+                categoria: string;
+                estado: string;
+                registro_editado: boolean;
+                comprobante_url: string | null;
+                usd_equivalente?: number;
+            } = {
                 fecha_movimiento: newFecha,
                 monto: editMonto,
                 moneda: editMoneda,
@@ -540,7 +554,7 @@ _Caja Recepción - AM Clínica_`;
         const formattedAmount = new Intl.NumberFormat(mov.moneda === 'ARS' ? 'es-AR' : 'en-US', { style: 'currency', currency: mov.moneda }).format(mov.monto);
 
         return `🧾 *Comprobante de Pago*
-📅 *Fecha:* ${new Date(mov.fecha_movimiento || mov.fecha_hora).toLocaleDateString('es-AR')}
+📅 *Fecha:* ${formatDateForLocale(mov.fecha_movimiento || mov.fecha_hora)}
 👤 *Paciente:* ${patientName}
 💰 *Monto:* ${formattedAmount}
 📝 *Concepto:* ${mov.concepto_nombre}
@@ -560,11 +574,55 @@ _AM Clínica_`;
 
 Te escribimos amablemente de *AM Estética Dental* para recordarte que quedó un saldo pendiente de tu última visita:
 
-🗓 *Fecha:* ${new Date(mov.fecha_movimiento || mov.fecha_hora).toLocaleDateString('es-AR')}
+🗓 *Fecha:* ${formatDateForLocale(mov.fecha_movimiento || mov.fecha_hora)}
 🦷 *Concepto:* ${mov.concepto_nombre}
 💰 *Saldo Pendiente:* ${formattedAmount}
 
 Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
+    };
+
+    const isSenaConcept = (concepto: string) => {
+        const normalized = (concepto || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+
+        return normalized.includes('sena') || normalized.includes('senado') || normalized.includes('anticipo');
+    };
+
+    const getSenaFlowMeta = (concepto: string) => {
+        const normalized = (concepto || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+
+        if (!isSenaConcept(concepto)) return null;
+
+        if (normalized.includes('ortodoncia') || normalized.includes('alineador') || normalized.includes('retenedor')) {
+            return {
+                label: 'ORTODONCIA',
+                className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700',
+            };
+        }
+
+        if (normalized.includes('diseno') || normalized.includes('sonrisa') || normalized.includes('carilla')) {
+            return {
+                label: 'DISENO',
+                className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300 border-cyan-300 dark:border-cyan-700',
+            };
+        }
+
+        if (normalized.includes('cirugia') || normalized.includes('implante') || normalized.includes('injerto')) {
+            return {
+                label: 'CIRUGIA',
+                className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 border-rose-300 dark:border-rose-700',
+            };
+        }
+
+        return {
+            label: 'GENERAL',
+            className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300 dark:border-amber-700',
+        };
     };
 
     const filteredMovimientos = movimientos.filter(mov => {
@@ -866,7 +924,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                         <tr key={mov.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50">
                                             <td className="px-4 py-3 text-gray-500">
                                                 <div className="flex flex-col">
-                                                    <span>{new Date(mov.fecha_movimiento || mov.fecha_hora).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}</span>
+                                                    <span>{formatDateForLocale(mov.fecha_movimiento || mov.fecha_hora, 'es-AR', { day: '2-digit', month: '2-digit' })}</span>
                                                     <span className="text-[10px] opacity-60">
                                                         {new Date(mov.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
@@ -910,15 +968,33 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-2">
                                                         <span>{mov.concepto_nombre}</span>
+                                                        {isSenaConcept(mov.concepto_nombre) && (
+                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700" title="Pago de sena vinculado a flujo clinico">
+                                                                SENA
+                                                            </span>
+                                                        )}
+                                                        {(() => {
+                                                            const senaFlowMeta = getSenaFlowMeta(mov.concepto_nombre);
+                                                            if (!senaFlowMeta) return null;
+
+                                                            return (
+                                                                <span className={clsx(
+                                                                    'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold border',
+                                                                    senaFlowMeta.className
+                                                                )}>
+                                                                    {senaFlowMeta.label}
+                                                                </span>
+                                                            );
+                                                        })()}
                                                         {mov.registro_editado && (
                                                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800" title="Registro editado manualmente">
                                                                 <Pencil size={8} /> EDITADO
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {(mov as any).cuota_nro && (mov as any).cuota_nro > 0 && (
+                                                    {mov.cuota_nro && mov.cuota_nro > 0 && (
                                                         <span className="text-[10px] text-gray-400">
-                                                            Cuota {(mov as any).cuota_nro} de {(mov as any).cuotas_total || '?'}
+                                                            Cuota {mov.cuota_nro} de {mov.cuotas_total || '?'}
                                                         </span>
                                                     )}
                                                 </div>

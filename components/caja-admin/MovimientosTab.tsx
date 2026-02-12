@@ -30,7 +30,6 @@ import {
     getMovimientos,
     getCuentas,
     createMovimiento,
-    updateMovimientoAdmin,
     updateMovimientoAdminWithLines,
     logMovimientoEdit,
     deleteMovimiento,
@@ -60,6 +59,7 @@ const TIPOS_MOVIMIENTO = [
 
 export default function MovimientosTab({ sucursal, tcBna }: Props) {
     const { role } = useAuth();
+    const canEditAdminAmounts = role === 'owner' || role === 'admin';
     const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
     const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
     const [loading, setLoading] = useState(true);
@@ -83,12 +83,14 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         motivo: string;
         lines: MovimientoLinea[];
         adjuntos: string[];
+        totalUsd: number;
     }>({
         fecha: '',
         descripcion: '',
         motivo: '',
         lines: [],
-        adjuntos: []
+        adjuntos: [],
+        totalUsd: 0,
     });
 
     // Form state
@@ -159,7 +161,62 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
         setFormLineas(newLineas);
     }
+
+    function getUsdEquivalente(importe: number, moneda: string, previousUsd?: number) {
+        if (moneda === 'USD') return importe;
+        if (moneda === 'ARS' && tcBna) return importe / tcBna;
+        return previousUsd || 0;
+    }
+
+    function addEditLinea() {
+        if (cuentas.length === 0) return;
+        const cuentaDefault = cuentas[0];
+        const newLine: MovimientoLinea = {
+            cuenta_id: cuentaDefault.id,
+            moneda: cuentaDefault.moneda,
+            importe: 0,
+            usd_equivalente: getUsdEquivalente(0, cuentaDefault.moneda, 0),
+        };
+
+        setEditData({
+            ...editData,
+            lines: [...editData.lines, newLine],
+        });
+    }
+
+    function removeEditLinea(index: number) {
+        const newLines = editData.lines.filter((_, i) => i !== index);
+        setEditData({ ...editData, lines: newLines });
+    }
+
+    function updateEditLinea(index: number, updates: Partial<MovimientoLinea>) {
+        const newLines = [...editData.lines];
+        const current = newLines[index];
+
+        const nextCuentaId = updates.cuenta_id || current.cuenta_id;
+        const selectedCuenta = cuentas.find(cuenta => cuenta.id === nextCuentaId);
+        const nextMoneda = selectedCuenta?.moneda || updates.moneda || current.moneda;
+        const nextImporte = updates.importe !== undefined ? Math.abs(updates.importe) : current.importe;
+        const nextUsd = getUsdEquivalente(nextImporte, nextMoneda, current.usd_equivalente);
+
+        newLines[index] = {
+            ...current,
+            ...updates,
+            cuenta_id: nextCuentaId,
+            moneda: nextMoneda,
+            importe: nextImporte,
+            usd_equivalente: nextUsd,
+        };
+
+        setEditData({ ...editData, lines: newLines });
+    }
+
     async function handleUpdate() {
+        if (!canEditAdminAmounts) {
+            alert('No tienes permisos para editar montos en Caja Administracion');
+            return;
+        }
+
         if (!editingMov || !editData.fecha || !editData.motivo) {
             alert('Por favor complete la fecha y el motivo del cambio');
             return;
@@ -192,16 +249,28 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             // Simple log: "Montos actualizados" if lines changed.
             // For now, let's rely on the mandatory "motivo" for audit.
 
+            const previousUsdTotal = Number(editingMov.usd_equivalente_total || 0);
+            const nextUsdTotal = editData.lines.length > 0
+                ? editData.lines.reduce((sum, line) => sum + Number(line.usd_equivalente || 0), 0)
+                : Number(editData.totalUsd || 0);
+
+            if (Math.abs(previousUsdTotal - nextUsdTotal) > 0.0001) {
+                await logMovimientoEdit(
+                    editingMov.id,
+                    'caja_admin_movimientos',
+                    'usd_equivalente_total',
+                    String(previousUsdTotal),
+                    String(nextUsdTotal),
+                    editData.motivo
+                );
+            }
+
             const { success, error } = await updateMovimientoAdminWithLines(editingMov.id, {
                 fecha_movimiento: editData.fecha,
                 descripcion: editData.descripcion,
                 adjuntos: editData.adjuntos,
                 registro_editado: true
-            }, editData.lines.map(l => ({
-                ...l,
-                id: undefined, // Strip ID to force new insertion logic in backend if needed
-                created_at: undefined
-            })));
+            }, editData.lines, editData.totalUsd);
 
             if (!success) throw new Error(error);
 
@@ -209,7 +278,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             setEditingMov(null);
         } catch (err) {
             console.error('Error updating:', err);
-            alert('Error al actualizar');
+            alert(`Error al actualizar: ${err instanceof Error ? err.message : 'desconocido'}`);
         } finally {
             setSubmitting(false);
         }
@@ -412,17 +481,26 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     </button>
                 </div>
 
-                {(role === 'owner' || role === 'admin') && (
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setShowForm(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-shadow"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Nuevo Movimiento
-                    </motion.button>
-                )}
+                <div className="flex items-center gap-3">
+                    <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                            Edicion de montos: solo Admin/Dueno
+                        </span>
+                    </div>
+
+                    {(role === 'owner' || role === 'admin') && (
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setShowForm(true)}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-shadow"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Nuevo Movimiento
+                        </motion.button>
+                    )}
+                </div>
             </div>
 
             {/* New Movement Form */}
@@ -734,22 +812,31 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                             >
                                                 <History className="w-4 h-4" />
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    setEditingMov(mov);
-                                                    setEditData({
-                                                        fecha: mov.fecha_movimiento,
-                                                        descripcion: mov.descripcion,
-                                                        motivo: '',
-                                                        lines: mov.caja_admin_movimiento_lineas || mov.lineas || [],
-                                                        adjuntos: mov.adjuntos || ((mov as any).url_comprobante ? [(mov as any).url_comprobante] : [])
-                                                    });
-                                                }}
-                                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                                title="Editar movimiento"
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </button>
+                                            {canEditAdminAmounts && (
+                                                <button
+                                                    onClick={() => {
+                                                        const movConComprobante = mov as CajaAdminMovimiento & { url_comprobante?: string | null };
+                                                        const currentLines = (mov.caja_admin_movimiento_lineas || mov.lineas || []).map((line) => ({
+                                                            ...line,
+                                                            importe: Math.abs(Number(line.importe || 0)),
+                                                            usd_equivalente: line.usd_equivalente ?? (line.moneda === 'USD' ? Number(line.importe || 0) : 0),
+                                                        }));
+                                                        setEditingMov(mov);
+                                                        setEditData({
+                                                            fecha: mov.fecha_movimiento,
+                                                            descripcion: mov.descripcion,
+                                                            motivo: '',
+                                                            lines: currentLines,
+                                                            adjuntos: mov.adjuntos || (movConComprobante.url_comprobante ? [movConComprobante.url_comprobante] : []),
+                                                            totalUsd: Number(mov.usd_equivalente_total || 0),
+                                                        });
+                                                    }}
+                                                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                    title="Editar movimiento"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             {(role === 'admin' || role === 'owner') && (
                                                 <button
                                                     onClick={() => {
@@ -900,6 +987,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                         </div>
 
                         <div className="p-6 space-y-4">
+                            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800 flex items-start gap-2 text-xs text-red-800 dark:text-red-300">
+                                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                <p>
+                                    Modo auditoria: edicion de montos habilitada solo para Admin/Dueno. Todo cambio queda registrado con motivo obligatorio.
+                                </p>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                     Fecha del movimiento
@@ -943,46 +1037,85 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
                             {/* Lines Editing */}
                             <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                    Montos / Líneas
-                                </label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                        Montos / Lineas
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={addEditLinea}
+                                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Agregar linea
+                                    </button>
+                                </div>
                                 <div className="space-y-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl max-h-48 overflow-y-auto">
                                     {editData.lines.map((line, idx) => (
                                         <div key={idx} className="flex items-center gap-2">
-                                            <span className="text-xs font-mono text-slate-500 w-12">{line.moneda}</span>
+                                            <select
+                                                value={line.cuenta_id}
+                                                onChange={(e) => updateEditLinea(idx, { cuenta_id: e.target.value })}
+                                                className="flex-1 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                                            >
+                                                {cuentas.map(cuenta => (
+                                                    <option key={cuenta.id} value={cuenta.id}>
+                                                        {cuenta.nombre_cuenta} ({cuenta.moneda})
+                                                    </option>
+                                                ))}
+                                            </select>
                                             <input
                                                 type="number"
                                                 value={line.importe}
                                                 onChange={(e) => {
                                                     const newImporte = Math.abs(parseFloat(e.target.value) || 0);
-                                                    const newLines = [...editData.lines];
-                                                    newLines[idx] = {
-                                                        ...newLines[idx],
-                                                        importe: newImporte,
-                                                        // Recalculate USD equivalent if needed
-                                                        usd_equivalente: line.moneda === 'USD' ? newImporte : (newImporte / (tcBna || 1))
-                                                    };
-                                                    setEditData({ ...editData, lines: newLines });
+                                                    updateEditLinea(idx, { importe: newImporte });
                                                 }}
                                                 min="0"
                                                 step="0.01"
-                                                className="flex-1 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                                                className="w-28 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
                                             />
+                                            <span className="text-xs font-mono text-slate-500 w-10 text-center">{line.moneda}</span>
                                             {line.moneda !== 'USD' && (
                                                 <span className="text-xs text-green-600">
                                                     ≈ ${line.usd_equivalente?.toFixed(2)} USD
                                                 </span>
                                             )}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeEditLinea(idx)}
+                                                className="text-red-500 hover:text-red-600"
+                                                title="Quitar linea"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     ))}
                                     {editData.lines.length === 0 && (
-                                        <p className="text-xs text-slate-400 text-center py-2">No hay líneas para editar</p>
+                                        <div className="space-y-2">
+                                            <p className="text-xs text-slate-400 text-center">No hay lineas asociadas. Puedes agregar lineas o editar el total en USD.</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-mono text-slate-500 w-12">USD</span>
+                                                <input
+                                                    type="number"
+                                                    value={editData.totalUsd}
+                                                    onChange={(e) => setEditData({ ...editData, totalUsd: Math.max(0, parseFloat(e.target.value) || 0) })}
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="flex-1 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                                                />
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
                         <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                            <span className="mr-auto hidden sm:inline-flex items-center gap-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                                <AlertTriangle size={12} />
+                                Se guarda en historial de auditoria
+                            </span>
                             <button
                                 onClick={() => setEditingMov(null)}
                                 className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"

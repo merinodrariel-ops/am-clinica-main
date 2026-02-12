@@ -1,5 +1,6 @@
 import { CajaMovimiento, TarifarioItem, CajaArqueo, TransferenciaCaja, Paciente } from './supabase';
 import { createClient } from '@/utils/supabase/client';
+import { getLocalISODate } from '@/lib/local-date';
 
 const supabase = createClient();
 
@@ -109,7 +110,7 @@ export async function crearMovimiento(input: NuevoMovimientoInput): Promise<Caja
 }
 
 export async function getMovimientosDelDia(fecha?: string): Promise<CajaMovimiento[]> {
-    const targetDate = fecha || new Date().toISOString().split('T')[0];
+    const targetDate = fecha || getLocalISODate();
 
     const { data, error } = await supabase
         .from('caja_recepcion_movimientos')
@@ -278,7 +279,7 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalISODate();
     const firstDayOfMonth = `${today.substring(0, 7)}-01`;
 
     // Today's movements
@@ -405,7 +406,7 @@ export async function getCurrentBalanceRecepcion(): Promise<{
     saldoArs: number;
     saldoUsd: number;
 }> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalISODate();
     const ultimo = await getUltimoCierre();
 
     // Check if today is already closed

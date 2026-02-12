@@ -7,6 +7,8 @@ import clsx from 'clsx';
 import { supabase, TarifarioItem } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
 import { useAuth } from '@/contexts/AuthContext';
+import { triggerWorkflowFromSenaPayment } from '@/app/actions/clinical-workflows';
+import { getLocalISODate } from '@/lib/local-date';
 
 interface Paciente {
     id_paciente: string;
@@ -23,6 +25,43 @@ interface NuevoIngresoFormProps {
     bnaRate: number;
 }
 
+type SenaTipo = '' | 'diseno_sonrisa' | 'ortodoncia_invisible' | 'cirugia_implantes';
+
+const SENA_OPCIONES: Array<{ value: SenaTipo; label: string; workflow: string }> = [
+    { value: 'diseno_sonrisa', label: 'Diseno de Sonrisa', workflow: 'Diseno de Sonrisa' },
+    { value: 'ortodoncia_invisible', label: 'Diseno de Alineadores Invisibles', workflow: 'Diseno de Alineadores Invisibles' },
+    { value: 'cirugia_implantes', label: 'Cirugia e Implantes', workflow: 'Cirugia e Implantes' },
+];
+
+const SENA_CONCEPTO_KEYWORDS: Record<Exclude<SenaTipo, ''>, string[]> = {
+    diseno_sonrisa: ['diseno', 'sonrisa', 'carilla', 'estetica'],
+    ortodoncia_invisible: ['ortodoncia', 'alineador', 'alineadores', 'invisible', 'retenedor'],
+    cirugia_implantes: ['cirugia', 'implante', 'injerto', 'seno', 'exodoncia', 'quirurgica'],
+};
+
+function normalizeComparableText(value: string) {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function isConceptRelatedToSena(tipo: SenaTipo, categoria: string, concepto: string) {
+    if (!tipo) return true;
+    const keywords = SENA_CONCEPTO_KEYWORDS[tipo as Exclude<SenaTipo, ''>] || [];
+    const haystack = normalizeComparableText(`${categoria} ${concepto}`);
+    return keywords.some(keyword => haystack.includes(keyword));
+}
+
+function getSenaLabel(tipo: SenaTipo) {
+    return SENA_OPCIONES.find(option => option.value === tipo)?.label || '';
+}
+
+function getSenaWorkflowLabel(tipo: SenaTipo) {
+    return SENA_OPCIONES.find(option => option.value === tipo)?.workflow || '';
+}
+
 interface FormData {
     paciente_id: string;
     paciente_nombre: string;
@@ -37,6 +76,8 @@ interface FormData {
     tipo_comprobante: 'Factura A' | 'Tipo C' | 'Sin factura' | 'Otro';
     estado: 'pagado' | 'pendiente';
     observaciones: string;
+    es_sena: boolean;
+    sena_tipo: SenaTipo;
     es_cuota: boolean;
     cuota_nro: number;
     cuotas_total: number;
@@ -72,7 +113,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
     const { user } = useAuth();
     const canUseHistoricalLoad = user?.role === 'owner' || user?.role === 'admin';
     const [cargaHistorica, setCargaHistorica] = useState(false);
-    const [fechaMovimiento, setFechaMovimiento] = useState(new Date().toISOString().split('T')[0]);
+    const [fechaMovimiento, setFechaMovimiento] = useState(getLocalISODate());
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
@@ -89,6 +130,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         tipo_comprobante: 'Factura A',
         estado: 'pagado',
         observaciones: '',
+        es_sena: false,
+        sena_tipo: '',
         es_cuota: false,
         cuota_nro: 1,
         cuotas_total: 1,
@@ -218,6 +261,21 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         setStep(3);
     }
 
+    function applySenaTipo(tipo: SenaTipo) {
+        const senaLabel = getSenaLabel(tipo);
+        const senaConcepto = senaLabel ? `Sena - ${senaLabel}` : '';
+
+        setFormData(prev => ({
+            ...prev,
+            sena_tipo: tipo,
+            concepto_id: '',
+            concepto_nombre: senaConcepto,
+            categoria: tipo ? 'Senas' : prev.categoria,
+        }));
+
+        setConceptoSearch('');
+    }
+
 
 
     function calculateUsdEquivalent(): number {
@@ -236,17 +294,27 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
             return;
         }
 
+        if (formData.es_sena && !formData.sena_tipo) {
+            alert('Selecciona a que corresponde la sena para activar el workflow correcto.');
+            return;
+        }
+
         setSaving(true);
         try {
             const usdEquivalente = calculateUsdEquivalent();
+            const senaLabel = getSenaLabel(formData.sena_tipo);
+            const conceptoFinal = formData.es_sena && senaLabel
+                ? `Sena - ${senaLabel}`
+                : formData.concepto_nombre;
+            const categoriaFinal = formData.es_sena ? 'Senas' : formData.categoria;
 
-            const { error } = await supabase
+            const { data: insertedMovement, error } = await supabase
                 .from('caja_recepcion_movimientos')
                 .insert({
                     paciente_id: formData.paciente_id,
                     concepto_id: formData.concepto_id || null,
-                    concepto_nombre: formData.concepto_nombre,
-                    categoria: formData.categoria,
+                    concepto_nombre: conceptoFinal,
+                    categoria: categoriaFinal,
                     precio_lista_usd: formData.precio_lista_usd,
                     monto: formData.monto,
                     moneda: formData.moneda,
@@ -261,14 +329,36 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                     usd_equivalente: usdEquivalente,
                     usuario: 'Recepción', // TODO: Get from auth
                     // Dual date fields
-                    fecha_movimiento: cargaHistorica ? fechaMovimiento : new Date().toISOString().split('T')[0],
+                    fecha_movimiento: cargaHistorica ? fechaMovimiento : getLocalISODate(),
                     origen: cargaHistorica ? 'carga_historica' : 'manual',
                     cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
                     cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
                     comprobante_url: formData.comprobante_url || null,
-                });
+                })
+                .select('id')
+                .single();
 
             if (error) throw error;
+
+            if (formData.es_sena && formData.sena_tipo) {
+                try {
+                    const workflowResult = await triggerWorkflowFromSenaPayment({
+                        patientId: formData.paciente_id,
+                        senaTipo: formData.sena_tipo,
+                        movementId: insertedMovement?.id || null,
+                        conceptoNombre: conceptoFinal,
+                        monto: formData.monto,
+                        moneda: formData.moneda,
+                    });
+
+                    if (!workflowResult.success) {
+                        alert('Ingreso guardado, pero no se pudo activar el workflow automaticamente. Revisalo en Workflows.');
+                    }
+                } catch (workflowError) {
+                    console.error('Error triggering workflow from sena payment:', workflowError);
+                    alert('Ingreso guardado, pero fallo la activacion del workflow.');
+                }
+            }
 
             onSuccess();
             handleClose();
@@ -285,7 +375,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
         setSearchQuery('');
         setPatients([]);
         setCargaHistorica(false);
-        setFechaMovimiento(new Date().toISOString().split('T')[0]);
+        setFechaMovimiento(getLocalISODate());
         setFormData({
             paciente_id: '',
             paciente_nombre: '',
@@ -300,6 +390,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
             tipo_comprobante: 'Factura A',
             estado: 'pagado',
             observaciones: '',
+            es_sena: false,
+            sena_tipo: '',
             es_cuota: false,
             cuota_nro: 1,
             cuotas_total: 1,
@@ -364,7 +456,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                             <button
                                                 key={m}
                                                 type="button"
-                                                onClick={() => setFormData({ ...formData, moneda: m as any })}
+                                                onClick={() => setFormData({ ...formData, moneda: m as FormData['moneda'] })}
                                                 className={clsx(
                                                     "px-4 py-2 text-sm font-bold transition-colors",
                                                     formData.moneda === m
@@ -382,6 +474,59 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                         ≈ {formatCurrency(calculateUsdEquivalent(), 'USD')} (TC BNA: ${bnaRate})
                                     </p>
                                 )}
+
+                                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 dark:bg-amber-900/20 dark:border-amber-800 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Este pago es una sena</p>
+                                            <p className="text-xs text-amber-700 dark:text-amber-300">Si activas esta opcion, se dispara el workflow clinico automaticamente.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const nextValue = !formData.es_sena;
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    es_sena: nextValue,
+                                                    sena_tipo: nextValue ? prev.sena_tipo : '',
+                                                    categoria: nextValue ? prev.categoria : (prev.categoria === 'Senas' ? '' : prev.categoria),
+                                                }));
+
+                                                if (!nextValue) {
+                                                    setConceptoSearch('');
+                                                }
+                                            }}
+                                            className={clsx(
+                                                'px-3 py-1.5 rounded-lg text-xs font-bold transition-colors',
+                                                formData.es_sena
+                                                    ? 'bg-amber-600 text-white'
+                                                    : 'bg-white text-amber-700 border border-amber-300'
+                                            )}
+                                        >
+                                            {formData.es_sena ? 'ACTIVA' : 'Activar'}
+                                        </button>
+                                    </div>
+
+                                    {formData.es_sena && (
+                                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            {SENA_OPCIONES.map(option => (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    onClick={() => applySenaTipo(option.value)}
+                                                    className={clsx(
+                                                        'px-3 py-2 rounded-lg text-xs font-semibold border transition-colors text-left',
+                                                        formData.sena_tipo === option.value
+                                                            ? 'bg-amber-600 text-white border-amber-600'
+                                                            : 'bg-white dark:bg-gray-800 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                                                    )}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
@@ -450,13 +595,25 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                     ¿A qué corresponde este ingreso?
                                 </label>
 
+                                {formData.es_sena && (
+                                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3">
+                                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Pago de sena detectado</p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                            Se registrara como <span className="font-bold">{formData.concepto_nombre || 'Sena - (definir)'}</span>
+                                            {formData.sena_tipo ? ` y activara el workflow ${getSenaWorkflowLabel(formData.sena_tipo)}.` : '.'}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Manual entry and SEARCH option */}
                                 <div className="mb-6 space-y-3">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                         <input
                                             type="text"
-                                            placeholder="Buscar servicio o escribir concepto libre..."
+                                            placeholder={formData.es_sena && formData.sena_tipo
+                                                ? 'Filtrar conceptos relacionados al flujo de sena...'
+                                                : 'Buscar servicio o escribir concepto libre...'}
                                             value={conceptoSearch}
                                             onChange={(e) => {
                                                 setConceptoSearch(e.target.value);
@@ -475,8 +632,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                                     {Object.entries(tarifarioByCategoria).map(([categoria, items]) => {
                                         const filteredItems = items.filter(item =>
-                                            item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()) ||
-                                            categoria.toLowerCase().includes(conceptoSearch.toLowerCase())
+                                            (item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()) ||
+                                                categoria.toLowerCase().includes(conceptoSearch.toLowerCase())) &&
+                                            (!formData.es_sena || !formData.sena_tipo || isConceptRelatedToSena(formData.sena_tipo, categoria, item.concepto_nombre))
                                         );
 
                                         if (filteredItems.length === 0) return null;
@@ -516,6 +674,19 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                             </div>
                                         );
                                     })}
+
+                                    {formData.es_sena && formData.sena_tipo &&
+                                        Object.entries(tarifarioByCategoria).every(([categoria, items]) =>
+                                            items.filter(item =>
+                                                (item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()) ||
+                                                    categoria.toLowerCase().includes(conceptoSearch.toLowerCase())) &&
+                                                isConceptRelatedToSena(formData.sena_tipo, categoria, item.concepto_nombre)
+                                            ).length === 0
+                                        ) && (
+                                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                                                No hay conceptos del tarifario para este tipo de sena con ese filtro. Puedes cargar un concepto libre igualmente.
+                                            </div>
+                                        )}
                                 </div>
                             </div>
 
@@ -528,7 +699,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 </button>
                                 <button
                                     onClick={() => setStep(3)}
-                                    disabled={!formData.concepto_nombre}
+                                    disabled={!formData.concepto_nombre || (formData.es_sena && !formData.sena_tipo)}
                                     className="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-medium transition-colors"
                                 >
                                     Continuar
@@ -709,7 +880,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                 type="date"
                                                 value={fechaMovimiento}
                                                 onChange={(e) => setFechaMovimiento(e.target.value)}
-                                                max={new Date().toISOString().split('T')[0]}
+                                                max={getLocalISODate()}
                                                 className="w-full px-4 py-2 border border-amber-300 dark:border-amber-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-amber-500"
                                             />
                                         </div>
@@ -747,6 +918,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                     <span className="text-gray-500">Concepto:</span>
                                     <span className="font-medium">{formData.concepto_nombre}</span>
                                 </div>
+                                {formData.es_sena && formData.sena_tipo && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Workflow a activar:</span>
+                                        <span className="font-medium text-amber-700 dark:text-amber-300">{getSenaWorkflowLabel(formData.sena_tipo)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Categoría:</span>
                                     <span>{formData.categoria}</span>
