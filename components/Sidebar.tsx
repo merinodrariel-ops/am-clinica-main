@@ -11,7 +11,6 @@ import {
     Settings,
     LogOut,
     UserCircle,
-    Upload,
     Package,
     CalendarDays,
     Bell,
@@ -20,11 +19,13 @@ import {
     ChevronLeft,
     ChevronRight,
     Menu,
-    X
+    X,
+    SlidersHorizontal
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
 import { readSidebarCollapsed, writeSidebarCollapsed } from '@/lib/sidebar-preferences';
+import SettingsModal from '@/components/settings/SettingsModal';
 
 const MENU_ITEMS = [
     {
@@ -58,12 +59,6 @@ const MENU_ITEMS = [
         roles: ['owner', 'admin', 'partner_viewer', 'developer']
     },
     {
-        icon: Upload,
-        label: 'Importador CSV',
-        href: '/importador-csv',
-        roles: ['owner', 'admin']
-    },
-    {
         icon: Package,
         label: 'Inventario',
         href: '/inventario',
@@ -91,6 +86,7 @@ export default function Sidebar() {
     const [isDesktop, setIsDesktop] = useState(() =>
         typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1024px)').matches
     );
+    const [showSettings, setShowSettings] = useState(false);
 
     useEffect(() => {
         const syncCollapsed = () => setCollapsed(readSidebarCollapsed());
@@ -153,6 +149,8 @@ export default function Sidebar() {
 
     return (
         <>
+            <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
             {!isDesktop && !mobileOpen && (
                 <button
                     onClick={() => setMobileOpen(true)}
@@ -252,6 +250,22 @@ export default function Sidebar() {
 
                 {/* User Profile & Actions */}
                 <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+
+                    {/* ALWAYS VISIBLE SETTINGS BUTTON */}
+                    <button
+                        onClick={() => setShowSettings(true)}
+                        className={clsx(
+                            'block w-full flex items-center rounded-lg text-sm font-medium transition-colors',
+                            compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2',
+                            showSettings
+                                ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        )}
+                        title={compactMode ? 'Configuración' : undefined}
+                    >
+                        <SlidersHorizontal size={18} />
+                        {!compactMode && <span>Configuración</span>}
+                    </button>
 
                     {/* Always Show Admin Link for Real Owner or Active Admin */}
                     {(isRealOwner || userRole === 'owner' || userRole === 'admin') && (

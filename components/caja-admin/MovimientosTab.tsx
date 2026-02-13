@@ -153,9 +153,21 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             }
         }
 
-        // Enforce positive values
+        // Enforce positive values only if not explicitly allowing negative (for Exchange Source)
+        // For CAMBIO_MONEDA, we will handle signs manually in the UI change handler, so here we might just accept what comes
+        // BUT current UI calls this with absolute value for normal lines.
+        // Let's modify this to Check if it is CAMBIO_MONEDA logic downstream or just accept value.
+        // To be safe, let's keep Math.abs UNLESS we pass a special flag or check formData.
+        // Actually, easiest way is to NOT enforce Math.abs here if the caller handles it, OR check formData.tipo_movimiento.
+
         if (updates.importe !== undefined) {
-            newLineas[index].importe = Math.abs(newLineas[index].importe);
+            if (formData.tipo_movimiento === 'CAMBIO_MONEDA') {
+                // Allow negative, but maybe just trust the caller?
+                // Let's assume the caller (UI) sends the correct signed value.
+                newLineas[index].importe = updates.importe;
+            } else {
+                newLineas[index].importe = Math.abs(newLineas[index].importe);
+            }
         }
 
         // Calculate USD equivalent
@@ -258,7 +270,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         const nextCuentaId = updates.cuenta_id || current.cuenta_id;
         const selectedCuenta = cuentas.find(cuenta => cuenta.id === nextCuentaId);
         const nextMoneda = selectedCuenta?.moneda || updates.moneda || current.moneda;
-        const nextImporte = updates.importe !== undefined ? Math.abs(updates.importe) : current.importe;
+
+        // Allow negative if CAMBIO_MONEDA
+        let nextImporte = current.importe;
+        if (updates.importe !== undefined) {
+            if (editingMov?.tipo_movimiento === 'CAMBIO_MONEDA') {
+                nextImporte = updates.importe;
+            } else {
+                nextImporte = Math.abs(updates.importe);
+            }
+        }
+
         const nextUsd = getUsdEquivalente(nextImporte, nextMoneda, current.usd_equivalente);
 
         newLines[index] = {
@@ -303,9 +325,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         const linesToSave = editData.lines
             .map((line) => ({
                 ...line,
-                importe: Math.max(0, Number(line.importe || 0)),
+                importe: editingMov?.tipo_movimiento === 'CAMBIO_MONEDA' ? Number(line.importe || 0) : Math.max(0, Number(line.importe || 0)),
             }))
-            .filter((line) => line.cuenta_id && line.importe > 0);
+            .filter((line) => line.cuenta_id && (editingMov?.tipo_movimiento === 'CAMBIO_MONEDA' ? line.importe !== 0 : line.importe > 0));
 
         if (editData.lines.length > 0 && linesToSave.length === 0) {
             setEditSaveError('Debes completar al menos una linea con importe mayor a 0, o eliminar lineas vacias antes de guardar.');
@@ -707,15 +729,102 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                                 Líneas de Movimiento
                             </label>
-                            <button
-                                onClick={addLinea}
-                                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                            >
-                                + Agregar línea
-                            </button>
+                            {formData.tipo_movimiento !== 'CAMBIO_MONEDA' && (
+                                <button
+                                    onClick={addLinea}
+                                    className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                >
+                                    + Agregar línea
+                                </button>
+                            )}
                         </div>
 
-                        {formLineas.length === 0 ? (
+                        {formData.tipo_movimiento === 'CAMBIO_MONEDA' ? (
+                            <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Detalles del Intercambio</h4>
+
+                                {/* Source (Negative) */}
+                                <div className="flex flex-col gap-2">
+                                    <div className="text-xs font-bold text-red-500 uppercase tracking-wider">Origen (Sale Dinero)</div>
+                                    <div className="flex items-center gap-3">
+                                        <select
+                                            value={formLineas[0]?.cuenta_id || ''}
+                                            onChange={(e) => {
+                                                const cid = e.target.value;
+                                                if (!formLineas[0]) {
+                                                    // Initialize Source Line
+                                                    const cuenta = cuentas.find(c => c.id === cid);
+                                                    setFormLineas(prev => [
+                                                        { cuenta_id: cid, importe: 0, moneda: cuenta?.moneda || 'ARS', usd_equivalente: 0 },
+                                                        ...(prev[1] ? [prev[1]] : [])
+                                                    ]);
+                                                } else {
+                                                    updateLinea(0, { cuenta_id: cid });
+                                                }
+                                            }}
+                                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                                        >
+                                            <option value="">Seleccionar Cuenta Origen...</option>
+                                            {cuentas.map(c => (
+                                                <option key={c.id} value={c.id}>{c.nombre_cuenta} ({c.moneda})</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            value={formLineas[0]?.importe ? Math.abs(formLineas[0].importe) : ''}
+                                            onChange={(e) => updateLinea(0, { importe: -Math.abs(parseFloat(e.target.value) || 0) })}
+                                            placeholder="Monto a retirar"
+                                            min="0"
+                                            step="0.01"
+                                            className="w-40 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-red-600"
+                                        />
+                                        <span className="text-sm font-medium w-10">{formLineas[0]?.moneda}</span>
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-slate-200 dark:bg-slate-700 my-2"></div>
+
+                                {/* Destination (Positive) */}
+                                <div className="flex flex-col gap-2">
+                                    <div className="text-xs font-bold text-green-500 uppercase tracking-wider">Destino (Entra Dinero)</div>
+                                    <div className="flex items-center gap-3">
+                                        <select
+                                            value={formLineas[1]?.cuenta_id || ''}
+                                            onChange={(e) => {
+                                                const cid = e.target.value;
+                                                if (!formLineas[1]) {
+                                                    // Initialize Dest Line if missing
+                                                    const cuenta = cuentas.find(c => c.id === cid);
+                                                    const newLine = { cuenta_id: cid, importe: 0, moneda: cuenta?.moneda || 'ARS', usd_equivalente: 0 };
+                                                    const newArr = [...formLineas];
+                                                    if (!newArr[0]) newArr[0] = { ...newLine, importe: 0 }; // Placeholder
+                                                    newArr[1] = newLine;
+                                                    setFormLineas(newArr);
+                                                } else {
+                                                    updateLinea(1, { cuenta_id: cid });
+                                                }
+                                            }}
+                                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                                        >
+                                            <option value="">Seleccionar Cuenta Destino...</option>
+                                            {cuentas.map(c => (
+                                                <option key={c.id} value={c.id}>{c.nombre_cuenta} ({c.moneda})</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            value={formLineas[1]?.importe || ''}
+                                            onChange={(e) => updateLinea(1, { importe: Math.abs(parseFloat(e.target.value) || 0) })}
+                                            placeholder="Monto a ingresar"
+                                            min="0"
+                                            step="0.01"
+                                            className="w-40 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-green-600"
+                                        />
+                                        <span className="text-sm font-medium w-10">{formLineas[1]?.moneda}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : formLineas.length === 0 ? (
                             <div className="text-center py-8 text-slate-400 bg-slate-50 dark:bg-slate-900 rounded-xl">
                                 <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                                 <p>No hay líneas. Agregue al menos una.</p>
@@ -1226,10 +1335,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                                 type="number"
                                                 value={line.importe}
                                                 onChange={(e) => {
-                                                    const newImporte = Math.abs(parseFloat(e.target.value) || 0);
+                                                    const val = parseFloat(e.target.value) || 0;
+                                                    // Allow negative only for CAMBIO_MONEDA
+                                                    const newImporte = editingMov?.tipo_movimiento === 'CAMBIO_MONEDA' ? val : Math.abs(val);
                                                     updateEditLinea(idx, { importe: newImporte });
                                                 }}
-                                                min="0"
+                                                min={editingMov?.tipo_movimiento === 'CAMBIO_MONEDA' ? undefined : "0"}
                                                 step="0.01"
                                                 className="w-28 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
                                             />
