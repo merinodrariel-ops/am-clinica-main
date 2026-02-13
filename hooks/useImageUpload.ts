@@ -3,9 +3,7 @@
 import { useState, useCallback } from 'react';
 import {
     compressImage,
-    compressImages,
     CompressionOptions,
-    CompressionResult,
     formatFileSize,
     isImageFile
 } from '@/lib/image-compression';

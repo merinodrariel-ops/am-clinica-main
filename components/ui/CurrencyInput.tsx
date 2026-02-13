@@ -14,7 +14,7 @@ interface CurrencyInputProps {
 export default function CurrencyInput({
     value,
     onChange,
-    currency = 'ARS',
+    currency: _currency = 'ARS',
     className = '',
     placeholder = '0.00',
     disabled = false

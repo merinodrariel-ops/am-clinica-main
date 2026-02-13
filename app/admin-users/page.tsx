@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { resendUserAccessEmail, inviteUser, setUserPassword } from '@/app/actions/user-management';
 import RoleGuard from '@/components/auth/RoleGuard';
@@ -11,7 +11,6 @@ import {
     CheckCircle2,
     XCircle,
     RefreshCw,
-    MoreHorizontal,
     Key,
     Lock
 } from 'lucide-react';
@@ -55,9 +54,25 @@ export default function UserManagementPage() {
     const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
     const [passwordStatus, setPasswordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
+    const loadUsers = useCallback(async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setUsers(data || []);
+        } catch (err) {
+            console.error('Error loading users:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [supabase]);
+
     useEffect(() => {
         loadUsers();
-    }, []);
+    }, [loadUsers]);
 
     async function handleResendAccess(user: Profile) {
         if (!session?.user?.id) return;
@@ -71,7 +86,7 @@ export default function UserManagementPage() {
             } else {
                 setActionMessage({ type: 'error', text: result.error || 'Error al enviar.' });
             }
-        } catch (error) {
+        } catch (_error) {
             setActionMessage({ type: 'error', text: 'Error inesperado.' });
         } finally {
             setResendingId(null);
@@ -115,7 +130,7 @@ export default function UserManagementPage() {
                 setPasswordStatus('error');
                 setErrorMessage(result.error || 'Error al actualizar contraseña.');
             }
-        } catch (error) {
+        } catch (_error) {
             setPasswordStatus('error');
             setErrorMessage('Error inesperado.');
         }
@@ -129,21 +144,6 @@ export default function UserManagementPage() {
         setShowPasswordModal(true);
     }
 
-    async function loadUsers() {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setUsers(data || []);
-        } catch (error) {
-            console.error('Error loading users:', error);
-        } finally {
-            setLoading(false);
-        }
-    }
 
     async function handleInvite() {
         setInviteStatus('loading');

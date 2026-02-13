@@ -39,7 +39,7 @@ export default function ImportadorCSVPage() {
     const [mappings, setMappings] = useState<MappedColumn[]>([]);
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
     const [importResult, setImportResult] = useState<{ success: number; errors: number } | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [_isLoading, setIsLoading] = useState(false);
 
     const parseCSV = useCallback((text: string) => {
         const lines = text.split('\n').filter(line => line.trim());

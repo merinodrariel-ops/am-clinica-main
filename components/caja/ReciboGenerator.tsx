@@ -223,7 +223,7 @@ export function ReciboGenerator({
                         title: 'Comprobante de Pago',
                         text: `Comprobante Nº ${data.numero} - AM Clínica`,
                     });
-                } catch (err) {
+                } catch (_err) {
                     console.log('Share cancelled or failed');
                 }
             }, 'image/jpeg', 0.9);
@@ -324,6 +324,7 @@ export function ReciboGenerator({
                 </button>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={generatedImage}
                         alt="Comprobante"

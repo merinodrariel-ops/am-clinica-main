@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Banknote, Wallet, Building2, Store } from 'lucide-react';
+import { Building2, Store } from 'lucide-react';
 import { getSucursales } from '@/lib/caja-admin';
 import { getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
 import { getCurrentBalanceAdmin } from '@/lib/caja-admin';
@@ -75,8 +75,8 @@ export default function FinancialOverview() {
                         <div>
                             <h3 className="font-semibold text-gray-900 dark:text-white">Caja Recepción</h3>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${recepcion?.status === 'Cerrado'
-                                    ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                                    : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                                : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                                 }`}>
                                 {recepcion?.status}
                             </span>
@@ -118,8 +118,8 @@ export default function FinancialOverview() {
                             <div>
                                 <h3 className="font-semibold text-gray-900 dark:text-white">Adm. {admin.sucursalName}</h3>
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${admin.status === 'Cerrado'
-                                        ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                    ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
                                     }`}>
                                     {admin.status}
                                 </span>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, CheckCircle2, Clock, Ban, FlaskConical, Calendar, User, Stethoscope, Landmark, DollarSign } from 'lucide-react';
+import { X, CheckCircle2, Ban, FlaskConical, Calendar, User, Stethoscope, Landmark, DollarSign } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import clsx from 'clsx';
 

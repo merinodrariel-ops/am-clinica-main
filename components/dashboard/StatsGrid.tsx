@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, Banknote, BarChart3, Wallet, Loader2 } from 'lucide-react';
+import { Users, Banknote, BarChart3, Wallet } from 'lucide-react';
 import { getDashboardStats, DashboardStats } from '@/lib/dashboard';
 
 export default function StatsGrid() {

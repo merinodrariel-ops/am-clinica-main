@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, User, Loader2, Calendar, FlaskConical, Stethoscope, Landmark, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import clsx from 'clsx';
+
 
 interface Paciente {
     id_paciente: string;

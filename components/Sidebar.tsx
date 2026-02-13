@@ -124,15 +124,12 @@ export default function Sidebar() {
         };
     }, []);
 
-    useEffect(() => {
-        setMobileOpen(false);
-    }, [pathname]);
+    // Close mobile sidebar on route change – intentional synchronous setState
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-    useEffect(() => {
-        if (isDesktop) {
-            setMobileOpen(false);
-        }
-    }, [isDesktop]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { if (isDesktop) setMobileOpen(false); }, [isDesktop]);
 
     // Hide sidebar on login page or if not authenticated (optional, depends on layout)
     if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional')) return null;
@@ -175,144 +172,144 @@ export default function Sidebar() {
                     ? (compactMode ? 'w-20 translate-x-0' : 'w-64 translate-x-0')
                     : (mobileOpen ? 'w-[84vw] max-w-80 translate-x-0 shadow-2xl' : 'w-[84vw] max-w-80 -translate-x-full pointer-events-none')
             )}>
-            {/* Logo area */}
-            <div className={clsx('border-b border-gray-200 dark:border-gray-800', compactMode ? 'p-3' : 'p-6')}>
-                <div className={clsx('flex items-center', compactMode ? 'justify-center' : 'justify-between')}>
-                    <div className={clsx(compactMode && 'text-center')}>
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                            {compactMode ? 'AM' : 'AM Clínica'}
-                        </h1>
-                        {!compactMode && <p className="text-xs text-gray-500 mt-1">Operativa 360</p>}
+                {/* Logo area */}
+                <div className={clsx('border-b border-gray-200 dark:border-gray-800', compactMode ? 'p-3' : 'p-6')}>
+                    <div className={clsx('flex items-center', compactMode ? 'justify-center' : 'justify-between')}>
+                        <div className={clsx(compactMode && 'text-center')}>
+                            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                                {compactMode ? 'AM' : 'AM Clínica'}
+                            </h1>
+                            {!compactMode && <p className="text-xs text-gray-500 mt-1">Operativa 360</p>}
+                        </div>
+
+                        {isDesktop && !compactMode && (
+                            <button
+                                onClick={toggleCollapsed}
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                                title="Contraer menú lateral"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                        )}
+
+                        {!isDesktop && (
+                            <button
+                                onClick={() => setMobileOpen(false)}
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                                title="Cerrar menú"
+                            >
+                                <X size={16} />
+                            </button>
+                        )}
                     </div>
 
-                    {isDesktop && !compactMode && (
+                    {isDesktop && compactMode && (
                         <button
                             onClick={toggleCollapsed}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
-                            title="Contraer menú lateral"
+                            className="mt-2 w-full flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                            title="Expandir menú lateral"
                         >
-                            <ChevronLeft size={16} />
-                        </button>
-                    )}
-
-                    {!isDesktop && (
-                        <button
-                            onClick={() => setMobileOpen(false)}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
-                            title="Cerrar menú"
-                        >
-                            <X size={16} />
+                            <ChevronRight size={16} />
                         </button>
                     )}
                 </div>
 
-                {isDesktop && compactMode && (
-                    <button
-                        onClick={toggleCollapsed}
-                        className="mt-2 w-full flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
-                        title="Expandir menú lateral"
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                )}
-            </div>
+                {/* Navigation */}
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                    {MENU_ITEMS.filter(item => item.roles.includes(userRole)).map((item) => {
+                        const Icon = item.icon;
+                        const isActive = pathname.startsWith(item.href);
 
-            {/* Navigation */}
-            <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                {MENU_ITEMS.filter(item => item.roles.includes(userRole)).map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname.startsWith(item.href);
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={clsx(
+                                    'flex items-center rounded-xl text-sm font-medium transition-all duration-200',
+                                    compactMode ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3',
+                                    isActive
+                                        ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                )}
+                                onClick={() => {
+                                    if (!isDesktop) setMobileOpen(false);
+                                }}
+                                title={compactMode ? item.label : undefined}
+                            >
+                                <Icon size={20} strokeWidth={isActive ? 2 : 1.5} />
+                                {!compactMode && item.label}
+                            </Link>
+                        );
+                    })}
+                </nav>
 
-                    return (
+                {/* User Profile & Actions */}
+                <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+
+                    {/* Always Show Admin Link for Real Owner or Active Admin */}
+                    {(isRealOwner || userRole === 'owner' || userRole === 'admin') && (
                         <Link
-                            key={item.href}
-                            href={item.href}
+                            href="/admin-users"
                             className={clsx(
-                                'flex items-center rounded-xl text-sm font-medium transition-all duration-200',
-                                compactMode ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3',
-                                isActive
-                                    ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                'flex items-center rounded-lg text-sm font-medium transition-colors',
+                                compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2',
+                                pathname.startsWith('/admin-users')
+                                    ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                             )}
-                            onClick={() => {
-                                if (!isDesktop) setMobileOpen(false);
-                            }}
-                            title={compactMode ? item.label : undefined}
+                            title={compactMode ? 'Gestión de Usuarios' : undefined}
                         >
-                            <Icon size={20} strokeWidth={isActive ? 2 : 1.5} />
-                            {!compactMode && item.label}
+                            <Settings size={18} />
+                            {!compactMode && <span>Gestión de Usuarios</span>}
                         </Link>
-                    );
-                })}
-            </nav>
-
-            {/* User Profile & Actions */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
-
-                {/* Always Show Admin Link for Real Owner or Active Admin */}
-                {(isRealOwner || userRole === 'owner' || userRole === 'admin') && (
-                    <Link
-                        href="/admin-users"
-                        className={clsx(
-                            'flex items-center rounded-lg text-sm font-medium transition-colors',
-                            compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2',
-                            pathname.startsWith('/admin-users')
-                                ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
-                                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        )}
-                        title={compactMode ? 'Gestión de Usuarios' : undefined}
-                    >
-                        <Settings size={18} />
-                        {!compactMode && <span>Gestión de Usuarios</span>}
-                    </Link>
-                )}
-
-                {/* Stop Impersonating Button */}
-                {impersonatedRole && (
-                    <button
-                        onClick={() => setImpersonatedRole(null)}
-                        className={clsx(
-                            'w-full flex items-center rounded-lg text-sm font-medium transition-colors bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
-                            compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2'
-                        )}
-                        title={compactMode ? 'Dejar de Imitar' : undefined}
-                    >
-                        <EyeOff size={18} />
-                        {!compactMode && <span>Dejar de Imitar</span>}
-                    </button>
-                )}
-
-                <div className={clsx('flex items-center py-3', compactMode ? 'justify-center px-2' : 'gap-3 px-4')}>
-                    <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                        <UserCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                    </div>
-                    {!compactMode && (
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                {profile?.full_name || user.email?.split('@')[0]}
-                            </p>
-                            <p className="text-xs text-gray-500 capitalize truncate">
-                                {userRole.replace('_', ' ')}
-                                {impersonatedRole && <span className="ml-1 text-amber-600">(Imitando)</span>}
-                            </p>
-                        </div>
                     )}
-                    <button
-                        onClick={async () => {
-                            await signOut();
-                            window.location.href = '/login';
-                        }}
-                        className={clsx(
-                            'flex items-center text-gray-500 hover:text-red-600 transition-colors text-sm font-medium',
-                            compactMode ? 'justify-center p-1.5' : 'gap-2'
+
+                    {/* Stop Impersonating Button */}
+                    {impersonatedRole && (
+                        <button
+                            onClick={() => setImpersonatedRole(null)}
+                            className={clsx(
+                                'w-full flex items-center rounded-lg text-sm font-medium transition-colors bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
+                                compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2'
+                            )}
+                            title={compactMode ? 'Dejar de Imitar' : undefined}
+                        >
+                            <EyeOff size={18} />
+                            {!compactMode && <span>Dejar de Imitar</span>}
+                        </button>
+                    )}
+
+                    <div className={clsx('flex items-center py-3', compactMode ? 'justify-center px-2' : 'gap-3 px-4')}>
+                        <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                            <UserCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                        </div>
+                        {!compactMode && (
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                    {profile?.full_name || user.email?.split('@')[0]}
+                                </p>
+                                <p className="text-xs text-gray-500 capitalize truncate">
+                                    {userRole.replace('_', ' ')}
+                                    {impersonatedRole && <span className="ml-1 text-amber-600">(Imitando)</span>}
+                                </p>
+                            </div>
                         )}
-                        title="Cerrar Sesión"
-                    >
-                        <LogOut size={18} />
-                        {!compactMode && <span className="hidden sm:inline">Salir</span>}
-                    </button>
+                        <button
+                            onClick={async () => {
+                                await signOut();
+                                window.location.href = '/login';
+                            }}
+                            className={clsx(
+                                'flex items-center text-gray-500 hover:text-red-600 transition-colors text-sm font-medium',
+                                compactMode ? 'justify-center p-1.5' : 'gap-2'
+                            )}
+                            title="Cerrar Sesión"
+                        >
+                            <LogOut size={18} />
+                            {!compactMode && <span className="hidden sm:inline">Salir</span>}
+                        </button>
+                    </div>
                 </div>
-            </div>
             </aside>
         </>
     );

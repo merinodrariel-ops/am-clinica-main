@@ -58,7 +58,7 @@ export async function POST() {
 
     try {
         // Execute the SQL to fix RLS policies
-        const fixPolicies = `
+        const _fixPolicies = `
             -- Make sure RLS is enabled
             ALTER TABLE IF EXISTS public.sucursales ENABLE ROW LEVEL SECURITY;
             ALTER TABLE IF EXISTS public.cuentas_financieras ENABLE ROW LEVEL SECURITY;

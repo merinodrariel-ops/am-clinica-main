@@ -11,9 +11,9 @@ interface RoleGuardProps {
 }
 
 export default function RoleGuard({ children, allowedRoles, requireOwner }: RoleGuardProps) {
-    const { user, profile, loading, role } = useAuth();
+    const { user, loading, role } = useAuth();
     const router = useRouter();
-    const pathname = usePathname();
+    const _pathname = usePathname();
 
     useEffect(() => {
         console.log('RoleGuard state:', { loading, userEmail: user?.email, role, requireOwner });
@@ -32,7 +32,8 @@ export default function RoleGuard({ children, allowedRoles, requireOwner }: Role
                 }
             } else if (!role && !loading) {
                 // If we have a user but no role/profile, and it's not the hardcoded owner, something is wrong
-                if (!user.email?.includes('dr.arielmerinopersonal@gmail.com')) {
+                const ownerEmail = (process.env.NEXT_PUBLIC_OWNER_EMAIL || 'dr.arielmerinopersonal@gmail.com').toLowerCase();
+                if (user.email?.toLowerCase() !== ownerEmail) {
                     router.push('/dashboard?error=profile_not_found');
                 }
             }

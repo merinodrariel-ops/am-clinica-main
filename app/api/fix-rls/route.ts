@@ -16,7 +16,7 @@ export async function POST() {
         // Alternative: Create policies via individual statements
 
         // First, let's check current policies
-        const { data: policies, error: polErr } = await supabase
+        const { data: _policies, error: _polErr } = await supabase
             .rpc('get_policies_for_table', { table_name: 'sucursales' })
             .maybeSingle();
 

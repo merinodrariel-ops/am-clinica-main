@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 
@@ -43,7 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [impersonatedRole, setImpersonatedRole] = useState<Role | null>(null);
 
-    const isHardcodedOwner = user?.email?.toLowerCase() === 'dr.arielmerinopersonal@gmail.com'.toLowerCase();
+    const ownerEmail = (process.env.NEXT_PUBLIC_OWNER_EMAIL || 'dr.arielmerinopersonal@gmail.com').toLowerCase();
+    const isHardcodedOwner = user?.email?.toLowerCase() === ownerEmail;
     const isRealOwner = isHardcodedOwner || profile?.role === 'owner';
     const metadataRole = user?.user_metadata?.role as Role | undefined;
 

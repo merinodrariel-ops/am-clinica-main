@@ -3,7 +3,7 @@ import { sendEmail } from '@/lib/nodemailer';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-    const to = searchParams.get('to') || 'merinodrariel@gmail.com';
+    const to = searchParams.get('to') || process.env.NEXT_PUBLIC_OWNER_EMAIL || '';
 
     try {
         const result = await sendEmail({

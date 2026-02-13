@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Check, Clock, DollarSign, Home, MessageCircle, Mic, Plus, Settings, User, X, Stethoscope } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Calendar, Check, Clock, DollarSign, Home, MessageCircle, Mic, Plus, Settings, Stethoscope } from 'lucide-react';
 import { getAppointments } from '@/app/actions/agenda';
 import Link from 'next/link';
 
@@ -92,6 +92,7 @@ export default function PortalDashboard() {
                 </motion.div>
                 <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden ring-2 ring-indigo-100 dark:ring-indigo-900">
                     {/* User Avatar */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="https://ui-avatars.com/api/?name=Ariel+Merino&background=0D8ABC&color=fff" alt="User" />
                 </div>
             </header>
@@ -159,6 +160,7 @@ export default function PortalDashboard() {
                         <div className="flex items-center gap-4 mb-8">
                             <div className="w-16 h-16 rounded-2xl bg-slate-200 dark:bg-slate-700 overflow-hidden shadow-inner flex-shrink-0">
                                 {/* Patient Avatar */}
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={`https://ui-avatars.com/api/?name=${nextPatient.patient?.full_name || 'Paciente'}&background=random&size=128`}
                                     alt="P"

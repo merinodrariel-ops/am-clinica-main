@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
-import { X, Loader2, Search, User, Calendar, Clock, FileText, Trash2, Check, UserPlus, Stethoscope } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { X, Loader2, Search, User, Trash2, Check, Stethoscope } from 'lucide-react';
+
 import { supabase, type TarifarioItem } from '@/lib/supabase';
 
 interface Patient {
@@ -59,7 +59,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [patients, setPatients] = useState<Patient[]>([]);
     const [searching, setSearching] = useState(false);
     const [selectedPatientName, setSelectedPatientName] = useState('');
-    const { user } = useAuth();
+
 
     // Tarifario Search State
     const [tarifarioItems, setTarifarioItems] = useState<TarifarioItem[]>([]);
@@ -121,7 +121,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                 setSearchTerm('');
             }
         }
-    }, [isOpen, initialData, initialDate]);
+    }, [isOpen, initialData, initialDate, doctors]);
 
     // Search Patients Debounce
     useEffect(() => {

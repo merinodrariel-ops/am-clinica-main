@@ -1,9 +1,8 @@
 // EmailJS Configuration
 // https://www.emailjs.com/
 
-const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || 'WLKfesrk0_vbak-FE';
-const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || 'default_service';
-const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID_WELCOME || 'template_welcome';
+// EmailJS configuration is no longer used directly;
+// the app now uses Nodemailer via lib/nodemailer.ts
 
 interface EmailData {
   to_email: string;

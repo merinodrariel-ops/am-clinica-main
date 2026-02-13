@@ -37,7 +37,7 @@ export async function crearItem(data: NewItemData) {
         }
 
         // 2. Permission Check
-        const HARDCODED_OWNER = 'dr.arielmerinopersonal@gmail.com'.toLowerCase();
+        const HARDCODED_OWNER = (process.env.NEXT_PUBLIC_OWNER_EMAIL || 'dr.arielmerinopersonal@gmail.com').toLowerCase();
         const userEmail = (user.email || '').toLowerCase();
         const isOwnerByEmail = userEmail === HARDCODED_OWNER;
 

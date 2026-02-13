@@ -174,6 +174,7 @@ export function ComprobanteUpload({
 
             {preview && (
                 <div style={{ marginTop: '8px' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={preview}
                         alt="Preview"

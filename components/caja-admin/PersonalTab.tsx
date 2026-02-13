@@ -905,6 +905,7 @@ export default function PersonalTab({ tcBna }: Props) {
                                 <div className="flex items-start gap-3 mb-4">
                                     <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center flex-shrink-0">
                                         {p.foto_url ? (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
                                             <img src={p.foto_url} alt={p.nombre} className="w-12 h-12 rounded-full object-cover" />
                                         ) : (
                                             <User className="w-6 h-6 text-indigo-600" />
@@ -990,6 +991,7 @@ export default function PersonalTab({ tcBna }: Props) {
                                     <div className="flex items-start gap-3 mb-4">
                                         <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center flex-shrink-0">
                                             {p.foto_url ? (
+                                                /* eslint-disable-next-line @next/next/no-img-element */
                                                 <img src={p.foto_url} alt={p.nombre} className="w-12 h-12 rounded-full object-cover" />
                                             ) : (
                                                 <Stethoscope className="w-6 h-6 text-emerald-600" />
