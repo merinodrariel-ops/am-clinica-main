@@ -95,7 +95,7 @@ export async function scanCalendarForRecalls() {
             let pageToken: string | undefined = undefined;
 
             do {
-                const eventsResp = await calendar.events.list({
+                const eventsResp: any = await calendar.events.list({
                     calendarId: calId,
                     timeMin: startDate.toISOString(),
                     singleEvents: true,

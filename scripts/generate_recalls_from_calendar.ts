@@ -129,7 +129,7 @@ async function main() {
         try {
             let pageToken: string | undefined = undefined;
             do {
-                const eventsResp = await calendar.events.list({
+                const eventsResp: any = await calendar.events.list({
                     calendarId: calId,
                     timeMin: '2010-01-01T00:00:00Z', // "Toda la vida" usually implies reasonable past
                     singleEvents: true,
