@@ -5,8 +5,17 @@ import { ArrowRight, Users, Banknote, Calendar, Loader2 } from 'lucide-react';
 import CajaAlerts from '@/components/dashboard/CajaAlerts';
 import UserAlerts from '@/components/dashboard/UserAlerts';
 import StatsGrid from '@/components/dashboard/StatsGrid';
-import ReferralChart from '@/components/dashboard/ReferralChart';
-import NewPatientsCard from '@/components/dashboard/NewPatientsCard';
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/Skeleton';
+
+const ReferralChart = dynamic(() => import('@/components/dashboard/ReferralChart'), {
+    ssr: false,
+    loading: () => <Skeleton className="h-[250px] w-full rounded-xl" />
+});
+const NewPatientsCard = dynamic(() => import('@/components/dashboard/NewPatientsCard'), {
+    ssr: false,
+    loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />
+});
 import FinancialOverview from '@/components/dashboard/FinancialOverview';
 import ExecutiveCommandCenter from '@/components/dashboard/ExecutiveCommandCenter';
 import { useAuth } from '@/contexts/AuthContext';

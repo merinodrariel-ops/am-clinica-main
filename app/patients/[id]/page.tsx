@@ -1,11 +1,12 @@
 import { getPacienteById, getHistoriaClinica, getPlanesTratamiento } from '@/lib/patients';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 import PatientDashboard from '@/components/patients/PatientDashboard';
 
 export const revalidate = 0; // Always get fresh data
 
 export default async function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+    const supabase = await createClient();
 
     let patient;
     let historiaClinica;
