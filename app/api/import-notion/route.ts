@@ -17,6 +17,43 @@ const IMPORTACION_PACIENTE_ID = 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59'; // Place
 
 export const dynamic = 'force-dynamic';
 
+type NotionDatabaseInfo = {
+    data_sources?: Array<{ id: string }>;
+};
+
+type NotionQueryRequestBody = {
+    page_size: number;
+    sorts: Array<{
+        timestamp: 'created_time';
+        direction: 'descending';
+    }>;
+    start_cursor?: string;
+};
+
+type NotionProperty = {
+    date?: { start?: string };
+    title?: Array<{ plain_text?: string }>;
+    select?: { name?: string };
+    multi_select?: Array<{ name?: string }>;
+    number?: number;
+    type?: string;
+    files?: unknown[];
+};
+
+type NotionProperties = Record<string, NotionProperty | undefined>;
+
+type NotionPage = {
+    id: string;
+    url?: string;
+    properties?: NotionProperties;
+};
+
+type NotionQueryResponse = {
+    results?: NotionPage[];
+    has_more?: boolean;
+    next_cursor?: string | null;
+};
+
 export async function GET(request: Request) {
     try {
         if (!NOTION_API_KEY) {
@@ -59,15 +96,13 @@ export async function GET(request: Request) {
                     'Authorization': `Bearer ${NOTION_API_KEY}`,
                     'Notion-Version': '2022-06-28',
                 }
-            }).then(r => r.json());
+            }).then(r => r.json() as Promise<NotionDatabaseInfo>);
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if ((dbInfo as any).data_sources && (dbInfo as any).data_sources.length > 0) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                targetDbId = (dbInfo as any).data_sources[0].id;
+            if (dbInfo.data_sources && dbInfo.data_sources.length > 0) {
+                targetDbId = dbInfo.data_sources[0].id;
                 if (debug) console.log(`Resolved Data Source ID: ${targetDbId}`);
             }
-        } catch (e) {
+        } catch (e: unknown) {
             console.error('Error resolving data source ID, trying original...', e);
         }
 
@@ -86,8 +121,7 @@ export async function GET(request: Request) {
                 break;
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const body: any = {
+            const body: NotionQueryRequestBody = {
                 page_size: explicitLimit ? Math.min(explicitLimit - fetchedCount, 100) : 100,
                 sorts: [
                     {
@@ -117,23 +151,22 @@ export async function GET(request: Request) {
                 throw new Error(`Notion API Error: ${response.status} ${errorText}`);
             }
 
-            const data = await response.json();
+            const data = (await response.json()) as NotionQueryResponse;
             const results = data.results || [];
-            hasMore = data.has_more;
-            cursor = data.next_cursor; // Update cursor for next loop
+            hasMore = Boolean(data.has_more);
+            cursor = data.next_cursor || undefined; // Update cursor for next loop
 
             fetchedCount += results.length;
 
             for (const page of results) {
-                if (!('properties' in page)) continue;
+                if (!page.properties) continue;
 
                 if (debug && processed.length === 0) {
                     console.log('DEBUG: First Page Properties:', JSON.stringify(page.properties, null, 2));
                 }
 
                 try {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const props = page.properties as any;
+                    const props = page.properties as NotionProperties;
 
                     // Common Fields
                     let fecha = new Date().toISOString();
@@ -248,9 +281,13 @@ export async function GET(request: Request) {
 
                         // Link Only Strategy
                         const fileProp = props['Comprobante & Tickets'] || props['Adjuntos'] || props['Files'];
-                        const hasAttachments = fileProp && fileProp.type === 'files' && fileProp.files.length > 0;
+                        const attachmentsCount =
+                            fileProp?.type === 'files' && Array.isArray(fileProp.files)
+                                ? fileProp.files.length
+                                : 0;
+                        const hasAttachments = attachmentsCount > 0;
                         let nota = `Imported from Notion. Original ID: ${page.id}.`;
-                        if (hasAttachments) nota += ` Has ${fileProp.files.length} attachment(s).`;
+                        if (hasAttachments) nota += ` Has ${attachmentsCount} attachment(s).`;
 
                         const { error: insertError } = await supabase.from('caja_admin_movimientos').upsert({
                             fecha_hora: fecha,
@@ -291,7 +328,10 @@ export async function GET(request: Request) {
                             // "Área" is a multi_select in the Elements DB, serve as Category
                             const areaProp = props['Área']?.multi_select;
                             if (areaProp && areaProp.length > 0) {
-                                categoria = areaProp.map((o: any) => o.name).join(', ');
+                                categoria = areaProp
+                                    .map((option: { name?: string }) => option.name || '')
+                                    .filter(Boolean)
+                                    .join(', ');
                             } else {
                                 categoria = props['Categoria']?.select?.name || props['Category']?.select?.name || 'General';
                             }
@@ -318,8 +358,9 @@ export async function GET(request: Request) {
                             processed.push({ id: page.id, status: 'imported_inventario' });
                         }
                     }
-                } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-                    errors.push({ id: page.id, error: e.message });
+                } catch (e: unknown) {
+                    const message = e instanceof Error ? e.message : 'Error al procesar pagina';
+                    errors.push({ id: page.id, error: message });
                 }
             } // End for loop
         } // End while loop
@@ -331,8 +372,10 @@ export async function GET(request: Request) {
             processed_sample: processed.slice(0, 5)
         });
 
-    } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    } catch (error: unknown) {
         console.error('Import Error:', error);
-        return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Error de importacion';
+        const stack = error instanceof Error ? error.stack : undefined;
+        return NextResponse.json({ error: message, stack }, { status: 500 });
     }
 }

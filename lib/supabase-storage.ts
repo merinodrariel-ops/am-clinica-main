@@ -7,11 +7,12 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Bucket names for different areas
+// Bucket config for different areas
 const BUCKETS = {
-    'caja-admin': 'caja-admin',
-    'caja-recepcion': 'caja-recepcion',
-    'pacientes': 'pacientes',
+    'caja-admin': { name: 'caja-admin', isPublic: false },
+    'caja-recepcion': { name: 'caja-recepcion', isPublic: false },
+    'pacientes': { name: 'pacientes', isPublic: false },
+    'inventory-products': { name: 'inventory-products', isPublic: true },
 } as const;
 
 type AreaType = keyof typeof BUCKETS;
@@ -30,15 +31,15 @@ export async function initStorageBuckets() {
     const results: { bucket: string; status: string }[] = [];
 
     for (const [, bucketName] of Object.entries(BUCKETS)) {
-        const { error } = await supabase.storage.createBucket(bucketName, {
-            public: false,
+        const { error } = await supabase.storage.createBucket(bucketName.name, {
+            public: bucketName.isPublic,
             fileSizeLimit: 10485760, // 10MB
         });
 
         if (error && !error.message.includes('already exists')) {
-            results.push({ bucket: bucketName, status: `Error: ${error.message}` });
+            results.push({ bucket: bucketName.name, status: `Error: ${error.message}` });
         } else {
-            results.push({ bucket: bucketName, status: 'OK' });
+            results.push({ bucket: bucketName.name, status: 'OK' });
         }
     }
 
@@ -59,7 +60,8 @@ export async function uploadToStorage(
     contentType: string
 ): Promise<UploadResult> {
     try {
-        const bucket = BUCKETS[area];
+        const bucketConfig = BUCKETS[area];
+        const bucket = bucketConfig.name;
 
         // Convert base64 to buffer if needed
         const buffer = typeof fileContent === 'string'
@@ -81,15 +83,25 @@ export async function uploadToStorage(
             return { success: false, error: error.message };
         }
 
-        // Get a signed URL valid for 1 hour
-        const { data: signedData } = await supabase.storage
-            .from(bucket)
-            .createSignedUrl(data.path, 3600);
+        let publicOrSignedUrl: string | undefined;
+
+        if (bucketConfig.isPublic) {
+            const { data: publicData } = supabase.storage
+                .from(bucket)
+                .getPublicUrl(data.path);
+            publicOrSignedUrl = publicData.publicUrl;
+        } else {
+            // Get a signed URL valid for 1 hour
+            const { data: signedData } = await supabase.storage
+                .from(bucket)
+                .createSignedUrl(data.path, 3600);
+            publicOrSignedUrl = signedData?.signedUrl;
+        }
 
         return {
             success: true,
             path: data.path,
-            publicUrl: signedData?.signedUrl,
+            publicUrl: publicOrSignedUrl,
         };
     } catch (error) {
         console.error('Error uploading to Storage:', error);
@@ -108,7 +120,7 @@ export async function listStorageFiles(
     folder?: string
 ): Promise<{ files?: { name: string; size: number; createdAt: string }[]; error?: string }> {
     try {
-        const bucket = BUCKETS[area];
+        const bucket = BUCKETS[area].name;
 
         const { data, error } = await supabase.storage
             .from(bucket)
@@ -141,7 +153,7 @@ export async function getFileUrl(
     expiresIn: number = 3600
 ): Promise<{ url?: string; error?: string }> {
     try {
-        const bucket = BUCKETS[area];
+        const bucket = BUCKETS[area].name;
 
         const { data, error } = await supabase.storage
             .from(bucket)
@@ -165,7 +177,7 @@ export async function deleteFromStorage(
     filePath: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
-        const bucket = BUCKETS[area];
+        const bucket = BUCKETS[area].name;
 
         const { error } = await supabase.storage
             .from(bucket)

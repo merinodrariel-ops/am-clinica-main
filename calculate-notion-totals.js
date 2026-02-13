@@ -1,13 +1,8 @@
-
-const { Client } = require('@notionhq/client');
-
 const NOTION_API_KEY = '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';
 const RECEPTION_DB = '891fda42-c4f2-401b-ba7d-ffe2af271939';
 const ADMIN_DB = '607c1233-5699-48e0-977e-7f1e670c5e38';
 
-const notion = new Client({ auth: NOTION_API_KEY });
-
-async function getTotals(dbId, month, year) {
+async function getTotals(notion, dbId, month, year) {
     const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
     const nextMonth = month === 12 ? 1 : month + 1;
     const nextYear = month === 12 ? year + 1 : year;
@@ -46,7 +41,7 @@ async function getTotals(dbId, month, year) {
     return results;
 }
 
-async function getAdminTotals(dbId, month, year) {
+async function getAdminTotals(notion, dbId, month, year) {
     const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
     const nextMonth = month === 12 ? 1 : month + 1;
     const nextYear = month === 12 ? year + 1 : year;
@@ -86,8 +81,11 @@ async function getAdminTotals(dbId, month, year) {
 }
 
 async function main() {
+    const { Client } = await import('@notionhq/client');
+    const notion = new Client({ auth: NOTION_API_KEY });
+
     console.log('--- RECEPTION FEBRUARY ---');
-    const receptionFeb = await getTotals(RECEPTION_DB, 2, 2026);
+    const receptionFeb = await getTotals(notion, RECEPTION_DB, 2, 2026);
     let recArs = 0;
     let recUsd = 0;
     receptionFeb.forEach(page => {
@@ -104,7 +102,7 @@ async function main() {
     console.log(`Reception Feb: ARS ${recArs.toLocaleString()}, USD ${recUsd.toLocaleString()}`);
 
     console.log('\n--- ADMIN FEBRUARY ---');
-    const adminFeb = await getAdminTotals(ADMIN_DB, 2, 2026);
+    const adminFeb = await getAdminTotals(notion, ADMIN_DB, 2, 2026);
     let admArs = 0;
     let admUsd = 0;
     adminFeb.forEach(page => {
@@ -125,7 +123,7 @@ async function main() {
     console.log(`Total USD: ${(recUsd + admUsd).toLocaleString()}`);
 
     console.log('\n--- RECEPTION JANUARY ---');
-    const receptionJan = await getTotals(RECEPTION_DB, 1, 2026);
+    const receptionJan = await getTotals(notion, RECEPTION_DB, 1, 2026);
     let recArsJan = 0;
     receptionJan.forEach(page => {
         const type = page.properties.Categoria?.select?.name;
@@ -138,4 +136,4 @@ async function main() {
     console.log(`Reception Jan ARS: ${recArsJan.toLocaleString()}`);
 }
 
-main().catch(console.error);
+void main().catch(console.error);

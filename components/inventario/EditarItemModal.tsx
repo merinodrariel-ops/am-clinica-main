@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { X, Package, Loader2, Save, Tag, BarChart3, AlertCircle } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { actualizarItem } from '@/app/actions/inventory-update';
@@ -31,11 +30,6 @@ interface EditarItemModalProps {
 export default function EditarItemModal({ isOpen, onClose, onSuccess, item }: EditarItemModalProps) {
     const { role, user } = useAuth();
     const isLabUser = role === 'laboratorio';
-
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -122,9 +116,10 @@ export default function EditarItemModal({ isOpen, onClose, onSuccess, item }: Ed
 
             onSuccess();
             onClose();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Error updating item:', err);
-            setError(err.message || 'Error al actualizar el item');
+            const message = err instanceof Error ? err.message : 'Error al actualizar el item';
+            setError(message);
         } finally {
             setSaving(false);
         }
@@ -212,7 +207,12 @@ export default function EditarItemModal({ isOpen, onClose, onSuccess, item }: Ed
                                         : "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300"
                                 )}
                                 value={formData.area}
-                                onChange={(e) => setFormData({ ...formData, area: e.target.value as any })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        area: e.target.value as 'CLINICA' | 'LABORATORIO',
+                                    })
+                                }
                                 disabled={isLabUser}
                             >
                                 <option value="CLINICA">🏥 CLÍNICA GENERAL</option>

@@ -56,9 +56,10 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
             onClose();
             setCantidad(0);
             setMotivo('');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error saving movement:', error);
-            setError(error.message || 'Error al registrar el movimiento');
+            const message = error instanceof Error ? error.message : 'Error al registrar el movimiento';
+            setError(message);
         } finally {
             setSaving(false);
         }

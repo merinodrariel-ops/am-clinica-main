@@ -13,7 +13,7 @@ interface Movimiento {
     motivo: string;
     created_at: string;
     usuario: string;
-    item?: { nombre: string; unidade_medida: string };
+    item?: { nombre: string; unidad_medida: string };
 }
 
 interface HistorialMovimientosModalProps {
@@ -41,7 +41,7 @@ export default function HistorialMovimientosModal({ isOpen, onClose }: Historial
                 .limit(50);
 
             if (error) throw error;
-            setMovimientos(data as any || []);
+            setMovimientos((data || []) as Movimiento[]);
         } catch (error) {
             console.error('Error loading history:', error);
         } finally {
@@ -122,7 +122,7 @@ export default function HistorialMovimientosModal({ isOpen, onClose }: Historial
                                                 <User size={12} />
                                                 {mov.usuario}
                                             </div>
-                                            <p className="text-xs text-gray-400 font-medium italic truncate">"{mov.motivo}"</p>
+                                            <p className="text-xs text-gray-400 font-medium italic truncate">{mov.motivo}</p>
                                         </div>
                                     </div>
                                 </div>

@@ -3,6 +3,20 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 
+type AppointmentUpdatePayload = Partial<{
+    id: string;
+    title: string;
+    patient_id: string | null;
+    doctor_id: string | null;
+    start_time: string;
+    end_time: string;
+    status: string;
+    type: string;
+    notes: string | null;
+    created_at: string;
+    created_by: string;
+}>;
+
 export async function getAppointments(start: string, end: string) {
     const supabase = await createClient();
 
@@ -63,11 +77,14 @@ export async function createAppointment(formData: FormData) {
     return { success: true };
 }
 
-export async function updateAppointment(id: string, updates: any) {
+export async function updateAppointment(id: string, updates: AppointmentUpdatePayload) {
     const supabase = await createClient();
 
     // Sanitize input to avoid updating protected fields
-    const { id: _, created_at, created_by, ...safeUpdates } = updates;
+    const safeUpdates = { ...updates };
+    delete safeUpdates.id;
+    delete safeUpdates.created_at;
+    delete safeUpdates.created_by;
 
     const { error } = await supabase
         .from('agenda_appointments')
@@ -117,10 +134,10 @@ export async function searchPatients(query: string) {
         return [];
     }
 
-    return (data || []).map((p: any) => ({
+    return (data || []).map((p: { id_paciente: string; nombre: string; apellido: string; telefono: string | null }) => ({
         id: p.id_paciente,
         full_name: `${p.nombre} ${p.apellido}`,
-        phone: p.telefono
+        phone: p.telefono || ''
     }));
 }
 

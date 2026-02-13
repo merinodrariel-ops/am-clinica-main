@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { Loader2, TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, Lock, AlertTriangle, Info, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Building2, PersonStanding, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout } from 'lucide-react';
+import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -163,7 +163,6 @@ export default function CajaRecepcionPage() {
     const [stats, setStats] = useState<Stats | null>(null);
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
     const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);
-    const [loading, setLoading] = useState(true);
     const [aperturaAudit, setAperturaAudit] = useState<AperturaAudit | null>(null);
     const [mesActual, setMesActual] = useState(() => getLocalYearMonth());
     const [showNuevoGasto, setShowNuevoGasto] = useState(false);
@@ -415,14 +414,6 @@ export default function CajaRecepcionPage() {
 
         setSavingDate(true);
         try {
-            // Recalcular USD si cambió ARS
-            let usd_equiv = editingMov.usd_equivalente;
-            if (editMoneda === 'ARS' && bnaRate?.venta) {
-                usd_equiv = editMonto / bnaRate.venta;
-            } else if (editMoneda === 'USD') {
-                usd_equiv = editMonto;
-            }
-
             // Log changes before updating
             const currentMovDate = editingMov.fecha_movimiento || editingMov.fecha_hora.split('T')[0];
             if (newFecha !== currentMovDate) {
@@ -1571,7 +1562,8 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                         ? `${reciboMov.paciente.nombre} ${reciboMov.paciente.apellido}`
                                         : 'Paciente General',
                                     concepto: reciboMov.concepto_nombre,
-                                    monto: reciboMov.usd_equivalente || reciboMov.monto,
+                                    monto: reciboMov.monto,
+                                    moneda: reciboMov.moneda,
                                     metodoPago: reciboMov.metodo_pago,
                                     atendidoPor: 'AM Clínica',
                                 }}

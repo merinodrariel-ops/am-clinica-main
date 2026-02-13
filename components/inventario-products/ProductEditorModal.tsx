@@ -1,0 +1,329 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { Loader2, Save, X } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+    createInventoryProduct,
+    type ProductRecord,
+    updateInventoryProduct,
+} from '@/app/actions/inventory-products';
+import {
+    buildInventoryImagePayload,
+    type InventoryImagePayload,
+} from '@/lib/inventory-image-pipeline';
+
+interface ProductEditorModalProps {
+    isOpen: boolean;
+    mode: 'create' | 'edit';
+    product?: ProductRecord | null;
+    onClose: () => void;
+    onSaved: () => void;
+}
+
+const UNIT_OPTIONS = ['unidad', 'caja', 'ml', 'gr', 'pack', 'kit'];
+
+export default function ProductEditorModal({
+    isOpen,
+    mode,
+    product,
+    onClose,
+    onSaved,
+}: ProductEditorModalProps) {
+    const [saving, setSaving] = useState(false);
+    const [processingImage, setProcessingImage] = useState(false);
+    const [imagePayload, setImagePayload] = useState<InventoryImagePayload | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    const [form, setForm] = useState(() => ({
+        name: product?.name || '',
+        brand: product?.brand || '',
+        category: product?.category || 'Insumos Clinicos',
+        unit: product?.unit || 'unidad',
+        barcode: product?.barcode || '',
+        qrCode: product?.qr_code || '',
+        thresholdMin: String(product?.threshold_min ?? ''),
+        stockInitial: mode === 'create' ? '0' : String(product?.stock_current ?? 0),
+        notes: product?.notes || '',
+        isActive: product?.is_active ?? true,
+    }));
+
+    const title = mode === 'create' ? 'Nuevo producto' : 'Editar producto';
+    const submitLabel = mode === 'create' ? 'Crear producto' : 'Guardar cambios';
+
+    useEffect(() => {
+        setForm({
+            name: product?.name || '',
+            brand: product?.brand || '',
+            category: product?.category || 'Insumos Clinicos',
+            unit: product?.unit || 'unidad',
+            barcode: product?.barcode || '',
+            qrCode: product?.qr_code || '',
+            thresholdMin: String(product?.threshold_min ?? ''),
+            stockInitial: mode === 'create' ? '0' : String(product?.stock_current ?? 0),
+            notes: product?.notes || '',
+            isActive: product?.is_active ?? true,
+        });
+        setImagePayload(null);
+        setPreviewUrl(null);
+    }, [product, mode, isOpen]);
+
+    const thumbStats = useMemo(() => {
+        if (!imagePayload) return null;
+        return `${imagePayload.thumbWidth}x${imagePayload.thumbHeight} - ${imagePayload.thumbSizeKB}KB`;
+    }, [imagePayload]);
+
+    if (!isOpen) return null;
+
+    async function handleImageChange(file?: File | null) {
+        if (!file) return;
+
+        setProcessingImage(true);
+        try {
+            const payload = await buildInventoryImagePayload(file);
+            setImagePayload(payload);
+            setPreviewUrl(URL.createObjectURL(file));
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo procesar imagen');
+        } finally {
+            setProcessingImage(false);
+        }
+    }
+
+    async function submitForm() {
+
+        const payloadBase = {
+            name: form.name,
+            brand: form.brand,
+            category: form.category,
+            unit: form.unit,
+            barcode: form.barcode,
+            qrCode: form.qrCode,
+            notes: form.notes,
+            thresholdMin: form.thresholdMin ? Number(form.thresholdMin) : null,
+            imagePayload,
+            isActive: form.isActive,
+        };
+
+        setSaving(true);
+        try {
+            if (mode === 'create') {
+                const result = await createInventoryProduct({
+                    ...payloadBase,
+                    stockInitial: Number(form.stockInitial || 0),
+                });
+
+                if (!result.success) {
+                    throw new Error(result.error || 'No se pudo crear el producto');
+                }
+            } else if (product) {
+                const result = await updateInventoryProduct({
+                    id: product.id,
+                    ...payloadBase,
+                });
+
+                if (!result.success) {
+                    throw new Error(result.error || 'No se pudo actualizar el producto');
+                }
+            }
+
+            toast.success(mode === 'create' ? 'Producto creado' : 'Producto actualizado');
+            onSaved();
+            onClose();
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo guardar el producto');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        void submitForm();
+    }
+
+    return (
+        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl max-h-[92vh] overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl flex flex-col">
+                <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+                        <p className="text-xs text-gray-500">Imagen optimizada + datos operativos de inventario</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                        <X size={18} className="text-gray-500" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium mb-1">Nombre *</label>
+                            <input
+                                value={form.name}
+                                onChange={(event) => setForm(prev => ({ ...prev, name: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Marca</label>
+                            <input
+                                value={form.brand}
+                                onChange={(event) => setForm(prev => ({ ...prev, brand: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Categoria *</label>
+                            <input
+                                value={form.category}
+                                onChange={(event) => setForm(prev => ({ ...prev, category: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Unidad *</label>
+                            <select
+                                value={form.unit}
+                                onChange={(event) => setForm(prev => ({ ...prev, unit: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                required
+                            >
+                                {UNIT_OPTIONS.map(unit => (
+                                    <option key={unit} value={unit}>{unit}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Stock minimo</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={form.thresholdMin}
+                                onChange={(event) => setForm(prev => ({ ...prev, thresholdMin: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                            />
+                        </div>
+
+                        {mode === 'create' && (
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Stock inicial</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={form.stockInitial}
+                                    onChange={(event) => setForm(prev => ({ ...prev, stockInitial: event.target.value }))}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                />
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Barcode</label>
+                            <input
+                                value={form.barcode}
+                                onChange={(event) => setForm(prev => ({ ...prev, barcode: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                placeholder="EAN/UPC/Code128"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">QR interno (opcional)</label>
+                            <input
+                                value={form.qrCode}
+                                onChange={(event) => setForm(prev => ({ ...prev, qrCode: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                placeholder="Si se omite, se genera automaticamente"
+                            />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium mb-1">Notas</label>
+                            <textarea
+                                value={form.notes}
+                                onChange={(event) => setForm(prev => ({ ...prev, notes: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 min-h-[70px]"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Packshot del producto</p>
+                            {thumbStats && <p className="text-xs text-emerald-600">Thumb {thumbStats}</p>}
+                        </div>
+
+                        <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(event) => handleImageChange(event.target.files?.[0])}
+                            className="w-full text-sm"
+                        />
+
+                        {processingImage && (
+                            <p className="text-xs text-gray-500 flex items-center gap-2">
+                                <Loader2 size={14} className="animate-spin" />
+                                Procesando miniatura optimizada...
+                            </p>
+                        )}
+
+                        {(previewUrl || product?.image_thumb_url) && (
+                            <div className="w-32 h-32 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-800">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={previewUrl || product?.image_thumb_url || ''}
+                                    alt="Preview producto"
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <label className="inline-flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={form.isActive}
+                            onChange={(event) => setForm(prev => ({ ...prev, isActive: event.target.checked }))}
+                        />
+                        Producto activo
+                    </label>
+                </form>
+
+                <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            void submitForm();
+                        }}
+                        disabled={saving || processingImage}
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        {submitLabel}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}

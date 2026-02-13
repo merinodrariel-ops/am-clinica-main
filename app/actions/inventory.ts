@@ -98,8 +98,9 @@ export async function registrarMovimiento(data: {
         revalidatePath('/inventario');
         return { success: true };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error server action:', error);
-        return { success: false, error: error.message || 'Error del servidor' };
+        const message = error instanceof Error ? error.message : 'Error del servidor';
+        return { success: false, error: message };
     }
 }

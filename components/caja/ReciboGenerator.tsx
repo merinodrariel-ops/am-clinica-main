@@ -10,6 +10,7 @@ interface ReciboData {
     paciente: string;
     concepto: string;
     monto: number;
+    moneda: string;
     metodoPago: string;
     atendidoPor?: string;
 }
@@ -37,6 +38,20 @@ export function ReciboGenerator({
     const [emailTarget, setEmailTarget] = useState(recipientEmail || '');
     const [sendingEmail, setSendingEmail] = useState(false);
     const [emailStatus, setEmailStatus] = useState<string | null>(null);
+
+    const getCurrencyCode = () => {
+        const code = (data.moneda || 'ARS').toUpperCase();
+        if (code === 'USD' || code === 'ARS') return code;
+        return 'ARS';
+    };
+
+    const formatAmountWithCode = (amount: number, code: string) => {
+        const numberPart = new Intl.NumberFormat('es-AR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(amount || 0);
+        return `${code} ${numberPart}`;
+    };
 
     const generateRecibo = async () => {
         setIsGenerating(true);
@@ -128,17 +143,16 @@ export function ReciboGenerator({
             ctx.fillStyle = '#f0f0f0';
             ctx.fillRect(30, y - 15, canvas.width - 60, 70);
 
+            const currencyCode = getCurrencyCode();
+
             ctx.font = '14px Arial';
             ctx.fillStyle = '#666666';
             ctx.textAlign = 'left';
-            ctx.fillText('MONTO TOTAL', 50, y + 10);
+            ctx.fillText(`MONTO TOTAL (${currencyCode})`, 50, y + 10);
 
             ctx.font = 'bold 36px Arial';
             ctx.fillStyle = '#000000';
-            const montoStr = new Intl.NumberFormat('es-AR', {
-                style: 'currency',
-                currency: 'ARS',
-            }).format(data.monto);
+            const montoStr = formatAmountWithCode(data.monto, currencyCode);
             ctx.fillText(montoStr, 50, y + 48);
 
             y += 100;
@@ -222,12 +236,14 @@ export function ReciboGenerator({
     const openWhatsAppWeb = () => {
         if (!generatedImage) return;
 
+        const currencyCode = getCurrencyCode();
+
         const digits = (whatsappTarget || '').replace(/\D/g, '');
         const baseMessage = [
             `Hola! Te compartimos tu comprobante de pago de AM Clinica.`,
             `Recibo: ${data.numero}`,
             `Concepto: ${data.concepto}`,
-            `Monto: ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(data.monto)}`,
+            `Monto: ${formatAmountWithCode(data.monto, currencyCode)}`,
             storageImageUrl ? `Comprobante online: ${storageImageUrl}` : 'Adjunto: comprobante en imagen.',
         ].join('\n');
 
@@ -251,6 +267,7 @@ export function ReciboGenerator({
                 reciboNumero: data.numero,
                 concepto: data.concepto,
                 monto: data.monto,
+                moneda: getCurrencyCode(),
                 imageDataUrl: generatedImage,
                 storageUrl: storageImageUrl || undefined,
             });

@@ -127,7 +127,7 @@ export default function DetalleTrabajoModal({ isOpen, trabajo, onClose, onSucces
                         <div className="space-y-1">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Observaciones</p>
                             <p className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl text-sm text-gray-600 dark:text-gray-400 italic">
-                                "{trabajo.observaciones}"
+                                {trabajo.observaciones}
                             </p>
                         </div>
                     )}

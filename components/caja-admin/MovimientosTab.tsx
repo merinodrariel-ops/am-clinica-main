@@ -20,7 +20,8 @@ import {
     Eye,
     EyeOff,
     Share2,
-    Trash2
+    Trash2,
+    Minus
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -30,12 +31,12 @@ import {
     getMovimientos,
     getCuentas,
     createMovimiento,
-    updateMovimientoAdminWithLines,
     logMovimientoEdit,
     deleteMovimiento,
     SUBTIPOS_MOVIMIENTO,
     SUBTIPOS_ADJUNTO_OBLIGATORIO
 } from '@/lib/caja-admin';
+import { updateCajaAdminMovimientoSecure } from '@/app/actions/caja-admin';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
@@ -45,6 +46,8 @@ interface Props {
     sucursal: Sucursal;
     tcBna: number | null;
 }
+
+type MetodoPagoUI = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA' | 'OTRO';
 
 const TIPOS_MOVIMIENTO = [
     { value: 'EGRESO', label: 'Egreso' },
@@ -77,6 +80,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     const [deletionReason, setDeletionReason] = useState('');
     const [adjuntos, setAdjuntos] = useState<string[]>([]);
     const [editingMov, setEditingMov] = useState<CajaAdminMovimiento | null>(null);
+    const [isEditModalMinimized, setIsEditModalMinimized] = useState(false);
+    const [editSaveError, setEditSaveError] = useState<string | null>(null);
+    const [editSaveSuccess, setEditSaveSuccess] = useState<string | null>(null);
     const [editData, setEditData] = useState<{
         fecha: string;
         descripcion: string;
@@ -162,6 +168,62 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         setFormLineas(newLineas);
     }
 
+    function mapCuentaTipoToMetodo(tipoCuenta: CuentaFinanciera['tipo_cuenta']): MetodoPagoUI {
+        if (tipoCuenta === 'BANCO') return 'TRANSFERENCIA';
+        if (tipoCuenta === 'TARJETA') return 'TARJETA';
+        if (tipoCuenta === 'EFECTIVO') return 'EFECTIVO';
+        return 'OTRO';
+    }
+
+    function mapMetodoToCuentaTipo(metodo: MetodoPagoUI): CuentaFinanciera['tipo_cuenta'] | null {
+        if (metodo === 'TRANSFERENCIA') return 'BANCO';
+        if (metodo === 'TARJETA') return 'TARJETA';
+        if (metodo === 'EFECTIVO') return 'EFECTIVO';
+        return 'OTRO';
+    }
+
+    function getMetodoForCuentaId(cuentaId: string): MetodoPagoUI {
+        const cuenta = cuentas.find((item) => item.id === cuentaId);
+        if (!cuenta) return 'OTRO';
+        return mapCuentaTipoToMetodo(cuenta.tipo_cuenta);
+    }
+
+    function findCuentaByMetodo(metodo: MetodoPagoUI, preferredCurrency?: string): CuentaFinanciera | null {
+        const expectedTipo = mapMetodoToCuentaTipo(metodo);
+        if (!expectedTipo) return null;
+
+        if (metodo === 'OTRO') {
+            const otherAccount = cuentas.find((cuenta) =>
+                (cuenta.tipo_cuenta === 'OTRO' || cuenta.tipo_cuenta === 'SERVICIO') &&
+                (!preferredCurrency || cuenta.moneda === preferredCurrency)
+            );
+
+            if (otherAccount) return otherAccount;
+        }
+
+        const sameCurrency = cuentas.find((cuenta) =>
+            cuenta.tipo_cuenta === expectedTipo &&
+            (!preferredCurrency || cuenta.moneda === preferredCurrency)
+        );
+
+        if (sameCurrency) return sameCurrency;
+
+        return cuentas.find((cuenta) => cuenta.tipo_cuenta === expectedTipo) || null;
+    }
+
+    function handleMetodoChangeForNewLine(index: number, metodo: MetodoPagoUI) {
+        const currentLine = formLineas[index];
+        if (!currentLine) return;
+
+        const targetCuenta = findCuentaByMetodo(metodo, currentLine.moneda);
+        if (!targetCuenta) {
+            alert(`No hay cuenta configurada para ${metodo.toLowerCase()} en esta sucursal.`);
+            return;
+        }
+
+        updateLinea(index, { cuenta_id: targetCuenta.id });
+    }
+
     function getUsdEquivalente(importe: number, moneda: string, previousUsd?: number) {
         if (moneda === 'USD') return importe;
         if (moneda === 'ARS' && tcBna) return importe / tcBna;
@@ -211,14 +273,42 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         setEditData({ ...editData, lines: newLines });
     }
 
+    function handleMetodoChangeForEditLine(index: number, metodo: MetodoPagoUI) {
+        const currentLine = editData.lines[index];
+        if (!currentLine) return;
+
+        const targetCuenta = findCuentaByMetodo(metodo, currentLine.moneda);
+        if (!targetCuenta) {
+            alert(`No hay cuenta configurada para ${metodo.toLowerCase()} en esta sucursal.`);
+            return;
+        }
+
+        updateEditLinea(index, { cuenta_id: targetCuenta.id });
+    }
+
     async function handleUpdate() {
+        setEditSaveError(null);
+        setEditSaveSuccess(null);
+
         if (!canEditAdminAmounts) {
-            alert('No tienes permisos para editar montos en Caja Administracion');
+            setEditSaveError('No tienes permisos para editar montos en Caja Administracion.');
             return;
         }
 
         if (!editingMov || !editData.fecha || !editData.motivo) {
-            alert('Por favor complete la fecha y el motivo del cambio');
+            setEditSaveError('Completa fecha y motivo del cambio para guardar.');
+            return;
+        }
+
+        const linesToSave = editData.lines
+            .map((line) => ({
+                ...line,
+                importe: Math.max(0, Number(line.importe || 0)),
+            }))
+            .filter((line) => line.cuenta_id && line.importe > 0);
+
+        if (editData.lines.length > 0 && linesToSave.length === 0) {
+            setEditSaveError('Debes completar al menos una linea con importe mayor a 0, o eliminar lineas vacias antes de guardar.');
             return;
         }
 
@@ -250,8 +340,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             // For now, let's rely on the mandatory "motivo" for audit.
 
             const previousUsdTotal = Number(editingMov.usd_equivalente_total || 0);
-            const nextUsdTotal = editData.lines.length > 0
-                ? editData.lines.reduce((sum, line) => sum + Number(line.usd_equivalente || 0), 0)
+            const nextUsdTotal = linesToSave.length > 0
+                ? linesToSave.reduce((sum, line) => sum + Number(line.usd_equivalente || 0), 0)
                 : Number(editData.totalUsd || 0);
 
             if (Math.abs(previousUsdTotal - nextUsdTotal) > 0.0001) {
@@ -265,23 +355,41 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 );
             }
 
-            const { success, error } = await updateMovimientoAdminWithLines(editingMov.id, {
+            const { success, error } = await updateCajaAdminMovimientoSecure({
+                movimientoId: editingMov.id,
                 fecha_movimiento: editData.fecha,
                 descripcion: editData.descripcion,
-                registro_editado: true
-            }, editData.lines, editData.totalUsd);
+                registro_editado: true,
+                lines: linesToSave,
+                usdTotalOverride: editData.totalUsd,
+            });
 
             if (!success) throw new Error(error);
 
             await loadData();
+            setEditSaveSuccess('Cambios guardados correctamente.');
             setEditingMov(null);
         } catch (err) {
             console.error('Error updating:', err);
-            alert(`Error al actualizar: ${err instanceof Error ? err.message : 'desconocido'}`);
+            setEditSaveError(`Error al actualizar: ${err instanceof Error ? err.message : 'desconocido'}`);
         } finally {
             setSubmitting(false);
         }
     }
+
+    useEffect(() => {
+        if (!editingMov) return;
+
+        const handleEsc = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setEditingMov(null);
+                setIsEditModalMinimized(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [editingMov]);
 
     async function handleSubmit() {
         setFormError(null);
@@ -617,6 +725,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                 {formLineas.map((linea, idx) => (
                                     <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl">
                                         <select
+                                            value={getMetodoForCuentaId(linea.cuenta_id)}
+                                            onChange={(e) => handleMetodoChangeForNewLine(idx, e.target.value as MetodoPagoUI)}
+                                            className="w-36 px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
+                                            title="Metodo de pago"
+                                        >
+                                            <option value="EFECTIVO">Efectivo</option>
+                                            <option value="TRANSFERENCIA">Transferencia</option>
+                                            <option value="TARJETA">Tarjeta</option>
+                                            <option value="OTRO">Otro</option>
+                                        </select>
+                                        <select
                                             value={linea.cuenta_id}
                                             onChange={(e) => updateLinea(idx, { cuenta_id: e.target.value })}
                                             className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
@@ -821,6 +940,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                                             usd_equivalente: line.usd_equivalente ?? (line.moneda === 'USD' ? Number(line.importe || 0) : 0),
                                                         }));
                                                         setEditingMov(mov);
+                                                        setIsEditModalMinimized(false);
+                                                        setEditSaveError(null);
+                                                        setEditSaveSuccess(null);
                                                         setEditData({
                                                             fecha: mov.fecha_movimiento,
                                                             descripcion: mov.descripcion,
@@ -965,27 +1087,47 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             />
 
             {/* Modal de Edición */}
-            {editingMov && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            {editingMov && !isEditModalMinimized && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    onClick={() => {
+                        setEditingMov(null);
+                        setIsEditModalMinimized(false);
+                    }}
+                >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+                        className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-2xl w-full max-h-[92vh] overflow-hidden flex flex-col"
+                        onClick={(event) => event.stopPropagation()}
                     >
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                        <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                                 <History className="w-5 h-5 text-indigo-500" />
                                 Editar Movimiento
                             </h3>
-                            <button
-                                onClick={() => setEditingMov(null)}
-                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                            >
-                                <X size={20} className="text-slate-500" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setIsEditModalMinimized(true)}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg"
+                                    title="Minimizar"
+                                >
+                                    <Minus size={14} />
+                                    Minimizar
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setEditingMov(null);
+                                        setIsEditModalMinimized(false);
+                                    }}
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                >
+                                    <X size={20} className="text-slate-500" />
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="p-6 space-y-4">
+                        <div className="p-4 md:p-6 space-y-4 overflow-y-auto flex-1">
                             <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800 flex items-start gap-2 text-xs text-red-800 dark:text-red-300">
                                 <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                                 <p>
@@ -1053,8 +1195,22 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                     <p className="text-[11px] text-slate-500">
                                         Para cambiar metodo de pago (ej. Efectivo a Transferencia), cambia la cuenta de la linea.
                                     </p>
+                                    <p className="text-[11px] text-slate-400">
+                                        Las lineas con importe 0 se ignoran automaticamente al guardar.
+                                    </p>
                                     {editData.lines.map((line, idx) => (
                                         <div key={idx} className="flex items-center gap-2">
+                                            <select
+                                                value={getMetodoForCuentaId(line.cuenta_id)}
+                                                onChange={(e) => handleMetodoChangeForEditLine(idx, e.target.value as MetodoPagoUI)}
+                                                className="w-32 px-2 py-1 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                                                title="Metodo de pago"
+                                            >
+                                                <option value="EFECTIVO">Efectivo</option>
+                                                <option value="TRANSFERENCIA">Transferencia</option>
+                                                <option value="TARJETA">Tarjeta</option>
+                                                <option value="OTRO">Otro</option>
+                                            </select>
                                             <select
                                                 value={line.cuenta_id}
                                                 onChange={(e) => updateEditLinea(idx, { cuenta_id: e.target.value })}
@@ -1113,26 +1269,65 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                        <div className="p-4 md:p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 shrink-0 bg-white dark:bg-slate-800">
                             <span className="mr-auto hidden sm:inline-flex items-center gap-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium">
                                 <AlertTriangle size={12} />
                                 Se guarda en historial de auditoria
                             </span>
                             <button
+                                type="button"
                                 onClick={() => setEditingMov(null)}
                                 className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
+                                type="button"
                                 onClick={handleUpdate}
-                                disabled={submitting || !editData.motivo}
+                                disabled={submitting}
                                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                             >
                                 {submitting ? 'Guardando...' : 'Guardar Cambios'}
                             </button>
                         </div>
+                        {(editSaveError || editSaveSuccess) && (
+                            <div className="px-4 md:px-6 pb-4">
+                                {editSaveError && (
+                                    <p className="text-xs text-red-600 dark:text-red-400 font-medium">{editSaveError}</p>
+                                )}
+                                {editSaveSuccess && (
+                                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{editSaveSuccess}</p>
+                                )}
+                            </div>
+                        )}
                     </motion.div>
+                </div>
+            )}
+
+            {editingMov && isEditModalMinimized && (
+                <div className="fixed bottom-4 right-4 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg p-3 w-[300px]">
+                    <div className="flex items-start justify-between gap-2">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white">Edicion minimizada</p>
+                            <p className="text-xs text-slate-500 truncate">{editingMov.descripcion}</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setEditingMov(null);
+                                setIsEditModalMinimized(false);
+                            }}
+                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                        >
+                            <X size={16} className="text-slate-500" />
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={() => setIsEditModalMinimized(false)}
+                        className="mt-3 w-full px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                    >
+                        Restaurar edicion
+                    </button>
                 </div>
             )}
         </div>

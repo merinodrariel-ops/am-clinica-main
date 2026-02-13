@@ -17,7 +17,7 @@ export default function RoleSwitcher() {
         { id: 'reception', label: 'Recepción', icon: UserCheck },
         { id: 'pricing_manager', label: 'Gestor Precios', icon: Eye },
         { id: 'partner_viewer', label: 'Socio (Solo Lectura)', icon: Eye },
-    ];
+    ] as const;
 
     if (isMinimized) {
         return (
@@ -72,7 +72,7 @@ export default function RoleSwitcher() {
                     {roles.map((role) => (
                         <button
                             key={role.id}
-                            onClick={() => setImpersonatedRole(role.id as any)}
+                            onClick={() => setImpersonatedRole(role.id)}
                             className={clsx(
                                 "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all w-full text-left",
                                 impersonatedRole === role.id

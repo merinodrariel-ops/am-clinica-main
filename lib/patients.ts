@@ -207,7 +207,7 @@ export async function createPaciente(paciente: Partial<Paciente>): Promise<{ dat
     // Send Welcome Email if not already sent
     if (data.email && !data.welcome_email_sent) {
         import('@/app/actions/email').then(async ({ sendWelcomeEmailAction }) => {
-            const result = await sendWelcomeEmailAction(data.nombre, data.email!, data.whatsapp_numero);
+            const result = await sendWelcomeEmailAction(data.nombre, data.email!);
             await logEmail(
                 data.id_paciente,
                 'WELCOME',

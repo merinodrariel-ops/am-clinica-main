@@ -90,8 +90,9 @@ export async function actualizarItem(data: ItemUpdateData) {
         revalidatePath('/inventario');
         return { success: true };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error updating item:', error);
-        return { success: false, error: error.message || 'Error al actualizar el item' };
+        const message = error instanceof Error ? error.message : 'Error al actualizar el item';
+        return { success: false, error: message };
     }
 }

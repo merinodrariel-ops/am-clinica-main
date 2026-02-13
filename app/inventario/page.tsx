@@ -6,10 +6,7 @@ import {
     Plus,
     AlertTriangle,
     TrendingUp,
-    TrendingDown,
     Search,
-    Filter,
-    MoreVertical,
     Loader2,
     ArrowUpRight,
     ArrowDownRight,
@@ -24,6 +21,7 @@ import {
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import NuevoItemForm from '@/components/inventario/NuevoItemForm';
@@ -175,6 +173,20 @@ function InventarioContent() {
                     <p className="text-gray-500 dark:text-gray-400">Control de stock de insumos y materiales</p>
                 </div>
                 <div className="flex gap-2">
+                    <Link
+                        href="/inventario/productos"
+                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                    >
+                        <Package size={20} />
+                        <span className="hidden sm:inline">Inventario MVP</span>
+                    </Link>
+                    <Link
+                        href="/inventario/escanear"
+                        className="flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                    >
+                        <Search size={20} />
+                        <span className="hidden sm:inline">Escanear</span>
+                    </Link>
                     <div className="flex bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
                         <button
                             onClick={() => setViewMode('GRID')}
@@ -335,7 +347,7 @@ function InventarioContent() {
                     <select
                         className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm outline-none"
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as any)}
+                        onChange={(e) => setSortBy(e.target.value as 'NOMBRE' | 'STOCK' | 'CATEGORIA')}
                     >
                         <option value="NOMBRE">Nombre</option>
                         <option value="STOCK">Stock</option>

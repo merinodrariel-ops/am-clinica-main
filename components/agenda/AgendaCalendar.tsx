@@ -6,18 +6,62 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
+import type {
+    DateSelectArg,
+    EventClickArg,
+    EventDropArg,
+    EventInput,
+    EventSourceFuncArg,
+} from '@fullcalendar/core';
 import { getAppointments, updateAppointment } from '@/app/actions/agenda';
 import NewAppointmentModal from './NewAppointmentModal';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface AppointmentModalData {
+    id?: string;
+    title: string;
+    start: Date;
+    end: Date;
+    patientId: string;
+    doctorId: string;
+    status: string;
+    type: string;
+    notes: string;
+    patient?: { full_name: string };
+    doctor?: { full_name: string };
+}
+
+interface AgendaAppointmentRecord {
+    id: string;
+    title: string | null;
+    start_time: string;
+    end_time: string;
+    status: string;
+    type: string;
+    notes: string | null;
+    patient_id: string | null;
+    doctor_id: string | null;
+    patient?: { full_name?: string } | null;
+    doctor?: { full_name?: string } | null;
+}
+
+interface AgendaEventExtendedProps {
+    status?: string;
+    type?: string;
+    notes?: string;
+    patient_id?: string;
+    doctor_id?: string;
+    patient?: { full_name: string };
+    doctor?: { full_name: string };
+}
+
 export default function AgendaCalendar() {
     const calendarRef = useRef<FullCalendar>(null);
     const [modalOpen, setModalOpen] = useState(false);
-    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-    const [selectedEvent, setSelectedEvent] = useState<any>(null);
+    const [selectedEvent, setSelectedEvent] = useState<AppointmentModalData | null>(null);
     const { role } = useAuth();
 
-    const handleDateSelect = (selectInfo: any) => {
+    const handleDateSelect = (selectInfo: DateSelectArg) => {
         // Create new event from selection
         setSelectedEvent({
             title: '',
@@ -29,7 +73,6 @@ export default function AgendaCalendar() {
             type: 'consulta',
             notes: ''
         });
-        setSelectedDate(undefined);
         setModalOpen(true);
 
         // Clear selection to avoid visual artifacts
@@ -37,29 +80,37 @@ export default function AgendaCalendar() {
         calendarApi.unselect();
     };
 
-    const handleEventClick = (arg: any) => {
+    const handleEventClick = (arg: EventClickArg) => {
         const event = arg.event;
+        const props = (event.extendedProps || {}) as AgendaEventExtendedProps;
+
+        const safeStart = event.start || new Date();
+        const safeEnd = event.end || new Date(safeStart.getTime() + 30 * 60 * 1000);
         const appointmentData = {
             id: event.id,
             title: event.title,
-            start: event.start,
-            end: event.end,
-            status: event.extendedProps.status,
-            type: event.extendedProps.type,
-            notes: event.extendedProps.notes,
-            patientId: event.extendedProps.patient_id,
-            doctorId: event.extendedProps.doctor_id,
-            patient: event.extendedProps.patient,
-            doctor: event.extendedProps.doctor
+            start: safeStart,
+            end: safeEnd,
+            status: props.status || 'confirmed',
+            type: props.type || 'consulta',
+            notes: props.notes || '',
+            patientId: props.patient_id || '',
+            doctorId: props.doctor_id || '',
+            patient: props.patient,
+            doctor: props.doctor
         };
 
         setSelectedEvent(appointmentData);
-        setSelectedDate(undefined);
         setModalOpen(true);
     };
 
-    const handleEventDrop = async (arg: any) => {
+    const handleEventDrop = async (arg: EventDropArg) => {
         const { event } = arg;
+        if (!event.start || !event.end) {
+            arg.revert();
+            return;
+        }
+
         try {
             await updateAppointment(event.id, {
                 start_time: event.start.toISOString(),
@@ -71,10 +122,14 @@ export default function AgendaCalendar() {
         }
     };
 
-    const fetchEvents = async (fetchInfo: any, successCallback: any, failureCallback: any) => {
+    const fetchEvents = async (
+        fetchInfo: EventSourceFuncArg,
+        successCallback: (events: EventInput[]) => void,
+        failureCallback: (error: Error) => void
+    ) => {
         try {
-            const appointments = await getAppointments(fetchInfo.startStr, fetchInfo.endStr);
-            const events = appointments.map((apt: any) => ({
+            const appointments = (await getAppointments(fetchInfo.startStr, fetchInfo.endStr)) as AgendaAppointmentRecord[];
+            const events = appointments.map(apt => ({
                 id: apt.id,
                 title: apt.title || (apt.patient ? apt.patient.full_name : 'Cita'),
                 start: apt.start_time,
@@ -86,17 +141,18 @@ export default function AgendaCalendar() {
                 extendedProps: {
                     status: apt.status,
                     type: apt.type,
-                    notes: apt.notes,
-                    patient_id: apt.patient_id,
-                    doctor_id: apt.doctor_id,
-                    patient: apt.patient,
-                    doctor: apt.doctor
+                    notes: apt.notes || '',
+                    patient_id: apt.patient_id || '',
+                    doctor_id: apt.doctor_id || '',
+                    patient: apt.patient || undefined,
+                    doctor: apt.doctor || undefined
                 }
             }));
             successCallback(events);
         } catch (error) {
             console.error(error);
-            failureCallback(error);
+            const failureError = error instanceof Error ? error : new Error('No se pudieron cargar citas');
+            failureCallback(failureError);
         }
     };
 

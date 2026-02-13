@@ -83,8 +83,9 @@ export async function crearItem(data: NewItemData) {
         revalidatePath('/inventario');
         return { success: true };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error creating item:', error);
-        return { success: false, error: error.message || 'Error al guardar el item' };
+        const message = error instanceof Error ? error.message : 'Error al guardar el item';
+        return { success: false, error: message };
     }
 }

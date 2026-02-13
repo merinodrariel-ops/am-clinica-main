@@ -29,7 +29,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
     return (
         <main className={clsx(
             'min-h-screen transition-all duration-200',
-            isSidebarVisible ? (sidebarCollapsed ? 'ml-20' : 'ml-64') : ''
+            isSidebarVisible ? (sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64') : ''
         )}>
             {children}
         </main>

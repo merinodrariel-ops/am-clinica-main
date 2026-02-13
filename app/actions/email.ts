@@ -3,7 +3,7 @@
 import { sendEmail } from '@/lib/nodemailer';
 import { generateWelcomeMessage, generateInvitationMessage } from '@/lib/email-templates';
 
-export async function sendWelcomeEmailAction(toName: string, toEmail: string, whatsapp?: string) {
+export async function sendWelcomeEmailAction(toName: string, toEmail: string) {
     try {
         // Use the template generator if available, or fallback to simple HTML
         const html = generateWelcomeMessage(toName);
@@ -128,6 +128,7 @@ export async function sendReciboEmailAction(payload: {
     reciboNumero: string;
     concepto: string;
     monto: number;
+    moneda: string;
     imageDataUrl: string;
     storageUrl?: string;
 }) {
@@ -144,10 +145,12 @@ export async function sendReciboEmailAction(payload: {
             return { success: false, error: 'No se pudo adjuntar el comprobante' };
         }
 
-        const amountLabel = new Intl.NumberFormat('es-AR', {
-            style: 'currency',
-            currency: 'USD',
-        }).format(payload.monto || 0);
+        const currencyCode = (payload.moneda || 'ARS').toUpperCase();
+        const safeCurrencyCode = currencyCode === 'USD' || currencyCode === 'ARS' ? currencyCode : 'ARS';
+        const amountLabel = `${safeCurrencyCode} ${new Intl.NumberFormat('es-AR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(payload.monto || 0)}`;
 
         const html = `
             <div style="font-family: Arial, sans-serif; color: #111827; max-width: 640px; margin: 0 auto;">

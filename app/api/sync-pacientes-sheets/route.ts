@@ -10,6 +10,20 @@ const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQwXYeMlpxFSK
 
 export const dynamic = 'force-dynamic';
 
+type CsvRow = Record<string, string>;
+
+interface ExistingPatientRow {
+    id_paciente: string;
+    link_google_slides: string | null;
+    observaciones_generales: string | null;
+}
+
+interface PatientUpdates {
+    link_google_slides?: string;
+    observaciones_generales?: string;
+    referencia_origen?: string;
+}
+
 export async function GET() {
     try {
         const response = await fetch(SHEET_URL);
@@ -34,10 +48,10 @@ export async function GET() {
         const imported = [];
 
         // Helper to find column by flexible keyword matching
-        const findValue = (row: any, keywords: string[]) => {
+        const findValue = (row: CsvRow, keywords: string[]) => {
             const keys = Object.keys(row);
             const foundKey = keys.find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase())));
-            return foundKey ? row[foundKey] : null;
+            return foundKey ? row[foundKey] || '' : '';
         };
 
         for (const row of rows) {
@@ -83,11 +97,11 @@ export async function GET() {
                     query = query.eq('email', email);
                 }
 
-                const { data: existing } = await query.single();
+                const { data: existing } = await query.single<ExistingPatientRow>();
 
                 if (existing) {
                     // Update if missing data
-                    const updates: any = {};
+                    const updates: PatientUpdates = {};
                     if (slidesLink && !existing.link_google_slides) {
                         updates.link_google_slides = slidesLink;
                     }
@@ -149,19 +163,20 @@ export async function GET() {
             imported
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Sync error:', error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Error al sincronizar pacientes';
+        return NextResponse.json({ success: false, error: message }, { status: 500 });
     }
 }
 
-function parseCSV(text: string): any[] {
+function parseCSV(text: string): CsvRow[] {
     const lines = text.split('\n');
     if (lines.length < 2) return [];
 
     // Google Sheets might return CSV with quotes
     const parseLine = (line: string) => {
-        const result = [];
+        const result: string[] = [];
         let current = '';
         let inQuotes = false;
         for (let i = 0; i < line.length; i++) {
@@ -180,12 +195,12 @@ function parseCSV(text: string): any[] {
     };
 
     const headers = parseLine(lines[0]);
-    const data = [];
+    const data: CsvRow[] = [];
 
     for (let i = 1; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
         const values = parseLine(lines[i]);
-        const entry: any = {};
+        const entry: CsvRow = {};
         headers.forEach((h, idx) => {
             entry[h] = values[idx] || '';
         });

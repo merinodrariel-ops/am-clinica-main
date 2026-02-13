@@ -1,11 +1,5 @@
-
-const { createClient } = require('@supabase/supabase-js');
-
 const NOTION_API_KEY = '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';
 const RECEPTION_DB = '891fda42-c4f2-401b-ba7d-ffe2af271939';
-
-const supabaseUrl = 'https://ybozzesadqcorvfqpsyo.supabase.co';
-const supabaseKey = 'YOUR_KEY_HERE'; // I should use the MCP tool instead of hardcoding.
 
 // Actually I will use the MCP tool to get the data, then process it in Node.
 // But wait, I can't easily pass big data back and forth.
@@ -58,4 +52,4 @@ async function main() {
     console.log(JSON.stringify(notionData, null, 2));
 }
 
-main().catch(console.error);
+void main().catch(console.error);

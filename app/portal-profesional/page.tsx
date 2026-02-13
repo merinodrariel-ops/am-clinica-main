@@ -33,9 +33,18 @@ const BottomNav = () => (
 );
 
 export default function PortalDashboard() {
-    const [appointments, setAppointments] = useState<any[]>([]);
+    const [appointments, setAppointments] = useState<
+        Array<{
+            id: string;
+            start_time: string;
+            end_time: string;
+            type?: string | null;
+            notes?: string | null;
+            patient?: { full_name?: string } | null;
+        }>
+    >([]);
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({ hoy: 154000, prox: 45000 }); // Mock stats
+    const [stats] = useState({ hoy: 154000, prox: 45000 }); // Mock stats
 
     useEffect(() => {
         loadData();
@@ -51,7 +60,7 @@ export default function PortalDashboard() {
             const data = await getAppointments(today + 'T00:00:00', end.toISOString());
             if (data) {
                 // Filter ensuring dates are valid
-                const validAppointments = data.sort((a: any, b: any) =>
+                const validAppointments = [...data].sort((a, b) =>
                     new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
                 );
                 setAppointments(validAppointments);

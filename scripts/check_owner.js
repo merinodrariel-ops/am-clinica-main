@@ -1,29 +1,30 @@
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
-
-// Manually parse .env.local
-const envPath = path.resolve(__dirname, '../.env.local');
-const envContent = fs.readFileSync(envPath, 'utf8');
-const env = {};
-envContent.split('\n').forEach(line => {
-    const [key, ...valueParts] = line.split('=');
-    if (key && valueParts.length > 0) {
-        env[key.trim()] = valueParts.join('=').trim();
-    }
-});
-
-const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('Missing Supabase environment variables');
-    process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 async function updateOwner() {
+    const [{ createClient }, fs, path] = await Promise.all([
+        import('@supabase/supabase-js'),
+        import('node:fs'),
+        import('node:path'),
+    ]);
+
+    // Manually parse .env.local
+    const envPath = path.resolve(__dirname, '../.env.local');
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const env = {};
+    envContent.split('\n').forEach(line => {
+        const [key, ...valueParts] = line.split('=');
+        if (key && valueParts.length > 0) {
+            env[key.trim()] = valueParts.join('=').trim();
+        }
+    });
+
+    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        console.error('Missing Supabase environment variables');
+        process.exit(1);
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const email = 'dr.arielmerinopersonal@gmail.com';
 
     console.log(`Checking user: ${email}`);
@@ -65,4 +66,7 @@ async function updateOwner() {
     }
 }
 
-updateOwner();
+void updateOwner().catch(error => {
+    console.error('Failed to check owner:', error);
+    process.exit(1);
+});

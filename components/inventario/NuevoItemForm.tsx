@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { X, Package, Loader2, Save, Tag, BarChart3 } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { crearItem } from '@/app/actions/inventory-create';
@@ -16,11 +15,6 @@ interface NuevoItemFormProps {
 export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemFormProps) {
     const { role, user } = useAuth();
     const isLabUser = role === 'laboratorio';
-
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
     const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         nombre: '',
@@ -94,9 +88,10 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                 stock_minimo: 5,
                 area: isLabUser ? 'LABORATORIO' : 'CLINICA'
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error saving item:', error);
-            setError(error.message || 'Error al guardar el item');
+            const message = error instanceof Error ? error.message : 'Error al guardar el item';
+            setError(message);
         } finally {
             setSaving(false);
         }
@@ -174,7 +169,12 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                                             : "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300"
                                     )}
                                     value={formData.area}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, area: e.target.value as any }))}
+                                    onChange={(e) =>
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            area: e.target.value as 'CLINICA' | 'LABORATORIO',
+                                        }))
+                                    }
                                     disabled={isLabUser}
                                 >
                                     <option value="CLINICA">🏥 CLÍNICA GENERAL</option>

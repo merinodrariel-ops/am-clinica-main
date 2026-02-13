@@ -336,7 +336,12 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                                 />
                                 <select
                                     value={formData.moneda}
-                                    onChange={(e) => setFormData({ ...formData, moneda: e.target.value as any })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            moneda: e.target.value === 'USD' ? 'USD' : 'ARS',
+                                        })
+                                    }
                                     className="w-24 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm outline-none"
                                 >
                                     <option value="ARS">ARS</option>
