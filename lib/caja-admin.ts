@@ -1611,7 +1611,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
             let multiplier = 0;
             if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') multiplier = 1;
             else if (tipo === 'EGRESO' || tipo === 'RETIRO') multiplier = -1;
-            else if (tipo === 'CAMBIO_MONEDA') {
+            else if (['CAMBIO_MONEDA', 'TRANSFERENCIA', 'AJUSTE_CAJA'].includes(tipo)) {
                 multiplier = 1;
             }
 

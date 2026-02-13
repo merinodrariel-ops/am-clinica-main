@@ -161,9 +161,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         // Actually, easiest way is to NOT enforce Math.abs here if the caller handles it, OR check formData.tipo_movimiento.
 
         if (updates.importe !== undefined) {
-            if (formData.tipo_movimiento === 'CAMBIO_MONEDA') {
-                // Allow negative, but maybe just trust the caller?
-                // Let's assume the caller (UI) sends the correct signed value.
+            if (['CAMBIO_MONEDA', 'TRANSFERENCIA', 'AJUSTE_CAJA'].includes(formData.tipo_movimiento)) {
+                // Allow negative for these types (Source in Exchange, Outflow in Transfer, Shortage in Adjustment)
                 newLineas[index].importe = updates.importe;
             } else {
                 newLineas[index].importe = Math.abs(newLineas[index].importe);
@@ -274,7 +273,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         // Allow negative if CAMBIO_MONEDA
         let nextImporte = current.importe;
         if (updates.importe !== undefined) {
-            if (editingMov?.tipo_movimiento === 'CAMBIO_MONEDA') {
+            if (['CAMBIO_MONEDA', 'TRANSFERENCIA', 'AJUSTE_CAJA'].includes(editingMov?.tipo_movimiento || '')) {
                 nextImporte = updates.importe;
             } else {
                 nextImporte = Math.abs(updates.importe);
@@ -1336,11 +1335,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                                 value={line.importe}
                                                 onChange={(e) => {
                                                     const val = parseFloat(e.target.value) || 0;
-                                                    // Allow negative only for CAMBIO_MONEDA
-                                                    const newImporte = editingMov?.tipo_movimiento === 'CAMBIO_MONEDA' ? val : Math.abs(val);
+                                                    // Allow negative for specific types
+                                                    const allowNegative = ['CAMBIO_MONEDA', 'TRANSFERENCIA', 'AJUSTE_CAJA'].includes(editingMov?.tipo_movimiento || '');
+                                                    const newImporte = allowNegative ? val : Math.abs(val);
                                                     updateEditLinea(idx, { importe: newImporte });
                                                 }}
-                                                min={editingMov?.tipo_movimiento === 'CAMBIO_MONEDA' ? undefined : "0"}
+                                                min={['CAMBIO_MONEDA', 'TRANSFERENCIA', 'AJUSTE_CAJA'].includes(editingMov?.tipo_movimiento || '') ? undefined : "0"}
                                                 step="0.01"
                                                 className="w-28 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
                                             />
