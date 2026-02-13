@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Save, X } from 'lucide-react';
+import { Loader2, Save, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     createInventoryProduct,
@@ -12,6 +12,10 @@ import {
     buildInventoryImagePayload,
     type InventoryImagePayload,
 } from '@/lib/inventory-image-pipeline';
+import {
+    detectInventoryColorFromFile,
+    type DetectedInventoryColor,
+} from '@/lib/inventory-color-ai';
 
 interface ProductEditorModalProps {
     isOpen: boolean;
@@ -22,6 +26,23 @@ interface ProductEditorModalProps {
 }
 
 const UNIT_OPTIONS = ['unidad', 'caja', 'ml', 'gr', 'pack', 'kit'];
+const COLOR_SUGGESTIONS = [
+    'Blanco',
+    'Negro',
+    'Transparente',
+    'Gris',
+    'Azul',
+    'Verde',
+    'Rosa',
+    'Dorado',
+    'Plateado',
+    'Nude',
+    'Rojo',
+    'Naranja',
+    'Amarillo',
+    'Violeta',
+];
+const SHADE_SUGGESTIONS = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'C1', 'C2', 'D2', 'D3', 'BL1', 'BL2'];
 
 export default function ProductEditorModal({
     isOpen,
@@ -34,11 +55,16 @@ export default function ProductEditorModal({
     const [processingImage, setProcessingImage] = useState(false);
     const [imagePayload, setImagePayload] = useState<InventoryImagePayload | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [removeBackgroundEnabled, setRemoveBackgroundEnabled] = useState(true);
+    const [detectingColor, setDetectingColor] = useState(false);
+    const [detectedColor, setDetectedColor] = useState<DetectedInventoryColor | null>(null);
 
     const [form, setForm] = useState(() => ({
         name: product?.name || '',
         brand: product?.brand || '',
         category: product?.category || 'Insumos Clinicos',
+        color: product?.color || '',
+        shade: product?.shade || '',
         unit: product?.unit || 'unidad',
         barcode: product?.barcode || '',
         qrCode: product?.qr_code || '',
@@ -56,6 +82,8 @@ export default function ProductEditorModal({
             name: product?.name || '',
             brand: product?.brand || '',
             category: product?.category || 'Insumos Clinicos',
+            color: product?.color || '',
+            shade: product?.shade || '',
             unit: product?.unit || 'unidad',
             barcode: product?.barcode || '',
             qrCode: product?.qr_code || '',
@@ -66,6 +94,9 @@ export default function ProductEditorModal({
         });
         setImagePayload(null);
         setPreviewUrl(null);
+        setRemoveBackgroundEnabled(true);
+        setDetectingColor(false);
+        setDetectedColor(null);
     }, [product, mode, isOpen]);
 
     const thumbStats = useMemo(() => {
@@ -79,14 +110,39 @@ export default function ProductEditorModal({
         if (!file) return;
 
         setProcessingImage(true);
+        setDetectingColor(true);
         try {
-            const payload = await buildInventoryImagePayload(file);
+            const colorSuggestion = await detectInventoryColorFromFile(file);
+            setDetectedColor(colorSuggestion);
+
+            if (colorSuggestion) {
+                setForm(prev => {
+                    return {
+                        ...prev,
+                        color: prev.color.trim() ? prev.color : colorSuggestion.label,
+                        shade: prev.shade.trim() ? prev.shade : (colorSuggestion.dentalShade || ''),
+                    };
+                });
+            }
+
+            const payload = await buildInventoryImagePayload(file, {
+                removeBackground: removeBackgroundEnabled,
+                thumbSize: 320,
+                fullMaxWidth: 1080,
+                thumbMaxKB: 45,
+                fullMaxKB: 220,
+            });
             setImagePayload(payload);
             setPreviewUrl(URL.createObjectURL(file));
+
+            if (removeBackgroundEnabled && !payload.backgroundRemoved) {
+                toast.info('No se pudo quitar fondo automaticamente. Se guarda la foto optimizada original.');
+            }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'No se pudo procesar imagen');
         } finally {
             setProcessingImage(false);
+            setDetectingColor(false);
         }
     }
 
@@ -96,6 +152,8 @@ export default function ProductEditorModal({
             name: form.name,
             brand: form.brand,
             category: form.category,
+            color: form.color,
+            shade: form.shade,
             unit: form.unit,
             barcode: form.barcode,
             qrCode: form.qrCode,
@@ -191,6 +249,73 @@ export default function ProductEditorModal({
                         </div>
 
                         <div>
+                            <label className="block text-sm font-medium mb-1">Subcategoria color</label>
+                            <input
+                                value={form.color}
+                                onChange={(event) => setForm(prev => ({ ...prev, color: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                placeholder="Ej: Transparente"
+                                list="inventory-color-options"
+                            />
+                            <datalist id="inventory-color-options">
+                                {COLOR_SUGGESTIONS.map(color => (
+                                    <option key={color} value={color} />
+                                ))}
+                            </datalist>
+
+                            {detectingColor && (
+                                <p className="mt-1 text-[11px] text-gray-500 inline-flex items-center gap-1.5">
+                                    <Loader2 size={11} className="animate-spin" />
+                                    Detectando color sugerido...
+                                </p>
+                            )}
+
+                            {!detectingColor && detectedColor && (
+                                <div className="mt-2 flex items-center gap-2 text-[11px]">
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 font-semibold">
+                                        IA: {detectedColor.label} ({Math.round(detectedColor.confidence * 100)}%)
+                                    </span>
+                                    <span
+                                        className="w-3 h-3 rounded-full border border-gray-300"
+                                        style={{ backgroundColor: detectedColor.hex }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(prev => ({
+                                            ...prev,
+                                            color: detectedColor.label,
+                                            shade: detectedColor.dentalShade || prev.shade,
+                                        }))}
+                                        className="text-blue-600 hover:underline"
+                                    >
+                                        Aplicar
+                                    </button>
+                                    {detectedColor.dentalShade && (
+                                        <span className="px-2 py-1 rounded-full border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 font-semibold">
+                                            Tono: {detectedColor.dentalShade}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Tono dental</label>
+                            <input
+                                value={form.shade}
+                                onChange={(event) => setForm(prev => ({ ...prev, shade: event.target.value }))}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                placeholder="Ej: A2"
+                                list="inventory-shade-options"
+                            />
+                            <datalist id="inventory-shade-options">
+                                {SHADE_SUGGESTIONS.map(shade => (
+                                    <option key={shade} value={shade} />
+                                ))}
+                            </datalist>
+                        </div>
+
+                        <div>
                             <label className="block text-sm font-medium mb-1">Unidad *</label>
                             <select
                                 value={form.unit}
@@ -273,6 +398,16 @@ export default function ProductEditorModal({
                             onChange={(event) => handleImageChange(event.target.files?.[0])}
                             className="w-full text-sm"
                         />
+
+                        <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={removeBackgroundEnabled}
+                                onChange={(event) => setRemoveBackgroundEnabled(event.target.checked)}
+                            />
+                            <Sparkles size={13} className="text-violet-500" />
+                            Quitar fondo con IA (beta)
+                        </label>
 
                         {processingImage && (
                             <p className="text-xs text-gray-500 flex items-center gap-2">

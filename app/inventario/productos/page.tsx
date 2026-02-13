@@ -1,22 +1,38 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
     AlertTriangle,
     ArrowLeft,
     History,
+    ImageUp,
     Loader2,
     Package,
     Plus,
     ScanLine,
     Search,
+    Smartphone,
 } from 'lucide-react';
 import RoleGuard from '@/components/auth/RoleGuard';
-import { listInventoryProducts, type ProductRecord } from '@/app/actions/inventory-products';
+import {
+    listInventoryProducts,
+    type ProductRecord,
+    updateInventoryProductImage,
+} from '@/app/actions/inventory-products';
 import { useAuth } from '@/contexts/AuthContext';
 import ProductEditorModal from '@/components/inventario-products/ProductEditorModal';
 import clsx from 'clsx';
+import { buildInventoryImagePayload } from '@/lib/inventory-image-pipeline';
+import { toast } from 'sonner';
+
+function normalizeText(value?: string | null) {
+    return (value || '').toLowerCase().trim();
+}
+
+function includesAny(text: string, needles: string[]) {
+    return needles.some(needle => text.includes(needle));
+}
 
 export default function InventoryProductsPage() {
     return (
@@ -34,13 +50,18 @@ function ProductsScreen() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('Todos');
+    const [colorFilter, setColorFilter] = useState('Todos');
     const [editor, setEditor] = useState<{ mode: 'create' | 'edit'; product?: ProductRecord | null } | null>(null);
+    const [quickUploadTarget, setQuickUploadTarget] = useState<ProductRecord | null>(null);
+    const [quickUploadingId, setQuickUploadingId] = useState<string | null>(null);
+    const quickInputRef = useRef<HTMLInputElement>(null);
 
-    const loadProducts = useCallback(async (currentSearch: string, currentCategory: string) => {
+    const loadProducts = useCallback(async (currentSearch: string, currentCategory: string, currentColor: string) => {
         setLoading(true);
         const result = await listInventoryProducts({
             search: currentSearch,
             category: currentCategory,
+            color: currentColor,
             activeOnly: true,
         });
 
@@ -52,18 +73,107 @@ function ProductsScreen() {
 
     useEffect(() => {
         const timeout = setTimeout(() => {
-            void loadProducts(search, categoryFilter);
+            void loadProducts(search, categoryFilter, colorFilter);
         }, 220);
         return () => clearTimeout(timeout);
-    }, [search, categoryFilter, loadProducts]);
+    }, [search, categoryFilter, colorFilter, loadProducts]);
 
     const categories = useMemo(() => {
         return ['Todos', ...Array.from(new Set(products.map(item => item.category))).sort()];
     }, [products]);
 
+    const colors = useMemo(() => {
+        return ['Todos', ...Array.from(new Set(products.map(item => item.color).filter(Boolean) as string[])).sort()];
+    }, [products]);
+
     const lowStock = useMemo(() => {
         return products.filter(item => item.threshold_min !== null && item.stock_current <= item.threshold_min).length;
     }, [products]);
+
+    const keyKpis = useMemo(() => {
+        const totals = {
+            compositeJeringas: 0,
+            implantes: 0,
+            bloquesFresar: 0,
+            discosZirconio: 0,
+        };
+
+        products.forEach(product => {
+            const text = [
+                normalizeText(product.name),
+                normalizeText(product.category),
+                normalizeText(product.brand),
+                normalizeText(product.notes),
+                normalizeText(product.unit),
+            ].join(' ');
+
+            const qty = Number(product.stock_current || 0);
+            if (!Number.isFinite(qty) || qty <= 0) return;
+
+            const isComposite = text.includes('composite');
+            const isJeringaLike = includesAny(text, ['jeringa', 'syringe']);
+            if (isComposite && (isJeringaLike || !text.includes('compula'))) {
+                totals.compositeJeringas += qty;
+            }
+
+            if (includesAny(text, ['implante', 'implant'])) {
+                totals.implantes += qty;
+            }
+
+            const isBloque = text.includes('bloque');
+            const isFresar = includesAny(text, ['fresar', 'fresado', 'cad cam', 'cadcam']);
+            if (isBloque && isFresar) {
+                totals.bloquesFresar += qty;
+            }
+
+            const isDisco = text.includes('disco');
+            const isZirconio = includesAny(text, ['zirconio', 'zirconia']);
+            if (isDisco && isZirconio) {
+                totals.discosZirconio += qty;
+            }
+        });
+
+        return totals;
+    }, [products]);
+
+    async function handleQuickImageUpload(file?: File | null) {
+        if (!file || !quickUploadTarget) return;
+
+        setQuickUploadingId(quickUploadTarget.id);
+        try {
+            const payload = await buildInventoryImagePayload(file, {
+                removeBackground: true,
+                thumbSize: 320,
+                fullMaxWidth: 1080,
+                thumbMaxKB: 45,
+                fullMaxKB: 220,
+            });
+
+            const result = await updateInventoryProductImage({
+                id: quickUploadTarget.id,
+                imagePayload: payload,
+            });
+
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo subir imagen');
+            }
+
+            if (!payload.backgroundRemoved) {
+                toast.info('Foto subida sin quitar fondo (API IA no disponible o sin credito).');
+            }
+
+            toast.success(`Imagen actualizada: ${quickUploadTarget.name}`);
+            await loadProducts(search, categoryFilter, colorFilter);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo cargar imagen rapida');
+        } finally {
+            setQuickUploadingId(null);
+            setQuickUploadTarget(null);
+            if (quickInputRef.current) {
+                quickInputRef.current.value = '';
+            }
+        }
+    }
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -100,6 +210,15 @@ function ProductsScreen() {
                         Movimientos
                     </Link>
                     {isAdmin && (
+                        <Link
+                            href="/inventario/productos/rapido"
+                            className="px-3 py-2 rounded-lg border border-violet-200 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-sm inline-flex items-center gap-1.5"
+                        >
+                            <Smartphone size={15} />
+                            Alta rapida
+                        </Link>
+                    )}
+                    {isAdmin && (
                         <button
                             onClick={() => setEditor({ mode: 'create' })}
                             className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium inline-flex items-center gap-2"
@@ -114,7 +233,30 @@ function ProductsScreen() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatCard label="Productos activos" value={String(products.length)} hint="catalogo operativo" />
                 <StatCard label="Stock bajo" value={String(lowStock)} hint="segun threshold_min" danger={lowStock > 0} />
-                <StatCard label="Categorias" value={String(categories.length - 1)} hint="clasificacion util" />
+                <StatCard label="Categorias / colores" value={`${categories.length - 1} / ${Math.max(colors.length - 1, 0)}`} hint="clasificacion util" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <StatCard
+                    label="Jeringas de composite"
+                    value={String(keyKpis.compositeJeringas)}
+                    hint="stock total detectado"
+                />
+                <StatCard
+                    label="Implantes dentales"
+                    value={String(keyKpis.implantes)}
+                    hint="stock total detectado"
+                />
+                <StatCard
+                    label="Bloques para fresar"
+                    value={String(keyKpis.bloquesFresar)}
+                    hint="inventario laboratorio"
+                />
+                <StatCard
+                    label="Discos de zirconio"
+                    value={String(keyKpis.discosZirconio)}
+                    hint="inventario laboratorio"
+                />
             </div>
 
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col md:flex-row gap-3 md:items-center">
@@ -123,12 +265,12 @@ function ProductsScreen() {
                     <input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Buscar por nombre, marca, categoria o codigo"
+                        placeholder="Buscar por nombre, marca, categoria, color o codigo"
                         className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
                     />
                 </div>
 
-                <div className="flex gap-2 overflow-x-auto">
+                <div className="flex gap-2 overflow-x-auto md:max-w-[48%]">
                     {categories.map(category => (
                         <button
                             key={category}
@@ -141,6 +283,23 @@ function ProductsScreen() {
                             )}
                         >
                             {category}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto md:max-w-[36%]">
+                    {colors.map(color => (
+                        <button
+                            key={color}
+                            onClick={() => setColorFilter(color)}
+                            className={clsx(
+                                'px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap border',
+                                colorFilter === color
+                                    ? 'bg-violet-600 text-white border-violet-600'
+                                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                            )}
+                        >
+                            {color === 'Todos' ? 'Color: Todos' : color}
                         </button>
                     ))}
                 </div>
@@ -174,7 +333,11 @@ function ProductsScreen() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide">{product.category}</p>
                                         <h3 className="font-semibold text-gray-900 dark:text-white truncate">{product.name}</h3>
-                                        <p className="text-xs text-gray-500 truncate">{product.brand || 'Sin marca'}</p>
+                                        <p className="text-xs text-gray-500 truncate">
+                                            {product.brand || 'Sin marca'}
+                                            {product.color ? ` - ${product.color}` : ''}
+                                            {product.shade ? ` (${product.shade})` : ''}
+                                        </p>
                                         <div className="mt-2 text-xs text-gray-500 space-y-0.5">
                                             <p>Barcode: {product.barcode || 'N/D'}</p>
                                             <p>QR: {product.qr_code || 'N/D'}</p>
@@ -200,6 +363,24 @@ function ProductsScreen() {
                                         >
                                             Ver detalle
                                         </Link>
+                                        {isAdmin && (
+                                            <button
+                                                onClick={() => {
+                                                    setQuickUploadTarget(product);
+                                                    quickInputRef.current?.click();
+                                                }}
+                                                disabled={quickUploadingId === product.id}
+                                                className="px-3 py-1.5 rounded-lg border border-violet-300 dark:border-violet-700 text-xs font-semibold inline-flex items-center gap-1.5 text-violet-700 dark:text-violet-300 disabled:opacity-60"
+                                                title="Subir foto rapida con compresion y IA"
+                                            >
+                                                {quickUploadingId === product.id ? (
+                                                    <Loader2 size={13} className="animate-spin" />
+                                                ) : (
+                                                    <ImageUp size={13} />
+                                                )}
+                                                Foto
+                                            </button>
+                                        )}
                                         {isAdmin && (
                                             <button
                                                 onClick={() => setEditor({ mode: 'edit', product })}
@@ -229,7 +410,18 @@ function ProductsScreen() {
                 product={editor?.product || null}
                 onClose={() => setEditor(null)}
                 onSaved={() => {
-                    void loadProducts(search, categoryFilter);
+                    void loadProducts(search, categoryFilter, colorFilter);
+                }}
+            />
+
+            <input
+                ref={quickInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(event) => {
+                    void handleQuickImageUpload(event.target.files?.[0]);
                 }}
             />
         </div>

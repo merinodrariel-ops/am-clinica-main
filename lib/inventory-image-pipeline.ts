@@ -9,6 +9,7 @@ export interface InventoryImagePayload {
     fullHeight: number;
     thumbSizeKB: number;
     fullSizeKB: number;
+    backgroundRemoved: boolean;
 }
 
 interface BuildInventoryImagePayloadOptions {
@@ -16,6 +17,7 @@ interface BuildInventoryImagePayloadOptions {
     fullMaxWidth?: number;
     thumbMaxKB?: number;
     fullMaxKB?: number;
+    removeBackground?: boolean;
 }
 
 const DEFAULT_OPTIONS: Required<BuildInventoryImagePayloadOptions> = {
@@ -23,15 +25,51 @@ const DEFAULT_OPTIONS: Required<BuildInventoryImagePayloadOptions> = {
     fullMaxWidth: 1280,
     thumbMaxKB: 60,
     fullMaxKB: 320,
+    removeBackground: false,
 };
 
 function loadImage(file: File): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('No se pudo cargar la imagen seleccionada'));
-        img.src = URL.createObjectURL(file);
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(img);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('No se pudo cargar la imagen seleccionada'));
+        };
+        img.src = objectUrl;
     });
+}
+
+async function tryRemoveBackground(file: File) {
+    try {
+        const form = new FormData();
+        form.append('image', file);
+
+        const response = await fetch('/api/inventory/remove-bg', {
+            method: 'POST',
+            body: form,
+        });
+
+        if (!response.ok) {
+            return { file, backgroundRemoved: false };
+        }
+
+        const blob = await response.blob();
+        if (!blob || blob.size === 0) {
+            return { file, backgroundRemoved: false };
+        }
+
+        const withTransparentBg = new File([blob], `${file.name.replace(/\.[^.]+$/, '')}-nobg.png`, {
+            type: blob.type || 'image/png',
+        });
+        return { file: withTransparentBg, backgroundRemoved: true };
+    } catch {
+        return { file, backgroundRemoved: false };
+    }
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
@@ -124,8 +162,9 @@ export async function buildInventoryImagePayload(
     options: BuildInventoryImagePayloadOptions = {}
 ): Promise<InventoryImagePayload> {
     const opts = { ...DEFAULT_OPTIONS, ...options };
+    const backgroundResult = opts.removeBackground ? await tryRemoveBackground(file) : { file, backgroundRemoved: false };
 
-    const image = await loadImage(file);
+    const image = await loadImage(backgroundResult.file);
     const thumbCanvas = makeSquareThumbCanvas(image, opts.thumbSize);
     const fullCanvas = makeFullCanvas(image, opts.fullMaxWidth);
 
@@ -148,5 +187,6 @@ export async function buildInventoryImagePayload(
         fullHeight: fullCanvas.height,
         thumbSizeKB: Math.round((thumbBlob.size / 1024) * 10) / 10,
         fullSizeKB: Math.round((fullBlob.size / 1024) * 10) / 10,
+        backgroundRemoved: backgroundResult.backgroundRemoved,
     };
 }

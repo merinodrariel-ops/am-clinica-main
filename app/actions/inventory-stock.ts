@@ -137,7 +137,7 @@ async function getAuthAndRole() {
 }
 
 async function fetchProductByCode(supabase: Awaited<ReturnType<typeof createClient>>, code: string) {
-    const fields = 'id, name, brand, category, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at';
+    const fields = 'id, name, brand, category, color, shade, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at';
 
     const byBarcode = await supabase
         .from('products')
@@ -240,9 +240,9 @@ export async function searchInventoryProductsQuick(search: string) {
     const escaped = term.replace(/,/g, ' ');
     const { data, error: queryError } = await supabase
         .from('products')
-        .select('id, name, brand, category, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
+        .select('id, name, brand, category, color, shade, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
         .eq('is_active', true)
-        .or(`name.ilike.%${escaped}%,brand.ilike.%${escaped}%,category.ilike.%${escaped}%,barcode.ilike.%${escaped}%,qr_code.ilike.%${escaped}%`)
+        .or(`name.ilike.%${escaped}%,brand.ilike.%${escaped}%,category.ilike.%${escaped}%,color.ilike.%${escaped}%,shade.ilike.%${escaped}%,barcode.ilike.%${escaped}%,qr_code.ilike.%${escaped}%`)
         .order('name', { ascending: true })
         .limit(8);
 
@@ -341,7 +341,7 @@ export async function getInventoryProductDetail(productId: string) {
 
     const productRes = await supabase
         .from('products')
-        .select('id, name, brand, category, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
+        .select('id, name, brand, category, color, shade, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
         .eq('id', productId)
         .maybeSingle();
 
@@ -409,7 +409,7 @@ export async function listInventoryVisualMatchCandidates(limit = 80) {
     const safeLimit = Math.min(Math.max(Number(limit || 80), 10), 200);
     const { data, error: queryError } = await supabase
         .from('products')
-        .select('id, name, brand, category, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
+        .select('id, name, brand, category, color, shade, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
         .eq('is_active', true)
         .order('updated_at', { ascending: false })
         .limit(safeLimit);

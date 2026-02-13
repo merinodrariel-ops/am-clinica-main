@@ -951,7 +951,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     ? "bg-blue-50 text-blue-600 border-blue-200"
                                     : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                             )}
-                            title={showSidebar ? "Ocultar panel de cobro" : "Mostrar panel de cobro"}
+                            title={showSidebar ? "Expandir lista de ingresos" : "Contraer lista de ingresos"}
                         >
                             <div className="relative">
                                 <Layout size={18} />
@@ -960,7 +960,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 )}
                             </div>
                             <span className="hidden sm:inline">
-                                {showSidebar ? 'Contraer' : 'Expandir'}
+                                {showSidebar ? 'Expandir' : 'Contraer'}
                             </span>
                         </button>
                     </div>
