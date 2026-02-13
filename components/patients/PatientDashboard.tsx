@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FileText,
+    Bell,
     CreditCard,
     ArrowLeft,
     Calendar,
@@ -27,6 +28,7 @@ import clsx from 'clsx';
 import { supabase } from '@/lib/supabase';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
 import PatientCommandCenter from './PatientCommandCenter';
+import PatientCadence from '@/components/recalls/PatientCadence';
 
 interface Movement {
     id: string;
@@ -65,6 +67,7 @@ const TABS = [
     { id: 'financiamiento', label: 'Plan de Pagos', icon: TrendingUp },
     { id: 'pagos', label: 'Historial de Pagos', icon: CreditCard },
     { id: 'planes', label: 'Planes (Presupuestos)', icon: DollarSign },
+    { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
 ];
 
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments }: PatientDashboardProps) {
@@ -745,7 +748,15 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             </tbody>
                                         </table>
                                     )}
+
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Tab: Recalls */}
+                        {activeTab === 'recalls' && (
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
+                                <PatientCadence patientId={patient.id_paciente} />
                             </div>
                         )}
                     </motion.div>

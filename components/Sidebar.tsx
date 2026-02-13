@@ -14,6 +14,7 @@ import {
     Upload,
     Package,
     CalendarDays,
+    Bell,
     EyeOff,
     GitGraph,
     ChevronLeft,
@@ -73,6 +74,12 @@ const MENU_ITEMS = [
         label: 'Workflows',
         href: '/workflows',
         roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio']
+    },
+    {
+        icon: Bell,
+        label: 'Recall Engine',
+        href: '/recalls',
+        roles: ['owner', 'admin', 'reception', 'developer']
     },
 ];
 
