@@ -1292,7 +1292,7 @@ export async function updateMovimientoAdminWithLines(
     const supabase = createClient();
 
     const normalizeLine = (line: MovimientoLinea) => {
-        const importe = Math.max(0, Number(line.importe || 0));
+        const importe = Number(line.importe || 0);
         const moneda = (line.moneda || '').toUpperCase();
         const usdEquivalenteRaw = line.usd_equivalente;
         const usdEquivalente = Number.isFinite(Number(usdEquivalenteRaw))
@@ -1612,18 +1612,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
             if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') multiplier = 1;
             else if (tipo === 'EGRESO' || tipo === 'RETIRO') multiplier = -1;
             else if (tipo === 'CAMBIO_MONEDA') {
-                // Special case usually handled by negative line on source, positive on dest.
-                // If I just sum lines, it depends on if the API negated them.
-                // Assuming createMovimiento stores positive importes.
-                // For Exchange, usually one is Out, one is In. 
-                // Currently I don't have enough info on how Exchange is stored.
-                // Let's assume strict accounting: lines should have signs? 
-                // Or type governs sign?
-                // Given `createMovimiento` logic earlier, it takes `importe`.
-                // I will assume for safe MVP: 
-                // Ignore Cambio Moneda logic for now OR assume lines are applied as is?
-                // Actually, for a Quick View, just In/Out.
-                // I'll skip complex types to avoid error, or default to 0.
+                multiplier = 1;
             }
 
             if (multiplier !== 0) {
