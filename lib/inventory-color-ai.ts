@@ -4,7 +4,6 @@ export interface DetectedInventoryColor {
     label: string;
     confidence: number;
     hex: string;
-    dentalShade: string | null;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -167,14 +166,13 @@ export async function detectInventoryColorFromFile(file: File): Promise<Detected
     const avgHsv = rgbToHsv(avgR, avgG, avgB);
 
     return {
-        label,
-        confidence: Math.round(confidence * 100) / 100,
-        hex: rgbToHex(avgR, avgG, avgB),
-        dentalShade: classifyDentalShade({
+        label: classifyDentalShade({
             h: avgHsv.h,
             s: avgHsv.s,
             v: avgHsv.v,
             label,
         }),
+        confidence: Math.round(confidence * 100) / 100,
+        hex: rgbToHex(avgR, avgG, avgB),
     };
 }

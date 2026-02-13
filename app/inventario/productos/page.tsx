@@ -149,9 +149,16 @@ function ProductsScreen() {
                 fullMaxKB: 220,
             });
 
+            const serverImagePayload = {
+                thumbBase64: payload.thumbBase64,
+                fullBase64: payload.fullBase64,
+                thumbMimeType: payload.thumbMimeType,
+                fullMimeType: payload.fullMimeType,
+            };
+
             const result = await updateInventoryProductImage({
                 id: quickUploadTarget.id,
-                imagePayload: payload,
+                imagePayload: serverImagePayload,
             });
 
             if (!result.success) {
@@ -336,7 +343,6 @@ function ProductsScreen() {
                                         <p className="text-xs text-gray-500 truncate">
                                             {product.brand || 'Sin marca'}
                                             {product.color ? ` - ${product.color}` : ''}
-                                            {product.shade ? ` (${product.shade})` : ''}
                                         </p>
                                         <div className="mt-2 text-xs text-gray-500 space-y-0.5">
                                             <p>Barcode: {product.barcode || 'N/D'}</p>

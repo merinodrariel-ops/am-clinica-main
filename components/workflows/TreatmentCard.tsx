@@ -40,10 +40,25 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
     }
 
     const msPerDay = 1000 * 60 * 60 * 24;
-    const derivedNowMs = new Date(treatment.last_stage_change).getTime() + (daysInStage * msPerDay);
+    const nowMs = new Date(treatment.last_stage_change).getTime() + (daysInStage * msPerDay);
 
-    const milestoneDaysRemaining = treatment.next_milestone_date
-        ? Math.ceil((new Date(treatment.next_milestone_date).getTime() - derivedNowMs) / msPerDay)
+    const treatmentBaseDate = typeof treatment.metadata?.treatment_completed_at === 'string'
+        ? new Date(treatment.metadata.treatment_completed_at)
+        : treatment.start_date
+            ? new Date(treatment.start_date)
+            : null;
+
+    const milestoneDate = treatment.next_milestone_date ? new Date(treatment.next_milestone_date) : null;
+    const appointmentDate = typeof treatment.metadata?.appointment_date === 'string'
+        ? new Date(treatment.metadata.appointment_date)
+        : null;
+
+    const milestoneDaysRemaining = milestoneDate
+        ? Math.ceil((milestoneDate.getTime() - nowMs) / msPerDay)
+        : null;
+
+    const appointmentDaysRemaining = appointmentDate
+        ? Math.ceil((appointmentDate.getTime() - nowMs) / msPerDay)
         : null;
 
     if (milestoneDaysRemaining !== null) {
@@ -55,6 +70,32 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
     }
 
     const slaProgressPercent = timeLimit ? Math.min(100, Math.max(0, Math.round((daysInStage / timeLimit) * 100))) : 0;
+
+    const followUpProgressPercent = treatmentBaseDate && milestoneDate
+        ? Math.min(
+            100,
+            Math.max(
+                0,
+                Math.round(
+                    ((nowMs - treatmentBaseDate.getTime()) /
+                        Math.max(msPerDay, milestoneDate.getTime() - treatmentBaseDate.getTime())) * 100
+                )
+            )
+        )
+        : null;
+
+    const appointmentProgressPercent = appointmentDate && nowMs <= appointmentDate.getTime()
+        ? Math.min(
+            100,
+            Math.max(
+                0,
+                Math.round(
+                    ((nowMs - (treatmentBaseDate?.getTime() || nowMs)) /
+                        Math.max(msPerDay, appointmentDate.getTime() - (treatmentBaseDate?.getTime() || nowMs))) * 100
+                )
+            )
+        )
+        : null;
 
     const metadataType = typeof treatment.metadata?.type === 'string'
         ? treatment.metadata.type
@@ -96,10 +137,10 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
                     <span>{daysInStage}d</span>
                 </div>
 
-                {treatment.next_milestone_date && (
+                {milestoneDate && (
                     <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                         <AlertCircle size={14} />
-                        <span>{new Date(treatment.next_milestone_date).toLocaleDateString()}</span>
+                        <span>{milestoneDate.toLocaleDateString()}</span>
                         {milestoneDaysRemaining !== null ? (
                             <span className={clsx(
                                 'text-[10px] ml-1',
@@ -108,6 +149,23 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
                                 {milestoneDaysRemaining < 0
                                     ? `· Vencido ${Math.abs(milestoneDaysRemaining)}d`
                                     : `· ${milestoneDaysRemaining}d`}
+                            </span>
+                        ) : null}
+                    </div>
+                )}
+
+                {appointmentDate && (
+                    <div className="flex items-center gap-1 text-violet-600 dark:text-violet-400">
+                        <AlertCircle size={14} />
+                        <span>Turno {appointmentDate.toLocaleDateString()}</span>
+                        {appointmentDaysRemaining !== null ? (
+                            <span className={clsx(
+                                'text-[10px] ml-1',
+                                appointmentDaysRemaining < 0 ? 'text-red-600 dark:text-red-400' : appointmentDaysRemaining <= 2 ? 'text-yellow-600 dark:text-yellow-400' : 'text-violet-600 dark:text-violet-400'
+                            )}>
+                                {appointmentDaysRemaining < 0
+                                    ? `· Vencido ${Math.abs(appointmentDaysRemaining)}d`
+                                    : `· ${appointmentDaysRemaining}d`}
                             </span>
                         ) : null}
                     </div>
@@ -140,6 +198,42 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
                                 slaProgressPercent >= 100 ? 'bg-red-500' : slaProgressPercent >= 80 ? 'bg-yellow-500' : 'bg-emerald-500'
                             )}
                             style={{ width: `${slaProgressPercent}%` }}
+                        />
+                    </div>
+                </div>
+            ) : null}
+
+            {followUpProgressPercent !== null ? (
+                <div className="mt-2">
+                    <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400 mb-1">
+                        <span>Cuenta regresiva control</span>
+                        <span>{milestoneDaysRemaining !== null ? `${milestoneDaysRemaining}d` : '-'} </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                        <div
+                            className={clsx(
+                                'h-full transition-all',
+                                followUpProgressPercent >= 100 ? 'bg-red-500' : followUpProgressPercent >= 70 ? 'bg-yellow-500' : 'bg-cyan-500'
+                            )}
+                            style={{ width: `${followUpProgressPercent}%` }}
+                        />
+                    </div>
+                </div>
+            ) : null}
+
+            {appointmentProgressPercent !== null ? (
+                <div className="mt-2">
+                    <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400 mb-1">
+                        <span>Cuenta regresiva turno</span>
+                        <span>{appointmentDaysRemaining !== null ? `${appointmentDaysRemaining}d` : '-'} </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                        <div
+                            className={clsx(
+                                'h-full transition-all',
+                                appointmentProgressPercent >= 100 ? 'bg-red-500' : appointmentProgressPercent >= 80 ? 'bg-amber-500' : 'bg-violet-500'
+                            )}
+                            style={{ width: `${appointmentProgressPercent}%` }}
                         />
                     </div>
                 </div>

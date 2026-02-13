@@ -13,6 +13,7 @@ export interface WorkflowStage {
     notify_on_entry?: boolean | null;
     notify_before_days?: number | null;
     notify_emails?: string[] | null;
+    reminder_windows_days?: number[] | null;
 }
 
 export interface ClinicalWorkflow {

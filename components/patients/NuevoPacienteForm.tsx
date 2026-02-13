@@ -217,7 +217,7 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                Nuevo Paciente
+                                Agregar Paciente
                             </h2>
                             <p className="text-xs text-gray-500">Paso {step} de 3</p>
                         </div>

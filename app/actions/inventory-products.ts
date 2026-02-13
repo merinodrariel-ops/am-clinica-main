@@ -11,7 +11,6 @@ export interface ProductRecord {
     brand: string | null;
     category: string;
     color: string | null;
-    shade: string | null;
     unit: string;
     barcode: string | null;
     qr_code: string | null;
@@ -44,7 +43,6 @@ interface CreateProductInput {
     brand?: string;
     category: string;
     color?: string;
-    shade?: string;
     unit: string;
     barcode?: string;
     qrCode?: string;
@@ -61,7 +59,6 @@ interface UpdateProductInput {
     brand?: string;
     category: string;
     color?: string;
-    shade?: string;
     unit: string;
     barcode?: string;
     qrCode?: string;
@@ -167,14 +164,14 @@ export async function listInventoryProducts(filters: ProductListFilters = {}) {
 
     let query = authClient
         .from('products')
-        .select('id, name, brand, category, color, shade, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
+        .select('id, name, brand, category, color, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
         .order('name', { ascending: true })
         .limit(500);
 
     const search = sanitizeOptionalText(filters.search);
     if (search) {
         const escapedSearch = search.replace(/,/g, ' ');
-        query = query.or(`name.ilike.%${escapedSearch}%,brand.ilike.%${escapedSearch}%,category.ilike.%${escapedSearch}%,color.ilike.%${escapedSearch}%,shade.ilike.%${escapedSearch}%,barcode.ilike.%${escapedSearch}%,qr_code.ilike.%${escapedSearch}%`);
+        query = query.or(`name.ilike.%${escapedSearch}%,brand.ilike.%${escapedSearch}%,category.ilike.%${escapedSearch}%,color.ilike.%${escapedSearch}%,barcode.ilike.%${escapedSearch}%,qr_code.ilike.%${escapedSearch}%`);
     }
 
     const category = sanitizeOptionalText(filters.category);
@@ -200,193 +197,212 @@ export async function listInventoryProducts(filters: ProductListFilters = {}) {
 }
 
 export async function createInventoryProduct(input: CreateProductInput) {
-    const auth = await getSessionRole();
-    if (auth.error || !auth.user) {
-        return { success: false, error: auth.error || 'Sesion invalida' };
-    }
-
-    if (!['owner', 'admin'].includes(auth.role || '')) {
-        return { success: false, error: 'Solo Admin/Dueno puede crear productos.' };
-    }
-
-    const name = sanitizeRequiredText(input.name || '');
-    const category = sanitizeRequiredText(input.category || '');
-    const unit = sanitizeRequiredText(input.unit || '');
-
-    if (!name || !category || !unit) {
-        return { success: false, error: 'Completa nombre, categoria y unidad.' };
-    }
-
-    const writeClient = getWriteClient() || (await createClient());
-
-    let imageThumbUrl: string | null = null;
-    let imageFullUrl: string | null = null;
-
-    if (input.imagePayload) {
-        const upload = await uploadProductImages(name, input.imagePayload);
-        if (!upload.success) {
-            return { success: false, error: upload.error };
+    try {
+        const auth = await getSessionRole();
+        if (auth.error || !auth.user) {
+            return { success: false, error: auth.error || 'Sesion invalida' };
         }
 
-        imageThumbUrl = upload.thumbUrl;
-        imageFullUrl = upload.fullUrl;
-    }
-
-    const barcode = sanitizeOptionalText(input.barcode);
-    const qrCode = sanitizeOptionalText(input.qrCode) || buildInternalQrCode();
-    const stockInitial = Math.max(0, Number(input.stockInitial || 0));
-
-    const insertPayload = {
-        name,
-        brand: sanitizeOptionalText(input.brand),
-        category,
-        color: sanitizeOptionalText(input.color),
-        shade: sanitizeOptionalText(input.shade),
-        unit,
-        barcode,
-        qr_code: qrCode,
-        image_thumb_url: imageThumbUrl,
-        image_full_url: imageFullUrl,
-        notes: sanitizeOptionalText(input.notes),
-        stock_current: stockInitial,
-        threshold_min: input.thresholdMin ?? null,
-        is_active: input.isActive !== false,
-        created_by: auth.user.id,
-        updated_by: auth.user.id,
-    };
-
-    const { data, error } = await writeClient
-        .from('products')
-        .insert(insertPayload)
-        .select('id')
-        .single();
-
-    if (error) {
-        if (error.code === '23505') {
-            return { success: false, error: 'Ya existe un producto con ese barcode o QR.' };
+        if (!['owner', 'admin'].includes(auth.role || '')) {
+            return { success: false, error: 'Solo Admin/Dueno puede crear productos.' };
         }
-        return { success: false, error: error.message };
+
+        const name = sanitizeRequiredText(input.name || '');
+        const category = sanitizeRequiredText(input.category || '');
+        const unit = sanitizeRequiredText(input.unit || '');
+
+        if (!name || !category || !unit) {
+            return { success: false, error: 'Completa nombre, categoria y unidad.' };
+        }
+
+        const writeClient = getWriteClient() || (await createClient());
+
+        let imageThumbUrl: string | null = null;
+        let imageFullUrl: string | null = null;
+
+        if (input.imagePayload) {
+            const upload = await uploadProductImages(name, input.imagePayload);
+            if (!upload.success) {
+                return { success: false, error: upload.error };
+            }
+
+            imageThumbUrl = upload.thumbUrl;
+            imageFullUrl = upload.fullUrl;
+        }
+
+        const barcode = sanitizeOptionalText(input.barcode);
+        const qrCode = sanitizeOptionalText(input.qrCode) || buildInternalQrCode();
+        const stockInitial = Math.max(0, Number(input.stockInitial || 0));
+
+        const insertPayload = {
+            name,
+            brand: sanitizeOptionalText(input.brand),
+            category,
+            color: sanitizeOptionalText(input.color),
+            unit,
+            barcode,
+            qr_code: qrCode,
+            image_thumb_url: imageThumbUrl,
+            image_full_url: imageFullUrl,
+            notes: sanitizeOptionalText(input.notes),
+            stock_current: stockInitial,
+            threshold_min: input.thresholdMin ?? null,
+            is_active: input.isActive !== false,
+            created_by: auth.user.id,
+            updated_by: auth.user.id,
+        };
+
+        const { data, error } = await writeClient
+            .from('products')
+            .insert(insertPayload)
+            .select('id')
+            .single();
+
+        if (error) {
+            if (error.code === '23505') {
+                return { success: false, error: 'Ya existe un producto con ese barcode o QR.' };
+            }
+            return { success: false, error: error.message };
+        }
+
+        revalidatePath('/inventario/productos');
+        revalidatePath('/inventario');
+
+        return { success: true, productId: data.id };
+    } catch (error: unknown) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'No se pudo crear el producto',
+        };
     }
-
-    revalidatePath('/inventario/productos');
-    revalidatePath('/inventario');
-
-    return { success: true, productId: data.id };
 }
 
 export async function updateInventoryProduct(input: UpdateProductInput) {
-    const auth = await getSessionRole();
-    if (auth.error || !auth.user) {
-        return { success: false, error: auth.error || 'Sesion invalida' };
-    }
-
-    if (!['owner', 'admin'].includes(auth.role || '')) {
-        return { success: false, error: 'Solo Admin/Dueno puede editar productos.' };
-    }
-
-    const name = sanitizeRequiredText(input.name || '');
-    const category = sanitizeRequiredText(input.category || '');
-    const unit = sanitizeRequiredText(input.unit || '');
-
-    if (!name || !category || !unit) {
-        return { success: false, error: 'Completa nombre, categoria y unidad.' };
-    }
-
-    const writeClient = getWriteClient() || (await createClient());
-
-    let imagePatch: { image_thumb_url?: string | null; image_full_url?: string | null } = {};
-    if (input.imagePayload) {
-        const upload = await uploadProductImages(name, input.imagePayload);
-        if (!upload.success) {
-            return { success: false, error: upload.error };
+    try {
+        const auth = await getSessionRole();
+        if (auth.error || !auth.user) {
+            return { success: false, error: auth.error || 'Sesion invalida' };
         }
 
-        imagePatch = {
-            image_thumb_url: upload.thumbUrl,
-            image_full_url: upload.fullUrl,
+        if (!['owner', 'admin'].includes(auth.role || '')) {
+            return { success: false, error: 'Solo Admin/Dueno puede editar productos.' };
+        }
+
+        const name = sanitizeRequiredText(input.name || '');
+        const category = sanitizeRequiredText(input.category || '');
+        const unit = sanitizeRequiredText(input.unit || '');
+
+        if (!name || !category || !unit) {
+            return { success: false, error: 'Completa nombre, categoria y unidad.' };
+        }
+
+        const writeClient = getWriteClient() || (await createClient());
+
+        let imagePatch: { image_thumb_url?: string | null; image_full_url?: string | null } = {};
+        if (input.imagePayload) {
+            const upload = await uploadProductImages(name, input.imagePayload);
+            if (!upload.success) {
+                return { success: false, error: upload.error };
+            }
+
+            imagePatch = {
+                image_thumb_url: upload.thumbUrl,
+                image_full_url: upload.fullUrl,
+            };
+        }
+
+        const patchPayload = {
+            name,
+            brand: sanitizeOptionalText(input.brand),
+            category,
+            color: sanitizeOptionalText(input.color),
+            unit,
+            barcode: sanitizeOptionalText(input.barcode),
+            qr_code: sanitizeOptionalText(input.qrCode),
+            threshold_min: input.thresholdMin ?? null,
+            is_active: input.isActive !== false,
+            updated_by: auth.user.id,
+            notes: sanitizeOptionalText(input.notes),
+            ...imagePatch,
+        };
+
+        const { error } = await writeClient
+            .from('products')
+            .update(patchPayload)
+            .eq('id', input.id);
+
+        if (error) {
+            if (error.code === '23505') {
+                return { success: false, error: 'Ya existe un producto con ese barcode o QR.' };
+            }
+            return { success: false, error: error.message };
+        }
+
+        revalidatePath('/inventario/productos');
+        revalidatePath('/inventario');
+
+        return { success: true };
+    } catch (error: unknown) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'No se pudo actualizar el producto',
         };
     }
-
-    const patchPayload = {
-        name,
-        brand: sanitizeOptionalText(input.brand),
-        category,
-        color: sanitizeOptionalText(input.color),
-        shade: sanitizeOptionalText(input.shade),
-        unit,
-        barcode: sanitizeOptionalText(input.barcode),
-        qr_code: sanitizeOptionalText(input.qrCode),
-        threshold_min: input.thresholdMin ?? null,
-        is_active: input.isActive !== false,
-        updated_by: auth.user.id,
-        notes: sanitizeOptionalText(input.notes),
-        ...imagePatch,
-    };
-
-    const { error } = await writeClient
-        .from('products')
-        .update(patchPayload)
-        .eq('id', input.id);
-
-    if (error) {
-        if (error.code === '23505') {
-            return { success: false, error: 'Ya existe un producto con ese barcode o QR.' };
-        }
-        return { success: false, error: error.message };
-    }
-
-    revalidatePath('/inventario/productos');
-    revalidatePath('/inventario');
-
-    return { success: true };
 }
 
 export async function updateInventoryProductImage(input: {
     id: string;
     imagePayload: ProductImagePayload;
 }) {
-    const auth = await getSessionRole();
-    if (auth.error || !auth.user) {
-        return { success: false, error: auth.error || 'Sesion invalida' };
+    try {
+        const auth = await getSessionRole();
+        if (auth.error || !auth.user) {
+            return { success: false, error: auth.error || 'Sesion invalida' };
+        }
+
+        if (!['owner', 'admin'].includes(auth.role || '')) {
+            return { success: false, error: 'Solo Admin/Dueno puede actualizar imagenes.' };
+        }
+
+        const writeClient = getWriteClient() || (await createClient());
+
+        const { data: current, error: currentError } = await writeClient
+            .from('products')
+            .select('id, name')
+            .eq('id', input.id)
+            .maybeSingle();
+
+        if (currentError || !current) {
+            return { success: false, error: currentError?.message || 'Producto no encontrado.' };
+        }
+
+        const upload = await uploadProductImages(current.name || 'producto', input.imagePayload);
+        if (!upload.success) {
+            return { success: false, error: upload.error };
+        }
+
+        const { error } = await writeClient
+            .from('products')
+            .update({
+                image_thumb_url: upload.thumbUrl,
+                image_full_url: upload.fullUrl,
+                updated_by: auth.user.id,
+            })
+            .eq('id', input.id);
+
+        if (error) {
+            return { success: false, error: error.message };
+        }
+
+        revalidatePath('/inventario/productos');
+        revalidatePath('/inventario');
+        revalidatePath(`/inventario/productos/${input.id}`);
+
+        return { success: true };
+    } catch (error: unknown) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'No se pudo actualizar imagen del producto',
+        };
     }
-
-    if (!['owner', 'admin'].includes(auth.role || '')) {
-        return { success: false, error: 'Solo Admin/Dueno puede actualizar imagenes.' };
-    }
-
-    const writeClient = getWriteClient() || (await createClient());
-
-    const { data: current, error: currentError } = await writeClient
-        .from('products')
-        .select('id, name')
-        .eq('id', input.id)
-        .maybeSingle();
-
-    if (currentError || !current) {
-        return { success: false, error: currentError?.message || 'Producto no encontrado.' };
-    }
-
-    const upload = await uploadProductImages(current.name || 'producto', input.imagePayload);
-    if (!upload.success) {
-        return { success: false, error: upload.error };
-    }
-
-    const { error } = await writeClient
-        .from('products')
-        .update({
-            image_thumb_url: upload.thumbUrl,
-            image_full_url: upload.fullUrl,
-            updated_by: auth.user.id,
-        })
-        .eq('id', input.id);
-
-    if (error) {
-        return { success: false, error: error.message };
-    }
-
-    revalidatePath('/inventario/productos');
-    revalidatePath('/inventario');
-    revalidatePath(`/inventario/productos/${input.id}`);
-
-    return { success: true };
 }

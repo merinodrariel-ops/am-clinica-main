@@ -14,6 +14,8 @@ interface WorkflowNotificationsModalProps {
 function formatEventType(eventType: string) {
     if (eventType === 'stage_entry') return 'Ingreso a etapa';
     if (eventType === 'sla_due_soon') return 'SLA por vencer';
+    if (eventType.includes('appointment_due')) return eventType.includes('_staff') ? 'Recordatorio de turno (staff)' : 'Recordatorio de turno (paciente)';
+    if (eventType.includes('milestone_due')) return eventType.includes('_staff') ? 'Control recomendado (staff)' : 'Control recomendado (paciente)';
     return eventType;
 }
 
@@ -45,10 +47,10 @@ export function WorkflowNotificationsModal({ workflowId, workflowName }: Workflo
         setRunning(true);
         try {
             const result = await runWorkflowSlaReminders();
-            toast.success(`Recordatorios SLA ejecutados: ${result.sent} enviados`);
+            toast.success(`Recordatorios ejecutados: ${result.sent} enviados`);
             await loadLog();
         } catch {
-            toast.error('No se pudieron ejecutar recordatorios SLA');
+            toast.error('No se pudieron ejecutar recordatorios');
         } finally {
             setRunning(false);
         }
@@ -70,7 +72,7 @@ export function WorkflowNotificationsModal({ workflowId, workflowName }: Workflo
                         <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/50">
                             <div>
                                 <h3 className="font-semibold text-gray-900 dark:text-white">Notificaciones de {workflowName}</h3>
-                                <p className="text-xs text-gray-500">Historial y ejecucion manual de recordatorios SLA</p>
+                                <p className="text-xs text-gray-500">Historial y ejecucion manual de recordatorios por columna</p>
                             </div>
                             <button
                                 onClick={() => setIsOpen(false)}
@@ -87,7 +89,7 @@ export function WorkflowNotificationsModal({ workflowId, workflowName }: Workflo
                                 className="px-3 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
                             >
                                 {running ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
-                                Ejecutar SLA ahora
+                                Ejecutar recordatorios ahora
                             </button>
 
                             <button

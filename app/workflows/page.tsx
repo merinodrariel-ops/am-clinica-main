@@ -63,6 +63,7 @@ export default async function WorkflowsPage({ searchParams }: { searchParams: Pr
                             workflowType={activeWorkflow.type}
                             workflowFrequencyMonths={activeWorkflow.frequency_months || null}
                             initialStageId={activeWorkflow.stages[0]?.id || null}
+                            workflowStages={activeWorkflow.stages}
                         />
                     </div>
                 )}

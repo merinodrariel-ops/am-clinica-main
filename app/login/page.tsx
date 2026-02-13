@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { signInWithGoogleOAuth } from '@/lib/googleAuthService';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
@@ -14,12 +15,15 @@ function LoginForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [magicLoading, setMagicLoading] = useState(false);
+    const [magicNotice, setMagicNotice] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setMagicNotice(null);
 
         try {
             const { error } = await supabase.auth.signInWithPassword({
@@ -39,6 +43,41 @@ function LoginForm() {
         }
     };
 
+    const handleMagicLink = async () => {
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!normalizedEmail) {
+            setError('Ingresá tu email para recibir el Magic Link');
+            return;
+        }
+
+        setMagicLoading(true);
+        setError(null);
+        setMagicNotice(null);
+
+        try {
+            const callbackUrl = new URL('/auth/callback', location.origin);
+            callbackUrl.searchParams.set('next', redirectPath);
+
+            const { error: otpError } = await supabase.auth.signInWithOtp({
+                email: normalizedEmail,
+                options: {
+                    emailRedirectTo: callbackUrl.toString(),
+                    shouldCreateUser: true,
+                },
+            });
+
+            if (otpError) {
+                setError(otpError.message);
+            } else {
+                setMagicNotice('Te enviamos un enlace magico a tu email. Revisa bandeja y spam.');
+            }
+        } catch {
+            setError('No se pudo enviar el Magic Link');
+        } finally {
+            setMagicLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
             <div className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
@@ -54,13 +93,14 @@ function LoginForm() {
                     <button
                         onClick={async () => {
                             setLoading(true);
-                            await supabase.auth.signInWithOAuth({
-                                provider: 'google',
-                                options: {
-                                    redirectTo: `${location.origin}/auth/callback`,
-                                    scopes: 'https://www.googleapis.com/auth/calendar'
-                                },
+                            setError(null);
+                            const { error } = await signInWithGoogleOAuth({
+                                nextPath: redirectPath,
                             });
+                            if (error) {
+                                setError(error.message);
+                                setLoading(false);
+                            }
                         }}
                         type="button"
                         className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
@@ -138,6 +178,12 @@ function LoginForm() {
                         </div>
                     )}
 
+                    {magicNotice && (
+                        <div className="text-emerald-700 dark:text-emerald-300 text-sm text-center bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded">
+                            {magicNotice}
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-end">
                         <div className="text-sm">
                             <a href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500 hover:underline">
@@ -149,13 +195,28 @@ function LoginForm() {
                     <div>
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || magicLoading}
                             className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {loading ? (
                                 <Loader2 className="animate-spin h-5 w-5" />
                             ) : (
                                 'Iniciar Sesión'
+                            )}
+                        </button>
+                    </div>
+
+                    <div>
+                        <button
+                            type="button"
+                            onClick={handleMagicLink}
+                            disabled={loading || magicLoading}
+                            className="group relative w-full flex justify-center py-2 px-4 border border-blue-200 dark:border-blue-700 text-sm font-medium rounded-md text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {magicLoading ? (
+                                <Loader2 className="animate-spin h-5 w-5" />
+                            ) : (
+                                'Ingresar con Magic Link'
                             )}
                         </button>
                     </div>

@@ -5,7 +5,7 @@ import { createTreatment, getPatients } from '@/app/actions/clinical-workflows';
 import { Plus, X, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import type { PatientSearchResult, WorkflowType } from './types';
+import type { PatientSearchResult, WorkflowType, WorkflowStage } from './types';
 
 interface NewTreatmentModalProps {
     workflowId: string;
@@ -13,7 +13,25 @@ interface NewTreatmentModalProps {
     workflowType: WorkflowType;
     workflowFrequencyMonths?: number | null;
     initialStageId: string | null;
+    workflowStages: WorkflowStage[];
     onSuccess?: () => void;
+}
+
+function parseReminderDays(value: string, fallback: number[]) {
+    const parsed = value
+        .split(',')
+        .map(item => Number(item.trim()))
+        .filter(item => Number.isFinite(item) && item > 0)
+        .slice(0, 3)
+        .sort((a, b) => b - a);
+
+    return parsed.length ? parsed : fallback;
+}
+
+function toIsoDateAtNoon(dateInput: string) {
+    if (!dateInput) return new Date().toISOString();
+    const base = new Date(`${dateInput}T12:00:00`);
+    return Number.isNaN(base.getTime()) ? new Date().toISOString() : base.toISOString();
 }
 
 export function NewTreatmentModal({
@@ -22,6 +40,7 @@ export function NewTreatmentModal({
     workflowType,
     workflowFrequencyMonths,
     initialStageId,
+    workflowStages,
     onSuccess,
 }: NewTreatmentModalProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -31,10 +50,18 @@ export function NewTreatmentModal({
     const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null);
     const [searching, setSearching] = useState(false);
     const [recurrenceMonths, setRecurrenceMonths] = useState<number>(workflowFrequencyMonths || 6);
+    const [treatmentDate, setTreatmentDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [selectedStageId, setSelectedStageId] = useState<string | null>(initialStageId);
+    const [appointmentDate, setAppointmentDate] = useState('');
+    const [waitingRemindersText, setWaitingRemindersText] = useState('30,14,3');
+    const [appointmentRemindersText, setAppointmentRemindersText] = useState('7,2,1');
     const router = useRouter();
 
     const isRecurrentWorkflow = workflowType === 'recurrent';
     const isBotoxWorkflow = workflowName.toLowerCase().includes('botox');
+    const isBookingStage = (workflowStages.find(stage => stage.id === selectedStageId)?.name || '')
+        .toLowerCase()
+        .includes('agend');
 
     useEffect(() => {
         if (isBotoxWorkflow) {
@@ -49,11 +76,18 @@ export function NewTreatmentModal({
         }
     }, [isBotoxWorkflow, workflowFrequencyMonths]);
 
+    useEffect(() => {
+        setSelectedStageId(initialStageId);
+    }, [initialStageId]);
+
     const previewNextMilestone = React.useMemo(() => {
-        const next = new Date();
+        const next = new Date(`${treatmentDate}T12:00:00`);
+        if (Number.isNaN(next.getTime())) {
+            return new Date();
+        }
         next.setMonth(next.getMonth() + recurrenceMonths);
         return next;
-    }, [recurrenceMonths]);
+    }, [recurrenceMonths, treatmentDate]);
 
     // Debounce search
     useEffect(() => {
@@ -77,22 +111,33 @@ export function NewTreatmentModal({
     }, [searchTerm, selectedPatient]);
 
     const handleSubmit = async () => {
-        if (!selectedPatient || !initialStageId) return;
+        if (!selectedPatient || !selectedStageId) return;
 
         setIsLoading(true);
         try {
+            const waitingReminderDays = parseReminderDays(
+                waitingRemindersText,
+                isBotoxWorkflow ? [30, 14, 3] : [30, 14, 3]
+            );
+            const appointmentReminderDays = parseReminderDays(appointmentRemindersText, [7, 2, 1]);
+
             const metadata = isRecurrentWorkflow
                 ? {
                     recurrence_interval_months: recurrenceMonths,
                     type: isBotoxWorkflow ? `Botox ${recurrenceMonths}m` : 'Control recurrente',
                     recurrence_origin: 'manual_creation',
+                    treatment_completed_at: toIsoDateAtNoon(treatmentDate),
+                    waiting_reminder_days: waitingReminderDays,
+                    appointment_reminder_days: appointmentReminderDays,
+                    appointment_date: appointmentDate ? toIsoDateAtNoon(appointmentDate) : null,
                 }
                 : undefined;
 
             await createTreatment({
                 patient_id: selectedPatient.id_paciente,
                 workflow_id: workflowId,
-                initial_stage_id: initialStageId,
+                initial_stage_id: selectedStageId,
+                start_date: isRecurrentWorkflow ? toIsoDateAtNoon(treatmentDate) : undefined,
                 next_milestone_date: isRecurrentWorkflow ? previewNextMilestone.toISOString() : undefined,
                 metadata,
             });
@@ -101,6 +146,7 @@ export function NewTreatmentModal({
             setIsOpen(false);
             setSelectedPatient(null);
             setSearchTerm('');
+            setAppointmentDate('');
             router.refresh();
             if (onSuccess) onSuccess();
         } catch (error: unknown) {
@@ -141,20 +187,90 @@ export function NewTreatmentModal({
                 <div className="p-4 space-y-4">
                     {isRecurrentWorkflow && (
                         <div className="rounded-lg border border-blue-100 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-900/10 p-3">
-                            <label className="block text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
-                                Frecuencia del recordatorio
-                            </label>
-                            <select
-                                value={recurrenceMonths}
-                                onChange={(e) => setRecurrenceMonths(Number(e.target.value))}
-                                className="w-full rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-                            >
-                                {(isBotoxWorkflow ? [3, 4] : [3, 4, 6, 12]).map(months => (
-                                    <option key={months} value={months}>{months} meses</option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
-                                Proximo recordatorio estimado: {previewNextMilestone.toLocaleDateString('es-AR')}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                                        Fecha del tratamiento
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={treatmentDate}
+                                        onChange={e => setTreatmentDate(e.target.value)}
+                                        className="w-full rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                                        Frecuencia de control
+                                    </label>
+                                    <select
+                                        value={recurrenceMonths}
+                                        onChange={(e) => setRecurrenceMonths(Number(e.target.value))}
+                                        className="w-full rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    >
+                                        {(isBotoxWorkflow ? [3, 4] : [3, 4, 6, 12]).map(months => (
+                                            <option key={months} value={months}>{months} meses</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                                        Columna inicial
+                                    </label>
+                                    <select
+                                        value={selectedStageId || ''}
+                                        onChange={e => setSelectedStageId(e.target.value || null)}
+                                        className="w-full rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    >
+                                        {workflowStages.map(stage => (
+                                            <option key={stage.id} value={stage.id}>{stage.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                                        Fecha de turno (si ya esta agendado)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={appointmentDate}
+                                        onChange={e => setAppointmentDate(e.target.value)}
+                                        className="w-full rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                        placeholder="Opcional"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                                        Recordatorios (Pendiente) hasta 3
+                                    </label>
+                                    <input
+                                        value={waitingRemindersText}
+                                        onChange={e => setWaitingRemindersText(e.target.value)}
+                                        className="w-full rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                        placeholder="30,14,3"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                                        Recordatorios (Turno Agendado) hasta 3
+                                    </label>
+                                    <input
+                                        value={appointmentRemindersText}
+                                        onChange={e => setAppointmentRemindersText(e.target.value)}
+                                        className="w-full rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                        placeholder="7,2,1"
+                                    />
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-blue-700 dark:text-blue-300 mt-3">
+                                Proximo control estimado: {previewNextMilestone.toLocaleDateString('es-AR')}.
+                                {isBookingStage && !appointmentDate ? ' Esta en Turno Agendado: te conviene definir la fecha del turno.' : ''}
                             </p>
                         </div>
                     )}
@@ -233,7 +349,7 @@ export function NewTreatmentModal({
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={!selectedPatient || isLoading}
+                        disabled={!selectedPatient || isLoading || !selectedStageId}
                         className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                     >
                         {isLoading && <Loader2 className="animate-spin" size={16} />}

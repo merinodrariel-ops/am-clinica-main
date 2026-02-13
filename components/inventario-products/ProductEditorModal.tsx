@@ -27,22 +27,21 @@ interface ProductEditorModalProps {
 
 const UNIT_OPTIONS = ['unidad', 'caja', 'ml', 'gr', 'pack', 'kit'];
 const COLOR_SUGGESTIONS = [
-    'Blanco',
-    'Negro',
-    'Transparente',
-    'Gris',
-    'Azul',
-    'Verde',
-    'Rosa',
-    'Dorado',
-    'Plateado',
-    'Nude',
-    'Rojo',
-    'Naranja',
-    'Amarillo',
-    'Violeta',
+    'A1',
+    'A2',
+    'A3',
+    'A3.5',
+    'A4',
+    'B1',
+    'B2',
+    'B3',
+    'C1',
+    'C2',
+    'D2',
+    'D3',
+    'BL1',
+    'BL2',
 ];
-const SHADE_SUGGESTIONS = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'C1', 'C2', 'D2', 'D3', 'BL1', 'BL2'];
 
 export default function ProductEditorModal({
     isOpen,
@@ -64,7 +63,6 @@ export default function ProductEditorModal({
         brand: product?.brand || '',
         category: product?.category || 'Insumos Clinicos',
         color: product?.color || '',
-        shade: product?.shade || '',
         unit: product?.unit || 'unidad',
         barcode: product?.barcode || '',
         qrCode: product?.qr_code || '',
@@ -83,7 +81,6 @@ export default function ProductEditorModal({
             brand: product?.brand || '',
             category: product?.category || 'Insumos Clinicos',
             color: product?.color || '',
-            shade: product?.shade || '',
             unit: product?.unit || 'unidad',
             barcode: product?.barcode || '',
             qrCode: product?.qr_code || '',
@@ -117,11 +114,8 @@ export default function ProductEditorModal({
 
             if (colorSuggestion) {
                 setForm(prev => {
-                    return {
-                        ...prev,
-                        color: prev.color.trim() ? prev.color : colorSuggestion.label,
-                        shade: prev.shade.trim() ? prev.shade : (colorSuggestion.dentalShade || ''),
-                    };
+                    if (prev.color.trim()) return prev;
+                    return { ...prev, color: colorSuggestion.label };
                 });
             }
 
@@ -147,19 +141,26 @@ export default function ProductEditorModal({
     }
 
     async function submitForm() {
+        const serverImagePayload = imagePayload
+            ? {
+                thumbBase64: imagePayload.thumbBase64,
+                fullBase64: imagePayload.fullBase64,
+                thumbMimeType: imagePayload.thumbMimeType,
+                fullMimeType: imagePayload.fullMimeType,
+            }
+            : null;
 
         const payloadBase = {
             name: form.name,
             brand: form.brand,
             category: form.category,
             color: form.color,
-            shade: form.shade,
             unit: form.unit,
             barcode: form.barcode,
             qrCode: form.qrCode,
             notes: form.notes,
             thresholdMin: form.thresholdMin ? Number(form.thresholdMin) : null,
-            imagePayload,
+            imagePayload: serverImagePayload,
             isActive: form.isActive,
         };
 
@@ -249,12 +250,12 @@ export default function ProductEditorModal({
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Subcategoria color</label>
+                            <label className="block text-sm font-medium mb-1">Color dental</label>
                             <input
                                 value={form.color}
                                 onChange={(event) => setForm(prev => ({ ...prev, color: event.target.value }))}
                                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                                placeholder="Ej: Transparente"
+                                placeholder="Ej: A2"
                                 list="inventory-color-options"
                             />
                             <datalist id="inventory-color-options">
@@ -281,38 +282,13 @@ export default function ProductEditorModal({
                                     />
                                     <button
                                         type="button"
-                                        onClick={() => setForm(prev => ({
-                                            ...prev,
-                                            color: detectedColor.label,
-                                            shade: detectedColor.dentalShade || prev.shade,
-                                        }))}
+                                        onClick={() => setForm(prev => ({ ...prev, color: detectedColor.label }))}
                                         className="text-blue-600 hover:underline"
                                     >
                                         Aplicar
                                     </button>
-                                    {detectedColor.dentalShade && (
-                                        <span className="px-2 py-1 rounded-full border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 font-semibold">
-                                            Tono: {detectedColor.dentalShade}
-                                        </span>
-                                    )}
                                 </div>
                             )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Tono dental</label>
-                            <input
-                                value={form.shade}
-                                onChange={(event) => setForm(prev => ({ ...prev, shade: event.target.value }))}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                                placeholder="Ej: A2"
-                                list="inventory-shade-options"
-                            />
-                            <datalist id="inventory-shade-options">
-                                {SHADE_SUGGESTIONS.map(shade => (
-                                    <option key={shade} value={shade} />
-                                ))}
-                            </datalist>
                         </div>
 
                         <div>

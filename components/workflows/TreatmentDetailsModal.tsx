@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import { X, Calendar, User, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { X, Calendar, User, Clock, AlertCircle, Trash2, Save, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { deleteTreatment, getTreatmentHistory } from '@/app/actions/clinical-workflows';
+import { deleteTreatment, getTreatmentHistory, updateTreatmentFollowUpConfig } from '@/app/actions/clinical-workflows';
 import { toast } from 'sonner';
 import type { PatientTreatment, TreatmentHistoryEntry } from './types';
 
@@ -15,6 +15,7 @@ interface TreatmentDetailsModalProps {
 
 export function TreatmentDetailsModal({ treatment, onClose }: TreatmentDetailsModalProps) {
     const [isDeleting, setIsDeleting] = React.useState(false);
+    const [isSavingFollowUp, setIsSavingFollowUp] = React.useState(false);
     const [history, setHistory] = React.useState<TreatmentHistoryEntry[]>([]);
     const [historyLoading, setHistoryLoading] = React.useState(true);
 
@@ -72,6 +73,70 @@ export function TreatmentDetailsModal({ treatment, onClose }: TreatmentDetailsMo
     const recurrenceInterval = typeof treatment.metadata?.recurrence_interval_months === 'number'
         ? treatment.metadata.recurrence_interval_months
         : null;
+
+    const initialTreatmentDate = (() => {
+        const metadataValue = typeof treatment.metadata?.treatment_completed_at === 'string'
+            ? treatment.metadata.treatment_completed_at
+            : createdAt;
+        if (!metadataValue) return new Date().toISOString().slice(0, 10);
+        return new Date(metadataValue).toISOString().slice(0, 10);
+    })();
+
+    const initialAppointmentDate = (() => {
+        const value = typeof treatment.metadata?.appointment_date === 'string'
+            ? treatment.metadata.appointment_date
+            : null;
+        return value ? new Date(value).toISOString().slice(0, 10) : '';
+    })();
+
+    const initialWaitingReminders = Array.isArray(treatment.metadata?.waiting_reminder_days)
+        ? treatment.metadata.waiting_reminder_days.join(',')
+        : '30,14,3';
+
+    const initialAppointmentReminders = Array.isArray(treatment.metadata?.appointment_reminder_days)
+        ? treatment.metadata.appointment_reminder_days.join(',')
+        : '7,2,1';
+
+    const [followUpDate, setFollowUpDate] = React.useState(initialTreatmentDate);
+    const [followUpMonths, setFollowUpMonths] = React.useState(String(recurrenceInterval || 6));
+    const [appointmentDate, setAppointmentDate] = React.useState(initialAppointmentDate);
+    const [waitingReminders, setWaitingReminders] = React.useState(initialWaitingReminders);
+    const [appointmentReminders, setAppointmentReminders] = React.useState(initialAppointmentReminders);
+
+    const isRecurrent = Boolean(recurrenceInterval || treatment.next_milestone_date);
+
+    async function handleSaveFollowUp() {
+        setIsSavingFollowUp(true);
+        try {
+            const parseList = (value: string, fallback: number[]) => {
+                const parsed = value
+                    .split(',')
+                    .map(item => Number(item.trim()))
+                    .filter(item => Number.isFinite(item) && item > 0)
+                    .slice(0, 3);
+                return parsed.length ? parsed : fallback;
+            };
+
+            const result = await updateTreatmentFollowUpConfig({
+                treatmentId: treatment.id,
+                treatmentDate: followUpDate,
+                recurrenceMonths: Number(followUpMonths || 0),
+                appointmentDate: appointmentDate || null,
+                waitingReminderDays: parseList(waitingReminders, [30, 14, 3]),
+                appointmentReminderDays: parseList(appointmentReminders, [7, 2, 1]),
+            });
+
+            if (!result.success) {
+                throw new Error('No se pudo guardar configuracion recurrente');
+            }
+
+            toast.success('Configuracion recurrente actualizada');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo guardar configuracion');
+        } finally {
+            setIsSavingFollowUp(false);
+        }
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -163,6 +228,73 @@ export function TreatmentDetailsModal({ treatment, onClose }: TreatmentDetailsMo
                             ) : null}
                         </div>
                     </div>
+
+                    {isRecurrent ? (
+                        <div className="rounded-xl border border-violet-100 dark:border-violet-900/40 bg-violet-50/60 dark:bg-violet-900/10 p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-violet-900 dark:text-violet-200">Control recurrente y recordatorios</h3>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-violet-700 dark:text-violet-300 block mb-1">Fecha del ultimo tratamiento</label>
+                                    <input
+                                        type="date"
+                                        value={followUpDate}
+                                        onChange={event => setFollowUpDate(event.target.value)}
+                                        className="w-full rounded-lg border border-violet-200 dark:border-violet-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-violet-700 dark:text-violet-300 block mb-1">Frecuencia (meses)</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={24}
+                                        value={followUpMonths}
+                                        onChange={event => setFollowUpMonths(event.target.value)}
+                                        className="w-full rounded-lg border border-violet-200 dark:border-violet-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-violet-700 dark:text-violet-300 block mb-1">Fecha de turno (si aplica)</label>
+                                    <input
+                                        type="date"
+                                        value={appointmentDate}
+                                        onChange={event => setAppointmentDate(event.target.value)}
+                                        className="w-full rounded-lg border border-violet-200 dark:border-violet-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-violet-700 dark:text-violet-300 block mb-1">Avisos en Pendiente (max 3)</label>
+                                    <input
+                                        value={waitingReminders}
+                                        onChange={event => setWaitingReminders(event.target.value)}
+                                        placeholder="30,14,3"
+                                        className="w-full rounded-lg border border-violet-200 dark:border-violet-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="text-xs text-violet-700 dark:text-violet-300 block mb-1">Avisos en Turno Agendado (max 3)</label>
+                                    <input
+                                        value={appointmentReminders}
+                                        onChange={event => setAppointmentReminders(event.target.value)}
+                                        placeholder="7,2,1"
+                                        className="w-full rounded-lg border border-violet-200 dark:border-violet-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <button
+                                    onClick={() => void handleSaveFollowUp()}
+                                    disabled={isSavingFollowUp}
+                                    className="px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-60"
+                                >
+                                    {isSavingFollowUp ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                    Guardar seguimiento
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
 
                     {/* History Placeholder (To be implemented fully) */}
                     <div>

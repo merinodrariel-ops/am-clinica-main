@@ -37,6 +37,7 @@ interface EditableStage {
     notify_on_entry: boolean;
     notify_before_days: string;
     notify_emails: string;
+    reminder_windows_days: string;
 }
 
 const COLOR_OPTIONS = ['blue', 'green', 'purple', 'orange', 'red', 'yellow', 'gray'];
@@ -56,6 +57,7 @@ export function WorkflowSettingsModal({ workflow }: WorkflowSettingsModalProps) 
             notify_on_entry: Boolean(stage.notify_on_entry),
             notify_before_days: stage.notify_before_days?.toString() || '',
             notify_emails: (stage.notify_emails || []).join(', '),
+            reminder_windows_days: (stage.reminder_windows_days || []).join(','),
         })),
         [workflow.stages]
     );
@@ -96,6 +98,7 @@ export function WorkflowSettingsModal({ workflow }: WorkflowSettingsModalProps) 
                 notify_on_entry: false,
                 notify_before_days: '',
                 notify_emails: '',
+                reminder_windows_days: '',
             },
         ]);
     };
@@ -141,6 +144,11 @@ export function WorkflowSettingsModal({ workflow }: WorkflowSettingsModalProps) 
                         .split(',')
                         .map(email => email.trim())
                         .filter(Boolean),
+                    reminder_windows_days: stage.reminder_windows_days
+                        .split(',')
+                        .map(value => Number(value.trim()))
+                        .filter(value => Number.isFinite(value) && value > 0)
+                        .slice(0, 3),
                 })),
                 deletedStageIds,
             });
@@ -326,6 +334,16 @@ function SortableStageCard({
                         value={stage.notify_before_days}
                         onChange={e => updateStageField(stage.id, 'notify_before_days', e.target.value)}
                         placeholder="Ej: 2"
+                        className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                    />
+                </div>
+
+                <div>
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Recordatorios por columna (max 3)</label>
+                    <input
+                        value={stage.reminder_windows_days}
+                        onChange={e => updateStageField(stage.id, 'reminder_windows_days', e.target.value)}
+                        placeholder="30,14,3"
                         className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
                     />
                 </div>

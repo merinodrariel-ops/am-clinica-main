@@ -31,6 +31,7 @@ interface ReminderTreatmentRow {
     current_stage_id: string;
     last_stage_change: string;
     next_milestone_date?: string | null;
+    metadata?: unknown;
     patient: unknown;
     workflow: unknown;
     stage: unknown;
@@ -138,6 +139,57 @@ function getRecurrenceIntervalFromMetadata(metadata: unknown) {
     }
 
     return null;
+}
+
+function getReminderDaysFromMetadata(metadata: unknown, key: string, fallback: number[]) {
+    if (!metadata || typeof metadata !== 'object') {
+        return fallback.slice(0, 3);
+    }
+
+    const value = (metadata as Record<string, unknown>)[key];
+    let parsed: number[] = [];
+
+    if (Array.isArray(value)) {
+        parsed = value
+            .map(item => Number(item))
+            .filter(item => Number.isFinite(item) && item > 0);
+    } else if (typeof value === 'string') {
+        parsed = value
+            .split(',')
+            .map(item => Number(item.trim()))
+            .filter(item => Number.isFinite(item) && item > 0);
+    }
+
+    const uniqueSorted = Array.from(new Set(parsed)).sort((a, b) => b - a).slice(0, 3);
+    if (!uniqueSorted.length) {
+        return fallback.slice(0, 3);
+    }
+
+    return uniqueSorted;
+}
+
+function normalizeStageName(value?: string | null) {
+    return (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function getIsoStringFromMetadata(metadata: unknown, key: string) {
+    if (!metadata || typeof metadata !== 'object') return null;
+    const value = (metadata as Record<string, unknown>)[key];
+    if (typeof value !== 'string' || !value.trim()) return null;
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+}
+
+function buildWhatsappLink(countryCode?: string | null, number?: string | null) {
+    const raw = `${countryCode || ''}${number || ''}`.replace(/\D/g, '');
+    if (!raw) return null;
+    return `https://wa.me/${raw}`;
 }
 
 export async function getClinicalWorkflows(): Promise<ClinicalWorkflow[]> {
@@ -407,6 +459,95 @@ export async function moveTreatmentStage(
     } catch (error) {
         console.error('Error in recurrent cycle trigger:', error);
         // Do not fail the request, just log
+    }
+
+    revalidatePath('/workflows');
+    return { success: true };
+}
+
+export async function updateTreatmentFollowUpConfig(input: {
+    treatmentId: string;
+    treatmentDate?: string | null;
+    recurrenceMonths?: number | null;
+    appointmentDate?: string | null;
+    waitingReminderDays?: number[];
+    appointmentReminderDays?: number[];
+}) {
+    const supabase = await createClient();
+
+    const { data: treatment, error: treatmentError } = await supabase
+        .from('patient_treatments')
+        .select('id, workflow_id, start_date, next_milestone_date, metadata, workflow:clinical_workflows(frequency_months)')
+        .eq('id', input.treatmentId)
+        .single();
+
+    if (treatmentError || !treatment) {
+        throw new Error('No se pudo cargar el seguimiento para actualizar');
+    }
+
+    const workflowField = Array.isArray(treatment.workflow)
+        ? (treatment.workflow[0] || null)
+        : treatment.workflow;
+
+    const workflowFrequency = workflowField && typeof workflowField === 'object'
+        ? Number((workflowField as Record<string, unknown>).frequency_months || 0)
+        : 0;
+
+    const baseMetadata = treatment.metadata && typeof treatment.metadata === 'object'
+        ? (treatment.metadata as Record<string, unknown>)
+        : {};
+
+    const recurrenceMonths = Math.max(
+        1,
+        Number(input.recurrenceMonths || getRecurrenceIntervalFromMetadata(baseMetadata) || workflowFrequency || 6)
+    );
+
+    const treatmentDateSource = input.treatmentDate && input.treatmentDate.trim()
+        ? `${input.treatmentDate}T12:00:00`
+        : (getIsoStringFromMetadata(baseMetadata, 'treatment_completed_at') || treatment.start_date || new Date().toISOString());
+
+    const treatmentDate = new Date(treatmentDateSource);
+    if (Number.isNaN(treatmentDate.getTime())) {
+        throw new Error('La fecha de tratamiento no es valida');
+    }
+
+    const nextMilestoneDate = addMonths(treatmentDate, recurrenceMonths).toISOString();
+
+    const waitingDays = (input.waitingReminderDays || getReminderDaysFromMetadata(baseMetadata, 'waiting_reminder_days', [30, 14, 3]))
+        .map(day => Number(day))
+        .filter(day => Number.isFinite(day) && day > 0)
+        .slice(0, 3);
+
+    const appointmentDays = (input.appointmentReminderDays || getReminderDaysFromMetadata(baseMetadata, 'appointment_reminder_days', [7, 2, 1]))
+        .map(day => Number(day))
+        .filter(day => Number.isFinite(day) && day > 0)
+        .slice(0, 3);
+
+    const appointmentDateIso = input.appointmentDate && input.appointmentDate.trim()
+        ? new Date(`${input.appointmentDate}T12:00:00`).toISOString()
+        : getIsoStringFromMetadata(baseMetadata, 'appointment_date');
+
+    const mergedMetadata: Record<string, unknown> = {
+        ...baseMetadata,
+        recurrence_interval_months: recurrenceMonths,
+        treatment_completed_at: treatmentDate.toISOString(),
+        waiting_reminder_days: waitingDays,
+        appointment_reminder_days: appointmentDays,
+        appointment_date: appointmentDateIso || null,
+    };
+
+    const { error: updateError } = await supabase
+        .from('patient_treatments')
+        .update({
+            start_date: treatmentDate.toISOString(),
+            next_milestone_date: nextMilestoneDate,
+            metadata: mergedMetadata,
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', input.treatmentId);
+
+    if (updateError) {
+        throw new Error(updateError.message || 'No se pudo guardar configuracion de seguimiento');
     }
 
     revalidatePath('/workflows');
@@ -802,9 +943,10 @@ export async function runWorkflowSlaReminders() {
             current_stage_id,
             last_stage_change,
             next_milestone_date,
-            patient:pacientes(nombre, apellido, documento, email),
+            metadata,
+            patient:pacientes(nombre, apellido, documento, email, whatsapp_pais_code, whatsapp_numero),
             workflow:clinical_workflows(name, type, frequency_months),
-            stage:clinical_workflow_stages(name, time_limit_days, notify_before_days, notify_emails)
+            stage:clinical_workflow_stages(name, time_limit_days, notify_before_days, notify_emails, reminder_windows_days)
         `)
         .eq('status', 'active');
 
@@ -821,9 +963,10 @@ export async function runWorkflowSlaReminders() {
                 current_stage_id,
                 last_stage_change,
                 next_milestone_date,
-                patient:pacientes(nombre, apellido, documento, email),
+                metadata,
+                patient:pacientes(nombre, apellido, documento, email, whatsapp_pais_code, whatsapp_numero),
                 workflow:clinical_workflows(name, type, frequency_months),
-                stage:clinical_workflow_stages(name, time_limit_days)
+                stage:clinical_workflow_stages(name, time_limit_days, reminder_windows_days)
             `)
             .eq('status', 'active');
 
@@ -846,6 +989,7 @@ export async function runWorkflowSlaReminders() {
             time_limit_days?: number | null;
             notify_before_days?: number | null;
             notify_emails?: string[] | null;
+            reminder_windows_days?: number[] | null;
         } | null;
 
         const workflow = normalizeWorkflowData(treatment.workflow as WorkflowSummary | WorkflowSummary[] | null) as {
@@ -860,19 +1004,54 @@ export async function runWorkflowSlaReminders() {
             apellido?: string | null;
             documento?: string | null;
             email?: string | null;
+            whatsapp_pais_code?: string | null;
+            whatsapp_numero?: string | null;
         } | null;
+
+        const metadata = treatment.metadata && typeof treatment.metadata === 'object'
+            ? (treatment.metadata as Record<string, unknown>)
+            : {};
+
+        const stageNameNormalized = normalizeStageName(stage?.name);
+        const isBookedStage = stageNameNormalized.includes('turno') && (stageNameNormalized.includes('agend') || stageNameNormalized.includes('dado'));
+        const patientName = `${patient?.apellido || ''}, ${patient?.nombre || ''}`.replace(/^,\s*|\s*,\s*$/g, '').trim() || 'Paciente';
+        const staffEmails = Array.isArray(stage?.notify_emails)
+            ? stage.notify_emails.filter((email): email is string => typeof email === 'string' && email.trim().length > 0)
+            : [];
+        const staffWhatsappLink = buildWhatsappLink(patient?.whatsapp_pais_code, patient?.whatsapp_numero);
+        const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
         if (treatment.next_milestone_date && patient?.email) {
             const milestoneDate = new Date(treatment.next_milestone_date);
-            const daysToMilestone = Math.ceil((milestoneDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            const appointmentIso = getIsoStringFromMetadata(metadata, 'appointment_date');
+            const appointmentDate = appointmentIso ? new Date(appointmentIso) : null;
 
-            const reminderWindows = workflowName?.toLowerCase().includes('botox')
-                ? [30, 14, 3]
-                : [30, 7, 1];
+            const referenceDate = isBookedStage && appointmentDate
+                ? appointmentDate
+                : milestoneDate;
 
-            if (reminderWindows.includes(daysToMilestone)) {
-                const patientName = `${patient.apellido || ''}, ${patient.nombre || ''}`.replace(/^,\s*|\s*,\s*$/g, '').trim() || 'Paciente';
-                const eventType = `milestone_due_${daysToMilestone}d`;
+            const daysToReference = Math.ceil((referenceDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+            const reminderWindows = isBookedStage
+                ? getReminderDaysFromMetadata(
+                    metadata,
+                    'appointment_reminder_days',
+                    (stage?.reminder_windows_days && stage.reminder_windows_days.length > 0)
+                        ? stage.reminder_windows_days
+                        : [7, 2, 1]
+                )
+                : getReminderDaysFromMetadata(
+                    metadata,
+                    'waiting_reminder_days',
+                    (stage?.reminder_windows_days && stage.reminder_windows_days.length > 0)
+                        ? stage.reminder_windows_days
+                        : (workflowName?.toLowerCase().includes('botox') ? [30, 14, 3] : [30, 14, 3])
+                );
+
+            if (reminderWindows.includes(daysToReference)) {
+                const eventType = isBookedStage
+                    ? `appointment_due_${daysToReference}d`
+                    : `milestone_due_${daysToReference}d`;
                 const eventKey = createNotificationKey([eventType, treatment.id, patient.email, today]);
 
                 let alreadySent = false;
@@ -888,19 +1067,35 @@ export async function runWorkflowSlaReminders() {
 
                 alreadySent = Boolean(existingReminder?.id);
                 if (!alreadySent) {
-                    const subject = `Recordatorio ${workflowName || 'tratamiento'}: faltan ${daysToMilestone} dias`;
-                    const html = `
-                        <div style="font-family: Arial, sans-serif; color: #111827;">
-                            <h2 style="margin: 0 0 8px;">Recordatorio de control</h2>
-                            <p style="margin: 0 0 8px;">Hola ${patientName}, te recordamos tu proximo control.</p>
-                            <ul style="margin: 0; padding-left: 18px;">
-                                <li><strong>Servicio:</strong> ${workflowName || 'Control recurrente'}</li>
-                                <li><strong>Fecha objetivo:</strong> ${milestoneDate.toLocaleDateString('es-AR')}</li>
-                                <li><strong>Dias restantes:</strong> ${daysToMilestone}</li>
-                            </ul>
-                            <p style="margin-top: 10px;">Si deseas, responde este correo para coordinar tu turno.</p>
-                        </div>
-                    `;
+                    const subject = isBookedStage
+                        ? `Recordatorio de turno ${workflowName || 'control'}: faltan ${daysToReference} dias`
+                        : `Recordatorio ${workflowName || 'tratamiento'}: faltan ${daysToReference} dias`;
+
+                    const html = isBookedStage
+                        ? `
+                            <div style="font-family: Arial, sans-serif; color: #111827;">
+                                <h2 style="margin: 0 0 8px;">Recordatorio de turno</h2>
+                                <p style="margin: 0 0 8px;">Hola ${patientName}, te recordamos tu proximo turno.</p>
+                                <ul style="margin: 0; padding-left: 18px;">
+                                    <li><strong>Servicio:</strong> ${workflowName || 'Control recurrente'}</li>
+                                    <li><strong>Fecha del turno:</strong> ${referenceDate.toLocaleDateString('es-AR')}</li>
+                                    <li><strong>Dias restantes:</strong> ${daysToReference}</li>
+                                </ul>
+                                <p style="margin-top: 10px;">Si necesitas reprogramar, respondenos este email.</p>
+                            </div>
+                        `
+                        : `
+                            <div style="font-family: Arial, sans-serif; color: #111827;">
+                                <h2 style="margin: 0 0 8px;">Recordatorio de control recomendado</h2>
+                                <p style="margin: 0 0 8px;">Hola ${patientName}, ya estas entrando en la ventana recomendada para tu control.</p>
+                                <ul style="margin: 0; padding-left: 18px;">
+                                    <li><strong>Servicio:</strong> ${workflowName || 'Control recurrente'}</li>
+                                    <li><strong>Fecha recomendada:</strong> ${referenceDate.toLocaleDateString('es-AR')}</li>
+                                    <li><strong>Dias restantes:</strong> ${daysToReference}</li>
+                                </ul>
+                                <p style="margin-top: 10px;">Para agendar, entra aqui: <a href="${appBaseUrl}/login">${appBaseUrl}/login</a></p>
+                            </div>
+                        `;
 
                     const response = await sendEmail({
                         to: patient.email,
@@ -922,6 +1117,60 @@ export async function runWorkflowSlaReminders() {
 
                     if (response.success) {
                         sent++;
+                    }
+
+                    for (const staffEmail of staffEmails) {
+                        const staffEventKey = createNotificationKey([`${eventType}_staff`, treatment.id, staffEmail, today]);
+                        const { data: existingStaff } = await supabase
+                            .from('workflow_notifications_log')
+                            .select('id')
+                            .eq('event_key', staffEventKey)
+                            .maybeSingle();
+
+                        if (existingStaff?.id) {
+                            skipped++;
+                            continue;
+                        }
+
+                        const staffSubject = isBookedStage
+                            ? `Staff: recordar turno de ${patientName}`
+                            : `Staff: contactar a ${patientName} para agendar control`;
+
+                        const staffHtml = `
+                            <div style="font-family: Arial, sans-serif; color: #111827;">
+                                <h2 style="margin: 0 0 8px;">Recordatorio para staff</h2>
+                                <ul style="margin: 0; padding-left: 18px;">
+                                    <li><strong>Paciente:</strong> ${patientName}</li>
+                                    <li><strong>Documento:</strong> ${patient?.documento || 'Sin documento'}</li>
+                                    <li><strong>Workflow:</strong> ${workflowName || 'Control recurrente'}</li>
+                                    <li><strong>Columna:</strong> ${stage?.name || 'Sin columna'}</li>
+                                    <li><strong>Fecha de referencia:</strong> ${referenceDate.toLocaleDateString('es-AR')}</li>
+                                    <li><strong>Dias restantes:</strong> ${daysToReference}</li>
+                                </ul>
+                                <p style="margin-top: 10px;">Link de agenda: <a href="${appBaseUrl}/login">${appBaseUrl}/login</a></p>
+                                ${staffWhatsappLink ? `<p>Whatsapp paciente: <a href="${staffWhatsappLink}">${staffWhatsappLink}</a></p>` : '<p>Whatsapp paciente: no disponible</p>'}
+                            </div>
+                        `;
+
+                        const staffResponse = await sendEmail({
+                            to: staffEmail,
+                            subject: staffSubject,
+                            html: staffHtml,
+                        });
+
+                        await logWorkflowNotification({
+                            workflowId: treatment.workflow_id,
+                            stageId: treatment.current_stage_id,
+                            treatmentId: treatment.id,
+                            eventType: `${eventType}_staff`,
+                            recipientEmail: staffEmail,
+                            subject: staffSubject,
+                            status: staffResponse.success ? 'sent' : 'failed',
+                            errorMessage: staffResponse.success ? null : String(staffResponse.error || 'unknown_error'),
+                            eventKey: staffEventKey,
+                        });
+
+                        if (staffResponse.success) sent++;
                     }
                 } else {
                     skipped++;
@@ -946,7 +1195,7 @@ export async function runWorkflowSlaReminders() {
             continue;
         }
 
-        const patientName = patient
+        const patientNameForSla = patient
             ? `${patient.apellido || ''}, ${patient.nombre || ''}`.replace(/^,\s*|\s*,\s*$/g, '').trim()
             : 'Paciente';
 
@@ -958,7 +1207,7 @@ export async function runWorkflowSlaReminders() {
                 <ul style="margin: 0; padding-left: 18px;">
                     <li><strong>Workflow:</strong> ${workflowName || 'Sin nombre'}</li>
                     <li><strong>Etapa:</strong> ${stage.name || 'Sin etapa'}</li>
-                    <li><strong>Paciente:</strong> ${patientName || 'Sin nombre'}</li>
+                    <li><strong>Paciente:</strong> ${patientNameForSla || 'Sin nombre'}</li>
                     <li><strong>Documento:</strong> ${patient?.documento || 'Sin documento'}</li>
                     <li><strong>Dias en etapa:</strong> ${daysInStage}</li>
                     <li><strong>Limite SLA:</strong> ${stage.time_limit_days} dias</li>
@@ -1161,6 +1410,7 @@ interface StageConfigInput {
     notify_on_entry?: boolean;
     notify_before_days?: number | null;
     notify_emails?: string[];
+    reminder_windows_days?: number[];
 }
 
 function isMissingNotificationColumnsError(error: { code?: string; message?: string } | null) {
@@ -1169,7 +1419,8 @@ function isMissingNotificationColumnsError(error: { code?: string; message?: str
     return Boolean(
         error.message?.includes('notify_before_days') ||
         error.message?.includes('notify_on_entry') ||
-        error.message?.includes('notify_emails')
+        error.message?.includes('notify_emails') ||
+        error.message?.includes('reminder_windows_days')
     );
 }
 
@@ -1256,6 +1507,15 @@ export async function updateWorkflowStagesConfig(payload: {
             notify_on_entry: stage.notify_on_entry ?? false,
             notify_before_days: stage.notify_before_days ?? null,
             notify_emails: sanitizedEmails,
+            reminder_windows_days: Array.from(
+                new Set(
+                    (stage.reminder_windows_days || [])
+                        .map(value => Number(value))
+                        .filter(value => Number.isFinite(value) && value > 0)
+                )
+            )
+                .sort((a, b) => b - a)
+                .slice(0, 3),
         };
 
         if (stage.id) {

@@ -24,7 +24,7 @@ import {
 } from '@/lib/inventory-color-ai';
 
 const UNIT_OPTIONS = ['unidad', 'caja', 'ml', 'gr', 'pack', 'kit'];
-const SHADE_OPTIONS = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'C1', 'C2', 'D2', 'D3', 'BL1', 'BL2'];
+const DENTAL_COLOR_OPTIONS = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'C1', 'C2', 'D2', 'D3', 'BL1', 'BL2'];
 
 export default function InventoryQuickProductPage() {
     return (
@@ -39,8 +39,7 @@ function QuickProductScreen() {
     const [saving, setSaving] = useState(false);
     const [processingImage, setProcessingImage] = useState(false);
     const [categories, setCategories] = useState<string[]>(['Insumos Clinicos']);
-    const [colors, setColors] = useState<string[]>([]);
-    const [shades, setShades] = useState<string[]>(SHADE_OPTIONS);
+    const [colors, setColors] = useState<string[]>(DENTAL_COLOR_OPTIONS);
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [keepLoading, setKeepLoading] = useState(true);
@@ -52,7 +51,6 @@ function QuickProductScreen() {
         name: '',
         category: 'Insumos Clinicos',
         color: '',
-        shade: '',
         unit: 'unidad',
         brand: '',
         barcode: '',
@@ -70,13 +68,11 @@ function QuickProductScreen() {
 
         const nextCategories = Array.from(new Set(result.products.map(item => item.category).filter(Boolean))).sort();
         const nextColors = Array.from(new Set(result.products.map(item => item.color).filter(Boolean) as string[])).sort();
-        const nextShades = Array.from(new Set(result.products.map(item => item.shade).filter(Boolean) as string[])).sort();
 
         if (nextCategories.length > 0) {
             setCategories(nextCategories);
         }
-        setColors(nextColors);
-        setShades(nextShades.length > 0 ? Array.from(new Set([...SHADE_OPTIONS, ...nextShades])) : SHADE_OPTIONS);
+        setColors(nextColors.length > 0 ? Array.from(new Set([...DENTAL_COLOR_OPTIONS, ...nextColors])) : DENTAL_COLOR_OPTIONS);
     }, []);
 
     useEffect(() => {
@@ -108,13 +104,10 @@ function QuickProductScreen() {
 
             if (suggestion) {
                 setForm(prev => {
-                    return {
-                        ...prev,
-                        color: prev.color.trim() ? prev.color : suggestion.label,
-                        shade: prev.shade.trim() ? prev.shade : (suggestion.dentalShade || ''),
-                    };
+                    if (prev.color.trim()) return prev;
+                    return { ...prev, color: suggestion.label };
                 });
-                toast.success(`Color sugerido por IA: ${suggestion.label}`);
+                toast.success(`Color dental sugerido por IA: ${suggestion.label}`);
             }
         } catch {
             setDetectedColor(null);
@@ -147,17 +140,25 @@ function QuickProductScreen() {
                 }
             }
 
+            const serverImagePayload = imagePayload
+                ? {
+                    thumbBase64: imagePayload.thumbBase64,
+                    fullBase64: imagePayload.fullBase64,
+                    thumbMimeType: imagePayload.thumbMimeType,
+                    fullMimeType: imagePayload.fullMimeType,
+                }
+                : null;
+
             const result = await createInventoryProduct({
                 name: form.name,
                 category: form.category,
                 color: form.color,
-                shade: form.shade,
                 unit: form.unit,
                 brand: form.brand,
                 barcode: form.barcode,
                 stockInitial: Number(form.stockInitial || 0),
                 notes: form.notes,
-                imagePayload,
+                imagePayload: serverImagePayload,
             });
 
             if (!result.success || !result.productId) {
@@ -171,7 +172,6 @@ function QuickProductScreen() {
                     ...prev,
                     name: '',
                     color: '',
-                    shade: '',
                     brand: '',
                     barcode: '',
                     stockInitial: '0',
@@ -212,7 +212,7 @@ function QuickProductScreen() {
                     Alta rapida de producto
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                    Nombre + categoria + color/tono + foto. El sistema optimiza para web y puede quitar fondo automaticamente.
+                    Nombre + categoria + color dental + foto. El sistema optimiza para web y puede quitar fondo automaticamente.
                 </p>
             </div>
 
@@ -248,33 +248,17 @@ function QuickProductScreen() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Color (subcategoria)</label>
+                            <label className="block text-sm font-medium mb-1">Color dental</label>
                             <input
                                 value={form.color}
                                 onChange={event => setForm(prev => ({ ...prev, color: event.target.value }))}
                                 list="quick-color-options"
                                 className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                                placeholder="Ej: Transparente"
+                                placeholder="Ej: A2"
                             />
                             <datalist id="quick-color-options">
                                 {colors.map(color => (
                                     <option key={color} value={color} />
-                                ))}
-                            </datalist>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Tono dental</label>
-                            <input
-                                value={form.shade}
-                                onChange={event => setForm(prev => ({ ...prev, shade: event.target.value }))}
-                                list="quick-shade-options"
-                                className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                                placeholder="Ej: A2"
-                            />
-                            <datalist id="quick-shade-options">
-                                {shades.map(shade => (
-                                    <option key={shade} value={shade} />
                                 ))}
                             </datalist>
                         </div>
@@ -359,20 +343,11 @@ function QuickProductScreen() {
                                     <span className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: detectedColor.hex }} />
                                     <button
                                         type="button"
-                                        onClick={() => setForm(prev => ({
-                                            ...prev,
-                                            color: detectedColor.label,
-                                            shade: detectedColor.dentalShade || prev.shade,
-                                        }))}
+                                        onClick={() => setForm(prev => ({ ...prev, color: detectedColor.label }))}
                                         className="text-blue-600 hover:underline"
                                     >
                                         Usar
                                     </button>
-                                    {detectedColor.dentalShade && (
-                                        <span className="px-2 py-1 rounded-full border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 font-semibold">
-                                            Tono: {detectedColor.dentalShade}
-                                        </span>
-                                    )}
                                 </div>
                             )}
                         </div>

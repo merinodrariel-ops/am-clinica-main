@@ -147,7 +147,6 @@ function ProductDetailScreen() {
                     <div className="grid grid-cols-2 gap-2 text-sm">
                         <DataCell label="Categoria" value={product.category} />
                         <DataCell label="Color" value={product.color || 'Sin color'} />
-                        <DataCell label="Tono" value={product.shade || 'Sin tono'} />
                         <DataCell label="Marca" value={product.brand || 'Sin marca'} />
                         <DataCell label="Unidad" value={product.unit} />
                         <DataCell label="Estado" value={product.is_active ? 'Activo' : 'Inactivo'} />

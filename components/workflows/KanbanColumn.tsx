@@ -32,6 +32,12 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
         }
     };
 
+    const stageLabel = stage.name === 'Pendiente de Control'
+        ? 'Esperando por turno'
+        : stage.name === 'Turno Agendado'
+            ? 'Turno dado'
+            : stage.name;
+
     return (
         <div className="flex flex-col min-w-[280px] w-80 h-full max-h-full">
             {/* Header */}
@@ -39,7 +45,7 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
                 "p-3 rounded-t-xl border-b-2 font-semibold flex justify-between items-center",
                 getStageColor(stage.color)
             )}>
-                <span>{stage.name}</span>
+                <span>{stageLabel}</span>
                 <div className="flex items-center gap-1">
                     {stage.time_limit_days ? (
                         <span className="inline-flex items-center gap-1 bg-white/60 dark:bg-black/20 px-1.5 py-0.5 rounded text-[10px]">
