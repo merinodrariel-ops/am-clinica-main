@@ -587,11 +587,20 @@ export async function getCurrentBalanceRecepcion(): Promise<{
 
   // 2. Add Movements (Open, not closed)
   // We use IS NULL on cierre_id to get only pending movements
-  const baseQuery = supabase
+  let baseQuery = supabase
     .from("caja_recepcion_movimientos")
     .select("monto, moneda, metodo_pago, estado")
     .is("cierre_id", null)
-    .neq("estado", "anulado");
+    .neq("estado", "anulado")
+    // Filter out deleted records
+    .eq("is_deleted", false);
+
+  // CRITICAL: Only include movements that are ON or AFTER the last closure date.
+  // Historical movements (backdated) created after the closure should not affect the current cash box
+  // because the closure established a verified balance for that date.
+  if (ultimo?.fecha) {
+    baseQuery = baseQuery.gte("fecha_movimiento", ultimo.fecha);
+  }
 
   const { data: movimientos } = await baseQuery;
   const movs = movimientos || [];
