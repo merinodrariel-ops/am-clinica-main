@@ -5,7 +5,7 @@ import { Loader2, DollarSign, Lock, CheckCircle, AlertTriangle, PlayCircle } fro
 import clsx from 'clsx';
 import { supabase, CajaArqueo } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
-import { getUltimoCierre, cerrarCajaDelDia, abrirCajaDelDia } from '@/lib/caja-recepcion';
+import { getUltimoCierre, cerrarCajaDelDia, abrirCajaDelDia, getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
 import { formatDateForLocale, getLocalISODate } from '@/lib/local-date';
 
 interface ArqueoPanelProps {
@@ -70,6 +70,11 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
             const ultimo = await getUltimoCierre(today);
             setUltimoCierre(ultimo);
 
+            if (aperturaData) {
+                const current = await getCurrentBalanceRecepcion();
+                setSaldosEsperados({ ars: current.saldoArs, usd: current.saldoUsd });
+            }
+
         } catch (error) {
             console.error('Error checking caja:', error);
         } finally {
@@ -97,13 +102,11 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
     // Fetch expected balances when modal opens
     useEffect(() => {
         if (showCerrarModal) {
-            import('@/lib/caja-recepcion').then(m => {
-                m.getCurrentBalanceRecepcion().then(res => {
-                    setSaldosEsperados({ ars: res.saldoArs, usd: res.saldoUsd });
-                    // Auto-fill with expected to make it easier (Admin style)
-                    setSaldoFinalArs(res.saldoArs);
-                    setSaldoFinalUsd(res.saldoUsd);
-                });
+            getCurrentBalanceRecepcion().then(res => {
+                setSaldosEsperados({ ars: res.saldoArs, usd: res.saldoUsd });
+                // Auto-fill with expected to make it easier (Admin style)
+                setSaldoFinalArs(res.saldoArs);
+                setSaldoFinalUsd(res.saldoUsd);
             });
         }
     }, [showCerrarModal]);
@@ -247,6 +250,35 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                         )}
                     </div>
                 )}
+
+                {!cierreHoy && aperturaHoy && (
+                    <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800/40">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider text-[10px]">Saldo Actual Estimado</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-200 dark:border-blue-800/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo ARS</span>
+                                </div>
+                                <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                    {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(saldosEsperados.ars)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-200 dark:border-blue-800/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo USD</span>
+                                </div>
+                                <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(saldosEsperados.usd)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
             </div>
 
             {/* Modal Abrir Caja */}
