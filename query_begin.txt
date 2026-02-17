@@ -1,0 +1,1 @@
+UPDATE pacientes SET is_deleted = true, deleted_at = now(), delete_reason = 'Limpieza de duplicados masiva' WHERE id_paciente IN (

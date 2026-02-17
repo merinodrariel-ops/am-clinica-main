@@ -14,15 +14,24 @@ type CsvRow = Record<string, string>;
 
 interface ExistingPatientRow {
     id_paciente: string;
+    nombre: string;
+    apellido: string;
+    email: string | null;
+    telefono: string | null;
+    ciudad: string | null;
     link_google_slides: string | null;
     observaciones_generales: string | null;
+    documento: string | null;
 }
 
 interface PatientUpdates {
     link_google_slides?: string;
     observaciones_generales?: string;
     referencia_origen?: string;
+    [key: string]: any; // Allow other fields
 }
+
+// ... imports
 
 export async function GET() {
     try {
@@ -42,6 +51,7 @@ export async function GET() {
             total: rows.length,
             newlyImported: 0,
             skippedDuplicates: 0,
+            updatedRecords: 0,
             errors: 0
         };
 
@@ -89,30 +99,86 @@ export async function GET() {
                 const observaciones = obs.length > 0 ? obs.join(' | ') : null;
 
                 // Check for duplicates
-                let query = supabase.from('pacientes').select('id_paciente, link_google_slides, observaciones_generales');
+                // STRICT RULE: Priority DNI.
+                let existing: ExistingPatientRow | null = null;
 
                 if (dni) {
-                    query = query.or(`documento.eq.${dni}${email ? `,email.eq.${email}` : ''}`);
-                } else {
-                    query = query.eq('email', email);
+                    const { data, error } = await supabase
+                        .from('pacientes')
+                        .select('id_paciente, nombre, apellido, email, telefono, ciudad, link_google_slides, observaciones_generales, documento')
+                        .eq('documento', dni)
+                        .eq('is_deleted', false)
+                        .limit(1);
+
+                    if (data && data.length > 0) {
+                        existing = data[0];
+                    }
                 }
 
-                const { data: existing } = await query.single<ExistingPatientRow>();
+                // Fallback to Email only if DNI wasn't found (or wasn't provided)
+                if (!existing && email) {
+                    const { data, error } = await supabase
+                        .from('pacientes')
+                        .select('id_paciente, nombre, apellido, email, telefono, ciudad, link_google_slides, observaciones_generales, documento')
+                        .eq('email', email)
+                        .eq('is_deleted', false)
+                        .limit(1);
+
+                    if (data && data.length > 0) {
+                        existing = data[0];
+                    }
+                }
+
+                // Fallback to Nombre + Apellido if neither DNI nor Email matched
+                if (!existing && nombre && apellido) {
+                    const { data, error } = await supabase
+                        .from('pacientes')
+                        .select('id_paciente, nombre, apellido, email, telefono, ciudad, link_google_slides, observaciones_generales, documento')
+                        .eq('nombre', nombre)
+                        .eq('apellido', apellido)
+                        .eq('is_deleted', false)
+                        .limit(1);
+
+                    if (data && data.length > 0) {
+                        existing = data[0];
+                    }
+                }
 
                 if (existing) {
-                    // Update if missing data
-                    const updates: PatientUpdates = {};
-                    if (slidesLink && !existing.link_google_slides) {
-                        updates.link_google_slides = slidesLink;
-                    }
-                    // If we have new observations, append them if not already there
-                    if (observaciones && (!existing.observaciones_generales || !existing.observaciones_generales.includes(motivo))) {
-                        updates.observaciones_generales = existing.observaciones_generales
-                            ? `${existing.observaciones_generales}\n${observaciones}`
-                            : observaciones;
-                    }
-                    if (referencia) {
-                        updates.referencia_origen = referencia;
+                    // DUPLICATE FOUND - UPDATE LOGIC
+                    const updates: Record<string, any> = {};
+
+                    // Helper: Update field if new value is present and different.
+                    // "Nunca reemplazar un campo completo con uno vacío"
+                    const updateIfBetter = (field: keyof typeof existing, newValue: string | null) => {
+                        if (newValue && newValue.trim() !== '') {
+                            // If existing is empty/null, OR if we have a conflict (we take the most recent aka the sheet)
+                            if (existing![field] !== newValue) {
+                                updates[field as string] = newValue;
+                            }
+                        }
+                    };
+
+                    updateIfBetter('nombre', nombre);
+                    updateIfBetter('apellido', apellido);
+                    updateIfBetter('email', email); // only if not primary key for search? It's fine.
+                    updateIfBetter('telefono', telefono);
+                    updateIfBetter('ciudad', ciudad);
+                    updateIfBetter('link_google_slides', slidesLink);
+
+                    // Explicitly handle fields that might not be in existing selection if I didn't select them? 
+                    // I selected specific fields above. 'referencia' is not in standard select unless I add it.
+                    // For safety, let's stick to what we fetched or add reference update
+
+                    if (referencia) updates['referencia_origen'] = referencia;
+
+                    // Observaciones: Append instead of replace to avoid losing history
+                    if (observaciones) {
+                        if (!existing.observaciones_generales) {
+                            updates.observaciones_generales = observaciones;
+                        } else if (!existing.observaciones_generales.includes(observaciones)) {
+                            updates.observaciones_generales = `${existing.observaciones_generales}\n${observaciones}`;
+                        }
                     }
 
                     if (Object.keys(updates).length > 0) {
@@ -120,9 +186,11 @@ export async function GET() {
                             .from('pacientes')
                             .update(updates)
                             .eq('id_paciente', existing.id_paciente);
-                    }
 
-                    stats.skippedDuplicates++;
+                        stats.updatedRecords++;
+                    } else {
+                        stats.skippedDuplicates++;
+                    }
                     continue;
                 }
 

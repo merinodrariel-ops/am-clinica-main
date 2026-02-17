@@ -13,9 +13,7 @@ import {
     ChevronRight,
     Check
 } from 'lucide-react';
-import { createPaciente, logEmail } from '@/lib/patients';
-import { supabase } from '@/lib/supabase';
-import { sendWelcomeEmailAction } from '@/app/actions/email';
+import { upsertPatientAction } from '@/app/actions/patients';
 
 interface NuevoPacienteFormProps {
     isOpen: boolean;
@@ -132,33 +130,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
 
         setSaving(true);
 
-        // Check for duplicates
         try {
             const emailCompleto = getFullEmail();
-            const query = supabase.from('pacientes').select('id_paciente, nombre, apellido, documento, email').eq('is_deleted', false);
+            const whatsappE164 = getWhatsAppE164();
 
-            const conditions: string[] = [];
-            if (form.documento) conditions.push(`documento.eq.${form.documento}`);
-            if (emailCompleto) conditions.push(`email.eq.${emailCompleto}`);
-
-            if (conditions.length > 0) {
-                const { data: existing } = await query.or(conditions.join(','));
-
-                if (existing && existing.length > 0) {
-                    const confirmMsg = `El paciente ya existe:\n\n${existing.map((p: { nombre: string; apellido: string; documento: string }) => `- ${p.nombre} ${p.apellido} (DNI: ${p.documento || '-'})`).join('\n')}\n\nNo se puede crear un duplicado.`;
-                    alert(confirmMsg);
-                    setSaving(false);
-                    return;
-                }
-            }
-        } catch (checkError) {
-            console.error('Error checking duplicates:', checkError);
-        }
-
-        try {
-            const emailCompleto = getFullEmail();
-
-            const { data, error } = await createPaciente({
+            const result = await upsertPatientAction({
                 apellido: form.apellido,
                 nombre: form.nombre,
                 documento: form.documento || undefined,
@@ -168,37 +144,27 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                 email_local: form.email_local || undefined,
                 email_dominio: form.email_dominio === 'otro' ? form.email_custom_domain : form.email_dominio,
                 email: emailCompleto || undefined,
+                telefono: whatsappE164 || undefined,
                 ciudad: form.ciudad || undefined,
                 zona_barrio: form.zona_barrio || undefined,
                 direccion: form.direccion || undefined,
                 observaciones_generales: form.observaciones_generales || undefined,
                 estado_paciente: form.estado_paciente,
                 origen_registro: form.origen_registro,
+                referencia_origen: form.origen_registro,
                 consentimiento_comunicacion: form.consentimiento_comunicacion,
             });
 
-            if (error) throw error;
-
-            // Send welcome email if consent and valid email
-            if (form.consentimiento_comunicacion && emailCompleto && data) {
-                const emailResult = await sendWelcomeEmailAction(
-                    `${form.nombre} ${form.apellido}`,
-                    emailCompleto
-                );
-
-                await logEmail(
-                    data.id_paciente,
-                    'Bienvenida',
-                    emailResult.success ? 'Enviado' : 'Fallido',
-                    emailResult.error
-                );
+            if (result.success) {
+                if (result.message) alert(result.message);
+                onSuccess();
+                handleClose();
+            } else {
+                throw new Error(result.error || 'Error desconocido');
             }
-
-            onSuccess();
-            handleClose();
         } catch (err) {
-            console.error('Error creating patient:', err);
-            alert('Error al crear paciente');
+            console.error('Error creating/updating patient:', err);
+            alert(err instanceof Error ? err.message : 'Error al guardar paciente');
         } finally {
             setSaving(false);
         }
