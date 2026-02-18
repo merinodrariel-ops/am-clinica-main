@@ -46,6 +46,9 @@ import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import HistorialEdicionesModal from "@/components/caja/HistorialEdicionesModal";
 import { ComprobanteUpload } from "@/components/caja/ComprobanteUpload";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 
 interface Props {
   sucursal: Sucursal;
@@ -697,25 +700,25 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {/* Month Selector */}
-          <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700">
-            <Calendar className="w-5 h-5 text-indigo-500" />
-            <input
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500 pointer-events-none" />
+            <Input
               type="month"
               value={mesActual}
               onChange={(e) => setMesActual(e.target.value)}
-              className="bg-transparent border-none outline-none text-sm font-medium"
+              className="pl-10 h-10 w-full rounded-xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-indigo-500"
             />
           </div>
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Input
               type="text"
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white dark:bg-slate-800 rounded-xl text-sm border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="pl-10 pr-4 h-10 rounded-xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-indigo-500"
             />
           </div>
 
@@ -738,7 +741,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           </div>
 
           {/* Share Summary Button */}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => {
               const summary = getMonthlySummary();
               window.open(
@@ -746,16 +751,18 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 "_blank",
               );
             }}
-            className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors border border-transparent hover:border-green-200"
+            className="rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200"
             title="Enviar Resumen del Mes por WhatsApp"
           >
             <Share2 className="w-5 h-5" />
-          </button>
+          </Button>
 
           {/* Privacy Toggle */}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setPrivacyMode(!privacyMode)}
-            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-transparent hover:border-blue-200"
+            className="rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200"
             title={
               privacyMode ? "Mostrar montos" : "Ocultar montos (Modo Discreto)"
             }
@@ -765,7 +772,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             ) : (
               <Eye className="w-5 h-5" />
             )}
-          </button>
+          </Button>
         </div>
 
         <div className="flex items-center gap-3">
@@ -777,15 +784,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           </div>
 
           {(role === "owner" || role === "admin") && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <Button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-shadow"
             >
               <Plus className="w-5 h-5" />
               Nuevo Movimiento
-            </motion.button>
+            </Button>
           )}
         </div>
       </div>
@@ -799,12 +804,14 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         >
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold">Nuevo Movimiento</h3>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowForm(false)}
               className="text-slate-400 hover:text-slate-600"
             >
               <X className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -851,13 +858,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Fecha del Movimiento *
               </label>
-              <input
+              <Input
                 type="date"
                 value={formData.fecha_movimiento}
                 onChange={(e) =>
                   setFormData({ ...formData, fecha_movimiento: e.target.value })
                 }
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                 required
               />
             </div>
@@ -870,14 +877,14 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Descripción *
               </label>
-              <input
+              <Input
                 type="text"
                 value={formData.descripcion}
                 onChange={(e) =>
                   setFormData({ ...formData, descripcion: e.target.value })
                 }
                 placeholder="Descripción del movimiento..."
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
               />
             </div>
 
@@ -885,13 +892,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Nota adicional
               </label>
-              <textarea
+              <Textarea
                 value={formData.nota}
                 onChange={(e) =>
                   setFormData({ ...formData, nota: e.target.value })
                 }
                 rows={2}
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
               />
             </div>
           </div>
@@ -903,12 +910,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 Líneas de Movimiento
               </label>
               {formData.tipo_movimiento !== "CAMBIO_MONEDA" && (
-                <button
+                <Button
+                  variant="ghost"
                   onClick={addLinea}
-                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium h-auto p-0 hover:bg-transparent"
                 >
                   + Agregar línea
-                </button>
+                </Button>
               )}
             </div>
             // ... (rest of methods) // ... (inside the form JSX for
@@ -928,12 +936,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         $
                       </span>
-                      <input
+                      <Input
                         type="number"
                         value={exchangeAmountUSD}
                         onChange={(e) => setExchangeAmountUSD(e.target.value)}
                         placeholder="0.00"
-                        className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700"
+                        className="w-full pl-8 pr-4 py-2 rounded-lg border-slate-200 dark:border-slate-700"
                       />
                     </div>
                   </div>
@@ -946,12 +954,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         $
                       </span>
-                      <input
+                      <Input
                         type="number"
                         value={manualRate}
                         onChange={(e) => setManualRate(e.target.value)}
                         placeholder={tcBna ? String(tcBna) : "0.00"}
-                        className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700"
+                        className="w-full pl-8 pr-4 py-2 rounded-lg border-slate-200 dark:border-slate-700"
                       />
                     </div>
                     <div className="text-xs text-slate-400 mt-1">
@@ -1032,7 +1040,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                         </option>
                       ))}
                     </select>
-                    <input
+                    <Input
                       type="number"
                       value={linea.importe}
                       onChange={(e) =>
@@ -1043,7 +1051,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                       placeholder="Importe"
                       min="0"
                       step="0.01"
-                      className="w-32 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                      className="w-32 px-3 py-2 rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
                     />
                     <span className="text-sm text-slate-500 w-12">
                       {linea.moneda}
@@ -1054,12 +1062,14 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                           ≈ ${linea.usd_equivalente.toFixed(2)} USD
                         </span>
                       )}
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => removeLinea(idx)}
-                      className="text-red-500 hover:text-red-600"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
                     >
                       <X className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -1101,15 +1111,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                         Ver adjunto {idx + 1}
                       </a>
                     </div>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() =>
                         setAdjuntos(adjuntos.filter((_, i) => i !== idx))
                       }
-                      className="text-red-500 hover:text-red-600 p-1"
+                      className="text-red-500 hover:text-red-600 h-6 w-6"
                       title="Eliminar adjunto"
                     >
                       <X className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -1133,20 +1145,21 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           )}
 
           <div className="flex justify-end gap-3">
-            <button
+            <Button
+              variant="ghost"
               onClick={() => setShowForm(false)}
               className="px-4 py-2 text-slate-600 hover:text-slate-800"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-700"
             >
               {submitting ? "Guardando..." : "Guardar Movimiento"}
               <Check className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </motion.div>
       )}
@@ -1247,15 +1260,19 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                             CSV
                           </span>
                         )}
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setHistorialMovId(mov.id)}
                         className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                         title="Ver historial de ediciones"
                       >
                         <History className="w-4 h-4" />
-                      </button>
+                      </Button>
                       {canEditAdminAmounts && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => {
                             const movConComprobante =
                               mov as CajaAdminMovimiento & {
@@ -1295,10 +1312,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                           title="Editar movimiento"
                         >
                           <Pencil className="w-4 h-4" />
-                        </button>
+                        </Button>
                       )}
                       {(role === "admin" || role === "owner") && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => {
                             setDeletingMovId(mov.id);
                             setDeletionConfirmation("");
@@ -1308,7 +1327,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                           title="Eliminar movimiento"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
@@ -1344,10 +1363,10 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
                     Motivo de la eliminación (Obligatorio)
                   </label>
-                  <textarea
+                  <Textarea
                     value={deletionReason}
                     onChange={(e) => setDeletionReason(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus-visible:ring-red-500"
                     rows={2}
                     placeholder="Ej: Error de carga, registro duplicado..."
                   />
@@ -1361,44 +1380,31 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     </span>{" "}
                     abajo:
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={deletionConfirmation}
                     onChange={(e) => setDeletionConfirmation(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                    className="w-full px-3 py-2 border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus-visible:ring-red-500 font-mono"
                     placeholder="ELIMINAR"
                   />
                 </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-8">
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => setDeletingMovId(null)}
                   className="px-4 py-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={async () => {
                     if (
                       deletionConfirmation !== "ELIMINAR" ||
                       !deletionReason.trim()
                     )
                       return;
-
-                    // Since we are in the component, we need the user ID.
-                    // The component likely doesn't have it directly exposed or we need to pass it.
-                    // But deleteMovimiento is a server action or library function?
-                    // It's a client-side function importing supabase client.
-                    // We need the user ID for the log.
-                    // We can get it from supabase.auth.getUser() inside deleteMovimiento or pass it.
-                    // The updated deleteMovimiento takes (id, usuarioId, motivo).
-                    // So we need to pass usuarioId.
-                    // We don't have user object here easily unless we add useAuth hook or similar.
-                    // Wait, we have `role` passed as prop. Do we have user ID?
-                    // Looking at file content... it doesn't seem to have `user` prop.
-                    // But checking imports... it uses `createClient` inside `loadData`.
-                    // I should get the user in the component.
 
                     // Temporary: fetch user here.
                     const {
@@ -1429,7 +1435,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 >
                   <Trash2 className="w-4 h-4" />
                   Confirmar Eliminación
-                </button>
+                </Button>
               </div>
             </div>
           </motion.div>
@@ -1465,15 +1471,19 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 Editar Movimiento
               </h3>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setIsEditModalMinimized(true)}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg"
                   title="Minimizar"
                 >
                   <Minus size={14} />
                   Minimizar
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => {
                     setEditingMov(null);
                     setIsEditModalMinimized(false);
@@ -1481,7 +1491,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   <X size={20} className="text-slate-500" />
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -1499,13 +1509,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Fecha del movimiento
                 </label>
-                <input
+                <Input
                   type="date"
                   value={editData.fecha}
                   onChange={(e) =>
                     setEditData({ ...editData, fecha: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -1513,13 +1523,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Descripción
                 </label>
-                <input
+                <Input
                   type="text"
                   value={editData.descripcion}
                   onChange={(e) =>
                     setEditData({ ...editData, descripcion: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -1527,13 +1537,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 font-bold text-red-500">
                   Motivo del cambio (Obligatorio)
                 </label>
-                <textarea
+                <Textarea
                   value={editData.motivo}
                   onChange={(e) =>
                     setEditData({ ...editData, motivo: e.target.value })
                   }
                   placeholder="Explique por qué se realiza este cambio..."
-                  className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white min-h-[80px]"
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white min-h-[80px]"
                 />
               </div>
 
@@ -1551,14 +1561,16 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                     Montos / Lineas
                   </label>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={addEditLinea}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Agregar linea
-                  </button>
+                  </Button>
                 </div>
                 <div className="space-y-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl max-h-48 overflow-y-auto">
                   <p className="text-[11px] text-slate-500">
@@ -1600,7 +1612,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                           </option>
                         ))}
                       </select>
-                      <input
+                      <Input
                         type="number"
                         value={line.importe}
                         onChange={(e) => {
@@ -1626,7 +1638,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                             : "0"
                         }
                         step="0.01"
-                        className="w-28 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                        className="w-28 px-2 py-1 text-sm border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
                       />
                       <span className="text-xs font-mono text-slate-500 w-10 text-center">
                         {line.moneda}
@@ -1636,14 +1648,16 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                           ≈ ${line.usd_equivalente?.toFixed(2)} USD
                         </span>
                       )}
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => removeEditLinea(idx)}
-                        className="text-red-500 hover:text-red-600"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
                         title="Quitar linea"
                       >
                         <X className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   ))}
                   {editData.lines.length === 0 && (
@@ -1656,7 +1670,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                         <span className="text-xs font-mono text-slate-500 w-12">
                           USD
                         </span>
-                        <input
+                        <Input
                           type="number"
                           value={editData.totalUsd}
                           onChange={(e) =>
@@ -1670,7 +1684,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                           }
                           min="0"
                           step="0.01"
-                          className="flex-1 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                          className="flex-1 px-2 py-1 text-sm border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
                         />
                       </div>
                     </div>
@@ -1684,21 +1698,22 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 <AlertTriangle size={12} />
                 Se guarda en historial de auditoria
               </span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setEditingMov(null)}
                 className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleUpdate}
                 disabled={submitting}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 {submitting ? "Guardando..." : "Guardar Cambios"}
-              </button>
+              </Button>
             </div>
             {(editSaveError || editSaveSuccess) && (
               <div className="px-4 md:px-6 pb-4">
@@ -1729,7 +1744,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 {editingMov.descripcion}
               </p>
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setEditingMov(null);
                 setIsEditModalMinimized(false);
@@ -1737,15 +1754,15 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
             >
               <X size={16} className="text-slate-500" />
-            </button>
+            </Button>
           </div>
 
-          <button
+          <Button
             onClick={() => setIsEditModalMinimized(false)}
             className="mt-3 w-full px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
           >
             Restaurar edicion
-          </button>
+          </Button>
         </div>
       )}
     </div>

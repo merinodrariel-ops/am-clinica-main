@@ -63,7 +63,13 @@ export async function updateSession(request: NextRequest) {
     // I'll assume '/' might redirect to dashboard if logged in, or login if not.
     // Let's treat '/' as public for now, but inspect logic below.
 
-    if (!user && !isPublicRoute && !path.startsWith('/_next') && !path.includes('.')) {
+    // Improve static file detection to avoid security loopholes with dot-files
+    const isStaticAsset =
+        path.startsWith('/_next') ||
+        path.startsWith('/static') ||
+        /\.(ico|svg|png|jpg|jpeg|gif|webp|css|js|woff|woff2)$/.test(path);
+
+    if (!user && !isPublicRoute && !isStaticAsset) {
         // no user, protected route
         const url = request.nextUrl.clone()
         url.pathname = '/login'

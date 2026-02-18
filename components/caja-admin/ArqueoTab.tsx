@@ -16,6 +16,8 @@ import {
 } from '@/lib/caja-admin';
 import { useAuth } from '@/contexts/AuthContext';
 import CurrencyInput from '@/components/ui/CurrencyInput';
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
 
 interface Props {
     sucursal: Sucursal;
@@ -177,13 +179,13 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                         </div>
                     </div>
                     {!cierreHoy && (role === 'owner' || role === 'admin') && (
-                        <button
+                        <Button
                             onClick={() => setShowCerrarModal(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
                         >
                             <Lock size={18} />
                             Cerrar Caja del Día
-                        </button>
+                        </Button>
                     )}
                 </div>
 
@@ -296,29 +298,30 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Observaciones
                                 </label>
-                                <textarea
+                                <Textarea
                                     value={observaciones}
                                     onChange={(e) => setObservaciones(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                                    className="w-full px-3 py-2 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
                                     rows={3}
                                     placeholder="Notas del cierre..."
                                 />
                             </div>
 
                             <div className="flex gap-3 justify-end">
-                                <button
+                                <Button
+                                    variant="ghost"
                                     onClick={() => setShowCerrarModal(false)}
                                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                 >
                                     Cancelar
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={handleCerrar}
                                     disabled={submitting}
                                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                                 >
                                     {submitting ? 'Guardando...' : 'Confirmar Cierre'}
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>

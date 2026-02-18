@@ -3,6 +3,8 @@
 import React, { useState, useRef } from 'react';
 import { uploadToStorage } from '@/lib/supabase-storage';
 import { compressImage, formatFileSize, isImageFile } from '@/lib/image-compression';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 interface ComprobanteUploadProps {
     area: 'caja-admin' | 'caja-recepcion';
@@ -114,43 +116,23 @@ export function ComprobanteUpload({
 
     return (
         <div className={`comprobante-upload ${className}`}>
-            <input
+            <Input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*,.pdf"
                 onChange={handleFileSelect}
-                style={{ display: 'none' }}
+                className="hidden"
             />
 
-            <button
+            <Button
                 type="button"
                 onClick={triggerFileSelect}
                 disabled={isUploading}
-                className="upload-btn"
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 16px',
-                    backgroundColor: isUploading ? '#666' : '#333',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: isUploading ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                    transition: 'background-color 0.2s',
-                }}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-900 text-white border-none rounded-lg cursor-pointer text-sm transition-colors ${isUploading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
                 {isUploading ? (
                     <>
-                        <span className="spinner" style={{
-                            width: '16px',
-                            height: '16px',
-                            border: '2px solid #fff',
-                            borderTopColor: 'transparent',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite',
-                        }} />
+                        <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                         Subiendo... {progress}%
                     </>
                 ) : (
@@ -158,7 +140,7 @@ export function ComprobanteUpload({
                         📎 Adjuntar Comprobante
                     </>
                 )}
-            </button>
+            </Button>
 
             {compressionInfo && (
                 <p style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>

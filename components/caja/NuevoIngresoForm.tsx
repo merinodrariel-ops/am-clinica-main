@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon } from 'lucide-react';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import clsx from 'clsx';
 import { supabase, TarifarioItem } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
@@ -421,12 +424,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                             ))}
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={handleClose}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg h-auto w-auto"
                     >
                         <X size={20} className="text-gray-500" />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Content */}
@@ -442,30 +447,30 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 <div className="flex gap-3">
                                     <div className="relative flex-1">
                                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                        <input
+                                        <Input
                                             type="number"
                                             value={formData.monto || ''}
                                             onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
-                                            className="w-full pl-10 pr-4 py-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 text-2xl font-bold"
+                                            className="w-full pl-10 pr-4 py-4 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus-visible:ring-blue-500 text-2xl font-bold h-auto"
                                             placeholder="0.00"
                                             autoFocus
                                         />
                                     </div>
                                     <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
                                         {['ARS', 'USD'].map((m) => (
-                                            <button
+                                            <Button
                                                 key={m}
                                                 type="button"
                                                 onClick={() => setFormData({ ...formData, moneda: m as FormData['moneda'] })}
                                                 className={clsx(
-                                                    "px-4 py-2 text-sm font-bold transition-colors",
+                                                    "px-4 py-2 text-sm font-bold transition-colors rounded-none h-auto",
                                                     formData.moneda === m
-                                                        ? "bg-blue-600 text-white"
-                                                        : "bg-white dark:bg-gray-800 text-gray-500"
+                                                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                                                        : "bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                 )}
                                             >
                                                 {m}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 </div>
@@ -481,7 +486,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                             <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Este pago es una sena</p>
                                             <p className="text-xs text-amber-700 dark:text-amber-300">Si activas esta opcion, se dispara el workflow clinico automaticamente.</p>
                                         </div>
-                                        <button
+                                        <Button
                                             type="button"
                                             onClick={() => {
                                                 const nextValue = !formData.es_sena;
@@ -497,32 +502,32 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                 }
                                             }}
                                             className={clsx(
-                                                'px-3 py-1.5 rounded-lg text-xs font-bold transition-colors',
+                                                'px-3 py-1.5 rounded-lg text-xs font-bold transition-colors h-auto',
                                                 formData.es_sena
-                                                    ? 'bg-amber-600 text-white'
-                                                    : 'bg-white text-amber-700 border border-amber-300'
+                                                    ? 'bg-amber-600 text-white hover:bg-amber-700 border-transparent'
+                                                    : 'bg-white text-amber-700 border border-amber-300 hover:bg-amber-50'
                                             )}
                                         >
                                             {formData.es_sena ? 'ACTIVA' : 'Activar'}
-                                        </button>
+                                        </Button>
                                     </div>
 
                                     {formData.es_sena && (
                                         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
                                             {SENA_OPCIONES.map(option => (
-                                                <button
+                                                <Button
                                                     key={option.value}
                                                     type="button"
                                                     onClick={() => applySenaTipo(option.value)}
                                                     className={clsx(
-                                                        'px-3 py-2 rounded-lg text-xs font-semibold border transition-colors text-left',
+                                                        'px-3 py-2 rounded-lg text-xs font-semibold border transition-colors justify-start h-auto whitespace-normal text-left',
                                                         formData.sena_tipo === option.value
-                                                            ? 'bg-amber-600 text-white border-amber-600'
+                                                            ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
                                                             : 'bg-white dark:bg-gray-800 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40'
                                                     )}
                                                 >
                                                     {option.label}
-                                                </button>
+                                                </Button>
                                             ))}
                                         </div>
                                     )}
@@ -535,12 +540,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 </label>
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                    <input
+                                    <Input
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         placeholder="Nombre, apellido o documento..."
-                                        className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500"
+                                        className="w-full pl-10 pr-4 py-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus-visible:ring-blue-500 h-auto"
                                     />
                                     {searchLoading && (
                                         <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" size={20} />
@@ -550,10 +555,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 {patients.length > 0 && (
                                     <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm max-h-[300px] overflow-y-auto">
                                         {patients.map((patient) => (
-                                            <button
+                                            <Button
                                                 key={patient.id_paciente}
+                                                variant="ghost"
                                                 onClick={() => selectPatient(patient)}
-                                                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-left"
+                                                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-left justify-start h-auto font-normal rounded-none"
                                             >
                                                 <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                                                     <User size={20} className="text-blue-600 dark:text-blue-400" />
@@ -566,7 +572,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                         {patient.documento || 'Sin documento'}
                                                     </p>
                                                 </div>
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 )}
@@ -609,7 +615,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 <div className="mb-6 space-y-3">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
+                                        <Input
                                             type="text"
                                             placeholder={formData.es_sena && formData.sena_tipo
                                                 ? 'Filtrar conceptos relacionados al flujo de sena...'
@@ -619,7 +625,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                 setConceptoSearch(e.target.value);
                                                 setFormData({ ...formData, concepto_nombre: e.target.value, concepto_id: '' });
                                             }}
-                                            className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 font-medium"
+                                            className="w-full pl-10 pr-4 py-3 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus-visible:ring-blue-500 font-medium h-auto"
                                         />
                                     </div>
                                     {conceptoSearch && !Object.values(tarifarioByCategoria).some(items => items.some(item => item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()))) && (
@@ -647,20 +653,20 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                 </h4>
                                                 <div className="grid grid-cols-1 gap-2">
                                                     {filteredItems.map((item) => (
-                                                        <button
+                                                        <Button
                                                             key={item.id}
                                                             onClick={() => {
                                                                 selectConcepto(item);
                                                                 setConceptoSearch(item.concepto_nombre);
                                                             }}
                                                             className={clsx(
-                                                                "p-3 text-left border rounded-xl transition-all group",
+                                                                "p-3 text-left border rounded-xl transition-all group h-auto justify-start w-full whitespace-normal",
                                                                 formData.concepto_id === item.id
-                                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm"
-                                                                    : "border-gray-100 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/5"
+                                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm hover:bg-blue-100"
+                                                                    : "border-gray-100 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/5 bg-transparent"
                                                             )}
                                                         >
-                                                            <div className="flex justify-between items-center">
+                                                            <div className="flex justify-between items-center w-full">
                                                                 <span className="font-medium text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                                                     {item.concepto_nombre}
                                                                 </span>
@@ -668,7 +674,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                                     REF: {formatCurrency(item.precio_base_usd, 'USD')}
                                                                 </span>
                                                             </div>
-                                                        </button>
+                                                        </Button>
                                                     ))}
                                                 </div>
                                             </div>
@@ -691,19 +697,20 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                             </div>
 
                             <div className="flex gap-3">
-                                <button
+                                <Button
+                                    variant="outline"
                                     onClick={() => setStep(1)}
-                                    className="flex-1 py-3 border border-gray-200 dark:border-gray-700 rounded-xl font-medium text-gray-600 dark:text-gray-400"
+                                    className="flex-1 py-3 border-gray-200 dark:border-gray-700 rounded-xl font-medium text-gray-600 dark:text-gray-400 h-auto"
                                 >
                                     Atrás
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={() => setStep(3)}
                                     disabled={!formData.concepto_nombre || (formData.es_sena && !formData.sena_tipo)}
-                                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-medium transition-colors"
+                                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-medium transition-colors h-auto"
                                 >
                                     Continuar
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     )}
@@ -734,19 +741,19 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {METODOS_PAGO.map((metodo) => (
-                                        <button
+                                        <Button
                                             key={metodo.value}
                                             onClick={() => setFormData({ ...formData, metodo_pago: metodo.value as FormData['metodo_pago'] })}
                                             className={clsx(
-                                                "p-3 border rounded-xl text-left transition-colors",
+                                                "p-3 border rounded-xl text-left transition-colors h-auto justify-start",
                                                 formData.metodo_pago === metodo.value
-                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100"
+                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 bg-transparent"
                                             )}
                                         >
                                             <span className="mr-2">{metodo.icon}</span>
                                             {metodo.label}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             </div>
@@ -770,22 +777,22 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                     <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                         <div>
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Cuota Nro.</label>
-                                            <input
+                                            <Input
                                                 type="number"
                                                 min="1"
                                                 value={formData.cuota_nro}
                                                 onChange={(e) => setFormData({ ...formData, cuota_nro: Math.max(1, parseInt(e.target.value) || 0) })}
-                                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
                                             />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-gray-500 mb-1">De un total de</label>
-                                            <input
+                                            <Input
                                                 type="number"
                                                 min="1"
                                                 value={formData.cuotas_total}
                                                 onChange={(e) => setFormData({ ...formData, cuotas_total: Math.max(1, parseInt(e.target.value) || 0) })}
-                                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
                                             />
                                         </div>
                                     </div>
@@ -822,28 +829,28 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                     Estado
                                 </label>
                                 <div className="flex gap-3">
-                                    <button
+                                    <Button
                                         onClick={() => setFormData({ ...formData, estado: 'pagado' })}
                                         className={clsx(
-                                            "flex-1 p-3 border rounded-xl transition-colors",
+                                            "flex-1 p-3 border rounded-xl transition-colors h-auto",
                                             formData.estado === 'pagado'
-                                                ? "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700"
-                                                : "border-gray-200 dark:border-gray-700"
+                                                ? "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 hover:bg-green-100"
+                                                : "border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50"
                                         )}
                                     >
                                         ✓ Pagado
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         onClick={() => setFormData({ ...formData, estado: 'pendiente' })}
                                         className={clsx(
-                                            "flex-1 p-3 border rounded-xl transition-colors",
+                                            "flex-1 p-3 border rounded-xl transition-colors h-auto",
                                             formData.estado === 'pendiente'
-                                                ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700"
-                                                : "border-gray-200 dark:border-gray-700"
+                                                ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 hover:bg-yellow-100"
+                                                : "border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50"
                                         )}
                                     >
                                         ⏳ Pendiente
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
 
@@ -855,11 +862,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                             <p className="font-medium text-amber-800 dark:text-amber-300">Carga histórica</p>
                                             <p className="text-xs text-amber-600 dark:text-amber-400">Registrar ingreso en fecha pasada</p>
                                         </div>
-                                        <button
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
                                             onClick={() => setCargaHistorica(!cargaHistorica)}
                                             className={clsx(
-                                                "w-12 h-6 rounded-full transition-colors relative",
-                                                cargaHistorica ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"
+                                                "w-12 h-6 rounded-full p-0 transition-colors relative hover:bg-transparent",
+                                                cargaHistorica ? "bg-amber-500 hover:bg-amber-600" : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400"
                                             )}
                                         >
                                             <span
@@ -868,7 +877,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                     cargaHistorica ? "right-0.5" : "left-0.5"
                                                 )}
                                             />
-                                        </button>
+                                        </Button>
                                     </div>
                                     {cargaHistorica && (
                                         <div>
@@ -876,31 +885,32 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                                 <Calendar size={14} className="inline mr-1" />
                                                 Fecha del movimiento
                                             </label>
-                                            <input
+                                            <Input
                                                 type="date"
                                                 value={fechaMovimiento}
                                                 onChange={(e) => setFechaMovimiento(e.target.value)}
                                                 max={getLocalISODate()}
-                                                className="w-full px-4 py-2 border border-amber-300 dark:border-amber-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-amber-500"
+                                                className="w-full px-4 py-2 border-amber-300 dark:border-amber-700 rounded-xl bg-white dark:bg-gray-800 focus-visible:ring-amber-500 h-auto"
                                             />
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            <button
+                            <Button
                                 onClick={() => setStep(4)}
-                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors h-auto"
                             >
                                 Continuar
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
+                                variant="link"
                                 onClick={() => setStep(2)}
-                                className="w-full text-sm text-blue-600 hover:underline"
+                                className="w-full text-sm text-blue-600 hover:underline h-auto p-0"
                             >
                                 ← Cambiar concepto
-                            </button>
+                            </Button>
                         </div>
                     )}
 
@@ -975,19 +985,19 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Observaciones (opcional)
                                 </label>
-                                <textarea
+                                <Textarea
                                     value={formData.observaciones}
                                     onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                                    className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none"
+                                    className="w-full p-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none min-h-[80px]"
                                     rows={3}
                                     placeholder="Notas adicionales..."
                                 />
                             </div>
 
-                            <button
+                            <Button
                                 onClick={handleSubmit}
                                 disabled={saving}
-                                className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                                className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 h-auto"
                             >
                                 {saving ? (
                                     <>
@@ -1000,14 +1010,15 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                         Confirmar Ingreso
                                     </>
                                 )}
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
+                                variant="link"
                                 onClick={() => setStep(3)}
-                                className="w-full text-sm text-blue-600 hover:underline"
+                                className="w-full text-sm text-blue-600 hover:underline h-auto p-0"
                             >
                                 ← Volver
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>

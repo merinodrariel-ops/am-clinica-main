@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { uploadToStorage } from '@/lib/supabase-storage';
 import { sendReciboEmailAction } from '@/app/actions/email';
 
@@ -303,149 +305,78 @@ export function ReciboGenerator({
             />
 
             {!generatedImage ? (
-                <button
+                <Button
                     onClick={generateRecibo}
                     disabled={isGenerating}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '12px 24px',
-                        backgroundColor: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: isGenerating ? 'not-allowed' : 'pointer',
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                    }}
+                    className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg h-auto"
                 >
                     {isGenerating ? '⏳ Generando...' : '🧾 Generar Comprobante'}
-                </button>
+                </Button>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="flex flex-col gap-4">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={generatedImage}
                         alt="Comprobante"
-                        style={{
-                            maxWidth: '100%',
-                            maxHeight: '52vh',
-                            objectFit: 'contain',
-                            borderRadius: '12px',
-                            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                        }}
+                        className="w-full max-h-[52vh] object-contain rounded-xl shadow-2xl"
                     />
 
-                    <div style={{ display: 'grid', gap: '10px' }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563' }}>WhatsApp destino (opcional)</label>
-                        <input
+                    <div className="grid gap-2">
+                        <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">WhatsApp destino (opcional)</label>
+                        <Input
                             type="text"
                             value={whatsappTarget}
                             onChange={(event) => setWhatsappTarget(event.target.value)}
                             placeholder="Ej: +54911..."
-                            style={{
-                                width: '100%',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '8px',
-                                padding: '10px 12px',
-                                fontSize: '14px',
-                            }}
+                            className="w-full text-sm h-auto"
                         />
                     </div>
 
-                    <div style={{ display: 'grid', gap: '10px' }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563' }}>Email destino (Gmail)</label>
-                        <input
+                    <div className="grid gap-2">
+                        <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">Email destino (Gmail)</label>
+                        <Input
                             type="email"
                             value={emailTarget}
                             onChange={(event) => setEmailTarget(event.target.value)}
                             placeholder="paciente@email.com"
-                            style={{
-                                width: '100%',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '8px',
-                                padding: '10px 12px',
-                                fontSize: '14px',
-                            }}
+                            className="w-full text-sm h-auto"
                         />
                         {emailStatus && (
-                            <p style={{ fontSize: '12px', margin: 0, color: emailStatus.includes('correctamente') ? '#059669' : '#b91c1c' }}>
+                            <p className={`text-xs m-0 ${emailStatus.includes('correctamente') ? 'text-emerald-600' : 'text-red-700'}`}>
                                 {emailStatus}
                             </p>
                         )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <button
+                    <div className="flex gap-3 flex-wrap">
+                        <Button
                             onClick={openWhatsAppWeb}
-                            style={{
-                                flex: 1,
-                                padding: '12px 20px',
-                                backgroundColor: '#25D366',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: 'bold',
-                            }}
+                            className="flex-1 px-5 py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold h-auto border-none"
                         >
                             💬 WhatsApp Web
-                        </button>
+                        </Button>
 
-                        <button
+                        <Button
                             onClick={shareViaWhatsApp}
-                            style={{
-                                flex: 1,
-                                padding: '12px 20px',
-                                backgroundColor: '#0ea5e9',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: 'bold',
-                            }}
+                            className="flex-1 px-5 py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold h-auto border-none"
                         >
                             📱 Compartir archivo
-                        </button>
+                        </Button>
 
-                        <button
+                        <Button
                             onClick={sendByEmail}
                             disabled={sendingEmail}
-                            style={{
-                                flex: 1,
-                                padding: '12px 20px',
-                                backgroundColor: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: sendingEmail ? 'not-allowed' : 'pointer',
-                                fontSize: '14px',
-                                fontWeight: 'bold',
-                                opacity: sendingEmail ? 0.7 : 1,
-                            }}
+                            className="flex-1 px-5 py-3 bg-red-500 hover:bg-red-600 text-white font-bold h-auto border-none disabled:opacity-70"
                         >
                             {sendingEmail ? '⏳ Enviando email...' : '✉️ Enviar por Gmail'}
-                        </button>
+                        </Button>
 
-                        <button
+                        <Button
                             onClick={downloadImage}
-                            style={{
-                                flex: 1,
-                                padding: '12px 20px',
-                                backgroundColor: '#333',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: 'bold',
-                            }}
+                            className="flex-1 px-5 py-3 bg-gray-800 hover:bg-gray-900 text-white font-bold h-auto border-none"
                         >
                             💾 Descargar
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

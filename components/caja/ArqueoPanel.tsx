@@ -7,6 +7,9 @@ import { supabase, CajaArqueo } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
 import { getUltimoCierre, cerrarCajaDelDia, abrirCajaDelDia, getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
 import { formatDateForLocale, getLocalISODate } from '@/lib/local-date';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 
 interface ArqueoPanelProps {
     bnaRate: number;
@@ -195,24 +198,24 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                     </div>
 
                     {!cierreHoy && aperturaHoy && (
-                        <button
+                        <Button
                             onClick={() => setShowCerrarModal(true)}
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm h-auto"
                         >
                             <Lock size={18} />
                             Cerrar Caja del Día
-                        </button>
+                        </Button>
                     )}
 
                     {!cierreHoy && !aperturaHoy && (
-                        <button
+                        <Button
                             onClick={() => setShowAbrirModal(true)}
                             disabled={opening}
-                            className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60"
+                            className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60 h-auto border-none"
                         >
                             {opening ? <Loader2 size={18} className="animate-spin" /> : <PlayCircle size={18} />}
                             Iniciar Jornada
-                        </button>
+                        </Button>
                     )}
                 </div>
 
@@ -322,20 +325,21 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                         </div>
 
                         <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex gap-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-b-2xl">
-                            <button
+                            <Button
+                                variant="outline"
                                 onClick={() => setShowAbrirModal(false)}
-                                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-white dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800"
+                                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-white dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 h-auto"
                             >
                                 Cancelar
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={handleAbrirCaja}
                                 disabled={opening}
-                                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] h-auto border-none"
                             >
                                 {opening ? <Loader2 size={18} className="animate-spin" /> : <PlayCircle size={18} />}
                                 Confirmar apertura
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -380,12 +384,12 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                                     </div>
                                     <div className="relative">
                                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
+                                        <Input
                                             type="number"
                                             value={saldoFinalUsd || ''}
                                             onChange={(e) => setSaldoFinalUsd(parseFloat(e.target.value) || 0)}
                                             className={clsx(
-                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold",
+                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold h-auto",
                                                 (saldoFinalUsd === saldosEsperados.usd) ? "border-gray-200 dark:border-gray-700" : "border-amber-200 dark:border-amber-800 ring-amber-500/10"
                                             )}
                                             placeholder="0.00"
@@ -407,12 +411,12 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                                     </div>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">$</span>
-                                        <input
+                                        <Input
                                             type="number"
                                             value={saldoFinalArs || ''}
                                             onChange={(e) => setSaldoFinalArs(parseFloat(e.target.value) || 0)}
                                             className={clsx(
-                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold",
+                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold h-auto",
                                                 (saldoFinalArs === saldosEsperados.ars) ? "border-gray-200 dark:border-gray-700" : "border-amber-200 dark:border-amber-800 ring-amber-500/10"
                                             )}
                                             placeholder="0.00"
@@ -429,10 +433,10 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                         Observaciones
                                     </label>
-                                    <textarea
+                                    <Textarea
                                         value={observaciones}
                                         onChange={(e) => setObservaciones(e.target.value)}
-                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none focus:ring-2 focus:ring-blue-500 outline-none transition-all h-auto"
                                         rows={2}
                                         placeholder="Ej: Diferencia por billetes chicos, etc..."
                                     />
@@ -440,20 +444,21 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                             </div>
                         </div>
                         <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex gap-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-b-2xl">
-                            <button
+                            <Button
+                                variant="outline"
                                 onClick={() => setShowCerrarModal(false)}
-                                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-white dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800"
+                                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-white dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 h-auto"
                             >
                                 Cancelar
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={handleCerrarCaja}
                                 disabled={saving}
-                                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] h-auto border-none"
                             >
                                 {saving ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />}
                                 Confirmar Cierre
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

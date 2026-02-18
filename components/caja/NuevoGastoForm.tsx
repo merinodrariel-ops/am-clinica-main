@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { X, DollarSign, Check, Loader2 } from 'lucide-react';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
@@ -109,12 +112,14 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                         <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">Registrar Gasto</h2>
                         <p className="text-xs text-red-600/70 dark:text-red-400/70">Salida de caja chica (Efectivo)</p>
                     </div>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={handleClose}
-                        className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-red-500"
+                        className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-red-500 h-auto w-auto"
                     >
                         <X size={20} />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Content */}
@@ -125,12 +130,12 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Concepto *
                         </label>
-                        <input
+                        <Input
                             type="text"
                             value={formData.concepto}
                             onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
                             placeholder="Ej. Delivery, Taxi, Art. Limpieza..."
-                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-red-500 outline-none"
+                            className="w-full px-4 py-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus-visible:ring-red-500 h-auto"
                             autoFocus
                         />
                     </div>
@@ -143,11 +148,11 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                         <div className="flex gap-3">
                             <div className="relative flex-1">
                                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                <input
+                                <Input
                                     type="number"
                                     value={formData.monto || ''}
                                     onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
-                                    className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-red-500 outline-none"
+                                    className="w-full pl-10 pr-4 py-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus-visible:ring-red-500 h-auto"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -172,19 +177,19 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Observaciones
                         </label>
-                        <textarea
+                        <Textarea
                             value={formData.observaciones}
                             onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                            className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none outline-none focus:ring-2 focus:ring-red-500"
+                            className="w-full p-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none focus-visible:ring-red-500 min-h-[80px]"
                             rows={3}
                             placeholder="Detalles adicionales..."
                         />
                     </div>
 
-                    <button
+                    <Button
                         onClick={handleSubmit}
                         disabled={saving}
-                        className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                        className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20 h-auto"
                     >
                         {saving ? (
                             <>
@@ -197,7 +202,7 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                                 Confirmar Egreso
                             </>
                         )}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div >

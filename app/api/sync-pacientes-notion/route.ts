@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { authorizeRequest } from '@/lib/api-auth';
 
 // Initialize Supabase Client with service role for admin operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -233,6 +234,11 @@ async function insertPatient(patient: NotionPatient): Promise<{ success: boolean
 }
 
 export async function GET(request: Request) {
+    const auth = await authorizeRequest(request);
+    if (!auth.authorized) {
+        return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
     try {
         if (!NOTION_API_KEY) {
             return NextResponse.json({ error: 'Missing NOTION_API_KEY' }, { status: 500 });
@@ -390,8 +396,8 @@ export async function POST(request: Request) {
         url.searchParams.set('dry_run', dryRun.toString());
         url.searchParams.set('limit', batchSize.toString());
 
-        // For POST, we just call GET logic
-        return GET(new Request(url.toString()));
+        // For POST, we just call GET logic preserving headers for auth
+        return GET(new Request(url.toString(), { headers: request.headers }));
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json({

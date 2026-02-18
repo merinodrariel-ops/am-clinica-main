@@ -23,6 +23,8 @@ import {
     createPrestacion
 } from '@/lib/caja-admin';
 import { supabase } from '@/lib/supabase';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 interface Props {
     sucursal: Sucursal;
@@ -165,26 +167,24 @@ export default function ProfesionalesTab({ tcBna }: Props) {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700">
-                        <Calendar className="w-5 h-5 text-indigo-500" />
-                        <input
+                    <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500 pointer-events-none" />
+                        <Input
                             type="month"
                             value={mesActual}
                             onChange={(e) => setMesActual(e.target.value)}
-                            className="bg-transparent border-none outline-none text-sm font-medium"
+                            className="pl-10 h-10 w-full rounded-xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-indigo-500"
                         />
                     </div>
                 </div>
 
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                <Button
                     onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-shadow"
                 >
                     <Plus className="w-5 h-5" />
                     Nueva Prestación
-                </motion.button>
+                </Button>
             </div>
 
             {/* New Prestacion Form */}
@@ -196,9 +196,9 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                 >
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-semibold">Nueva Prestación</h3>
-                        <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
+                        <Button variant="ghost" size="icon" onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
                             <X className="w-5 h-5" />
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
@@ -229,7 +229,7 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                             </label>
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Buscar paciente por nombre o apellido..."
                                     value={patientSearch}
@@ -237,7 +237,7 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                                         setPatientSearch(e.target.value);
                                         if (formData.paciente_id) setFormData({ ...formData, paciente_id: '' });
                                     }}
-                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus-visible:ring-indigo-500"
                                 />
                                 {searchingPatients && (
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -250,10 +250,11 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                             {patientResults.length > 0 && (
                                 <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
                                     {patientResults.map(p => (
-                                        <button
+                                        <Button
                                             key={p.id_paciente}
+                                            variant="ghost"
                                             onClick={() => selectPatient(p)}
-                                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 text-left border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors"
+                                            className="w-full flex justify-start items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 text-left border-b border-slate-50 dark:border-slate-700 last:border-0 h-auto font-normal rounded-none"
                                         >
                                             <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
                                                 <User className="w-4 h-4 text-indigo-600" />
@@ -262,7 +263,7 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                                                 <p className="text-sm font-medium">{p.apellido}, {p.nombre}</p>
                                                 <p className="text-[10px] text-slate-400 uppercase tracking-tighter">ID: {p.id_paciente.slice(0, 8)}</p>
                                             </div>
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             )}
@@ -275,7 +276,7 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                             </label>
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Buscar en catálogo o escribir..."
                                     value={treatmentSearch}
@@ -284,7 +285,7 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                                         setFormData({ ...formData, tratamiento: e.target.value });
                                         if (selectedHonorario) setSelectedHonorario(null);
                                     }}
-                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus-visible:ring-indigo-500"
                                 />
                             </div>
 
@@ -294,14 +295,15 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                                     {honorarios
                                         .filter(h => h.tratamiento.toLowerCase().includes(treatmentSearch.toLowerCase()))
                                         .map(h => (
-                                            <button
+                                            <Button
                                                 key={h.id}
+                                                variant="ghost"
                                                 onClick={() => handleHonorarioSelect(h)}
-                                                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 text-left border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors"
+                                                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 text-left border-b border-slate-50 dark:border-slate-700 last:border-0 h-auto font-normal rounded-none"
                                             >
                                                 <span className="text-sm font-medium">{h.tratamiento}</span>
                                                 <span className="text-xs font-mono text-indigo-500">{h.moneda} {h.precio.toLocaleString('es-AR')}</span>
-                                            </button>
+                                            </Button>
                                         ))
                                     }
                                 </div>
@@ -313,12 +315,12 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                 Tratamiento (Confirmación) *
                             </label>
-                            <input
+                            <Input
                                 type="text"
                                 value={formData.tratamiento}
                                 onChange={(e) => setFormData({ ...formData, tratamiento: e.target.value })}
                                 placeholder="Nombre del tratamiento"
-                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                className="w-full px-4 py-2.5 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus-visible:ring-indigo-500"
                             />
                         </div>
 
@@ -328,11 +330,11 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                                 Precio
                             </label>
                             <div className="flex gap-2">
-                                <input
+                                <Input
                                     type="number"
                                     value={formData.precio || ''}
                                     onChange={(e) => setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })}
-                                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    className="flex-1 px-4 py-2.5 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus-visible:ring-indigo-500"
                                 />
                                 <select
                                     value={formData.moneda}
@@ -357,20 +359,21 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                     </div>
 
                     <div className="flex justify-end gap-3">
-                        <button
+                        <Button
+                            variant="ghost"
                             onClick={() => setShowForm(false)}
                             className="px-4 py-2 text-slate-600 hover:text-slate-800"
                         >
                             Cancelar
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={handleSubmit}
                             disabled={submitting || !formData.tratamiento}
-                            className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50"
+                            className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-700"
                         >
                             {submitting ? 'Guardando...' : 'Registrar Prestación'}
                             <Check className="w-4 h-4" />
-                        </button>
+                        </Button>
                     </div>
                 </motion.div>
             )}

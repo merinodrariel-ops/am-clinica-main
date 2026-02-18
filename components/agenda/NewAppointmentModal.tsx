@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
 import { X, Loader2, Search, User, Trash2, Check, Stethoscope } from 'lucide-react';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 
 import { supabase, type TarifarioItem } from '@/lib/supabase';
 
@@ -245,9 +248,9 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         {initialData?.id ? 'Editar Cita' : 'Nueva Cita'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-full hover:bg-gray-200/50 transition-colors">
+                    <Button variant="ghost" size="icon" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-200/50 transition-colors">
                         <X size={20} />
-                    </button>
+                    </Button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
@@ -266,23 +269,25 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                         <span className="text-xs text-blue-500 font-medium">Paciente Registrado</span>
                                     </div>
                                 </div>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => { setPatientId(''); setSelectedPatientName(''); setSearchTerm(''); }}
-                                    className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all"
+                                    className="text-gray-400 hover:text-red-500 rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all h-auto p-2"
                                 >
                                     <X size={18} />
-                                </button>
+                                </Button>
                             </div>
                         ) : (
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                                     <Search className="h-5 w-5 text-gray-400" />
                                 </div>
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Buscar por nombre..."
-                                    className="block w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                                    className="block w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     autoFocus={!initialData?.id}
@@ -297,10 +302,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 {patients.length > 0 ? (
                                     <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 max-h-60 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
                                         {patients.map(p => (
-                                            <button
+                                            <Button
                                                 key={p.id}
                                                 type="button"
-                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+                                                variant="ghost"
+                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3 justify-start h-auto font-normal rounded-none"
                                                 onClick={() => {
                                                     setPatientId(p.id);
                                                     setSelectedPatientName(p.full_name);
@@ -316,7 +322,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                                     <div className="font-medium text-gray-900 dark:text-white">{p.full_name}</div>
                                                     <div className="text-xs text-gray-500">{p.phone}</div>
                                                 </div>
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 ) : (
@@ -334,11 +340,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     <div className="relative">
                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Título / Tratamiento</label>
                         <div className="relative">
-                            <input
+                            <Input
                                 type="text"
                                 required
                                 placeholder="Ej: Limpieza Dental"
-                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                 value={title}
                                 onChange={(e) => {
                                     setTitle(e.target.value);
@@ -362,10 +368,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     )
                                     .slice(0, 8)
                                     .map(item => (
-                                        <button
+                                        <Button
                                             key={item.id}
                                             type="button"
-                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-between"
+                                            variant="ghost"
+                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-between h-auto font-normal rounded-none"
                                             onClick={() => selectTarifarioItem(item)}
                                         >
                                             <div>
@@ -373,7 +380,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                                 <div className="text-[10px] text-gray-500 uppercase">{item.categoria}</div>
                                             </div>
                                             <div className="text-[10px] font-bold text-blue-500">Ref: USD {item.precio_base_usd}</div>
-                                        </button>
+                                        </Button>
                                     ))
                                 }
                                 {tarifarioItems.filter(item =>
@@ -392,20 +399,20 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     <div className="grid grid-cols-2 gap-5">
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Inicio</label>
-                            <input
+                            <Input
                                 type="datetime-local"
                                 required
-                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                 value={startTime}
                                 onChange={(e) => setStartTime(e.target.value)}
                             />
                         </div>
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Fin</label>
-                            <input
+                            <Input
                                 type="datetime-local"
                                 required
-                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                 value={endTime}
                                 onChange={(e) => setEndTime(e.target.value)}
                             />
@@ -418,10 +425,10 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Doctor / Profesional</label>
                             <div className="relative">
                                 <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Buscar doctor..."
-                                    className="block w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                                    className="block w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                     value={doctorSearch}
                                     onChange={(e) => {
                                         setDoctorSearch(e.target.value);
@@ -443,10 +450,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     {doctors
                                         .filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase()))
                                         .map(d => (
-                                            <button
+                                            <Button
                                                 key={d.id}
                                                 type="button"
-                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+                                                variant="ghost"
+                                                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3 justify-start h-auto font-normal rounded-none"
                                                 onClick={() => {
                                                     setDoctorId(d.id);
                                                     setDoctorSearch(d.full_name);
@@ -457,7 +465,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                                     <User className="w-4 h-4 text-blue-500" />
                                                 </div>
                                                 <div className="font-medium text-sm text-gray-900 dark:text-white">{d.full_name}</div>
-                                            </button>
+                                            </Button>
                                         ))
                                     }
                                     {doctors.filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase())).length === 0 && (
@@ -494,17 +502,18 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 { val: 'arrived', label: 'En Sala', color: 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' },
                                 { val: 'cancelled', label: 'Cancelado', color: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' },
                             ].map((opt) => (
-                                <button
+                                <Button
                                     key={opt.val}
                                     type="button"
+                                    variant="ghost"
                                     onClick={() => setStatus(opt.val)}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${status === opt.val
+                                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all h-auto ${status === opt.val
                                         ? 'ring-2 ring-offset-1 ring-gray-300 dark:ring-gray-600 ' + opt.color
                                         : 'bg-white dark:bg-gray-800 text-gray-600 border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     {opt.label}
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     </div>
@@ -512,10 +521,10 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     {/* Notes */}
                     <div>
                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Notas</label>
-                        <textarea
+                        <Textarea
                             rows={2}
                             placeholder="Detalles adicionales..."
-                            className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm resize-none"
+                            className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm resize-none h-auto"
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                         />
@@ -524,33 +533,35 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     {/* Footer Actions */}
                     <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
                         {initialData?.id ? (
-                            <button
+                            <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={handleDelete}
                                 disabled={loading}
-                                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors h-auto"
                             >
                                 <Trash2 size={16} className="group-hover:scale-110 transition-transform" />
                                 <span>Eliminar</span>
-                            </button>
+                            </Button>
                         ) : <div></div>}
 
                         <div className="flex gap-3">
-                            <button
+                            <Button
                                 type="button"
+                                variant="outline"
                                 onClick={onClose}
-                                className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-sm hover:shadow dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                                className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-all shadow-sm hover:shadow dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 h-auto"
                             >
                                 Cancelar
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 type="submit"
                                 disabled={loading}
-                                className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed h-auto border-none"
                             >
                                 {loading ? <Loader2 className="animate-spin h-4 w-4" /> : <Check size={18} />}
                                 <span>Guardar Cita</span>
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </form>

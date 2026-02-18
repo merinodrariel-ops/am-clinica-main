@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { ArrowRightLeft, DollarSign, Loader2, X, Send } from 'lucide-react';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
 
@@ -93,12 +96,14 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                             <p className="text-xs text-gray-500">Registrar entrega de efectivo</p>
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={handleClose}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg h-auto w-auto"
                     >
                         <X size={18} className="text-gray-500" />
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="p-5 space-y-4">
@@ -110,11 +115,11 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                         <div className="flex gap-3">
                             <div className="relative flex-1">
                                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input
+                                <Input
                                     type="number"
                                     value={monto || ''}
                                     onChange={(e) => setMonto(parseFloat(e.target.value) || 0)}
-                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                    className="w-full pl-10 pr-4 py-2.5 border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -155,10 +160,10 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Observaciones
                         </label>
-                        <textarea
+                        <Textarea
                             value={observaciones}
                             onChange={(e) => setObservaciones(e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 resize-none"
+                            className="w-full px-4 py-2.5 border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 resize-none min-h-[60px]"
                             rows={2}
                             placeholder="Detalles adicionales..."
                         />
@@ -182,16 +187,17 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                 </div>
 
                 <div className="p-5 border-t border-gray-100 dark:border-gray-700 flex gap-3">
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={handleClose}
-                        className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
+                        className="flex-1 py-2.5 border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-900 h-auto"
                     >
                         Cancelar
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleSubmit}
                         disabled={saving || monto <= 0}
-                        className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+                        className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white rounded-lg font-medium flex items-center justify-center gap-2 h-auto"
                     >
                         {saving ? (
                             <Loader2 size={18} className="animate-spin" />
@@ -199,7 +205,7 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                             <Send size={18} />
                         )}
                         Confirmar
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

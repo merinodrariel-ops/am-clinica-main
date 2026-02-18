@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
+import { authorizeRequest } from '@/lib/api-auth';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-export async function POST() {
+export async function POST(request: Request) {
+    const auth = await authorizeRequest(request);
+    if (!auth.authorized) {
+        return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
         auth: { autoRefreshToken: false, persistSession: false }
     });
@@ -117,7 +122,11 @@ CREATE POLICY "historial_insert_authenticated"
     }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+    const auth = await authorizeRequest(request);
+    if (!auth.authorized) {
+        return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
         auth: { autoRefreshToken: false, persistSession: false }
     });

@@ -22,6 +22,9 @@ import {
     resolverRegistro,
     anularRegistro
 } from '@/lib/caja-admin';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 
 interface Props {
     mes: string;
@@ -269,15 +272,14 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <motion.button
-                                            whileHover={{ scale: 1.05 }}
-                                            whileTap={{ scale: 0.95 }}
+                                        <Button
+                                            size="sm"
                                             onClick={() => openResolver(reg)}
-                                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium"
+                                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 h-auto"
                                         >
                                             <Eye className="w-4 h-4" />
                                             Resolver
-                                        </motion.button>
+                                        </Button>
                                     </td>
                                 </tr>
                             ))}
@@ -354,22 +356,22 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Hora Ingreso Corregida
                                         </label>
-                                        <input
+                                        <Input
                                             type="time"
                                             value={resolucionForm.hora_ingreso || ''}
                                             onChange={(e) => setResolucionForm({ ...resolucionForm, hora_ingreso: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Hora Egreso Corregida
                                         </label>
-                                        <input
+                                        <Input
                                             type="time"
                                             value={resolucionForm.hora_egreso || ''}
                                             onChange={(e) => setResolucionForm({ ...resolucionForm, hora_egreso: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                         />
                                     </div>
                                 </div>
@@ -394,12 +396,12 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                         URL de Evidencia (opcional)
                                     </label>
-                                    <input
+                                    <Input
                                         type="url"
                                         value={resolucionForm.evidencia_url || ''}
                                         onChange={(e) => setResolucionForm({ ...resolucionForm, evidencia_url: e.target.value })}
                                         placeholder="https://drive.google.com/..."
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                        className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                     />
                                 </div>
 
@@ -407,12 +409,12 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                         Nota de Resolución *
                                     </label>
-                                    <textarea
+                                    <Textarea
                                         value={resolucionForm.nota_resolucion || ''}
                                         onChange={(e) => setResolucionForm({ ...resolucionForm, nota_resolucion: e.target.value })}
                                         rows={3}
                                         placeholder="Describir cómo se verificó la información y justificar la corrección..."
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                        className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                     />
                                 </div>
 
@@ -426,32 +428,32 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
 
                             {/* Modal Footer */}
                             <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
-                                <button
+                                <Button
+                                    variant="ghost"
                                     onClick={handleAnular}
                                     disabled={submitting}
-                                    className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl font-medium disabled:opacity-50"
+                                    className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl font-medium disabled:opacity-50 hover:text-red-700"
                                 >
                                     <XCircle className="w-4 h-4" />
                                     Anular Registro
-                                </button>
+                                </Button>
 
                                 <div className="flex items-center gap-3">
-                                    <button
+                                    <Button
+                                        variant="ghost"
                                         onClick={() => setSelectedRegistro(null)}
                                         className="px-4 py-2 text-slate-600 hover:text-slate-800"
                                     >
                                         Cancelar
-                                    </button>
-                                    <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
+                                    </Button>
+                                    <Button
                                         onClick={handleResolver}
                                         disabled={submitting}
-                                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium shadow-lg disabled:opacity-50"
+                                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium shadow-lg disabled:opacity-50 hover:shadow-xl transition-shadow"
                                     >
                                         {submitting ? 'Guardando...' : 'Guardar Resolución'}
                                         <CheckCircle className="w-4 h-4" />
-                                    </motion.button>
+                                    </Button>
                                 </div>
                             </div>
                         </motion.div>

@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
+import { authorizeRequest } from '@/lib/api-auth';
 import { sendEmail } from '@/lib/nodemailer';
 
 export async function GET(request: Request) {
+    const auth = await authorizeRequest(request);
+    if (!auth.authorized) {
+        return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const to = searchParams.get('to') || process.env.NEXT_PUBLIC_OWNER_EMAIL || '';
 

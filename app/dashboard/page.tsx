@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { ArrowRight, Users, Banknote, Calendar, Loader2 } from 'lucide-react';
-import CajaAlerts from '@/components/dashboard/CajaAlerts';
-import UserAlerts from '@/components/dashboard/UserAlerts';
-import StatsGrid from '@/components/dashboard/StatsGrid';
 import dynamic from 'next/dynamic';
+const CajaAlerts = dynamic(() => import('@/components/dashboard/CajaAlerts'), { ssr: false });
+const UserAlerts = dynamic(() => import('@/components/dashboard/UserAlerts'), { ssr: false });
+const StatsGrid = dynamic(() => import('@/components/dashboard/StatsGrid'), {
+    ssr: false,
+    loading: () => <Skeleton className="h-32 w-full rounded-xl" />
+});
 import { Skeleton } from '@/components/ui/Skeleton';
 
 const ReferralChart = dynamic(() => import('@/components/dashboard/ReferralChart'), {
@@ -16,8 +19,14 @@ const NewPatientsCard = dynamic(() => import('@/components/dashboard/NewPatients
     ssr: false,
     loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />
 });
-import FinancialOverview from '@/components/dashboard/FinancialOverview';
-import ExecutiveCommandCenter from '@/components/dashboard/ExecutiveCommandCenter';
+const FinancialOverview = dynamic(() => import('@/components/dashboard/FinancialOverview'), {
+    ssr: false,
+    loading: () => <Skeleton className="h-[400px] w-full rounded-xl" />
+});
+const ExecutiveCommandCenter = dynamic(() => import('@/components/dashboard/ExecutiveCommandCenter'), {
+    ssr: false,
+    loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />
+});
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';

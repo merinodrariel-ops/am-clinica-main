@@ -26,6 +26,9 @@ import {
     BadgeCheck,
     ChevronDown
 } from 'lucide-react';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import {
     type Sucursal,
     type Personal,
@@ -369,57 +372,61 @@ export default function PersonalTab({ tcBna }: Props) {
             <div className="flex flex-col gap-4">
                 {/* Main Tabs */}
                 <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={() => setActiveTab('equipo')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors ${activeTab === 'equipo'
-                            ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-b-2 border-indigo-500'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'equipo'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-b-2 border-indigo-500 rounded-b-none'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
                             }`}
                     >
                         <Users className="w-4 h-4" />
                         Staff General
-                        <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full">
+                        <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full ml-2">
                             {empleados.length}
                         </span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
                         onClick={() => setActiveTab('profesionales')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors ${activeTab === 'profesionales'
-                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-b-2 border-emerald-500'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'profesionales'
+                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-b-2 border-emerald-500 rounded-b-none'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
                             }`}
                     >
                         <Stethoscope className="w-4 h-4" />
                         Profesionales
-                        <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full">
+                        <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full ml-2">
                             {profesionales.length}
                         </span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
                         onClick={() => setActiveTab('registros')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors ${activeTab === 'registros'
-                            ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-b-2 border-purple-500'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'registros'
+                            ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-b-2 border-purple-500 rounded-b-none'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
                             }`}
                     >
                         <Clock className="w-4 h-4" />
                         Horas & Liquidaciones
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
                         onClick={() => setActiveTab('observados')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors ${activeTab === 'observados'
-                            ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-b-2 border-amber-500'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'observados'
+                            ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-b-2 border-amber-500 rounded-b-none'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
                             }`}
                     >
                         <AlertTriangle className="w-4 h-4" />
                         Observados
                         {observadosCount > 0 && (
-                            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-amber-500 rounded-full">
+                            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-amber-500 rounded-full ml-2">
                                 {observadosCount}
                             </span>
                         )}
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Search and Actions */}
@@ -427,46 +434,42 @@ export default function PersonalTab({ tcBna }: Props) {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 max-w-md">
                             <Search className="w-5 h-5 text-slate-400" />
-                            <input
+                            <Input
                                 type="text"
                                 placeholder="Buscar personal..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-transparent border-none outline-none text-sm flex-1"
+                                className="bg-transparent border-none outline-none text-sm flex-1 focus-visible:ring-0 shadow-none h-auto p-0"
                             />
                         </div>
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                        <Button
                             onClick={() => openNewPersonalForm(activeTab === 'profesionales' ? 'profesional' : 'empleado')}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg"
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg hover:opacity-90 transition-opacity"
                         >
                             <UserPlus className="w-5 h-5" />
                             {activeTab === 'profesionales' ? 'Nuevo Profesional' : 'Nuevo Prestador'}
-                        </motion.button>
+                        </Button>
                     </div>
                 )}
 
                 {activeTab === 'registros' && (
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700">
-                            <Calendar className="w-5 h-5 text-indigo-500" />
-                            <input
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500 pointer-events-none" />
+                            <Input
                                 type="month"
                                 value={mesActual}
                                 onChange={(e) => setMesActual(e.target.value)}
-                                className="bg-transparent border-none outline-none text-sm font-medium"
+                                className="pl-10 h-10 w-full rounded-xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-indigo-500"
                             />
                         </div>
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                        <Button
                             onClick={() => setShowHorasForm(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg"
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg hover:opacity-90 transition-opacity"
                         >
                             <Plus className="w-5 h-5" />
                             Registrar Horas
-                        </motion.button>
+                        </Button>
                     </div>
                 )}
             </div>
@@ -504,40 +507,42 @@ export default function PersonalTab({ tcBna }: Props) {
                                         {editingPersonal ? 'Editar' : 'Registrar'} {formData.tipo === 'profesional' ? 'Profesional' : 'Prestador'}
                                     </h2>
                                 </div>
-                                <button
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => setShowForm(false)}
-                                    className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                                    className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
                                 >
                                     <X className="w-5 h-5" />
-                                </button>
+                                </Button>
                             </div>
 
                             {/* Form Body */}
                             <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)] space-y-6">
                                 {/* Type Toggle */}
                                 <div className="flex gap-2">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => setFormData({ ...formData, tipo: 'empleado', area: '' })}
-                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all ${formData.tipo === 'empleado'
-                                            ? 'bg-indigo-600 text-white shadow-lg'
-                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all h-auto ${formData.tipo === 'empleado'
+                                            ? 'bg-indigo-600 text-white shadow-lg hover:bg-indigo-700'
+                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                                             }`}
                                     >
                                         <Users className="w-4 h-4 inline mr-2" />
                                         Staff / Operativo
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         onClick={() => setFormData({ ...formData, tipo: 'profesional', area: '' })}
-                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all ${formData.tipo === 'profesional'
-                                            ? 'bg-emerald-600 text-white shadow-lg'
-                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all h-auto ${formData.tipo === 'profesional'
+                                            ? 'bg-emerald-600 text-white shadow-lg hover:bg-emerald-700'
+                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                                             }`}
                                     >
                                         <Stethoscope className="w-4 h-4 inline mr-2" />
                                         Profesional
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {/* Basic Info */}
@@ -546,11 +551,11 @@ export default function PersonalTab({ tcBna }: Props) {
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Nombre *
                                         </label>
-                                        <input
+                                        <Input
                                             type="text"
                                             value={formData.nombre}
                                             onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                             placeholder="Nombre"
                                         />
                                     </div>
@@ -558,11 +563,11 @@ export default function PersonalTab({ tcBna }: Props) {
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Apellido
                                         </label>
-                                        <input
+                                        <Input
                                             type="text"
                                             value={formData.apellido}
                                             onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                             placeholder="Apellido"
                                         />
                                     </div>
@@ -577,7 +582,7 @@ export default function PersonalTab({ tcBna }: Props) {
                                         <select
                                             value={formData.area}
                                             onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none"
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         >
                                             <option value="">Seleccionar área...</option>
                                             {areasForType.map(area => (
@@ -595,11 +600,11 @@ export default function PersonalTab({ tcBna }: Props) {
                                             <Mail className="w-4 h-4 inline mr-1" />
                                             Email
                                         </label>
-                                        <input
+                                        <Input
                                             type="email"
                                             value={formData.email}
                                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                             placeholder="email@ejemplo.com"
                                         />
                                     </div>
@@ -608,11 +613,11 @@ export default function PersonalTab({ tcBna }: Props) {
                                             <Phone className="w-4 h-4 inline mr-1" />
                                             WhatsApp
                                         </label>
-                                        <input
+                                        <Input
                                             type="tel"
                                             value={formData.whatsapp}
                                             onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                             placeholder="1123456789"
                                         />
                                     </div>
@@ -625,141 +630,148 @@ export default function PersonalTab({ tcBna }: Props) {
                                             <FileText className="w-4 h-4 inline mr-1" />
                                             DNI / Documento
                                         </label>
-                                        <input
-                                            type="text"
-                                            value={formData.documento}
-                                            onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                            placeholder="12345678"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            <Building2 className="w-4 h-4 inline mr-1" />
-                                            Condición AFIP
-                                        </label>
-                                        <select
-                                            value={formData.condicion_afip || ''}
-                                            onChange={(e) => setFormData({ ...formData, condicion_afip: (e.target.value || undefined) as CreatePersonalInput['condicion_afip'] })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                        >
-                                            <option value="">Seleccionar...</option>
-                                            {CONDICION_AFIP_OPTIONS.map(opt => (
-                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        <MapPin className="w-4 h-4 inline mr-1" />
-                                        Dirección / Barrio
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.barrio_localidad}
-                                        onChange={(e) => setFormData({ ...formData, barrio_localidad: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                        placeholder="Ej: Palermo, CABA"
-                                    />
-                                </div>
-
-                                {/* Payment Info */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            <DollarSign className="w-4 h-4 inline mr-1" />
-                                            Valor Hora (ARS)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={formData.valor_hora_ars}
-                                            onChange={(e) => setFormData({ ...formData, valor_hora_ars: parseFloat(e.target.value) || 0 })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                    {formData.tipo === 'profesional' && (
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                % Honorarios
+                                                <FileText className="w-4 h-4 inline mr-1" />
+                                                DNI / Documento
                                             </label>
-                                            <input
-                                                type="number"
-                                                value={formData.porcentaje_honorarios}
-                                                onChange={(e) => setFormData({ ...formData, porcentaje_honorarios: parseFloat(e.target.value) || 0 })}
-                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                                placeholder="0"
-                                                min="0"
-                                                max="100"
+                                            <Input
+                                                type="text"
+                                                value={formData.documento}
+                                                onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
+                                                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                                placeholder="12345678"
                                             />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <Building2 className="w-4 h-4 inline mr-1" />
+                                                Condición AFIP
+                                            </label>
+                                            <select
+                                                value={formData.condicion_afip || ''}
+                                                onChange={(e) => setFormData({ ...formData, condicion_afip: (e.target.value || undefined) as CreatePersonalInput['condicion_afip'] })}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value="">Seleccionar...</option>
+                                                {CONDICION_AFIP_OPTIONS.map(opt => (
+                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            <MapPin className="w-4 h-4 inline mr-1" />
+                                            Dirección / Barrio
+                                        </label>
+                                        <Input
+                                            type="text"
+                                            value={formData.barrio_localidad}
+                                            onChange={(e) => setFormData({ ...formData, barrio_localidad: e.target.value })}
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            placeholder="Ej: Palermo, CABA"
+                                        />
+                                    </div>
+
+                                    {/* Payment Info */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <DollarSign className="w-4 h-4 inline mr-1" />
+                                                Valor Hora (ARS)
+                                            </label>
+                                            <Input
+                                                type="number"
+                                                value={formData.valor_hora_ars}
+                                                onChange={(e) => setFormData({ ...formData, valor_hora_ars: parseFloat(e.target.value) || 0 })}
+                                                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        {formData.tipo === 'profesional' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    % Honorarios
+                                                </label>
+                                                <Input
+                                                    type="number"
+                                                    value={formData.porcentaje_honorarios}
+                                                    onChange={(e) => setFormData({ ...formData, porcentaje_honorarios: parseFloat(e.target.value) || 0 })}
+                                                    className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                                    placeholder="0"
+                                                    min="0"
+                                                    max="100"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Professional specific fields */}
+                                    {formData.tipo === 'profesional' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <BadgeCheck className="w-4 h-4 inline mr-1" />
+                                                    Matrícula Provincial
+                                                </label>
+                                                <Input
+                                                    type="text"
+                                                    value={formData.matricula_provincial}
+                                                    onChange={(e) => setFormData({ ...formData, matricula_provincial: e.target.value })}
+                                                    className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                                    placeholder="MP-12345"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <Shield className="w-4 h-4 inline mr-1" />
+                                                    Especialidad
+                                                </label>
+                                                <Input
+                                                    type="text"
+                                                    value={formData.especialidad}
+                                                    onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })}
+                                                    className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                                    placeholder="Ej: Ortodoncia"
+                                                />
+                                            </div>
                                         </div>
                                     )}
-                                </div>
 
-                                {/* Professional specific fields */}
-                                {formData.tipo === 'profesional' && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                <BadgeCheck className="w-4 h-4 inline mr-1" />
-                                                Matrícula Provincial
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={formData.matricula_provincial}
-                                                onChange={(e) => setFormData({ ...formData, matricula_provincial: e.target.value })}
-                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                                                placeholder="MP-12345"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                <Shield className="w-4 h-4 inline mr-1" />
-                                                Especialidad
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={formData.especialidad}
-                                                onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })}
-                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                                                placeholder="Ej: Ortodoncia"
-                                            />
-                                        </div>
+                                    {/* Description */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Notas / Descripción
+                                        </label>
+                                        <Textarea
+                                            value={formData.descripcion}
+                                            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[80px]"
+                                            placeholder="Información adicional..."
+                                        />
                                     </div>
-                                )}
-
-                                {/* Description */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Notas / Descripción
-                                    </label>
-                                    <textarea
-                                        value={formData.descripcion}
-                                        onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[80px]"
-                                        placeholder="Información adicional..."
-                                    />
                                 </div>
                             </div>
 
                             {/* Form Footer */}
                             <div className="flex justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                                <button
+                                <Button
+                                    variant="ghost"
                                     onClick={() => setShowForm(false)}
                                     className="px-4 py-2 text-slate-600 hover:text-slate-800"
                                 >
                                     Cancelar
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={handleSubmitPersonal}
                                     disabled={submitting || !formData.nombre || !formData.area}
-                                    className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50"
+                                    className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-700 transition-colors"
                                 >
                                     {submitting ? 'Guardando...' : editingPersonal ? 'Actualizar' : 'Crear'}
                                     <Check className="w-4 h-4" />
-                                </button>
+                                </Button>
                             </div>
                         </motion.div>
                     </motion.div>
@@ -791,9 +803,9 @@ export default function PersonalTab({ tcBna }: Props) {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Paciente</label>
-                                    <input
+                                    <Input
                                         type="text"
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                        className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
                                         value={prestacionForm.paciente_nombre}
                                         onChange={e => setPrestacionForm({ ...prestacionForm, paciente_nombre: e.target.value })}
                                         placeholder="Nombre del Paciente"
@@ -829,9 +841,9 @@ export default function PersonalTab({ tcBna }: Props) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium mb-1">Valor Cobrado</label>
-                                        <input
+                                        <Input
                                             type="number"
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
                                             value={prestacionForm.valor_cobrado}
                                             onChange={e => setPrestacionForm({ ...prestacionForm, valor_cobrado: parseFloat(e.target.value) || 0 })}
                                         />
@@ -851,8 +863,8 @@ export default function PersonalTab({ tcBna }: Props) {
 
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Notas</label>
-                                    <textarea
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                    <Textarea
+                                        className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
                                         rows={2}
                                         value={prestacionForm.notas}
                                         onChange={e => setPrestacionForm({ ...prestacionForm, notas: e.target.value })}
@@ -861,19 +873,20 @@ export default function PersonalTab({ tcBna }: Props) {
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4">
-                                <button
+                                <Button
+                                    variant="ghost"
                                     onClick={() => setShowPrestacionForm(false)}
                                     className="px-4 py-2 text-slate-500 hover:text-slate-700"
                                 >
                                     Cancelar
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     onClick={handleRegistrarPrestacion}
                                     disabled={submitting}
                                     className="bg-emerald-600 text-white px-6 py-2 rounded-xl hover:bg-emerald-700 disabled:opacity-50"
                                 >
                                     {submitting ? 'Guardando...' : 'Registrar'}
-                                </button>
+                                </Button>
                             </div>
                         </motion.div>
                     </motion.div>
@@ -887,12 +900,13 @@ export default function PersonalTab({ tcBna }: Props) {
                         <div className="col-span-full p-12 text-center text-slate-400">
                             <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                             <p>No hay miembros del staff registrados</p>
-                            <button
+                            <Button
+                                variant="link"
                                 onClick={() => openNewPersonalForm('empleado')}
-                                className="mt-4 text-indigo-600 hover:text-indigo-700 font-medium"
+                                className="mt-4 text-indigo-600 hover:text-indigo-700 font-medium h-auto p-0"
                             >
                                 + Agregar primer prestador
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         filteredEmpleados.map((p) => (
@@ -917,12 +931,14 @@ export default function PersonalTab({ tcBna }: Props) {
                                             {p.area || p.rol}
                                         </span>
                                     </div>
-                                    <button
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => openEditForm(p)}
-                                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                        className="h-8 w-8 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                                     >
                                         <Pencil className="w-4 h-4" />
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 <div className="space-y-2 text-sm">
@@ -973,12 +989,13 @@ export default function PersonalTab({ tcBna }: Props) {
                             <div className="col-span-full p-12 text-center text-slate-400">
                                 <Stethoscope className="w-12 h-12 mx-auto mb-4 opacity-50" />
                                 <p>No hay profesionales registrados</p>
-                                <button
+                                <Button
+                                    variant="link"
                                     onClick={() => openNewPersonalForm('profesional')}
-                                    className="mt-4 text-emerald-600 hover:text-emerald-700 font-medium"
+                                    className="mt-4 text-emerald-600 hover:text-emerald-700 font-medium h-auto p-0"
                                 >
                                     + Agregar primer profesional
-                                </button>
+                                </Button>
                             </div>
                         ) : (
                             filteredProfesionales.map((p) => (
@@ -1007,18 +1024,22 @@ export default function PersonalTab({ tcBna }: Props) {
                                             </span>
                                         </div>
                                         <div className="flex gap-1">
-                                            <button
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => openEditForm(p)}
-                                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors"
+                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors"
                                             >
                                                 <Pencil className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
                                                 title="Ver ficha completa"
                                             >
                                                 <Eye className="w-4 h-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
 
@@ -1063,13 +1084,13 @@ export default function PersonalTab({ tcBna }: Props) {
                                             <span className="text-xs text-amber-600 font-medium">Pendiente de pago</span>
                                         </div>
                                     )}
-                                    <button
+                                    <Button
                                         onClick={() => openPrestacionForm(p.id)}
-                                        className="w-full mt-4 flex items-center justify-center gap-2 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors font-medium text-sm"
+                                        className="w-full mt-4 flex items-center justify-center gap-2 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors font-medium text-sm h-auto"
                                     >
                                         <Plus className="w-4 h-4" />
                                         Registrar Prestación
-                                    </button>
+                                    </Button>
                                 </motion.div>
                             ))
                         )}
@@ -1090,9 +1111,9 @@ export default function PersonalTab({ tcBna }: Props) {
                             >
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-lg font-semibold">Registrar Horas</h3>
-                                    <button onClick={() => setShowHorasForm(false)} className="text-slate-400 hover:text-slate-600">
+                                    <Button variant="ghost" size="icon" onClick={() => setShowHorasForm(false)} className="text-slate-400 hover:text-slate-600 h-auto w-auto p-1">
                                         <X className="w-5 h-5" />
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -1115,11 +1136,11 @@ export default function PersonalTab({ tcBna }: Props) {
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Fecha *
                                         </label>
-                                        <input
+                                        <Input
                                             type="date"
                                             value={horasForm.fecha}
                                             onChange={(e) => setHorasForm({ ...horasForm, fecha: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                         />
                                     </div>
 
@@ -1127,13 +1148,13 @@ export default function PersonalTab({ tcBna }: Props) {
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Horas *
                                         </label>
-                                        <input
+                                        <Input
                                             type="number"
                                             step="0.5"
                                             min="0"
                                             value={horasForm.horas}
                                             onChange={(e) => setHorasForm({ ...horasForm, horas: parseFloat(e.target.value) || 0 })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                         />
                                     </div>
 
@@ -1141,31 +1162,32 @@ export default function PersonalTab({ tcBna }: Props) {
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Observaciones
                                         </label>
-                                        <input
+                                        <Input
                                             type="text"
                                             value={horasForm.observaciones}
                                             onChange={(e) => setHorasForm({ ...horasForm, observaciones: e.target.value })}
                                             placeholder="Opcional..."
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="flex justify-end gap-3">
-                                    <button
+                                    <Button
+                                        variant="ghost"
                                         onClick={() => setShowHorasForm(false)}
                                         className="px-4 py-2 text-slate-600 hover:text-slate-800"
                                     >
                                         Cancelar
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         onClick={handleRegistrarHoras}
                                         disabled={submitting || horasForm.horas <= 0}
-                                        className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50"
+                                        className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-700"
                                     >
                                         {submitting ? 'Guardando...' : 'Registrar'}
                                         <Check className="w-4 h-4" />
-                                    </button>
+                                    </Button>
                                 </div>
                             </motion.div>
                         )}
@@ -1268,14 +1290,14 @@ export default function PersonalTab({ tcBna }: Props) {
                                                 </span>
                                             </div>
                                         ) : (
-                                            <button
+                                            <Button
                                                 onClick={() => handleGenerarLiquidacion(p.id)}
                                                 disabled={submitting || (isProfesional ? totalHonorarios === 0 : totalHoras === 0)}
-                                                className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-200"
+                                                className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-200 h-auto"
                                             >
                                                 <DollarSign className="w-4 h-4" />
                                                 Generar Liquidación
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 );

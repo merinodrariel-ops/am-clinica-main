@@ -1,6 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { authorizeRequest } from '@/lib/api-auth';
 
 // Initialize Supabase Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -55,6 +56,11 @@ type NotionQueryResponse = {
 };
 
 export async function GET(request: Request) {
+    const auth = await authorizeRequest(request);
+    if (!auth.authorized) {
+        return NextResponse.json({ error: auth.error }, { status: 401 });
+    }
+
     try {
         if (!NOTION_API_KEY) {
             console.error('Missing NOTION_API_KEY');

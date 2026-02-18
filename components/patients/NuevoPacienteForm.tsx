@@ -13,6 +13,9 @@ import {
     ChevronRight,
     Check
 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
 import { upsertPatientAction } from '@/app/actions/patients';
 
 interface NuevoPacienteFormProps {
@@ -188,12 +191,14 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                             <p className="text-xs text-gray-500">Paso {step} de 3</p>
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={handleClose}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        className="hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-500"
                     >
-                        <X size={20} className="text-gray-500" />
-                    </button>
+                        <X size={20} />
+                    </Button>
                 </div>
 
                 {/* Progress Bar */}
@@ -218,11 +223,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Apellido *
                                     </label>
-                                    <input
+                                    <Input
                                         type="text"
                                         value={form.apellido}
                                         onChange={(e) => setForm({ ...form, apellido: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                        className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                         placeholder="Pérez"
                                     />
                                 </div>
@@ -230,11 +235,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Nombre *
                                     </label>
-                                    <input
+                                    <Input
                                         type="text"
                                         value={form.nombre}
                                         onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                        className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                         placeholder="Juan"
                                     />
                                 </div>
@@ -245,11 +250,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         DNI / Pasaporte
                                     </label>
-                                    <input
+                                    <Input
                                         type="text"
                                         value={form.documento}
                                         onChange={(e) => setForm({ ...form, documento: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                        className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                         placeholder="12345678"
                                     />
                                 </div>
@@ -259,11 +264,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                     </label>
                                     <div className="relative">
                                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
+                                        <Input
                                             type="date"
                                             value={form.fecha_nacimiento}
                                             onChange={(e) => setForm({ ...form, fecha_nacimiento: e.target.value })}
-                                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                         />
                                     </div>
                                 </div>
@@ -326,11 +331,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                     </select>
                                     <div className="relative flex-1">
                                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
+                                        <Input
                                             type="tel"
                                             value={form.whatsapp_numero}
                                             onChange={(e) => setForm({ ...form, whatsapp_numero: e.target.value })}
-                                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                             placeholder="1123456789"
                                         />
                                     </div>
@@ -350,11 +355,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                 <div className="flex gap-2">
                                     <div className="relative flex-1">
                                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
+                                        <Input
                                             type="text"
                                             value={form.email_local}
                                             onChange={(e) => setForm({ ...form, email_local: e.target.value })}
-                                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                             placeholder="juanperez"
                                         />
                                     </div>
@@ -370,11 +375,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                     </select>
                                 </div>
                                 {form.email_dominio === 'otro' && (
-                                    <input
+                                    <Input
                                         type="text"
                                         value={form.email_custom_domain}
                                         onChange={(e) => setForm({ ...form, email_custom_domain: e.target.value })}
-                                        className="w-full mt-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                        className="w-full mt-2 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                         placeholder="Ingrese dominio personalizado"
                                     />
                                 )}
@@ -406,11 +411,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Zona / Barrio
                                     </label>
-                                    <input
+                                    <Input
                                         type="text"
                                         value={form.zona_barrio}
                                         onChange={(e) => setForm({ ...form, zona_barrio: e.target.value })}
-                                        className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                        className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                         placeholder="Palermo, Recoleta..."
                                     />
                                 </div>
@@ -422,11 +427,11 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                 </label>
                                 <div className="relative">
                                     <MapPin className="absolute left-3 top-3 text-gray-400" size={18} />
-                                    <input
+                                    <Input
                                         type="text"
                                         value={form.direccion}
                                         onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
                                         placeholder="Av. Corrientes 1234, Piso 5"
                                     />
                                 </div>
@@ -526,10 +531,10 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Observaciones generales
                                 </label>
-                                <textarea
+                                <Textarea
                                     value={form.observaciones_generales}
                                     onChange={(e) => setForm({ ...form, observaciones_generales: e.target.value })}
-                                    className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 resize-none"
+                                    className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto resize-none"
                                     rows={3}
                                     placeholder="Notas adicionales sobre el paciente..."
                                 />
@@ -540,28 +545,29 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
 
                 {/* Footer */}
                 <div className="p-5 border-t border-gray-100 dark:border-gray-700 flex justify-between shrink-0">
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={() => step > 1 ? setStep(step - 1) : handleClose()}
-                        className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-900 h-auto"
                     >
                         <ChevronLeft size={18} />
                         {step === 1 ? 'Cancelar' : 'Anterior'}
-                    </button>
+                    </Button>
 
                     {step < 3 ? (
-                        <button
+                        <Button
                             onClick={() => setStep(step + 1)}
                             disabled={step === 1 && (!form.apellido || !form.nombre)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium h-auto"
                         >
                             Siguiente
                             <ChevronRight size={18} />
-                        </button>
+                        </Button>
                     ) : (
-                        <button
+                        <Button
                             onClick={handleSubmit}
                             disabled={saving}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium"
+                            className="flex items-center gap-2 px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium h-auto"
                         >
                             {saving ? (
                                 <Loader2 size={18} className="animate-spin" />
@@ -569,7 +575,7 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                 <Check size={18} />
                             )}
                             Guardar Paciente
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

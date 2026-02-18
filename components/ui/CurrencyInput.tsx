@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Input } from "@/components/ui/Input";
 
 interface CurrencyInputProps {
     value: number;
@@ -10,6 +11,7 @@ interface CurrencyInputProps {
     placeholder?: string;
     disabled?: boolean;
 }
+
 
 export default function CurrencyInput({
     value,
@@ -59,14 +61,14 @@ export default function CurrencyInput({
 
     return (
         <div className="relative w-full">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none select-none">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none select-none z-10">
                 $
             </span>
-            <input
+            <Input
                 type="text"
                 inputMode="decimal"
                 disabled={disabled}
-                className={`w-full pl-7 pr-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-right bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${className}`}
+                className={`pl-7 pr-3 text-right tabular-nums ${className}`}
                 placeholder={placeholder}
                 value={isFocused ? localValue : (value === 0 ? '' : formattedValue)}
                 onFocus={handleFocus}

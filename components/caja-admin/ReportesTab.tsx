@@ -24,6 +24,8 @@ import {
     type ReporteSummary
 } from '@/lib/caja-admin';
 import { supabase } from '@/lib/supabase';
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 
 interface Props {
@@ -152,18 +154,21 @@ export default function ReportesTab({ sucursal }: Props) {
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700">
                         <Calendar className="w-5 h-5 text-indigo-500" />
-                        <input
+                        <Input
                             type="month"
                             value={mesActual}
                             onChange={(e) => setMesActual(e.target.value)}
-                            className="bg-transparent border-none outline-none text-sm font-medium"
+                            className="bg-transparent border-none outline-none text-sm font-medium p-0 h-auto focus-visible:ring-0 shadow-none"
                         />
                     </div>
 
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50">
+                    <Button
+                        variant="outline"
+                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 h-auto"
+                    >
                         <Download className="w-4 h-4" />
                         Exportar
-                    </button>
+                    </Button>
                 </div>
             </div>
 
