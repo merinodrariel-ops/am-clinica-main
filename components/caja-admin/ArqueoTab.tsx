@@ -11,7 +11,7 @@ import {
     type CuentaFinanciera,
     getCuentas,
     getUltimoCierreAdmin,
-
+    getCurrentBalanceAdmin,
     cerrarCajaAdmin
 } from '@/lib/caja-admin';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +32,7 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
     const [submitting, setSubmitting] = useState(false);
     const [showCerrarModal, setShowCerrarModal] = useState(false);
     const [saldosIniciales, setSaldosIniciales] = useState<Record<string, number>>({});
+    const [expectedBalances, setExpectedBalances] = useState<Record<string, number>>({});
 
 
     useEffect(() => {
@@ -43,9 +44,10 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
         setLoading(true);
         try {
             const today = new Date().toISOString().split('T')[0];
-            const [cuentasData, cierreData] = await Promise.all([
+            const [cuentasData, cierreData, balanceActual] = await Promise.all([
                 getCuentas(sucursal.id),
                 getUltimoCierreAdmin(sucursal.id),
+                getCurrentBalanceAdmin(sucursal.id),
             ]);
             setCuentas(cuentasData);
 
@@ -60,30 +62,14 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                 setUltimoCierre(cierreData);
             }
 
-            // Calculate expected balances for "Active" day
-            // Initial (from last closure) + Movements
-            // Initial (from last closure) + Movements
-            // const initial = cierreData && cierreData.fecha !== today ? cierreData.saldos_finales : (cierreData && cierreData.fecha === today ? (await getUltimoCierreAdmin(sucursal.id, today))?.saldos_finales : {});
-            // const startBalances = initial || {};
+            setExpectedBalances(balanceActual.saldosPorCuenta);
 
-            // To do this strictly, we need to fetch movements of the day.
-            // Simplified: Just use initial for now, or fetch movements if we want to show "Expected".
-            // Since the user didn't explicitly ask for "Expected vs Actual" breakdown in Admin as detailed as Reception, 
-            // but "Diferencia" implies expected.
-            // Let's assume 0 difference for now or fetch movements.
-            // Ideally we fetch movements.
-
-            // NOTE: Admin module is complex, let's keep it simple: Just allow counting and saving.
-            // The "Difference" will be calculated based on user input vs (Initial + Ops).
-            // For now, I will skip complex "Expected" calculation in this view to avoid over-engineering unless required.
-            // I will just let them input the "Conteo".
-
-            // Initialize saldos inputs with 0 or previous
+            // Initialize saldos inputs with expected values
             const formInit: Record<string, number> = {};
             cuentasData.forEach(c => {
                 if (c.tipo_cuenta === 'EFECTIVO') {
-                    // Default to 0, let them count.
-                    formInit[c.id] = 0;
+                    // Pre-fill with expected balance to help the user
+                    formInit[c.id] = balanceActual.saldosPorCuenta[c.id] || 0;
                 }
             });
             setSaldos(formInit);
@@ -96,9 +82,6 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
     }
 
     async function handleCerrar() {
-        // Validation for initial closure
-        // Validation skipped for automation ease, or handle with better UX later
-
         setSubmitting(true);
         try {
             // Calculate totals
@@ -110,34 +93,29 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                 return sum;
             }, 0);
 
-            // Fetch movements to calculate difference
-            // This is "Server-side" logic usually, but we need to pass difference to RPC.
-            // ... RPC can calculate difference? No, RPC needs specific inputs.
-            // We'll pass 0 difference for now or implement full calculation.
-            // Given time constraints, passing 0 difference if calculation is complex.
-            // BUT, users want "Audit".
-            // I'll assume Difference = 0 for this iteration (Trust the count).
+            // Fetch current expected balances
+            const balanceActualNow = await getCurrentBalanceAdmin(sucursal.id);
+            const totalExpectedUsdEq = cuentas.reduce((sum, c) => {
+                const val = balanceActualNow.saldosPorCuenta[c.id] || 0;
+                if (c.tipo_cuenta !== 'EFECTIVO') return sum;
+                if (c.moneda === 'USD') return sum + val;
+                if (c.moneda === 'ARS' && tcBna) return sum + (val / tcBna);
+                return sum;
+            }, 0);
 
             const { success, error } = await cerrarCajaAdmin({
                 sucursalId: sucursal.id,
                 fecha: new Date().toISOString().split('T')[0],
                 usuario: 'Admin', // Should be dynamic
-                saldosFinales: saldos, // Only modified ones? or all? Merge with others?
-                // Admin box has many accounts (Bank, etc). We only count Cash?
-                // The interface `saldos` only has EFECTIVO keys currently?
-                // We should safeguard to keep other accounts' balances if feasible, but "Cierre de Caja" usually implies Cash Count.
-                // Admin architecture seems to store ALL balances in `saldos_finales`.
-                // I will pass `saldos` which contains EFECTIVO. 
-                // Non-cash accounts: Should they be carried over?
-                // Probably yes.
-
+                saldosFinales: saldos,
                 saldoFinalUsdEq: totalCountedUsdEq,
-                diferenciaUsd: 0, // Placeholder
+                diferenciaUsd: totalCountedUsdEq - totalExpectedUsdEq,
                 tcBna: tcBna || 0,
                 observaciones,
                 snapshot: {
                     cuentas: cuentas,
-                    saldos_count: saldos
+                    saldos_count: saldos,
+                    expected: balanceActualNow.saldosPorCuenta
                 },
                 saldosIniciales: !ultimoCierre ? saldosIniciales : undefined,
             });
@@ -156,6 +134,22 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
     const { role } = useAuth();
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando...</div>;
+
+    const totalExpectedUsdEq = cuentas.reduce((sum, c) => {
+        const val = expectedBalances[c.id] || 0;
+        if (c.tipo_cuenta !== 'EFECTIVO') return sum;
+        if (c.moneda === 'USD') return sum + val;
+        if (c.moneda === 'ARS' && tcBna) return sum + (val / tcBna);
+        return sum;
+    }, 0);
+
+    const totalCountedUsdEqCurrent = cuentas.reduce((sum, c) => {
+        const val = saldos[c.id] || 0;
+        if (c.tipo_cuenta !== 'EFECTIVO') return sum;
+        if (c.moneda === 'USD') return sum + val;
+        if (c.moneda === 'ARS' && tcBna) return sum + (val / tcBna);
+        return sum;
+    }, 0);
 
     return (
         <div className="space-y-6">
@@ -262,11 +256,16 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
 
                             <h4 className="font-medium text-sm text-gray-500 uppercase">Conteo de Efectivo (Cierre)</h4>
                             {cuentas.filter(c => c.tipo_cuenta === 'EFECTIVO').map(cuenta => (
-                                <div key={cuenta.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
-                                    <span className="font-medium text-gray-700 dark:text-gray-300">{cuenta.nombre_cuenta}</span>
+                                <div key={cuenta.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-medium text-gray-700 dark:text-gray-300">{cuenta.nombre_cuenta}</span>
+                                        <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                            Esperado: {new Intl.NumberFormat('es-AR', { style: 'currency', currency: cuenta.moneda }).format(expectedBalances[cuenta.id] || 0)}
+                                        </div>
+                                    </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-gray-500">{cuenta.moneda}</span>
-                                        <div className="w-32">
+                                        <div className="flex-1">
                                             <CurrencyInput
                                                 value={saldos[cuenta.id] || 0}
                                                 onChange={(val) => setSaldos({ ...saldos, [cuenta.id]: val })}
@@ -277,35 +276,50 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                                     </div>
                                 </div>
                             ))}
-                        </div>
 
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Observaciones
-                            </label>
-                            <textarea
-                                value={observaciones}
-                                onChange={(e) => setObservaciones(e.target.value)}
-                                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
-                                rows={3}
-                                placeholder="Notas del cierre..."
-                            />
-                        </div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl mb-6 border border-blue-100 dark:border-blue-800">
+                                <div className="flex justify-between items-center text-sm mb-1">
+                                    <span className="text-gray-600 dark:text-gray-400">Total Esperado (Eq. USD):</span>
+                                    <span className="font-bold text-gray-900 dark:text-white">
+                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalExpectedUsdEq)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600 dark:text-gray-400">Total Contado (Eq. USD):</span>
+                                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalCountedUsdEqCurrent)}
+                                    </span>
+                                </div>
+                            </div>
 
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => setShowCerrarModal(false)}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleCerrar}
-                                disabled={submitting}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                            >
-                                {submitting ? 'Guardando...' : 'Confirmar Cierre'}
-                            </button>
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Observaciones
+                                </label>
+                                <textarea
+                                    value={observaciones}
+                                    onChange={(e) => setObservaciones(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                                    rows={3}
+                                    placeholder="Notas del cierre..."
+                                />
+                            </div>
+
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setShowCerrarModal(false)}
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCerrar}
+                                    disabled={submitting}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {submitting ? 'Guardando...' : 'Confirmar Cierre'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

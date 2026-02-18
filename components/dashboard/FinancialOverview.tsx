@@ -12,7 +12,9 @@ interface BalanceState {
     saldoArs: number;
     saldoUsd: number;
     sucursalName?: string;
+    saldosPorCuenta?: Record<string, number>;
 }
+
 
 export default function FinancialOverview() {
     const [recepcion, setRecepcion] = useState<BalanceState | null>(null);

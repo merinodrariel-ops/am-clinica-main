@@ -1532,6 +1532,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     lastCloseDate: string | null;
     saldoArs: number;
     saldoUsd: number;
+    saldosPorCuenta: Record<string, number>;
 }> {
     const today = new Date().toISOString().split('T')[0];
     const ultimo = await getUltimoCierreAdmin(sucursalId);
@@ -1539,9 +1540,14 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     // Get Cash Accounts
     const cuentas = await getCuentas(sucursalId);
     const efectivas = cuentas.filter(c => c.tipo_cuenta === 'EFECTIVO');
-    const idsEfectivo = new Set(efectivas.map(c => c.id));
     const idsArs = new Set(efectivas.filter(c => c.moneda === 'ARS').map(c => c.id));
     const idsUsd = new Set(efectivas.filter(c => c.moneda === 'USD').map(c => c.id));
+
+    // Initialize balances per account
+    const saldosPorCuenta: Record<string, number> = {};
+    efectivas.forEach(c => {
+        saldosPorCuenta[c.id] = 0;
+    });
 
     // Check if closed today
     if (ultimo && ultimo.fecha === today && ultimo.estado === 'Cerrado') {
@@ -1549,26 +1555,27 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         let usd = 0;
         // Sum from saldos_finales
         Object.entries(ultimo.saldos_finales).forEach(([cuentaId, monto]) => {
-            if (idsArs.has(cuentaId)) ars += monto;
-            if (idsUsd.has(cuentaId)) usd += monto;
+            if (saldosPorCuenta.hasOwnProperty(cuentaId)) {
+                saldosPorCuenta[cuentaId] = monto;
+                if (idsArs.has(cuentaId)) ars += monto;
+                if (idsUsd.has(cuentaId)) usd += monto;
+            }
         });
         return {
             status: 'Cerrado',
             lastCloseDate: ultimo.fecha,
             saldoArs: ars,
-            saldoUsd: usd
+            saldoUsd: usd,
+            saldosPorCuenta
         };
     }
-
-    // If Open, calculate from last closure
-    let saldoArs = 0;
-    let saldoUsd = 0;
 
     // 1. Initial from Last Closure
     if (ultimo) {
         Object.entries(ultimo.saldos_finales).forEach(([cuentaId, monto]) => {
-            if (idsArs.has(cuentaId)) saldoArs += monto;
-            if (idsUsd.has(cuentaId)) saldoUsd += monto;
+            if (saldosPorCuenta.hasOwnProperty(cuentaId)) {
+                saldosPorCuenta[cuentaId] = monto;
+            }
         });
     }
 
@@ -1585,7 +1592,8 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
             )
         `)
         .eq('sucursal_id', sucursalId)
-        .neq('estado', 'Anulado');
+        .neq('estado', 'Anulado')
+        .eq('is_deleted', false);
 
     if (ultimo) {
         query = query.gt('fecha_movimiento', ultimo.fecha);
@@ -1596,40 +1604,37 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     if (movs) {
         movs.forEach(m => {
             const tipo = m.tipo_movimiento;
-            // Determine Sign based on Type
-            // INGRESO_*, APORTE_CAPITAL, AJUSTE_CAJA (Positive?) -> Usually inputs
-            // EGRESO, RETIRO, GASTOS -> Outputs
-
-            // Note: Data model might store 'importe' as always positive.
-            // Logic:
-            // INGRESO_*: Add
-            // EGRESO: Subtract
-            // RETIRO: Subtract
-            // AJUSTE_CAJA: Depends... Assume Add if positive? Or does it vary? 
-            // Better to assume generic INPUT/OUTPUT types.
-
             let multiplier = 0;
             if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') multiplier = 1;
             else if (tipo === 'EGRESO' || tipo === 'RETIRO') multiplier = -1;
             else if (['CAMBIO_MONEDA', 'TRANSFERENCIA', 'AJUSTE_CAJA'].includes(tipo)) {
-                multiplier = 1;
+                multiplier = 1; // Signed amount
             }
 
             if (multiplier !== 0) {
                 m.caja_admin_movimiento_lineas.forEach((l: MovimientoLinea) => {
-                    if (idsEfectivo.has(l.cuenta_id)) {
-                        if (l.moneda === 'ARS') saldoArs += Number(l.importe || 0) * multiplier;
-                        if (l.moneda === 'USD') saldoUsd += Number(l.importe || 0) * multiplier;
+                    if (saldosPorCuenta.hasOwnProperty(l.cuenta_id)) {
+                        saldosPorCuenta[l.cuenta_id] += Number(l.importe || 0) * multiplier;
                     }
                 });
             }
         });
     }
 
+    // Calculate totals
+    let totalArs = 0;
+    let totalUsd = 0;
+    Object.entries(saldosPorCuenta).forEach(([id, monto]) => {
+        if (idsArs.has(id)) totalArs += monto;
+        if (idsUsd.has(id)) totalUsd += monto;
+    });
+
     return {
         status: 'Abierto',
         lastCloseDate: ultimo?.fecha || null,
-        saldoArs,
-        saldoUsd
+        saldoArs: totalArs,
+        saldoUsd: totalUsd,
+        saldosPorCuenta
     };
 }
+
