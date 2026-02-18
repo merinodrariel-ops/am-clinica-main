@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout } from 'lucide-react';
+import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -14,10 +14,11 @@ import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
 import { ReciboGenerator, generateReciboNumber } from '@/components/caja/ReciboGenerator';
-import { logMovimientoEdit } from '@/lib/caja-recepcion';
+import { logMovimientoEdit, deleteMovimiento } from '@/lib/caja-recepcion';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
 import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 // Types
@@ -160,6 +161,7 @@ const PAYMENT_DATA: Record<string, PaymentMethod> = {
 };
 
 export default function CajaRecepcionPage() {
+    const { role } = useAuth();
     const [stats, setStats] = useState<Stats | null>(null);
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
     const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);
@@ -200,6 +202,11 @@ export default function CajaRecepcionPage() {
     const [editMotivo, setEditMotivo] = useState("");
     const [editComprobanteUrl, setEditComprobanteUrl] = useState<string | null>(null);
     const [savingDate, setSavingDate] = useState(false);
+
+    // Deletion modal state
+    const [deletingMovId, setDeletingMovId] = useState<string | null>(null);
+    const [deletionConfirmation, setDeletionConfirmation] = useState("");
+    const [deletionReason, setDeletionReason] = useState("");
 
     // QR Modal state
     const [qrModal, setQrModal] = useState<{ open: boolean; value: string; title: string }>({
@@ -1164,6 +1171,19 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                     >
                                                         <History size={16} />
                                                     </button>
+                                                    {(role === 'admin' || role === 'owner' || role === 'developer') && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setDeletingMovId(mov.id);
+                                                                setDeletionConfirmation("");
+                                                                setDeletionReason("");
+                                                            }}
+                                                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-400 hover:text-red-600 transition-colors"
+                                                            title="Eliminar movimiento"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -1883,6 +1903,98 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 registroId={historialMovId || ''}
                 tabla="caja_recepcion_movimientos"
             />
+            {/* Modal de Confirmación de Eliminación */}
+            {deletingMovId && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-red-100 dark:border-red-900/30"
+                    >
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4 text-red-600 dark:text-red-400">
+                                <AlertTriangle size={32} />
+                                <h3 className="text-xl font-bold">¡Advertencia Crítica!</h3>
+                            </div>
+
+                            <p className="text-gray-600 dark:text-gray-300 mb-4">
+                                Está a punto de eliminar un registro financiero. Esta acción es{" "}
+                                <strong>IRREVERSIBLE</strong> y quedará registrada en el
+                                historial de auditoría.
+                            </p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                                        Motivo de la eliminación (Obligatorio)
+                                    </label>
+                                    <textarea
+                                        value={deletionReason}
+                                        onChange={(e) => setDeletionReason(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 focus:ring-red-500 outline-none"
+                                        rows={2}
+                                        placeholder="Ej: Error de carga, registro duplicado..."
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                                        Para confirmar, escriba{" "}
+                                        <span className="font-mono font-bold select-all">
+                                            ELIMINAR
+                                        </span>{" "}
+                                        abajo:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={deletionConfirmation}
+                                        onChange={(e) => setDeletionConfirmation(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 focus:ring-red-500 font-mono outline-none"
+                                        placeholder="ELIMINAR"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-8">
+                                <button
+                                    onClick={() => setDeletingMovId(null)}
+                                    className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 font-medium"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        if (
+                                            deletionConfirmation !== "ELIMINAR" ||
+                                            !deletionReason.trim()
+                                        )
+                                            return;
+
+                                        const { success, error } = await deleteMovimiento(
+                                            deletingMovId!,
+                                            deletionReason,
+                                        );
+                                        if (success) {
+                                            setDeletingMovId(null);
+                                            loadData();
+                                        } else {
+                                            alert("Error al eliminar: " + error);
+                                        }
+                                    }}
+                                    disabled={
+                                        deletionConfirmation !== "ELIMINAR" ||
+                                        !deletionReason.trim()
+                                    }
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-lg shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <Trash2 size={16} />
+                                    Confirmar Eliminación
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 }

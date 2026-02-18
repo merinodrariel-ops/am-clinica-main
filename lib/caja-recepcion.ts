@@ -178,6 +178,34 @@ export async function anularMovimiento(
   if (error) throw error;
 }
 
+export async function deleteMovimiento(
+  id: string,
+  motivo: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await logMovimientoEdit(
+      id,
+      "caja_recepcion_movimientos",
+      "REGISTRO_ELIMINADO",
+      "ACTIVO",
+      "ELIMINADO",
+      motivo,
+    );
+  } catch (e) {
+    console.error("Error in deletion audit:", e);
+  }
+
+  const { error } = await supabase
+    .from("caja_recepcion_movimientos")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
 // ===================== ARQUEO =====================
 
 export async function getUltimoCierre(
