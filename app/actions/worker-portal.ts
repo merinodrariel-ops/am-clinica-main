@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server'; // Adjust import path if needed
+import { createClient } from '@/utils/supabase/server'; // Corrected import path
 import { WorkerProfile, WorkLog, Achievement, WorkerAchievement } from '@/types/worker-portal';
 import { revalidatePath } from 'next/cache';
 
