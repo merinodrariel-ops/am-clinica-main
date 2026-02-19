@@ -559,7 +559,17 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
 
     const { data: stageConfig, error: stageError } = await supabase
         .from('clinical_workflow_stages')
-        .select('name, workflow_id, notify_on_entry, notify_emails, notify_before_days')
+        .select(`
+            name, 
+            workflow_id, 
+            notify_on_entry, 
+            notify_emails, 
+            staff_email_template, 
+            staff_email_subject,
+            patient_email_template, 
+            patient_email_subject,
+            notify_patient_on_entry
+        `)
         .eq('id', stageId)
         .single();
 
@@ -570,14 +580,15 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
         ? stageConfig.notify_emails.filter((email: unknown): email is string => typeof email === 'string' && email.length > 0)
         : [];
 
-    if (!notifyOnEntry || notifyEmails.length === 0) return;
+    // If no notifications are enabled, return early
+    if (!notifyOnEntry && !stageConfig.notify_patient_on_entry) return;
 
     const { data: treatmentData, error: treatmentError } = await supabase
         .from('patient_treatments')
         .select(`
             id,
             next_milestone_date,
-            patient:pacientes(nombre, apellido, documento),
+            patient:pacientes(nombre, apellido, documento, email),
             workflow:clinical_workflows(name)
         `)
         .eq('id', treatmentId)
@@ -592,50 +603,105 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
         nombre?: string | null;
         apellido?: string | null;
         documento?: string | null;
+        email?: string | null;
     } | null;
 
-    const patientName = patientData
+    const patientFullName = patientData
         ? `${patientData.apellido || ''}, ${patientData.nombre || ''}`.replace(/^,\s*|\s*,\s*$/g, '').trim()
         : 'Paciente';
 
-    const subject = `Workflow: ingreso a etapa ${stageConfig.name}`;
     const milestoneText = treatmentData.next_milestone_date
         ? new Date(treatmentData.next_milestone_date).toLocaleDateString('es-AR')
         : 'No definido';
 
-    const html = `
-        <div style="font-family: Arial, sans-serif; color: #111827;">
-            <h2 style="margin: 0 0 8px;">Notificacion de Workflow</h2>
-            <p style="margin: 0 0 8px;">Se movio un tratamiento a una nueva etapa.</p>
-            <ul style="margin: 0; padding-left: 18px;">
-                <li><strong>Workflow:</strong> ${workflowName || 'Sin nombre'}</li>
-                <li><strong>Etapa:</strong> ${stageConfig.name}</li>
-                <li><strong>Paciente:</strong> ${patientName || 'Sin nombre'}</li>
-                <li><strong>Documento:</strong> ${patientData?.documento || 'Sin documento'}</li>
-                <li><strong>Proximo hito:</strong> ${milestoneText}</li>
-                <li><strong>Recordatorio previo SLA:</strong> ${stageConfig.notify_before_days ?? '-'} dias</li>
-            </ul>
-        </div>
-    `;
+    // Helper for variable replacement
+    const replaceVars = (text: string) => {
+        return text
+            .replace(/{{paciente}}/g, patientFullName)
+            .replace(/{{etapa}}/g, stageConfig.name)
+            .replace(/{{workflow}}/g, workflowName || 'Workflow')
+            .replace(/{{hito}}/g, milestoneText);
+    };
 
-    await Promise.all(
-        notifyEmails.map(async email => {
-            const eventKey = createNotificationKey(['stage_entry', treatmentId, stageId, email, new Date().toISOString().slice(0, 10)]);
-            const response = await sendEmail({ to: email, subject, html });
+    // 1. Send to Staff (notify_emails)
+    if (notifyOnEntry && notifyEmails.length > 0) {
+        let staffHtml = '';
+        if (stageConfig.staff_email_template && stageConfig.staff_email_template.trim()) {
+            staffHtml = replaceVars(stageConfig.staff_email_template).replace(/\n/g, '<br/>');
+        } else {
+            staffHtml = `
+                <div style="font-family: Arial, sans-serif; color: #111827;">
+                    <h2 style="margin: 0 0 8px;">Notificacion para Equipo</h2>
+                    <p style="margin: 0 0 8px;">Se movio un tratamiento a una nueva etapa.</p>
+                    <ul style="margin: 0; padding-left: 18px;">
+                        <li><strong>Workflow:</strong> ${workflowName || 'Sin nombre'}</li>
+                        <li><strong>Etapa:</strong> ${stageConfig.name}</li>
+                        <li><strong>Paciente:</strong> ${patientFullName}</li>
+                        <li><strong>Documento:</strong> ${patientData?.documento || 'Sin documento'}</li>
+                        <li><strong>Proximo hito:</strong> ${milestoneText}</li>
+                    </ul>
+                </div>
+            `;
+        }
 
-            await logWorkflowNotification({
-                workflowId: stageConfig.workflow_id,
-                stageId,
-                treatmentId,
-                eventType: 'stage_entry',
-                recipientEmail: email,
-                subject,
-                status: response.success ? 'sent' : 'failed',
-                errorMessage: response.success ? null : String(response.error || 'unknown_error'),
-                eventKey,
-            });
-        })
-    );
+        const staffSubject = stageConfig.staff_email_subject
+            ? replaceVars(stageConfig.staff_email_subject)
+            : `Workflow [Equipo]: ingreso a etapa ${stageConfig.name}`;
+
+        await Promise.all(
+            notifyEmails.map(async email => {
+                const eventKey = createNotificationKey(['stage_entry_staff', treatmentId, stageId, email, new Date().toISOString().slice(0, 10)]);
+                const response = await sendEmail({ to: email, subject: staffSubject, html: staffHtml });
+
+                await logWorkflowNotification({
+                    workflowId: stageConfig.workflow_id,
+                    stageId,
+                    treatmentId,
+                    eventType: 'stage_entry_staff',
+                    recipientEmail: email,
+                    subject: staffSubject,
+                    status: response.success ? 'sent' : 'failed',
+                    errorMessage: response.success ? null : String(response.error || 'unknown_error'),
+                    eventKey,
+                });
+            })
+        );
+    }
+
+    // 2. Send to Patient
+    if (stageConfig.notify_patient_on_entry && patientData?.email) {
+        let patientHtml = '';
+        if (stageConfig.patient_email_template && stageConfig.patient_email_template.trim()) {
+            patientHtml = replaceVars(stageConfig.patient_email_template).replace(/\n/g, '<br/>');
+        } else {
+            patientHtml = `
+                <div style="font-family: Arial, sans-serif; color: #111827;">
+                    <h2 style="margin: 0 0 8px;">Notificacion de tratamiento</h2>
+                    <p style="margin: 0 0 8px;">Hola ${patientData.nombre || 'Paciente'}, te informamos que tu caso en ${workflowName || 'nuestra clinica'} ha avanzado a la etapa: <strong>${stageConfig.name}</strong>.</p>
+                    <p style="margin: 0 0 8px;">Estaremos en contacto pronto para los siguientes pasos.</p>
+                </div>
+            `;
+        }
+
+        const patientSubject = stageConfig.patient_email_subject
+            ? replaceVars(stageConfig.patient_email_subject)
+            : `Actualizacion sobre tu tratamiento: ${stageConfig.name}`;
+
+        const patientEventKey = createNotificationKey(['stage_entry_patient', treatmentId, stageId, patientData.email, new Date().toISOString().slice(0, 10)]);
+        const response = await sendEmail({ to: patientData.email, subject: patientSubject, html: patientHtml });
+
+        await logWorkflowNotification({
+            workflowId: stageConfig.workflow_id,
+            stageId,
+            treatmentId,
+            eventType: 'stage_entry_patient',
+            recipientEmail: patientData.email,
+            subject: patientSubject,
+            status: response.success ? 'sent' : 'failed',
+            errorMessage: response.success ? null : String(response.error || 'unknown_error'),
+            eventKey: patientEventKey,
+        });
+    }
 }
 
 async function checkAndTriggerLaboratorioCase(treatmentId: string, stageId: string) {
@@ -1411,6 +1477,17 @@ interface StageConfigInput {
     notify_before_days?: number | null;
     notify_emails?: string[];
     reminder_windows_days?: number[];
+    staff_email_template?: string | null;
+    patient_email_template?: string | null;
+    notify_patient_on_entry?: boolean;
+    sla_staff_template?: string | null;
+    reminder_patient_template?: string | null;
+    reminder_staff_template?: string | null;
+    staff_email_subject?: string | null;
+    patient_email_subject?: string | null;
+    sla_staff_subject?: string | null;
+    reminder_patient_subject?: string | null;
+    reminder_staff_subject?: string | null;
 }
 
 function isMissingNotificationColumnsError(error: { code?: string; message?: string } | null) {
@@ -1420,7 +1497,18 @@ function isMissingNotificationColumnsError(error: { code?: string; message?: str
         error.message?.includes('notify_before_days') ||
         error.message?.includes('notify_on_entry') ||
         error.message?.includes('notify_emails') ||
-        error.message?.includes('reminder_windows_days')
+        error.message?.includes('reminder_windows_days') ||
+        error.message?.includes('staff_email_template') ||
+        error.message?.includes('patient_email_template') ||
+        error.message?.includes('notify_patient_on_entry') ||
+        error.message?.includes('sla_staff_template') ||
+        error.message?.includes('reminder_patient_template') ||
+        error.message?.includes('reminder_staff_template') ||
+        error.message?.includes('staff_email_subject') ||
+        error.message?.includes('patient_email_subject') ||
+        error.message?.includes('sla_staff_subject') ||
+        error.message?.includes('reminder_patient_subject') ||
+        error.message?.includes('reminder_staff_subject')
     );
 }
 
@@ -1516,6 +1604,17 @@ export async function updateWorkflowStagesConfig(payload: {
             )
                 .sort((a, b) => b - a)
                 .slice(0, 3),
+            staff_email_template: stage.staff_email_template || null,
+            patient_email_template: stage.patient_email_template || null,
+            notify_patient_on_entry: stage.notify_patient_on_entry ?? false,
+            sla_staff_template: stage.sla_staff_template || null,
+            reminder_patient_template: stage.reminder_patient_template || null,
+            reminder_staff_template: stage.reminder_staff_template || null,
+            staff_email_subject: stage.staff_email_subject || null,
+            patient_email_subject: stage.patient_email_subject || null,
+            sla_staff_subject: stage.sla_staff_subject || null,
+            reminder_patient_subject: stage.reminder_patient_subject || null,
+            reminder_staff_subject: stage.reminder_staff_subject || null,
         };
 
         if (stage.id) {

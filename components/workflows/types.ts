@@ -14,6 +14,17 @@ export interface WorkflowStage {
     notify_before_days?: number | null;
     notify_emails?: string[] | null;
     reminder_windows_days?: number[] | null;
+    staff_email_template?: string | null;
+    patient_email_template?: string | null;
+    notify_patient_on_entry?: boolean | null;
+    sla_staff_template?: string | null;
+    reminder_patient_template?: string | null;
+    reminder_staff_template?: string | null;
+    staff_email_subject?: string | null;
+    patient_email_subject?: string | null;
+    sla_staff_subject?: string | null;
+    reminder_patient_subject?: string | null;
+    reminder_staff_subject?: string | null;
 }
 
 export interface ClinicalWorkflow {

@@ -27,9 +27,10 @@ export async function POST(request: NextRequest) {
                 workflow_id,
                 current_stage_id,
                 last_stage_change,
+                next_milestone_date,
                 patient:pacientes(nombre, apellido, documento),
                 workflow:clinical_workflows(name),
-                stage:clinical_workflow_stages(name, time_limit_days, notify_before_days, notify_emails)
+                stage:clinical_workflow_stages(name, time_limit_days, notify_before_days, notify_emails, sla_staff_template, sla_staff_subject)
             `)
             .eq('status', 'active');
 
@@ -42,11 +43,14 @@ export async function POST(request: NextRequest) {
         const today = new Date().toISOString().slice(0, 10);
 
         for (const treatment of treatments || []) {
+            // ... (rest of the loop setup)
             const stage = treatment.stage as {
                 name?: string | null;
                 time_limit_days?: number | null;
                 notify_before_days?: number | null;
                 notify_emails?: string[] | null;
+                sla_staff_template?: string | null;
+                sla_staff_subject?: string | null;
             } | null;
 
             const workflowData = treatment.workflow as { name?: string | null }[] | { name?: string | null } | null;
@@ -71,25 +75,42 @@ export async function POST(request: NextRequest) {
                 continue;
             }
 
-            const patientName = patient
+            const patientFullName = patient
                 ? `${patient.apellido || ''}, ${patient.nombre || ''}`.replace(/^,\s*|\s*,\s*$/g, '').trim()
                 : 'Paciente';
 
-            const subject = `SLA por vencer: ${workflowName || 'Workflow'} / ${stage.name || 'Etapa'}`;
-            const html = `
+            const milestoneText = treatment.next_milestone_date
+                ? new Date(treatment.next_milestone_date).toLocaleDateString('es-AR')
+                : 'No definido';
+
+            // Helper for variable replacement
+            const replaceVars = (text: string) => {
+                return text
+                    .replace(/{{paciente}}/g, patientFullName)
+                    .replace(/{{etapa}}/g, stage.name || 'Etapa')
+                    .replace(/{{workflow}}/g, workflowName || 'Workflow')
+                    .replace(/{{hito}}/g, milestoneText);
+            };
+
+            let htmlValue = '';
+            if (stage.sla_staff_template && stage.sla_staff_template.trim()) {
+                htmlValue = replaceVars(stage.sla_staff_template).replace(/\n/g, '<br/>');
+            } else {
+                htmlValue = `
                 <div style="font-family: Arial, sans-serif; color: #111827;">
                     <h2 style="margin: 0 0 8px;">Recordatorio SLA</h2>
                     <p style="margin: 0 0 8px;">Un tratamiento esta proximo al limite de tiempo de su etapa.</p>
                     <ul style="margin: 0; padding-left: 18px;">
                         <li><strong>Workflow:</strong> ${workflowName || 'Sin nombre'}</li>
                         <li><strong>Etapa:</strong> ${stage.name || 'Sin etapa'}</li>
-                        <li><strong>Paciente:</strong> ${patientName || 'Sin nombre'}</li>
+                        <li><strong>Paciente:</strong> ${patientFullName || 'Sin nombre'}</li>
                         <li><strong>Documento:</strong> ${patient?.documento || 'Sin documento'}</li>
                         <li><strong>Dias en etapa:</strong> ${daysInStage}</li>
                         <li><strong>Limite SLA:</strong> ${stage.time_limit_days} dias</li>
                     </ul>
                 </div>
             `;
+            }
 
             for (const email of stage.notify_emails) {
                 const eventKey = createNotificationKey(['sla_due_soon', treatment.id, treatment.current_stage_id, email, today]);
@@ -104,7 +125,11 @@ export async function POST(request: NextRequest) {
                     continue;
                 }
 
-                const response = await sendEmail({ to: email, subject, html });
+                const subjectValue = stage.sla_staff_subject
+                    ? replaceVars(stage.sla_staff_subject)
+                    : `SLA por vencer: ${workflowName || 'Workflow'} / ${stage.name || 'Etapa'}`;
+
+                const response = await sendEmail({ to: email, subject: subjectValue, html: htmlValue });
 
                 await supabase.from('workflow_notifications_log').insert({
                     workflow_id: treatment.workflow_id,
@@ -112,7 +137,7 @@ export async function POST(request: NextRequest) {
                     treatment_id: treatment.id,
                     event_type: 'sla_due_soon',
                     recipient_email: email,
-                    subject,
+                    subject: subjectValue,
                     status: response.success ? 'sent' : 'failed',
                     error_message: response.success ? null : String(response.error || 'unknown_error'),
                     event_key: eventKey,
