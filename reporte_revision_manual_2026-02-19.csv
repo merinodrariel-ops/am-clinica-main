@@ -1,0 +1,3 @@
+Pasada,Motivo,ID_A,Nombre_A,DNI_A,Email_A,ID_B,Nombre_B,DNI_B,Email_B
+E,"Levenshtein 2: ""paula maglairella"" ↔ ""paula magliarella""",f1e07e6e-ac62-415f-a4cc-97be55933525,"Paula Maglairella",,,9e0b4951-fef5-461a-b5a1-944bff572045,"Paula Magliarella",27746903,paula.magliarella@gmail.com
+E,"Levenshtein 1: ""melania guisondi"" ↔ ""melania gisondi""",b968a94e-ce5e-4c0e-8b85-ff0dea81c9ae,"Melania Guisondi",,,1ca6c9ea-f55a-424c-b215-2ac6578a4e09,"Melania Gisondi",35514252,Gisondimelania@gmail.com

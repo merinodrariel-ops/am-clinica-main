@@ -3,8 +3,8 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { TreatmentCard } from './TreatmentCard';
 import clsx from 'clsx';
-import { Bell, Timer } from 'lucide-react';
-import type { PatientTreatment, WorkflowStage } from './types';
+import { Bell, Timer, AlertTriangle } from 'lucide-react';
+import type { PatientTreatment, PatientSummary, WorkflowStage } from './types';
 
 interface KanbanColumnProps {
     stage: WorkflowStage;
@@ -12,9 +12,12 @@ interface KanbanColumnProps {
     stagePosition: number;
     totalStages: number;
     onTreatmentClick: (treatment: PatientTreatment) => void;
+    onPatientClick: (patient: PatientSummary) => void;
+    onMoveToNext: (treatment: PatientTreatment) => void;
+    isLastStage: boolean;
 }
 
-export function KanbanColumn({ stage, treatments, stagePosition, totalStages, onTreatmentClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, treatments, stagePosition, totalStages, onTreatmentClick, onPatientClick, onMoveToNext, isLastStage }: KanbanColumnProps) {
     const { setNodeRef } = useDroppable({
         id: stage.id,
     });
@@ -32,6 +35,29 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
         }
     };
 
+    // Compute urgency counts for the badge
+    const today = new Date();
+    const urgentCount = treatments.filter(t => {
+        const daysInStage = Math.ceil(Math.abs(today.getTime() - new Date(t.last_stage_change).getTime()) / (1000 * 60 * 60 * 24));
+        if (stage.time_limit_days && daysInStage > stage.time_limit_days) return true;
+        if (t.next_milestone_date && new Date(t.next_milestone_date) < today) return true;
+        return false;
+    }).length;
+
+    const warningCount = treatments.filter(t => {
+        const daysInStage = Math.ceil(Math.abs(today.getTime() - new Date(t.last_stage_change).getTime()) / (1000 * 60 * 60 * 24));
+        const timeLimit = stage.time_limit_days;
+        if (timeLimit && daysInStage > timeLimit) return false; // ya contado como urgente
+        if (timeLimit && daysInStage >= timeLimit - 3) return true;
+        const milestone = t.next_milestone_date ? new Date(t.next_milestone_date) : null;
+        if (milestone) {
+            const daysRemaining = Math.ceil((milestone.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysRemaining < 0) return false; // ya urgente
+            if (daysRemaining <= 14) return true;
+        }
+        return false;
+    }).length;
+
     const stageLabel = stage.name === 'Pendiente de Control'
         ? 'Esperando por turno'
         : stage.name === 'Turno Agendado'
@@ -42,11 +68,24 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
         <div className="flex flex-col min-w-[280px] w-80 h-full max-h-full">
             {/* Header */}
             <div className={clsx(
-                "p-3 rounded-t-xl border-b-2 font-semibold flex justify-between items-center",
+                "p-3 rounded-t-xl border-b-2 font-semibold flex justify-between items-center gap-2",
                 getStageColor(stage.color)
             )}>
-                <span>{stageLabel}</span>
-                <div className="flex items-center gap-1">
+                <span className="truncate">{stageLabel}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Urgency badges */}
+                    {urgentCount > 0 && (
+                        <span className="inline-flex items-center gap-0.5 bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold animate-pulse">
+                            <AlertTriangle size={9} />
+                            {urgentCount}
+                        </span>
+                    )}
+                    {warningCount > 0 && urgentCount === 0 && (
+                        <span className="inline-flex items-center gap-0.5 bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                            <AlertTriangle size={9} />
+                            {warningCount}
+                        </span>
+                    )}
                     {stage.time_limit_days ? (
                         <span className="inline-flex items-center gap-1 bg-white/60 dark:bg-black/20 px-1.5 py-0.5 rounded text-[10px]">
                             <Timer size={11} />
@@ -75,9 +114,7 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
                     strategy={verticalListSortingStrategy}
                 >
                     {treatments.map((treatment) => {
-                        // Calculate days in stage
                         const lastChange = new Date(treatment.last_stage_change);
-                        const today = new Date();
                         const diffTime = Math.abs(today.getTime() - lastChange.getTime());
                         const daysInStage = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -89,6 +126,8 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
                                 timeLimit={stage.time_limit_days}
                                 progressPercent={Math.min(100, Math.max(0, Math.round((stagePosition / Math.max(totalStages, 1)) * 100)))}
                                 onClick={() => onTreatmentClick(treatment)}
+                                onPatientClick={onPatientClick}
+                                onMoveToNext={!isLastStage ? () => onMoveToNext(treatment) : undefined}
                             />
                         );
                     })}

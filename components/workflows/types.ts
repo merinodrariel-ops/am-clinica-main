@@ -44,6 +44,8 @@ export interface PatientSummary {
 
 export interface WorkflowSummary {
     name: string;
+    type?: WorkflowType | null;
+    frequency_months?: number | null;
 }
 
 export interface PatientTreatment {
@@ -76,6 +78,16 @@ export interface TreatmentHistoryEntry {
     comments?: string | null;
     previous_stage?: { name?: string | null } | null;
     new_stage?: { name?: string | null } | null;
+}
+
+export interface PatientTimelineTreatmentEntry {
+    treatment: PatientTreatment;
+    history: TreatmentHistoryEntry[];
+}
+
+export interface PatientTimelineData {
+    patient: PatientSummary;
+    treatments: PatientTimelineTreatmentEntry[];
 }
 
 export interface WorkflowNotificationLogEntry {

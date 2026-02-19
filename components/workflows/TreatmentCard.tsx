@@ -2,9 +2,9 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-import { Clock, AlertCircle } from 'lucide-react';
+import { Clock, AlertCircle, ChevronRight, User } from 'lucide-react';
 import clsx from 'clsx';
-import type { PatientTreatment } from './types';
+import type { PatientTreatment, PatientSummary } from './types';
 
 interface TreatmentCardProps {
     treatment: PatientTreatment;
@@ -12,9 +12,11 @@ interface TreatmentCardProps {
     timeLimit?: number | null;
     progressPercent?: number;
     onClick?: () => void;
+    onPatientClick?: (patient: PatientSummary) => void;
+    onMoveToNext?: () => void;
 }
 
-export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPercent = 0, onClick }: TreatmentCardProps) {
+export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPercent = 0, onClick, onPatientClick, onMoveToNext }: TreatmentCardProps) {
     const {
         attributes,
         listeners,
@@ -108,7 +110,7 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
             {...attributes}
             {...listeners}
             className={clsx(
-                "bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-3 cursor-grab hover:shadow-md transition-all select-none",
+                "group bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-3 cursor-grab hover:shadow-md transition-all select-none",
                 isDragging && "opacity-50 scale-105 shadow-xl rotate-2 z-50",
                 alertStatus === 'red' && "border-l-4 border-l-red-500",
                 alertStatus === 'yellow' && "border-l-4 border-l-yellow-500",
@@ -117,9 +119,22 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
             onClick={onClick}
         >
             <div className="flex justify-between items-start mb-2">
-                <h4 className="font-semibold text-gray-900 dark:text-white truncate pr-2">
-                    {treatment.patient.apellido}, {treatment.patient.nombre}
-                </h4>
+                {onPatientClick ? (
+                    <button
+                        type="button"
+                        className="font-semibold text-gray-900 dark:text-white truncate pr-2 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline underline-offset-2 transition-colors cursor-pointer"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onPatientClick(treatment.patient);
+                        }}
+                    >
+                        {treatment.patient.apellido}, {treatment.patient.nombre}
+                    </button>
+                ) : (
+                    <h4 className="font-semibold text-gray-900 dark:text-white truncate pr-2">
+                        {treatment.patient.apellido}, {treatment.patient.nombre}
+                    </h4>
+                )}
                 {metadataType && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300 font-medium">
                         {metadataType}
@@ -238,6 +253,34 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
                     </div>
                 </div>
             ) : null}
+
+            {/* Quick actions — visibles al hover */}
+            {(onPatientClick || onMoveToNext) && (
+                <div className="hidden group-hover:flex items-center gap-1 mt-3 pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                    {onPatientClick && (
+                        <button
+                            type="button"
+                            className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-0.5 rounded transition-colors"
+                            onClick={(e) => { e.stopPropagation(); onPatientClick(treatment.patient); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            <User size={11} />
+                            Timeline
+                        </button>
+                    )}
+                    {onMoveToNext && (
+                        <button
+                            type="button"
+                            className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-2 py-0.5 rounded transition-colors ml-auto"
+                            onClick={(e) => { e.stopPropagation(); onMoveToNext(); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            Siguiente
+                            <ChevronRight size={11} />
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

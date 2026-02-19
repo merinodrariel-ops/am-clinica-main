@@ -6,7 +6,10 @@ import { sendEmail } from '@/lib/nodemailer';
 import type {
     ClinicalWorkflow,
     PatientSearchResult,
+    PatientSummary,
     PatientTreatment,
+    PatientTimelineData,
+    PatientTimelineTreatmentEntry,
     TreatmentStatus,
     TreatmentHistoryEntry,
     WorkflowNotificationLogEntry,
@@ -1746,4 +1749,51 @@ export async function deleteTreatment(treatmentId: string) {
 
     revalidatePath('/workflows');
     return { success: true };
+}
+
+export async function getPatientTimeline(
+    patientId: string
+): Promise<PatientTimelineData | null> {
+    const supabase = await createClient();
+
+    const { data: treatmentRows, error } = await supabase
+        .from('patient_treatments')
+        .select(`
+            *,
+            patient:pacientes(id_paciente, nombre, apellido, documento),
+            stage:clinical_workflow_stages(*),
+            workflow:clinical_workflows(name, type, frequency_months)
+        `)
+        .eq('patient_id', patientId)
+        .order('created_at', { ascending: false });
+
+    if (error || !treatmentRows?.length) return null;
+
+    const normalizedTreatments = treatmentRows.map(t => ({
+        ...t,
+        workflow: normalizeWorkflowData(t.workflow as WorkflowSummary | WorkflowSummary[] | null),
+    })) as PatientTreatment[];
+
+    const historyResults = await Promise.all(
+        normalizedTreatments.map(async (treatment) => {
+            const { data } = await supabase
+                .from('treatment_history')
+                .select(`
+                    id, created_at, comments,
+                    previous_stage:clinical_workflow_stages!treatment_history_previous_stage_id_fkey(name),
+                    new_stage:clinical_workflow_stages!treatment_history_new_stage_id_fkey(name)
+                `)
+                .eq('treatment_id', treatment.id)
+                .order('created_at', { ascending: true });
+            return (data || []) as TreatmentHistoryEntry[];
+        })
+    );
+
+    const patient = normalizedTreatments[0].patient as PatientSummary;
+    const treatments: PatientTimelineTreatmentEntry[] = normalizedTreatments.map((treatment, i) => ({
+        treatment,
+        history: historyResults[i],
+    }));
+
+    return { patient, treatments };
 }
