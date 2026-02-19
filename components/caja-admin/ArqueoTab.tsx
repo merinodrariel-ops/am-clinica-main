@@ -63,16 +63,26 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
             ]);
             setCuentas(cuentasData);
 
-            // Check if today is closed
-            if (cierreData && cierreData.fecha === today) {
+            // Priority: If there is an open session, it's "Open".
+            // Even if there's a closure for today, a new session might have been started.
+            const isTodayClosed = cierreData && cierreData.fecha === today;
+            const hasActiveApertura = aperturaData && aperturaData.estado === 'Abierto';
+
+            if (hasActiveApertura) {
+                // We have an active session
+                setAperturaHoy(aperturaData);
+                setCierreHoy(null);
+                setUltimoCierre(cierreData && cierreData.fecha !== today ? cierreData : await getUltimoCierreAdmin(sucursal.id, today));
+            } else if (isTodayClosed) {
+                // No active session, but today was closed
                 setCierreHoy(cierreData);
                 setAperturaHoy(null);
-                // Fetch previous closure for context if needed
                 const prev = await getUltimoCierreAdmin(sucursal.id, today);
                 setUltimoCierre(prev);
             } else {
+                // No sessions today yet
                 setCierreHoy(null);
-                setAperturaHoy(aperturaData || null);
+                setAperturaHoy(null);
                 setUltimoCierre(cierreData);
             }
 
