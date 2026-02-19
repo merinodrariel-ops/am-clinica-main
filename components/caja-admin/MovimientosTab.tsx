@@ -33,9 +33,11 @@ import {
   type CajaAdminMovimiento,
   type CuentaFinanciera,
   type MovimientoLinea,
+  type CajaAdminArqueo,
   getMovimientos,
   getCuentas,
   createMovimiento,
+  getAperturaAdminDelDia,
   logMovimientoEdit,
   deleteMovimiento,
   SUBTIPOS_MOVIMIENTO,
@@ -109,6 +111,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     totalUsd: 0,
   });
 
+  const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
+  const isCajaAbierta = aperturaHoy?.estado === "Abierto";
+
   // Form state
   const [formData, setFormData] = useState({
     tipo_movimiento: "EGRESO",
@@ -131,9 +136,11 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       // and ensure explicit error handling
       const movData = await getMovimientos({ sucursalId: sucursal.id, mes: mesActual });
       const cuentasData = await getCuentas(sucursal.id);
+      const aperturaHoy = await getAperturaAdminDelDia(sucursal.id);
 
       setMovimientos(movData || []);
       setCuentas(cuentasData || []);
+      setAperturaHoy(aperturaHoy);
     } catch (error) {
       console.error("Error loading Caja Admin data:", error);
       // Optional: set specific error state to show to user
@@ -519,6 +526,41 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             : line.importe > 0),
       );
 
+    const normalizedLinesToSave = linesToSave.map((line) => {
+      const importe = Number(line.importe || 0);
+      const moneda = (line.moneda || "").toUpperCase();
+      const usdRaw = Number(line.usd_equivalente);
+      const hasUsdEq = Number.isFinite(usdRaw);
+
+      let usdEquivalente = hasUsdEq ? usdRaw : 0;
+      if (!hasUsdEq && moneda === "USD") {
+        usdEquivalente = importe;
+      }
+      if (!hasUsdEq && moneda === "ARS" && tcBna) {
+        usdEquivalente = importe / tcBna;
+      }
+
+      return {
+        ...line,
+        importe,
+        moneda,
+        usd_equivalente: usdEquivalente,
+      };
+    });
+
+    const hasArsWithoutUsdEq = normalizedLinesToSave.some((line) => {
+      if (line.moneda !== "ARS") return false;
+      if (Number(line.importe || 0) === 0) return false;
+      return !Number.isFinite(Number(line.usd_equivalente));
+    });
+
+    if (hasArsWithoutUsdEq) {
+      setEditSaveError(
+        "No hay cotizacion BNA disponible para lineas en ARS. Recarga la cotizacion o usa USD.",
+      );
+      return;
+    }
+
     if (editData.lines.length > 0 && linesToSave.length === 0) {
       setEditSaveError(
         "Debes completar al menos una linea con importe mayor a 0, o eliminar lineas vacias antes de guardar.",
@@ -555,8 +597,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
       const previousUsdTotal = Number(editingMov.usd_equivalente_total || 0);
       const nextUsdTotal =
-        linesToSave.length > 0
-          ? linesToSave.reduce(
+        normalizedLinesToSave.length > 0
+          ? normalizedLinesToSave.reduce(
             (sum, line) => sum + Number(line.usd_equivalente || 0),
             0,
           )
@@ -578,7 +620,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         fecha_movimiento: editData.fecha,
         descripcion: editData.descripcion,
         registro_editado: true,
-        lines: linesToSave,
+        lines: normalizedLinesToSave,
         usdTotalOverride: editData.totalUsd,
       });
 
@@ -631,6 +673,41 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       console.warn("Adjunto obligatorio para este subtipo");
     }
 
+    const normalizedLineas = formLineas.map((line) => {
+      const importe = Number(line.importe || 0);
+      const moneda = (line.moneda || "").toUpperCase();
+      const usdRaw = Number(line.usd_equivalente);
+      const hasUsdEq = Number.isFinite(usdRaw);
+
+      let usdEquivalente = hasUsdEq ? usdRaw : 0;
+      if (!hasUsdEq && moneda === "USD") {
+        usdEquivalente = importe;
+      }
+      if (!hasUsdEq && moneda === "ARS" && tcBna) {
+        usdEquivalente = importe / tcBna;
+      }
+
+      return {
+        ...line,
+        importe,
+        moneda,
+        usd_equivalente: usdEquivalente,
+      };
+    });
+
+    const hasArsWithoutUsdEq = normalizedLineas.some((line) => {
+      if (line.moneda !== "ARS") return false;
+      if (Number(line.importe || 0) === 0) return false;
+      return !Number.isFinite(Number(line.usd_equivalente));
+    });
+
+    if (hasArsWithoutUsdEq) {
+      setFormError(
+        "No hay cotizacion BNA disponible para lineas en ARS. Recarga la cotizacion o usa USD.",
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     const { error } = await createMovimiento(
@@ -647,7 +724,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         tc_fuente: tcBna ? "BNA_AUTO" : "N/A",
         tc_fecha_hora: new Date().toISOString(),
       },
-      formLineas,
+      normalizedLineas,
     );
 
     setSubmitting(false);
@@ -785,8 +862,15 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
           {(role === "owner" || role === "admin") && (
             <Button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-shadow"
+              onClick={() => {
+                if (!isCajaAbierta) {
+                  alert("La caja administrativa no está abierta para hoy. Debes abrirla en la pestaña 'Inicio / Cierre' para registrar movimientos.");
+                  return;
+                }
+                setShowForm(true);
+              }}
+              disabled={!isCajaAbierta}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed disabled:saturate-50"
             >
               <Plus className="w-5 h-5" />
               Nuevo Movimiento
@@ -794,6 +878,19 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           )}
         </div>
       </div>
+
+      {!isCajaAbierta && !loading && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-center gap-3 text-amber-700 dark:text-amber-400"
+        >
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <div className="text-sm">
+            <span className="font-semibold">Caja Cerrada:</span> No puedes registrar nuevos movimientos porque la caja administrativa de hoy aún no ha sido iniciada o ya fue cerrada. Dirígete a la pestaña <b>Inicio / Cierre</b> para comenzar.
+          </div>
+        </motion.div>
+      )}
 
       {/* New Movement Form */}
       {showForm && (
@@ -919,8 +1016,6 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 </Button>
               )}
             </div>
-            // ... (rest of methods) // ... (inside the form JSX for
-            CAMBIO_MONEDA)
             {formData.tipo_movimiento === "CAMBIO_MONEDA" ? (
               <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">

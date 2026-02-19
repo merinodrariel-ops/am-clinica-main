@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import {
     Lock,
-    AlertTriangle
+    AlertTriangle,
+    Loader2,
+    PlayCircle,
+    CheckCircle
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -11,10 +14,13 @@ import {
     type CuentaFinanciera,
     getCuentas,
     getUltimoCierreAdmin,
+    getAperturaAdminDelDia,
+    abrirCajaAdminDelDia,
     getCurrentBalanceAdmin,
     cerrarCajaAdmin
 } from '@/lib/caja-admin';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLocalISODate, formatDateForLocale } from '@/lib/local-date';
 import CurrencyInput from '@/components/ui/CurrencyInput';
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -26,12 +32,15 @@ interface Props {
 
 export default function ArqueoTab({ sucursal, tcBna }: Props) {
     const [cierreHoy, setCierreHoy] = useState<CajaAdminArqueo | null>(null);
+    const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
     const [ultimoCierre, setUltimoCierre] = useState<CajaAdminArqueo | null>(null);
     const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
     const [loading, setLoading] = useState(true);
     const [saldos, setSaldos] = useState<Record<string, number>>({});
     const [observaciones, setObservaciones] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [opening, setOpening] = useState(false);
+    const [showAbrirModal, setShowAbrirModal] = useState(false);
     const [showCerrarModal, setShowCerrarModal] = useState(false);
     const [saldosIniciales, setSaldosIniciales] = useState<Record<string, number>>({});
     const [expectedBalances, setExpectedBalances] = useState<Record<string, number>>({});
@@ -45,10 +54,11 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
     async function loadData() {
         setLoading(true);
         try {
-            const today = new Date().toISOString().split('T')[0];
-            const [cuentasData, cierreData, balanceActual] = await Promise.all([
+            const today = getLocalISODate();
+            const [cuentasData, cierreData, aperturaData, balanceActual] = await Promise.all([
                 getCuentas(sucursal.id),
                 getUltimoCierreAdmin(sucursal.id),
+                getAperturaAdminDelDia(sucursal.id, today),
                 getCurrentBalanceAdmin(sucursal.id),
             ]);
             setCuentas(cuentasData);
@@ -56,11 +66,13 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
             // Check if today is closed
             if (cierreData && cierreData.fecha === today) {
                 setCierreHoy(cierreData);
+                setAperturaHoy(null);
                 // Fetch previous closure for context if needed
                 const prev = await getUltimoCierreAdmin(sucursal.id, today);
                 setUltimoCierre(prev);
             } else {
                 setCierreHoy(null);
+                setAperturaHoy(aperturaData || null);
                 setUltimoCierre(cierreData);
             }
 
@@ -80,6 +92,25 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
             console.error(error);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleAbrir() {
+        setOpening(true);
+        try {
+            const today = getLocalISODate();
+            await abrirCajaAdminDelDia({
+                sucursalId: sucursal.id,
+                fecha: today,
+                usuario: profile?.full_name || user?.email || 'Admin',
+                tcBna: tcBna || null,
+            });
+            setShowAbrirModal(false);
+            await loadData();
+        } catch (err: unknown) {
+            alert(err instanceof Error ? err.message : 'Error desconocido');
+        } finally {
+            setOpening(false);
         }
     }
 
@@ -107,8 +138,8 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
 
             const { success, error } = await cerrarCajaAdmin({
                 sucursalId: sucursal.id,
-                fecha: new Date().toISOString().split('T')[0],
-                usuario: 'Admin', // Should be dynamic
+                fecha: getLocalISODate(),
+                usuario: profile?.full_name || user?.email || 'Admin',
                 saldosFinales: saldos,
                 saldoFinalUsdEq: totalCountedUsdEq,
                 diferenciaUsd: totalCountedUsdEq - totalExpectedUsdEq,
@@ -133,7 +164,7 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
         }
     }
 
-    const { role } = useAuth();
+    const { role, profile, user } = useAuth();
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando...</div>;
 
@@ -153,32 +184,60 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
         return sum;
     }, 0);
 
+    const aperturaSugeridaArs = cuentas
+        .filter(c => c.tipo_cuenta === 'EFECTIVO' && c.moneda === 'ARS')
+        .reduce((sum, c) => sum + Number(ultimoCierre?.saldos_finales?.[c.id] || 0), 0);
+
+    const aperturaSugeridaUsd = cuentas
+        .filter(c => c.tipo_cuenta === 'EFECTIVO' && c.moneda === 'USD')
+        .reduce((sum, c) => sum + Number(ultimoCierre?.saldos_finales?.[c.id] || 0), 0);
+
+    const aperturaSugeridaEq = ultimoCierre?.saldo_final_usd_equivalente
+        ?? (tcBna ? aperturaSugeridaUsd + (aperturaSugeridaArs / tcBna) : aperturaSugeridaUsd);
+
     return (
         <div className="space-y-6">
             <div className={`p-6 rounded-2xl border ${cierreHoy
                 ? 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'
-                : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'}`}>
+                : aperturaHoy
+                    ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
+                    : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'}`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         {cierreHoy ? (
                             <Lock className="text-gray-500" size={24} />
+                        ) : aperturaHoy ? (
+                            <CheckCircle className="text-green-600 dark:text-green-400" size={24} />
                         ) : (
                             <AlertTriangle className="text-blue-600 dark:text-blue-400" size={24} />
                         )}
                         <div>
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {cierreHoy ? 'Caja Cerrada' : 'Caja Activa'}
+                                {aperturaHoy ? 'Jornada Abierta' : cierreHoy ? 'Caja Cerrada (Sesión Finalizada)' : 'Caja sin iniciar'}
                             </h3>
                             <p className="text-sm text-gray-500">
                                 {cierreHoy
-                                    ? `Cerrado el ${new Date(cierreHoy.fecha).toLocaleDateString()}`
-                                    : ultimoCierre
-                                        ? `Último cierre: ${new Date(ultimoCierre.fecha).toLocaleDateString()}`
-                                        : 'Sin cierres previos'}
+                                    ? `Cerrado el ${formatDateForLocale(cierreHoy.fecha)}`
+                                    : aperturaHoy
+                                        ? `Abierta ${aperturaHoy.hora_inicio ? new Date(aperturaHoy.hora_inicio).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : ''}`
+                                        : ultimoCierre
+                                            ? `Último cierre: ${formatDateForLocale(ultimoCierre.fecha)}`
+                                            : 'Sin cierres previos (Saldo inicial: $0)'}
                             </p>
                         </div>
                     </div>
-                    {!cierreHoy && (role === 'owner' || role === 'admin') && (
+
+                    {!aperturaHoy && (role === 'owner' || role === 'admin') && (
+                        <Button
+                            onClick={() => setShowAbrirModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+                        >
+                            <PlayCircle size={18} />
+                            {cierreHoy ? 'Iniciar Nueva Sesión' : 'Iniciar Jornada'}
+                        </Button>
+                    )}
+
+                    {!cierreHoy && aperturaHoy && (role === 'owner' || role === 'admin') && (
                         <Button
                             onClick={() => setShowCerrarModal(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
@@ -215,6 +274,69 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                     </div>
                 )}
             </div>
+
+            {showAbrirModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                            <PlayCircle size={20} className="text-emerald-600" />
+                            {cierreHoy ? 'Iniciar Nueva Sesión Admin' : 'Iniciar Jornada Admin'}
+                        </h3>
+
+                        <p className="text-sm text-gray-500 mb-4">
+                            Se heredarán automáticamente los saldos del último cierre.
+                        </p>
+
+                        <div className="rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-900/20 p-4 mb-4">
+                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide mb-2">
+                                Saldo inicial sugerido
+                            </p>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between text-gray-700 dark:text-gray-200">
+                                    <span>Efectivo USD</span>
+                                    <span className="font-semibold">
+                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aperturaSugeridaUsd)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-gray-700 dark:text-gray-200">
+                                    <span>Efectivo ARS</span>
+                                    <span className="font-semibold">
+                                        {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(aperturaSugeridaArs)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between pt-2 border-t border-emerald-200 dark:border-emerald-800 text-gray-900 dark:text-white">
+                                    <span>Total equivalente</span>
+                                    <span className="font-bold">
+                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aperturaSugeridaEq || 0)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setShowAbrirModal(false)}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleAbrir}
+                                disabled={opening}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                            >
+                                {opening ? (
+                                    <span className="inline-flex items-center gap-2">
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Abriendo...
+                                    </span>
+                                ) : 'Confirmar apertura'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal Closure */}
             {showCerrarModal && (

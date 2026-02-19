@@ -50,9 +50,11 @@ export default function CajaAdminPage() {
 
     async function loadSucursales() {
         const data = await getSucursales();
-        setSucursales(data);
-        if (data.length > 0) {
-            setSelectedSucursal(data[0]);
+        const filtered = data.filter((s) => !s.nombre.toLowerCase().includes('montevideo'));
+        setSucursales(filtered);
+        if (filtered.length > 0) {
+            const buenosAires = filtered.find((s) => s.nombre.toLowerCase().includes('buenos'));
+            setSelectedSucursal(buenosAires || filtered[0]);
         }
     }
 

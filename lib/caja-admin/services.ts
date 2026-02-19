@@ -1,5 +1,6 @@
 
 import { createClient } from '@/utils/supabase/client';
+import { getLocalISODate } from '@/lib/local-date';
 import {
     Sucursal,
     CuentaFinanciera,
@@ -108,6 +109,20 @@ export async function createMovimiento(
     movimiento: Partial<CajaAdminMovimiento>,
     lineas: MovimientoLinea[]
 ): Promise<{ data: CajaAdminMovimiento | null; error: Error | null }> {
+    // 1. Enforce Cash Box Status
+    const sucursalId = movimiento.sucursal_id;
+    const fecha = movimiento.fecha_movimiento || getLocalISODate();
+
+    if (sucursalId) {
+        const apertura = await getAperturaAdminDelDia(sucursalId, fecha);
+        if (!apertura || apertura.estado !== 'Abierto') {
+            return {
+                data: null,
+                error: new Error('No se puede registrar movimientos: La caja administrativa no está abierta para esta fecha.')
+            };
+        }
+    }
+
     // Calculate USD equivalent total
     const usdTotal = lineas.reduce((sum, l) => sum + (l.usd_equivalente || 0), 0);
 
@@ -115,7 +130,7 @@ export async function createMovimiento(
         .from('caja_admin_movimientos')
         .insert({
             ...movimiento,
-            fecha_movimiento: movimiento.fecha_movimiento || new Date().toISOString().split('T')[0],
+            fecha_movimiento: movimiento.fecha_movimiento || getLocalISODate(),
             usd_equivalente_total: usdTotal,
             estado: 'Registrado',
             created_at: new Date().toISOString(),
@@ -270,7 +285,7 @@ export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: str
         .from('caja_admin_arqueos')
         .select('*')
         .eq('sucursal_id', sucursalId)
-        .eq('estado', 'Cerrado')
+        .in('estado', ['Cerrado', 'cerrado'])
         .order('fecha', { ascending: false })
         .limit(1);
 
@@ -285,6 +300,94 @@ export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: str
         return null;
     }
     return data;
+}
+
+export async function getAperturaAdminDelDia(
+    sucursalId: string,
+    fecha?: string
+): Promise<CajaAdminArqueo | null> {
+    const targetDate = fecha || getLocalISODate();
+
+    const { data, error } = await supabase
+        .from('caja_admin_arqueos')
+        .select('*')
+        .eq('sucursal_id', sucursalId)
+        .eq('fecha', targetDate)
+        .in('estado', ['Abierto', 'abierto'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw error;
+    }
+
+    return data || null;
+}
+
+export async function abrirCajaAdminDelDia(params: {
+    sucursalId: string;
+    fecha: string;
+    usuario: string;
+    tcBna?: number | null;
+}): Promise<CajaAdminArqueo> {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('abrir_caja_admin', {
+        p_sucursal_id: params.sucursalId,
+        p_fecha: params.fecha,
+        p_usuario: params.usuario,
+        p_tc_bna: params.tcBna || null,
+    });
+
+    if (!rpcError && rpcData) {
+        return rpcData as CajaAdminArqueo;
+    }
+
+    if (rpcError) {
+        console.warn('abrir_caja_admin RPC unavailable, using fallback flow:', rpcError.message);
+    }
+
+    /* 
+    Multiple sessions are allowed. 
+    The RPC or the logic below will handle inheriting balances from the 
+    absolute latest closure.
+    */
+
+
+    const aperturaExistente = await getAperturaAdminDelDia(params.sucursalId, params.fecha);
+    if (aperturaExistente) {
+        return aperturaExistente;
+    }
+
+    const ultimoCierre = await getUltimoCierreAdmin(params.sucursalId, params.fecha);
+    const saldosIniciales = ultimoCierre?.saldos_finales || {};
+    const saldoInicialUsdEq = Number(ultimoCierre?.saldo_final_usd_equivalente || 0);
+
+    const { data, error } = await supabase
+        .from('caja_admin_arqueos')
+        .insert({
+            sucursal_id: params.sucursalId,
+            fecha: params.fecha,
+            usuario: params.usuario,
+            hora_inicio: new Date().toISOString(),
+            hora_cierre: null,
+            saldos_iniciales: saldosIniciales,
+            saldos_finales: saldosIniciales,
+            saldo_final_usd_equivalente: saldoInicialUsdEq,
+            tc_bna_venta_dia: params.tcBna || null,
+            diferencia_usd: 0,
+            observaciones: 'Apertura automatica',
+            estado: 'Abierto',
+            snapshot_datos: {
+                apertura_automatica: true,
+                origen: 'sistema'
+            }
+        })
+        .select('*')
+        .single();
+
+    if (error) throw error;
+    return data as CajaAdminArqueo;
 }
 
 // Deprecated or Aliased
@@ -325,7 +428,7 @@ export async function cerrarCajaAdmin(params: {
 }
 
 export async function abrirArqueo(): Promise<{ data: null; error: Error }> {
-    return { data: null, error: new Error('Action not supported') };
+    return { data: null, error: new Error('Use abrirCajaAdminDelDia') };
 }
 
 export async function cerrarArqueo(): Promise<{ success: boolean; error?: string }> {
@@ -1277,7 +1380,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     saldoUsd: number;
     saldosPorCuenta: Record<string, number>;
 }> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalISODate();
     const ultimo = await getUltimoCierreAdmin(sucursalId);
 
     // Get Cash Accounts
