@@ -1,11 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/api-auth';
 
-// Initialize Supabase Client with service role for admin operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize Supabase Client lazily
+const getSupabase = () => createAdminClient();
 
 const NOTION_DATABASE_ID_PACIENTES = process.env.NOTION_DB_PACIENTES_ID;
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
@@ -149,7 +147,7 @@ function parseNotionPatient(page: Record<string, unknown>): NotionPatient | null
 }
 
 // Check if patient exists in Supabase
-async function findExistingPatient(patient: NotionPatient): Promise<{ exists: boolean; reason?: string }> {
+async function findExistingPatient(patient: NotionPatient, supabase: any): Promise<{ exists: boolean; reason?: string }> {
     // Check by email (most reliable)
     if (patient.email) {
         const { data } = await supabase
@@ -207,7 +205,7 @@ async function findExistingPatient(patient: NotionPatient): Promise<{ exists: bo
 }
 
 // Insert patient into Supabase
-async function insertPatient(patient: NotionPatient): Promise<{ success: boolean; error?: string }> {
+async function insertPatient(patient: NotionPatient, supabase: any): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase.from('pacientes').insert({
         nombre: patient.nombre || 'Sin nombre',
         apellido: patient.apellido || '',
@@ -234,6 +232,7 @@ async function insertPatient(patient: NotionPatient): Promise<{ success: boolean
 }
 
 export async function GET(request: Request) {
+    const supabase = getSupabase();
     const auth = await authorizeRequest(request);
     if (!auth.authorized) {
         return NextResponse.json({ error: auth.error }, { status: 401 });
@@ -326,7 +325,7 @@ export async function GET(request: Request) {
                 }
 
                 // Check for duplicates
-                const existingCheck = await findExistingPatient(patient);
+                const existingCheck = await findExistingPatient(patient, supabase);
                 if (existingCheck.exists) {
                     result.duplicates.push({
                         nombre: `${patient.nombre} ${patient.apellido}`.trim(),
@@ -339,7 +338,7 @@ export async function GET(request: Request) {
 
                 // Insert if not dry run
                 if (!dryRun) {
-                    const insertResult = await insertPatient(patient);
+                    const insertResult = await insertPatient(patient, supabase);
                     if (insertResult.success) {
                         result.imported.push({
                             nombre: patient.nombre,

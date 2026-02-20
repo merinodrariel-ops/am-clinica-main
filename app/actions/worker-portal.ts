@@ -15,7 +15,7 @@ const TableNames = {
  * Get the worker profile for the currently authenticated user
  */
 export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) return null;
@@ -38,7 +38,7 @@ export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
  * Get all worker profiles (Admin only usually, but RLS handles security)
  */
 export async function getAllWorkers(): Promise<WorkerProfile[]> {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from(TableNames.Profiles)
         .select('*')
@@ -56,7 +56,7 @@ export async function getAllWorkers(): Promise<WorkerProfile[]> {
  * Create or Update a worker profile
  */
 export async function upsertWorkerProfile(profile: Partial<WorkerProfile>) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Remove undefined fields to avoid overwriting with null
     const cleanProfile = Object.fromEntries(
@@ -82,7 +82,7 @@ export async function upsertWorkerProfile(profile: Partial<WorkerProfile>) {
  * Get work logs for a specific worker
  */
 export async function getWorkerLogs(workerId: string, startDate?: string, endDate?: string): Promise<WorkLog[]> {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     let query = supabase
         .from(TableNames.Logs)
@@ -107,7 +107,7 @@ export async function getWorkerLogs(workerId: string, startDate?: string, endDat
  * Log a new work entry (Shift, Procedure, etc.)
  */
 export async function logWorkEntry(entry: Partial<WorkLog>) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
         .from(TableNames.Logs)
@@ -129,7 +129,7 @@ export async function logWorkEntry(entry: Partial<WorkLog>) {
  * Get Achievements for a worker
  */
 export async function getWorkerAchievements(workerId: string): Promise<WorkerAchievement[]> {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
         .from(TableNames.WorkerAchievements)
@@ -152,7 +152,7 @@ export async function getWorkerAchievements(workerId: string): Promise<WorkerAch
  * Award an achievement to a worker
  */
 export async function awardAchievement(workerId: string, achievementCode: string) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // 1. Get Achievement ID
     const { data: achievement, error: achError } = await supabase

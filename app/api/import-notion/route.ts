@@ -1,12 +1,9 @@
-
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/api-auth';
 
-// Initialize Supabase Client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize Supabase Client lazily
+const getSupabase = () => createAdminClient();
 
 const NOTION_DATABASE_ID_ADMIN = process.env.NOTION_DB_ADMIN_ID;
 const NOTION_DB_RECEPCION_ID = process.env.NOTION_DB_RECEPCION_ID;
@@ -56,6 +53,7 @@ type NotionQueryResponse = {
 };
 
 export async function GET(request: Request) {
+    const supabase = getSupabase();
     const auth = await authorizeRequest(request);
     if (!auth.authorized) {
         return NextResponse.json({ error: auth.error }, { status: 401 });

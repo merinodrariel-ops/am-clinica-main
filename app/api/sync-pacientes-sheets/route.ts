@@ -1,10 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { NextResponse } from 'next/server';
 
-// Initialize Supabase Client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize Supabase Client lazily
+const getSupabase = () => createAdminClient();
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQwXYeMlpxFSKlCi6tOiJtaxQqcAHUPOAAqVPpzalimICRNj0QsfRcDR3ye2Cr80TOH1xSN6QYsHTYc/pub?gid=1185177260&single=true&output=csv';
 
@@ -34,6 +32,7 @@ interface PatientUpdates {
 // ... imports
 
 export async function GET() {
+    const supabase = getSupabase();
     try {
         const response = await fetch(SHEET_URL);
         if (!response.ok) {
