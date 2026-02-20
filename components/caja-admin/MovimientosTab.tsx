@@ -42,6 +42,7 @@ import {
   createMovimiento,
   getAperturaAdminDelDia,
   getArqueosForMonth,
+  getCurrentBalanceAdmin,
   logMovimientoEdit,
   deleteMovimiento,
   SUBTIPOS_MOVIMIENTO,
@@ -119,6 +120,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const isCajaAbierta = aperturaHoy?.estado === "Abierto";
   const [arqueos, setArqueos] = useState<CajaAdminArqueo[]>([]);
   const [showArqueos, setShowArqueos] = useState(true);
+  const [balanceVivo, setBalanceVivo] = useState<{ saldoArs: number; saldoUsd: number; status: string } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -144,11 +146,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       const cuentasData = await getCuentas(sucursal.id);
       const aperturaHoy = await getAperturaAdminDelDia(sucursal.id);
       const arqueosData = await getArqueosForMonth(sucursal.id, mesActual);
+      const balanceData = await getCurrentBalanceAdmin(sucursal.id);
 
       setMovimientos(movData || []);
       setCuentas(cuentasData || []);
       setAperturaHoy(aperturaHoy);
       setArqueos(arqueosData || []);
+      setBalanceVivo(balanceData);
     } catch (error) {
       console.error("Error loading Caja Admin data:", error);
       // Optional: set specific error state to show to user
@@ -801,6 +805,11 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     (t) => !t.onlyUnificada || sucursal.modo_caja === "UNIFICADA",
   );
 
+  // --- Gastos del mes (computed from loaded movimientos, no extra fetch) ---
+  const totalGastosMesUsd = movimientos
+    .filter((m) => m.tipo_movimiento === "EGRESO" && m.estado !== "Anulado")
+    .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
+
   // --- Helper for Privacy Mode ---
   const formatPrivacy = (content: React.ReactNode) => {
     if (!privacyMode) return content;
@@ -809,6 +818,50 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
   return (
     <div className="space-y-6">
+
+      {/* ── Live Balance Strip ── */}
+      {balanceVivo && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div>
+              <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Efectivo ARS</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+                {formatPrivacy(
+                  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(balanceVivo.saldoArs)
+                )}
+              </p>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${balanceVivo.status === "Cerrado" ? "bg-gray-100 text-gray-500" : "bg-green-100 text-green-700"}`}>
+              {balanceVivo.status}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div>
+              <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Efectivo USD</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+                {formatPrivacy(
+                  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.saldoUsd)
+                )}
+              </p>
+            </div>
+            <Wallet className="w-5 h-5 text-indigo-400" />
+          </div>
+
+          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-red-100 dark:border-red-900/30 shadow-sm">
+            <div>
+              <p className="text-xs text-red-400 uppercase font-semibold tracking-wide">Gastos del mes</p>
+              <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-0.5">
+                {formatPrivacy(
+                  `−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalGastosMesUsd)}`
+                )}
+              </p>
+            </div>
+            <DollarSign className="w-5 h-5 text-red-400" />
+          </div>
+        </div>
+      )}
+
       {/* Header with Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
