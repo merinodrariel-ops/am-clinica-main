@@ -15,6 +15,7 @@ export default function RoleSwitcher() {
         { id: 'owner', label: 'Dueño', icon: Zap },
         { id: 'admin', label: 'Administrador', icon: ShieldAlert },
         { id: 'reception', label: 'Recepción', icon: UserCheck },
+        { id: 'asistente', label: 'Asistente', icon: UserCheck },
         { id: 'pricing_manager', label: 'Gestor Precios', icon: Eye },
         { id: 'partner_viewer', label: 'Socio (Solo Lectura)', icon: Eye },
     ] as const;

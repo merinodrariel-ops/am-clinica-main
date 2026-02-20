@@ -39,9 +39,12 @@ export default function DashboardPage() {
         if (!loading && role === 'laboratorio') {
             router.replace('/inventario');
         }
+        if (!loading && role === 'asistente') {
+            router.replace('/patients');
+        }
     }, [role, loading, router]);
 
-    if (loading || role === 'laboratorio') {
+    if (loading || role === 'laboratorio' || role === 'asistente') {
         return (
             <div className="flex h-[80vh] items-center justify-center">
                 <Loader2 className="animate-spin text-blue-600" size={40} />

@@ -26,6 +26,9 @@ import {
   Minus,
   Paperclip,
   AlertCircle,
+  PlayCircle,
+  Lock,
+  BookOpen,
 } from "lucide-react";
 
 import {
@@ -38,6 +41,7 @@ import {
   getCuentas,
   createMovimiento,
   getAperturaAdminDelDia,
+  getArqueosForMonth,
   logMovimientoEdit,
   deleteMovimiento,
   SUBTIPOS_MOVIMIENTO,
@@ -113,6 +117,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
   const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
   const isCajaAbierta = aperturaHoy?.estado === "Abierto";
+  const [arqueos, setArqueos] = useState<CajaAdminArqueo[]>([]);
+  const [showArqueos, setShowArqueos] = useState(true);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -137,10 +143,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       const movData = await getMovimientos({ sucursalId: sucursal.id, mes: mesActual });
       const cuentasData = await getCuentas(sucursal.id);
       const aperturaHoy = await getAperturaAdminDelDia(sucursal.id);
+      const arqueosData = await getArqueosForMonth(sucursal.id, mesActual);
 
       setMovimientos(movData || []);
       setCuentas(cuentasData || []);
       setAperturaHoy(aperturaHoy);
+      setArqueos(arqueosData || []);
     } catch (error) {
       console.error("Error loading Caja Admin data:", error);
       // Optional: set specific error state to show to user
@@ -761,6 +769,34 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     return true;
   });
 
+  type TableRow =
+    | { kind: "movimiento"; data: CajaAdminMovimiento; sortTs: string }
+    | { kind: "apertura"; data: CajaAdminArqueo; sortTs: string }
+    | { kind: "cierre"; data: CajaAdminArqueo; sortTs: string };
+
+  // Show arqueo rows only when toggle is ON and no tipo filter is active
+  const arqueoVisible = showArqueos && !filterTipo;
+
+  const unifiedRows: TableRow[] = [
+    ...filteredMovimientos.map((m) => ({
+      kind: "movimiento" as const,
+      data: m,
+      sortTs: m.fecha_hora || m.fecha_movimiento + "T12:00:00",
+    })),
+    ...(arqueoVisible
+      ? arqueos.flatMap((a): TableRow[] => {
+          const rows: TableRow[] = [];
+          if (a.hora_inicio) {
+            rows.push({ kind: "apertura", data: a, sortTs: a.hora_inicio });
+          }
+          if (a.hora_cierre) {
+            rows.push({ kind: "cierre", data: a, sortTs: a.hora_cierre });
+          }
+          return rows;
+        })
+      : []),
+  ].sort((a, b) => b.sortTs.localeCompare(a.sortTs));
+
   const tiposDisponibles = TIPOS_MOVIMIENTO.filter(
     (t) => !t.onlyUnificada || sucursal.modo_caja === "UNIFICADA",
   );
@@ -832,6 +868,21 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             title="Enviar Resumen del Mes por WhatsApp"
           >
             <Share2 className="w-5 h-5" />
+          </Button>
+
+          {/* Arqueos Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowArqueos(!showArqueos)}
+            className={`rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 ${showArqueos ? "text-indigo-600" : "text-slate-400"}`}
+            title={
+              showArqueos
+                ? "Ocultar aperturas y cierres"
+                : "Mostrar aperturas y cierres"
+            }
+          >
+            <BookOpen className="w-5 h-5" />
           </Button>
 
           {/* Privacy Toggle */}
@@ -1266,7 +1317,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4" />
             Cargando movimientos...
           </div>
-        ) : filteredMovimientos.length === 0 ? (
+        ) : unifiedRows.length === 0 ? (
           <div className="p-12 text-center text-slate-400">
             <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No hay movimientos para este período</p>
@@ -1299,135 +1350,220 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {filteredMovimientos.map((mov) => (
-                <motion.tr
-                  key={mov.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
-                >
-                  <td className="px-6 py-4 text-sm">
-                    {new Date(mov.fecha_hora).toLocaleDateString("es-AR")}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${mov.tipo_movimiento === "EGRESO"
-                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        : mov.tipo_movimiento.includes("INGRESO")
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : mov.tipo_movimiento === "APORTE_CAPITAL"
-                            ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                            : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                        }`}
+              {unifiedRows.map((row) => {
+                if (row.kind === "apertura") {
+                  const a = row.data;
+                  return (
+                    <motion.tr
+                      key={`apertura-${a.id}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="bg-teal-50/40 dark:bg-teal-900/10 hover:bg-teal-50/70 dark:hover:bg-teal-900/20 border-l-2 border-teal-400 transition-colors"
                     >
-                      {mov.tipo_movimiento.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium">
-                    {mov.descripcion}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-500">
-                    {mov.subtipo || "-"}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-right font-mono">
-                    {formatPrivacy(
-                      `$${mov.usd_equivalente_total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {mov.estado === "Registrado" ? (
-                      <Check className="w-5 h-5 text-green-500 mx-auto" />
-                    ) : (
-                      <X className="w-5 h-5 text-red-500 mx-auto" />
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      {(mov as { registro_editado?: boolean })
-                        .registro_editado && (
-                          <span title="Este registro ha sido editado">
-                            <AlertTriangle className="w-4 h-4 text-amber-500" />
+                      <td className="px-6 py-3 text-sm text-slate-500">
+                        {a.hora_inicio
+                          ? new Date(a.hora_inicio).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+                          : a.fecha}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+                          APERTURA
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+                        Apertura de caja{a.usuario ? ` · ${a.usuario}` : ""}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-slate-400">—</td>
+                      <td className="px-6 py-3 text-sm text-right font-mono text-slate-400">
+                        {a.saldo_final_usd_equivalente != null
+                          ? `$${Number(a.saldo_final_usd_equivalente).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                          : "—"}
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <PlayCircle className="w-5 h-5 text-teal-500 mx-auto" />
+                      </td>
+                      <td className="px-6 py-3 text-center text-slate-300">—</td>
+                    </motion.tr>
+                  );
+                }
+
+                if (row.kind === "cierre") {
+                  const a = row.data;
+                  const dif = a.diferencia_usd ?? 0;
+                  return (
+                    <motion.tr
+                      key={`cierre-${a.id}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="bg-slate-100/60 dark:bg-slate-900/30 hover:bg-slate-100/90 dark:hover:bg-slate-900/50 border-l-2 border-slate-400 transition-colors"
+                    >
+                      <td className="px-6 py-3 text-sm text-slate-500">
+                        {a.hora_cierre
+                          ? new Date(a.hora_cierre).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+                          : a.fecha}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                          CIERRE
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+                        Cierre de caja{a.usuario ? ` · ${a.usuario}` : ""}
+                      </td>
+                      <td className="px-6 py-3 text-sm">
+                        {dif !== 0 ? (
+                          <span className={`font-medium ${dif > 0 ? "text-green-600" : "text-red-500"}`}>
+                            Dif: {dif > 0 ? "+" : ""}${dif.toFixed(2)} USD
                           </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">Sin diferencia</span>
                         )}
-                      {(mov as { origen?: string }).origen ===
-                        "importado_csv" && (
-                          <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 rounded">
-                            CSV
-                          </span>
-                        )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setHistorialMovId(mov.id)}
-                        className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                        title="Ver historial de ediciones"
+                      </td>
+                      <td className="px-6 py-3 text-sm text-right font-mono text-slate-600 dark:text-slate-300">
+                        {a.saldo_final_usd_equivalente != null
+                          ? `$${Number(a.saldo_final_usd_equivalente).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                          : "—"}
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <Lock className="w-5 h-5 text-slate-400 mx-auto" />
+                      </td>
+                      <td className="px-6 py-3 text-center text-slate-300">—</td>
+                    </motion.tr>
+                  );
+                }
+
+                // kind === "movimiento"
+                const mov = row.data;
+                return (
+                  <motion.tr
+                    key={mov.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
+                  >
+                    <td className="px-6 py-4 text-sm">
+                      {new Date(mov.fecha_hora).toLocaleDateString("es-AR")}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${mov.tipo_movimiento === "EGRESO"
+                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                          : mov.tipo_movimiento.includes("INGRESO")
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : mov.tipo_movimiento === "APORTE_CAPITAL"
+                              ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          }`}
                       >
-                        <History className="w-4 h-4" />
-                      </Button>
-                      {canEditAdminAmounts && (
+                        {mov.tipo_movimiento.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium">
+                      {mov.descripcion}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {mov.subtipo || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-right font-mono">
+                      {formatPrivacy(
+                        `$${mov.usd_equivalente_total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {mov.estado === "Registrado" ? (
+                        <Check className="w-5 h-5 text-green-500 mx-auto" />
+                      ) : (
+                        <X className="w-5 h-5 text-red-500 mx-auto" />
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {(mov as { registro_editado?: boolean })
+                          .registro_editado && (
+                            <span title="Este registro ha sido editado">
+                              <AlertTriangle className="w-4 h-4 text-amber-500" />
+                            </span>
+                          )}
+                        {(mov as { origen?: string }).origen ===
+                          "importado_csv" && (
+                            <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 rounded">
+                              CSV
+                            </span>
+                          )}
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
-                            const movConComprobante =
-                              mov as CajaAdminMovimiento & {
-                                url_comprobante?: string | null;
-                              };
-                            const currentLines = (
-                              mov.caja_admin_movimiento_lineas ||
-                              mov.lineas ||
-                              []
-                            ).map((line) => ({
-                              ...line,
-                              importe: Math.abs(Number(line.importe || 0)),
-                              usd_equivalente:
-                                line.usd_equivalente ??
-                                (line.moneda === "USD"
-                                  ? Number(line.importe || 0)
-                                  : 0),
-                            }));
-                            setEditingMov(mov);
-                            setIsEditModalMinimized(false);
-                            setEditSaveError(null);
-                            setEditSaveSuccess(null);
-                            setEditData({
-                              fecha: mov.fecha_movimiento,
-                              descripcion: mov.descripcion,
-                              motivo: "",
-                              lines: currentLines,
-                              adjuntos:
-                                mov.adjuntos ||
-                                (movConComprobante.url_comprobante
-                                  ? [movConComprobante.url_comprobante]
-                                  : []),
-                              totalUsd: Number(mov.usd_equivalente_total || 0),
-                            });
-                          }}
-                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                          title="Editar movimiento"
+                          onClick={() => setHistorialMovId(mov.id)}
+                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                          title="Ver historial de ediciones"
                         >
-                          <Pencil className="w-4 h-4" />
+                          <History className="w-4 h-4" />
                         </Button>
-                      )}
-                      {(role === "admin" || role === "owner") && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setDeletingMovId(mov.id);
-                            setDeletionConfirmation("");
-                            setDeletionReason("");
-                          }}
-                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                          title="Eliminar movimiento"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
+                        {canEditAdminAmounts && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const movConComprobante =
+                                mov as CajaAdminMovimiento & {
+                                  url_comprobante?: string | null;
+                                };
+                              const currentLines = (
+                                mov.caja_admin_movimiento_lineas ||
+                                mov.lineas ||
+                                []
+                              ).map((line) => ({
+                                ...line,
+                                importe: Math.abs(Number(line.importe || 0)),
+                                usd_equivalente:
+                                  line.usd_equivalente ??
+                                  (line.moneda === "USD"
+                                    ? Number(line.importe || 0)
+                                    : 0),
+                              }));
+                              setEditingMov(mov);
+                              setIsEditModalMinimized(false);
+                              setEditSaveError(null);
+                              setEditSaveSuccess(null);
+                              setEditData({
+                                fecha: mov.fecha_movimiento,
+                                descripcion: mov.descripcion,
+                                motivo: "",
+                                lines: currentLines,
+                                adjuntos:
+                                  mov.adjuntos ||
+                                  (movConComprobante.url_comprobante
+                                    ? [movConComprobante.url_comprobante]
+                                    : []),
+                                totalUsd: Number(mov.usd_equivalente_total || 0),
+                              });
+                            }}
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            title="Editar movimiento"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {(role === "admin" || role === "owner") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setDeletingMovId(mov.id);
+                              setDeletionConfirmation("");
+                              setDeletionReason("");
+                            }}
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            title="Eliminar movimiento"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </motion.tr>
+                );
+              })}
             </tbody>
           </table>
         )}

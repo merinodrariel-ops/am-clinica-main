@@ -86,25 +86,21 @@ export async function getUsers() {
 }
 
 // Helper to determine the correct public URL
+// Always returns a production URL, never localhost (invites must work from any env)
 function getAppPublicUrl() {
-    let url = process.env.NEXT_PUBLIC_APP_URL;
+    const url = process.env.NEXT_PUBLIC_APP_URL;
 
-    // If the configured URL is localhost, ignore it in favor of Vercel URL if available
-    if (url && url.includes('localhost') && process.env.VERCEL_URL) {
-        url = undefined;
+    // 1. Explicit Env Var, solo si NO es localhost
+    if (url && !url.includes('localhost')) {
+        return url.replace(/\/$/, '');
     }
 
-    // 1. Explicit Env Var (Best for custom domains)
-    if (url) {
-        return url.replace(/\/$/, ''); // Remove trailing slash
-    }
-
-    // 2. Vercel System Env Var (Automatic on Vercel)
+    // 2. Vercel System Env Var (automático en Vercel)
     if (process.env.VERCEL_URL) {
         return `https://${process.env.VERCEL_URL}`;
     }
 
-    // 3. Fallback (Hardcoded production URL provided by user)
+    // 3. Fallback producción
     return 'https://am-clinica-main.vercel.app';
 }
 

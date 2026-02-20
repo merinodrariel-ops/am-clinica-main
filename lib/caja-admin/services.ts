@@ -1434,25 +1434,29 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         saldosPorCuenta[c.id] = 0;
     });
 
-    // Check if closed today
-    if (ultimo && ultimo.fecha === today && ultimo.estado === 'Cerrado') {
-        let ars = 0;
-        let usd = 0;
-        // Sum from saldos_finales
-        Object.entries(ultimo.saldos_finales).forEach(([cuentaId, monto]) => {
-            if (saldosPorCuenta.hasOwnProperty(cuentaId)) {
-                saldosPorCuenta[cuentaId] = monto;
-                if (idsArs.has(cuentaId)) ars += monto;
-                if (idsUsd.has(cuentaId)) usd += monto;
-            }
-        });
-        return {
-            status: 'Cerrado',
-            lastCloseDate: ultimo.fecha,
-            saldoArs: ars,
-            saldoUsd: usd,
-            saldosPorCuenta
-        };
+    // Check if closed today — but only early-return if no active reopening exists
+    if (ultimo && ultimo.fecha === today) {
+        const aperturaActiva = await getAperturaAdminDelDia(sucursalId, today);
+        if (!aperturaActiva) {
+            // Truly closed for today — show physical count from closure
+            let ars = 0;
+            let usd = 0;
+            Object.entries(ultimo.saldos_finales).forEach(([cuentaId, monto]) => {
+                if (saldosPorCuenta.hasOwnProperty(cuentaId)) {
+                    saldosPorCuenta[cuentaId] = monto;
+                    if (idsArs.has(cuentaId)) ars += monto;
+                    if (idsUsd.has(cuentaId)) usd += monto;
+                }
+            });
+            return {
+                status: 'Cerrado',
+                lastCloseDate: ultimo.fecha,
+                saldoArs: ars,
+                saldoUsd: usd,
+                saldosPorCuenta
+            };
+        }
+        // Active apertura found after today's closure — fall through to add pending movements
     }
 
     // 1. Initial from Last Closure
@@ -1518,4 +1522,21 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         saldoUsd: totalUsd,
         saldosPorCuenta
     };
+}
+
+export async function getArqueosForMonth(sucursalId: string, mes: string): Promise<CajaAdminArqueo[]> {
+    const startDate = `${mes}-01`;
+    const [year, month] = mes.split('-').map(Number);
+    const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
+
+    const { data, error } = await getSupabase()
+        .from('caja_admin_arqueos')
+        .select('*')
+        .eq('sucursal_id', sucursalId)
+        .gte('fecha', startDate)
+        .lt('fecha', firstDayNextMonth)
+        .order('fecha', { ascending: false });
+
+    if (error) return [];
+    return data || [];
 }

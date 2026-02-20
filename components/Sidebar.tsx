@@ -40,13 +40,13 @@ const MENU_ITEMS = [
         icon: CalendarDays,
         label: 'Agenda 360',
         href: '/agenda',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'asistente']
     },
     {
         icon: Users,
         label: 'Pacientes',
         href: '/patients',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente']
     },
     {
         icon: Banknote,
@@ -64,25 +64,25 @@ const MENU_ITEMS = [
         icon: Package,
         label: 'Inventario',
         href: '/inventario',
-        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio']
+        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio', 'asistente']
     },
     {
         icon: GitGraph, // Using GitGraph as a metaphor for workflows/branches
         label: 'Workflows',
         href: '/workflows',
-        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio']
+        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio', 'asistente']
     },
     {
         icon: Bell,
         label: 'Recall Engine',
         href: '/recalls',
-        roles: ['owner', 'admin', 'reception', 'developer']
+        roles: ['owner', 'admin', 'reception', 'developer', 'asistente']
     },
     {
         icon: CheckSquare,
         label: 'Tareas',
         href: '/todos',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio', 'asistente']
     },
     {
         icon: Stethoscope,

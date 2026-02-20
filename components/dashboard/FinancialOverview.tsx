@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, Store } from 'lucide-react';
-import { getSucursales } from '@/lib/caja-admin';
+import { getSucursales, getCurrentBalanceAdmin, getReporteMensual } from '@/lib/caja-admin';
 import { getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
-import { getCurrentBalanceAdmin } from '@/lib/caja-admin';
 
 interface BalanceState {
     status: string;
@@ -13,6 +12,7 @@ interface BalanceState {
     saldoUsd: number;
     sucursalName?: string;
     saldosPorCuenta?: Record<string, number>;
+    egresosUsd?: number;
 }
 
 
@@ -32,13 +32,18 @@ export default function FinancialOverview() {
                 });
 
                 // 2. Administración (All Branches)
+                const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
                 const sucursales = await getSucursales();
                 const admins = await Promise.all(sucursales.map(async (s) => {
-                    const data = await getCurrentBalanceAdmin(s.id);
+                    const [data, reporte] = await Promise.all([
+                        getCurrentBalanceAdmin(s.id),
+                        getReporteMensual(s.id, currentMonth),
+                    ]);
                     return {
                         ...data,
                         status: data.status,
-                        sucursalName: s.nombre
+                        sucursalName: s.nombre,
+                        egresosUsd: reporte.egresosUsd,
                     };
                 }));
                 setAdminBalances(admins);
@@ -140,6 +145,12 @@ export default function FinancialOverview() {
                             <span className="text-sm text-gray-500 dark:text-gray-400">Efectivo USD</span>
                             <span className="text-lg font-bold text-gray-900 dark:text-white">
                                 {formatMoney(admin.saldoUsd || 0, 'USD')}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-end border-t border-gray-100 dark:border-gray-700 pt-2">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">Gastos del mes</span>
+                            <span className="text-base font-bold text-red-600 dark:text-red-400">
+                                {formatMoney(admin.egresosUsd || 0, 'USD')}
                             </span>
                         </div>
                     </div>

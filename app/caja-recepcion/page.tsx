@@ -19,6 +19,7 @@ import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
 import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
 import { useAuth } from '@/contexts/AuthContext';
+import RoleGuard from '@/components/auth/RoleGuard';
 
 
 // Types
@@ -683,6 +684,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
     });
 
     return (
+        <RoleGuard allowedRoles={['owner', 'admin', 'reception']}>
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex justify-between items-start mb-8">
@@ -1996,5 +1998,6 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 </div>
             )}
         </div>
+        </RoleGuard>
     );
 }
