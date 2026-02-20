@@ -21,7 +21,9 @@ import {
     ExternalLink,
     TrendingUp,
     Check,
+    Sparkles,
 } from 'lucide-react';
+import PatientPortalPanel from './PatientPortalPanel';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -68,6 +70,7 @@ const TABS = [
     { id: 'pagos', label: 'Historial de Pagos', icon: CreditCard },
     { id: 'planes', label: 'Planes (Presupuestos)', icon: DollarSign },
     { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
+    { id: 'portal', label: 'Portal 360', icon: Sparkles },
 ];
 
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments }: PatientDashboardProps) {
@@ -758,6 +761,14 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
                                 <PatientCadence patientId={patient.id_paciente} />
                             </div>
+                        )}
+
+                        {/* Tab: Portal 360 */}
+                        {activeTab === 'portal' && (
+                            <PatientPortalPanel
+                                patientId={patient.id_paciente}
+                                patientName={`${patient.nombre} ${patient.apellido}`}
+                            />
                         )}
                     </motion.div>
                 </AnimatePresence>

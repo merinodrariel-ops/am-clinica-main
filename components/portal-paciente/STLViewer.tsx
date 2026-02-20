@@ -25,10 +25,13 @@ export default function STLViewer({ url }: STLViewerProps) {
 
         async function init() {
             try {
-                // Dynamic import — requiere npm install three
-                const THREE = await import('three');
-                const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js' as string);
-                const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js' as string);
+                // Dynamic import — requiere: npm install three @types/three
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const THREE = await import('three' as any);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js' as any);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js' as any);
 
                 const w = container.clientWidth;
                 const h = container.clientHeight;
@@ -87,15 +90,14 @@ export default function STLViewer({ url }: STLViewerProps) {
                 const loader = new STLLoader();
                 loader.load(
                     url,
-                    (geometry: THREE.BufferGeometry) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (geometry: any) => {
                         geometry.computeBoundingBox();
                         geometry.center();
                         geometry.computeVertexNormals();
 
                         // Scale to fit view
-                        const box = new THREE.Box3().setFromBufferAttribute(
-                            geometry.attributes.position as THREE.BufferAttribute
-                        );
+                        const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
                         const size = box.getSize(new THREE.Vector3());
                         const maxDim = Math.max(size.x, size.y, size.z);
                         const scale = 80 / maxDim;
@@ -117,7 +119,8 @@ export default function STLViewer({ url }: STLViewerProps) {
 
                         setStatus('ready');
                     },
-                    (event: ProgressEvent) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (event: any) => {
                         if (event.total > 0) {
                             setLoadingPct(Math.round((event.loaded / event.total) * 100));
                         }

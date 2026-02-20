@@ -11,12 +11,9 @@ import {
     Download,
     FileText,
     Loader2,
-    MapPin,
     Phone,
     Smile,
     Sparkles,
-    Star,
-    Tooth,
     AlertTriangle,
     ChevronRight,
     Box,
@@ -160,12 +157,29 @@ function FadeIn({ children, delay = 0, className = '' }: { children: React.React
 
 // ─── Main Portal ──────────────────────────────────────────────────────────────
 
+interface StarItem {
+    left: number; top: number; size: number;
+    opacity: number; duration: number; delay: number;
+}
+
 export default function MiClinicaPortal({ params }: { params: Promise<{ token: string }> }) {
     const { token } = use(params);
     const [data, setData] = useState<PortalData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activeStl, setActiveStl] = useState<{ url: string; label: string } | null>(null);
+    const [stars, setStars] = useState<StarItem[]>([]);
+
+    useEffect(() => {
+        setStars(Array.from({ length: 40 }, () => ({
+            left: Math.random() * 100,
+            top: Math.random() * 60,
+            size: Math.random() > 0.8 ? 2 : 1,
+            opacity: Math.random() * 0.4 + 0.1,
+            duration: 2 + Math.random() * 3,
+            delay: Math.random() * 2,
+        })));
+    }, []);
 
     const { scrollY } = useScroll();
     const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
@@ -230,27 +244,27 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
             {/* ── Hero ── */}
             <motion.section
                 style={{ opacity: heroOpacity, y: heroY }}
-                className="relative min-h-[85vh] flex flex-col justify-end overflow-hidden"
+                className="relative min-h-[70vh] sm:min-h-[80vh] flex flex-col justify-end overflow-hidden"
             >
                 {/* Background gradient */}
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F] via-[#0D0D1A] to-[#0A0A0F]" />
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(201,169,110,0.12),transparent)]" />
 
-                {/* Stars effect */}
+                {/* Stars effect — generated client-side to avoid hydration mismatch */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    {Array.from({ length: 40 }).map((_, i) => (
+                    {stars.map((s, i) => (
                         <motion.div
                             key={i}
                             className="absolute rounded-full bg-white"
                             style={{
-                                left: `${Math.random() * 100}%`,
-                                top: `${Math.random() * 60}%`,
-                                width: Math.random() > 0.8 ? 2 : 1,
-                                height: Math.random() > 0.8 ? 2 : 1,
-                                opacity: Math.random() * 0.4 + 0.1,
+                                left: `${s.left}%`,
+                                top: `${s.top}%`,
+                                width: s.size,
+                                height: s.size,
+                                opacity: s.opacity,
                             }}
-                            animate={{ opacity: [null, 0.1, 0.4] }}
-                            transition={{ duration: 2 + Math.random() * 3, repeat: Infinity, repeatType: 'reverse', delay: Math.random() * 2 }}
+                            animate={{ opacity: [s.opacity, 0.05, s.opacity] }}
+                            transition={{ duration: s.duration, repeat: Infinity, repeatType: 'reverse', delay: s.delay }}
                         />
                     ))}
                 </div>
@@ -282,7 +296,7 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                         transition={{ delay: 0.3 }}
                         className="text-[#C9A96E] text-sm tracking-widest uppercase mb-3"
                     >
-                        Hola, bienvenido/a
+                        Hola,
                     </motion.p>
                     <motion.h1
                         initial={{ opacity: 0, y: 20 }}
@@ -364,10 +378,11 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                             <p className="text-white/40 text-sm mb-6">{treatment.workflow_name}</p>
 
                             {/* Stage timeline */}
-                            <div className="space-y-3">
+                            <div className="flex flex-col">
                                 {allStages.map((stage, idx) => {
                                     const isCurrent = stage.name === treatment.current_stage_name;
                                     const isDone = stage.order_index < treatment.current_stage_order;
+                                    const isLast = idx === allStages.length - 1;
 
                                     return (
                                         <motion.div
@@ -376,27 +391,32 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                                             whileInView={{ opacity: 1, x: 0 }}
                                             viewport={{ once: true }}
                                             transition={{ delay: idx * 0.08 }}
-                                            className="flex items-center gap-4"
+                                            className="flex gap-4"
                                         >
-                                            {/* Icon */}
-                                            <div className={clsx(
-                                                'h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all',
-                                                isDone ? 'bg-[#C9A96E]/20' : isCurrent ? 'bg-[#C9A96E]/30 ring-2 ring-[#C9A96E]/40' : 'bg-white/5'
-                                            )}>
-                                                {isDone
-                                                    ? <CheckCircle2 size={16} className="text-[#C9A96E]" />
-                                                    : isCurrent
-                                                        ? <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 2, repeat: Infinity }}>
-                                                            <div className="h-3 w-3 rounded-full bg-[#C9A96E]" />
-                                                          </motion.div>
-                                                        : <Circle size={14} className="text-white/20" />
-                                                }
+                                            {/* Left column: icon + connector */}
+                                            <div className="flex flex-col items-center flex-shrink-0 w-9">
+                                                <div className={clsx(
+                                                    'h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all',
+                                                    isDone ? 'bg-[#C9A96E]/20' : isCurrent ? 'bg-[#C9A96E]/30 ring-2 ring-[#C9A96E]/40' : 'bg-white/5'
+                                                )}>
+                                                    {isDone
+                                                        ? <CheckCircle2 size={16} className="text-[#C9A96E]" />
+                                                        : isCurrent
+                                                            ? <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 2, repeat: Infinity }}>
+                                                                <div className="h-3 w-3 rounded-full bg-[#C9A96E]" />
+                                                              </motion.div>
+                                                            : <Circle size={14} className="text-white/20" />
+                                                    }
+                                                </div>
+                                                {!isLast && (
+                                                    <div className="w-px flex-1 min-h-[16px] my-1 bg-white/10" />
+                                                )}
                                             </div>
 
                                             {/* Label */}
-                                            <div className="flex-1 min-w-0">
+                                            <div className={clsx('flex-1 min-w-0', isLast ? 'pb-0' : 'pb-4')}>
                                                 <p className={clsx(
-                                                    'text-sm font-semibold truncate',
+                                                    'text-sm font-semibold truncate pt-1.5',
                                                     isDone ? 'text-white/50 line-through' : isCurrent ? 'text-white' : 'text-white/30'
                                                 )}>
                                                     {stage.name}
@@ -405,11 +425,6 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                                                     <p className="text-[#C9A96E] text-[10px] mt-0.5 font-medium tracking-wide uppercase">Etapa actual</p>
                                                 )}
                                             </div>
-
-                                            {/* Connector line */}
-                                            {idx < allStages.length - 1 && (
-                                                <div className="absolute left-[calc(1.5rem+18px)] mt-9 h-3 w-px bg-white/10" />
-                                            )}
                                         </motion.div>
                                     );
                                 })}
@@ -678,15 +693,13 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                         </div>
                         <h3 className="text-white font-bold">AM Clínica</h3>
                         <p className="text-white/40 text-sm">Estética Dental de Alta Complejidad</p>
-                        {patient.telefono && (
-                            <a
-                                href={`https://wa.me/${patient.telefono.replace(/\D/g, '')}`}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
-                            >
-                                <Phone size={14} />
-                                Contactar al equipo
-                            </a>
-                        )}
+                        <a
+                            href="https://wa.me/5491100000000"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
+                        >
+                            <Phone size={14} />
+                            Contactar al equipo
+                        </a>
                         <p className="text-white/20 text-xs pt-2">
                             Portal privado generado exclusivamente para {patient.nombre} {patient.apellido}
                         </p>
