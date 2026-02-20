@@ -2,10 +2,16 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const getSupabase = () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error('Supabase environment variables are missing');
+    }
+
+    return createClient(supabaseUrl, supabaseServiceKey);
+};
 
 // Bucket config for different areas
 const BUCKETS = {
@@ -31,7 +37,7 @@ export async function initStorageBuckets() {
     const results: { bucket: string; status: string }[] = [];
 
     for (const [, bucketName] of Object.entries(BUCKETS)) {
-        const { error } = await supabase.storage.createBucket(bucketName.name, {
+        const { error } = await getSupabase().storage.createBucket(bucketName.name, {
             public: bucketName.isPublic,
             fileSizeLimit: 10485760, // 10MB
         });
@@ -72,7 +78,7 @@ export async function uploadToStorage(
         const timestamp = new Date().toISOString().slice(0, 7); // YYYY-MM
         const path = `${timestamp}/${fileName}`;
 
-        const { data, error } = await supabase.storage
+        const { data, error } = await getSupabase().storage
             .from(bucket)
             .upload(path, buffer, {
                 contentType,
@@ -86,13 +92,13 @@ export async function uploadToStorage(
         let publicOrSignedUrl: string | undefined;
 
         if (bucketConfig.isPublic) {
-            const { data: publicData } = supabase.storage
+            const { data: publicData } = getSupabase().storage
                 .from(bucket)
                 .getPublicUrl(data.path);
             publicOrSignedUrl = publicData.publicUrl;
         } else {
             // Get a signed URL valid for 1 hour
-            const { data: signedData } = await supabase.storage
+            const { data: signedData } = await getSupabase().storage
                 .from(bucket)
                 .createSignedUrl(data.path, 3600);
             publicOrSignedUrl = signedData?.signedUrl;
@@ -122,7 +128,7 @@ export async function listStorageFiles(
     try {
         const bucket = BUCKETS[area].name;
 
-        const { data, error } = await supabase.storage
+        const { data, error } = await getSupabase().storage
             .from(bucket)
             .list(folder || '', {
                 sortBy: { column: 'created_at', order: 'desc' },
@@ -155,7 +161,7 @@ export async function getFileUrl(
     try {
         const bucket = BUCKETS[area].name;
 
-        const { data, error } = await supabase.storage
+        const { data, error } = await getSupabase().storage
             .from(bucket)
             .createSignedUrl(filePath, expiresIn);
 
@@ -179,7 +185,7 @@ export async function deleteFromStorage(
     try {
         const bucket = BUCKETS[area].name;
 
-        const { error } = await supabase.storage
+        const { error } = await getSupabase().storage
             .from(bucket)
             .remove([filePath]);
 

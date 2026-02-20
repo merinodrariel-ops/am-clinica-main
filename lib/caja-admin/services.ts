@@ -22,14 +22,15 @@ import {
     MotivoObservado,
 } from './types';
 
-const supabase = createClient();
+const getSupabase = () => createClient();
+
 
 // =============================================
 // Sucursales
 // =============================================
 
 export async function getSucursales(): Promise<Sucursal[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('sucursales')
         .select('*')
         .eq('activa', true)
@@ -47,7 +48,7 @@ export async function getSucursales(): Promise<Sucursal[]> {
 // =============================================
 
 export async function getCuentas(sucursalId: string): Promise<CuentaFinanciera[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('cuentas_financieras')
         .select('*')
         .eq('sucursal_id', sucursalId)
@@ -71,7 +72,7 @@ export async function getMovimientos(options: {
     tipo?: string;
     limit?: number;
 }): Promise<CajaAdminMovimiento[]> {
-    let query = supabase
+    let query = getSupabase()
         .from('caja_admin_movimientos')
         .select('*, caja_admin_movimiento_lineas(*)')
         .eq('sucursal_id', options.sucursalId)
@@ -126,7 +127,7 @@ export async function createMovimiento(
     // Calculate USD equivalent total
     const usdTotal = lineas.reduce((sum, l) => sum + (l.usd_equivalente || 0), 0);
 
-    const { data: mov, error: movError } = await supabase
+    const { data: mov, error: movError } = await getSupabase()
         .from('caja_admin_movimientos')
         .insert({
             ...movimiento,
@@ -148,7 +149,7 @@ export async function createMovimiento(
         admin_movimiento_id: mov.id,
     }));
 
-    const { error: lineasError } = await supabase
+    const { error: lineasError } = await getSupabase()
         .from('caja_admin_movimiento_lineas')
         .insert(lineasWithMovId);
 
@@ -163,7 +164,7 @@ export async function updateMovimientoAdmin(
     id: string,
     updates: Partial<CajaAdminMovimiento>
 ): Promise<{ success: boolean; error?: string }> {
-    const { error } = await supabase
+    const { error } = await getSupabase()
         .from('caja_admin_movimientos')
         .update({
             ...updates,
@@ -187,7 +188,7 @@ export async function logMovimientoEdit(
 ) {
     try {
         // Get current user info
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getSupabase().auth.getUser();
 
         const insertData = {
             id_registro: registroId,
@@ -200,7 +201,7 @@ export async function logMovimientoEdit(
             motivo_edicion: motivo
         };
 
-        const { error } = await supabase
+        const { error } = await getSupabase()
             .from('historial_ediciones')
             .insert(insertData);
 
@@ -208,7 +209,7 @@ export async function logMovimientoEdit(
             // If error is Foreign Key Violation (user exists in auth but not in profiles), retry without user_id
             if (error.code === '23503') {
                 console.warn('Logging edit without linking to profile due to FK violation (missing profile). Email:', user?.email);
-                await supabase
+                await getSupabase()
                     .from('historial_ediciones')
                     .insert({
                         ...insertData,
@@ -228,7 +229,7 @@ export async function anularMovimiento(
     motivo: string,
     usuario: string
 ): Promise<{ success: boolean; error?: string }> {
-    const { error } = await supabase
+    const { error } = await getSupabase()
         .from('caja_admin_movimientos')
         .update({
             estado: 'Anulado',
@@ -250,7 +251,7 @@ export async function deleteMovimiento(
     motivo: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
-        const { error: logError } = await supabase
+        const { error: logError } = await getSupabase()
             .from('historial_ediciones')
             .insert({
                 id_registro: id,
@@ -269,7 +270,7 @@ export async function deleteMovimiento(
         console.error('Error in deletion audit:', e);
     }
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
         .from('caja_admin_movimientos')
         .delete()
         .eq('id', id);
@@ -281,7 +282,7 @@ export async function deleteMovimiento(
 }
 
 export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: string): Promise<CajaAdminArqueo | null> {
-    let query = supabase
+    let query = getSupabase()
         .from('caja_admin_arqueos')
         .select('*')
         .eq('sucursal_id', sucursalId)
@@ -308,7 +309,7 @@ export async function getAperturaAdminDelDia(
 ): Promise<CajaAdminArqueo | null> {
     const targetDate = fecha || getLocalISODate();
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('caja_admin_arqueos')
         .select('*')
         .eq('sucursal_id', sucursalId)
@@ -332,7 +333,7 @@ export async function abrirCajaAdminDelDia(params: {
     usuario: string;
     tcBna?: number | null;
 }): Promise<CajaAdminArqueo> {
-    const { data: rpcData, error: rpcError } = await supabase.rpc('abrir_caja_admin', {
+    const { data: rpcData, error: rpcError } = await getSupabase().rpc('abrir_caja_admin', {
         p_sucursal_id: params.sucursalId,
         p_fecha: params.fecha,
         p_usuario: params.usuario,
@@ -363,7 +364,7 @@ export async function abrirCajaAdminDelDia(params: {
     const saldosIniciales = ultimoCierre?.saldos_finales || {};
     const saldoInicialUsdEq = Number(ultimoCierre?.saldo_final_usd_equivalente || 0);
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('caja_admin_arqueos')
         .insert({
             sucursal_id: params.sucursalId,
@@ -408,7 +409,7 @@ export async function cerrarCajaAdmin(params: {
     snapshot: unknown;
     saldosIniciales?: Record<string, number>;
 }): Promise<{ success: boolean; error?: string }> {
-    const { error } = await supabase.rpc('cerrar_caja_admin', {
+    const { error } = await getSupabase().rpc('cerrar_caja_admin', {
         p_sucursal_id: params.sucursalId,
         p_fecha: params.fecha,
         p_usuario: params.usuario,
@@ -440,7 +441,7 @@ export async function cerrarArqueo(): Promise<{ success: boolean; error?: string
 // =============================================
 
 export async function getProfesionales(): Promise<Profesional[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('profesionales')
         .select('*')
         .eq('activo', true)
@@ -454,7 +455,7 @@ export async function getProfesionales(): Promise<Profesional[]> {
 }
 
 export async function getHonorariosItems(especialidad?: string): Promise<HonorarioItem[]> {
-    let query = supabase
+    let query = getSupabase()
         .from('honorarios_catalogo_items')
         .select('*, honorarios_catalogo_versiones!inner(*)')
         .eq('activo', true)
@@ -478,7 +479,7 @@ export async function getPrestaciones(options: {
     mes?: string;
     limit?: number;
 }): Promise<Prestacion[]> {
-    let query = supabase
+    let query = getSupabase()
         .from('prestaciones')
         .select('*, profesionales(*)')
         .eq('is_deleted', false)
@@ -512,7 +513,7 @@ export async function getPrestaciones(options: {
 export async function createPrestacion(
     prestacion: Partial<Prestacion>
 ): Promise<{ data: Prestacion | null; error: Error | null }> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('prestaciones')
         .insert({
             ...prestacion,
@@ -536,7 +537,7 @@ export async function getPersonal(options?: {
     area?: string;
     includeInactive?: boolean;
 }): Promise<Personal[]> {
-    let query = supabase
+    let query = getSupabase()
         .from('personal')
         .select('*')
         .order('tipo')
@@ -562,7 +563,7 @@ export async function getPersonal(options?: {
 }
 
 export async function getPersonalById(id: string): Promise<Personal | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('personal')
         .select('*')
         .eq('id', id)
@@ -577,7 +578,7 @@ export async function getPersonalById(id: string): Promise<Personal | null> {
 }
 
 export async function getPersonalAreas(): Promise<PersonalArea[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('personal_areas')
         .select('*')
         .eq('activo', true)
@@ -591,7 +592,7 @@ export async function getPersonalAreas(): Promise<PersonalArea[]> {
 }
 
 export async function createPersonal(input: CreatePersonalInput): Promise<{ data: Personal | null; error: Error | null }> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('personal')
         .insert({
             ...input,
@@ -613,7 +614,7 @@ export async function updatePersonal(
     id: string,
     updates: Partial<Personal>
 ): Promise<{ success: boolean; error?: string }> {
-    const { error } = await supabase
+    const { error } = await getSupabase()
         .from('personal')
         .update(updates)
         .eq('id', id);
@@ -636,7 +637,7 @@ export async function uploadPersonalDocument(
     const fileExt = file.name.split('.').pop();
     const fileName = `${personalId}/${documentType}_${Date.now()}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await getSupabase().storage
         .from('personal-documents')
         .upload(fileName, file, { upsert: true });
 
@@ -644,7 +645,7 @@ export async function uploadPersonalDocument(
         return { url: null, error: new Error(uploadError.message) };
     }
 
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = getSupabase().storage
         .from('personal-documents')
         .getPublicUrl(fileName);
 
@@ -655,7 +656,7 @@ export async function getRegistroHoras(options: {
     personalId?: string;
     mes?: string;
 }): Promise<RegistroHoras[]> {
-    let query = supabase
+    let query = getSupabase()
         .from('registro_horas')
         .select('*')
         .order('fecha', { ascending: false });
@@ -687,7 +688,7 @@ export async function registrarHoras(
     horas: number,
     observaciones?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const { error } = await supabase
+    const { error } = await getSupabase()
         .from('registro_horas')
         .insert({
             personal_id: personalId,
@@ -706,7 +707,7 @@ export async function getLiquidaciones(options: {
     personalId?: string;
     mes?: string;
 }): Promise<LiquidacionMensual[]> {
-    let query = supabase
+    let query = getSupabase()
         .from('liquidaciones_mensuales')
         .select('*, personal(*)')
         .order('mes', { ascending: false });
@@ -734,7 +735,7 @@ export async function generarLiquidacion(
     tcBna?: number
 ): Promise<{ data: LiquidacionMensual | null; error: Error | null }> {
     // Get personal info
-    const { data: personal } = await supabase
+    const { data: personal } = await getSupabase()
         .from('personal')
         .select('*')
         .eq('id', personalId)
@@ -748,7 +749,7 @@ export async function generarLiquidacion(
     const startDate = `${mes}-01`;
     const endDate = new Date(parseInt(mes.split('-')[0]), parseInt(mes.split('-')[1]), 0);
 
-    const { data: horas } = await supabase
+    const { data: horas } = await getSupabase()
         .from('registro_horas')
         .select('horas')
         .eq('personal_id', personalId)
@@ -759,7 +760,7 @@ export async function generarLiquidacion(
     const totalArs = totalHoras * personal.valor_hora_ars;
     const totalUsd = tcBna ? totalArs / tcBna : undefined;
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('liquidaciones_mensuales')
         .insert({
             personal_id: personalId,
@@ -785,7 +786,7 @@ export async function generarLiquidacion(
 // =============================================
 
 async function getSucursalById(id: string): Promise<Sucursal | null> {
-    const { data } = await supabase
+    const { data } = await getSupabase()
         .from('sucursales')
         .select('*')
         .eq('id', id)
@@ -807,7 +808,7 @@ export async function getReporteMensual(
 
     if (sucursal?.modo_caja === 'SEPARADA') {
         // BA: Read from caja_recepcion_movimientos
-        const { data: ingresos } = await supabase
+        const { data: ingresos } = await getSupabase()
             .from('caja_recepcion_movimientos')
             .select('usd_equivalente')
             .gte('fecha_movimiento', startDate)
@@ -817,7 +818,7 @@ export async function getReporteMensual(
         ingresosPacientesUsd = ingresos?.reduce((sum: number, i: { usd_equivalente: number }) => sum + (i.usd_equivalente || 0), 0) || 0;
     } else {
         // UY: Read from caja_admin_movimientos with INGRESO_PACIENTE
-        const { data: ingresos } = await supabase
+        const { data: ingresos } = await getSupabase()
             .from('caja_admin_movimientos')
             .select('usd_equivalente_total')
             .eq('sucursal_id', sucursalId)
@@ -830,7 +831,7 @@ export async function getReporteMensual(
     }
 
     // Egresos from caja_admin_movimientos
-    const { data: egresos } = await supabase
+    const { data: egresos } = await getSupabase()
         .from('caja_admin_movimientos')
         .select('usd_equivalente_total')
         .eq('sucursal_id', sucursalId)
@@ -842,7 +843,7 @@ export async function getReporteMensual(
     egresosUsd = egresos?.reduce((sum: number, e: { usd_equivalente_total: number }) => sum + (e.usd_equivalente_total || 0), 0) || 0;
 
     // Honorarios from prestaciones
-    const { data: honorarios } = await supabase
+    const { data: honorarios } = await getSupabase()
         .from('prestaciones')
         .select('usd_equivalente')
         .gte('fecha', startDate)
@@ -852,7 +853,7 @@ export async function getReporteMensual(
     const honorariosProfesionalesUsd = honorarios?.reduce((sum: number, h: { usd_equivalente: number }) => sum + (h.usd_equivalente || 0), 0) || 0;
 
     // Sueldos from liquidaciones_mensuales
-    const { data: sueldos } = await supabase
+    const { data: sueldos } = await getSupabase()
         .from('liquidaciones_mensuales')
         .select('total_usd')
         .eq('mes', startDate)
@@ -882,7 +883,7 @@ export async function getEgresosPorSubtipo(
     const endDate = new Date(parseInt(mes.split('-')[0]), parseInt(mes.split('-')[1]), 0);
     const endDateStr = `${mes}-${endDate.getDate()}`;
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('caja_admin_movimientos')
         .select('subtipo, usd_equivalente_total')
         .eq('sucursal_id', sucursalId)
@@ -915,7 +916,7 @@ export async function getRegistrosObservados(options: {
     personal_id?: string;
     motivo?: MotivoObservado;
 }): Promise<RegistroHoras[]> {
-    let query = supabase
+    let query = getSupabase()
         .from('registro_horas')
         .select('*, personal(*)')
         .eq('estado', 'Observado')
@@ -945,7 +946,7 @@ export async function getRegistrosObservados(options: {
 }
 
 export async function countObservadosPendientes(mes?: string): Promise<number> {
-    let query = supabase
+    let query = getSupabase()
         .from('registro_horas')
         .select('id', { count: 'exact', head: true })
         .eq('estado', 'Observado');
@@ -967,7 +968,7 @@ export async function resolverRegistro(
     data: ResolucionData
 ): Promise<{ success: boolean; error?: string }> {
     // First get current record for audit
-    const { data: current, error: fetchError } = await supabase
+    const { data: current, error: fetchError } = await getSupabase()
         .from('registro_horas')
         .select('*')
         .eq('id', registroId)
@@ -988,7 +989,7 @@ export async function resolverRegistro(
     }
 
     // Update the record
-    const { error: updateError } = await supabase
+    const { error: updateError } = await getSupabase()
         .from('registro_horas')
         .update({
             estado: 'Resuelto',
@@ -1049,7 +1050,7 @@ export async function resolverRegistro(
     });
 
     if (auditEntries.length > 0) {
-        await supabase.from('auditoria_cambios_horas').insert(auditEntries);
+        await getSupabase().from('auditoria_cambios_horas').insert(auditEntries);
     }
 
     return { success: true };
@@ -1060,7 +1061,7 @@ export async function anularRegistro(
     motivo: string,
     usuario: string
 ): Promise<{ success: boolean; error?: string }> {
-    const { data: current, error: fetchError } = await supabase
+    const { data: current, error: fetchError } = await getSupabase()
         .from('registro_horas')
         .select('estado')
         .eq('id', registroId)
@@ -1070,7 +1071,7 @@ export async function anularRegistro(
         return { success: false, error: 'Registro no encontrado' };
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await getSupabase()
         .from('registro_horas')
         .update({
             estado: 'Anulado',
@@ -1085,7 +1086,7 @@ export async function anularRegistro(
     }
 
     // Log audit
-    await supabase.from('auditoria_cambios_horas').insert({
+    await getSupabase().from('auditoria_cambios_horas').insert({
         registro_horas_id: registroId,
         usuario: usuario,
         campo_modificado: 'estado',
@@ -1098,7 +1099,7 @@ export async function anularRegistro(
 }
 
 export async function getAuditoriaRegistro(registroId: string): Promise<AuditoriaHoras[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
         .from('auditoria_cambios_horas')
         .select('*')
         .eq('registro_horas_id', registroId)
@@ -1113,7 +1114,7 @@ export async function getAuditoriaRegistro(registroId: string): Promise<Auditori
 // =============================================
 
 export async function getDiasSinCierreAdmin(sucursalId: string): Promise<DiaSinCierreAdmin[]> {
-    const { data, error } = await supabase.rpc('get_dias_sin_cierre_admin', {
+    const { data, error } = await getSupabase().rpc('get_dias_sin_cierre_admin', {
         p_sucursal_id: sucursalId
     });
     if (error) {
@@ -1154,13 +1155,13 @@ export async function updateMovimientoAdminWithLines(
         };
     };
 
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await getSupabase().auth.getUser();
     if (authError || !authData.user) {
         return { success: false, error: 'Sesion invalida. Vuelve a iniciar sesion.' };
     }
 
     const metadataRole = authData.user.user_metadata?.role as string | undefined;
-    const { data: profileData } = await supabase
+    const { data: profileData } = await getSupabase()
         .from('profiles')
         .select('role')
         .eq('id', authData.user.id)
@@ -1181,7 +1182,7 @@ export async function updateMovimientoAdminWithLines(
     } else if (typeof usdTotalOverride === 'number' && Number.isFinite(usdTotalOverride)) {
         usdTotal = Math.max(0, usdTotalOverride);
     } else {
-        const { data: current, error: currentError } = await supabase
+        const { data: current, error: currentError } = await getSupabase()
             .from('caja_admin_movimientos')
             .select('usd_equivalente_total')
             .eq('id', id)
@@ -1194,7 +1195,7 @@ export async function updateMovimientoAdminWithLines(
         usdTotal = Number(current?.usd_equivalente_total || 0);
     }
 
-    const { error: mainError } = await supabase
+    const { error: mainError } = await getSupabase()
         .from('caja_admin_movimientos')
         .update({
             ...updates,
@@ -1210,7 +1211,7 @@ export async function updateMovimientoAdminWithLines(
         return { success: true };
     }
 
-    const { data: currentLineRows, error: currentLinesError } = await supabase
+    const { data: currentLineRows, error: currentLinesError } = await getSupabase()
         .from('caja_admin_movimiento_lineas')
         .select('id')
         .eq('admin_movimiento_id', id);
@@ -1233,7 +1234,7 @@ export async function updateMovimientoAdminWithLines(
         .filter((rowId): rowId is string => typeof rowId === 'string' && !incomingLineIds.has(rowId));
 
     if (linesToDelete.length > 0) {
-        const { error: deleteLinesError } = await supabase
+        const { error: deleteLinesError } = await getSupabase()
             .from('caja_admin_movimiento_lineas')
             .delete()
             .in('id', linesToDelete)
@@ -1252,7 +1253,7 @@ export async function updateMovimientoAdminWithLines(
             usd_equivalente: line.usd_equivalente,
         }));
 
-        const { error: rpcError } = await supabase.rpc('upsert_caja_admin_movimiento_lineas', {
+        const { error: rpcError } = await getSupabase().rpc('upsert_caja_admin_movimiento_lineas', {
             p_movimiento_id: id,
             p_lineas: rpcPayload,
         });
@@ -1263,7 +1264,7 @@ export async function updateMovimientoAdminWithLines(
 
         console.warn('RPC upsert fallback unavailable, trying direct delete/insert:', rpcError.message);
 
-        const { error: hardDeleteError } = await supabase
+        const { error: hardDeleteError } = await getSupabase()
             .from('caja_admin_movimiento_lineas')
             .delete()
             .eq('admin_movimiento_id', id);
@@ -1280,7 +1281,7 @@ export async function updateMovimientoAdminWithLines(
             usd_equivalente: line.usd_equivalente,
         }));
 
-        const { error: hardInsertError } = await supabase
+        const { error: hardInsertError } = await getSupabase()
             .from('caja_admin_movimiento_lineas')
             .insert(linesToInsert);
 
@@ -1293,7 +1294,7 @@ export async function updateMovimientoAdminWithLines(
 
     try {
         for (const line of existingLines) {
-            const { error: updateLineError } = await supabase
+            const { error: updateLineError } = await getSupabase()
                 .from('caja_admin_movimiento_lineas')
                 .update({
                     cuenta_id: line.cuenta_id,
@@ -1319,7 +1320,7 @@ export async function updateMovimientoAdminWithLines(
                 usd_equivalente: line.usd_equivalente,
             }));
 
-            const { error: insertError } = await supabase
+            const { error: insertError } = await getSupabase()
                 .from('caja_admin_movimiento_lineas')
                 .insert(linesToInsert);
 
@@ -1337,7 +1338,7 @@ export async function updateMovimientoAdminWithLines(
 }
 
 export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: number }> {
-    const { data: sucursales, error: sError } = await supabase
+    const { data: sucursales, error: sError } = await getSupabase()
         .from('sucursales')
         .select('*')
         .eq('activa', true);
@@ -1427,7 +1428,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
     // 2. Add Movements
     // Fetch movements > ultimo.fecha
-    let query = supabase
+    let query = getSupabase()
         .from('caja_admin_movimientos')
         .select(`
             tipo_movimiento, 

@@ -8,7 +8,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { getLocalISODate } from "@/lib/local-date";
 
-const supabase = createClient();
+const getSupabase = () => createClient();
 
 /**
  * Caja Recepción Business Logic
@@ -17,7 +17,7 @@ const supabase = createClient();
 // ===================== TARIFARIO =====================
 
 export async function getTarifarioVigente(): Promise<TarifarioItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("tarifario_items")
     .select(
       `
@@ -53,7 +53,7 @@ export async function getTarifarioByCategoria(): Promise<
 // ===================== PACIENTES =====================
 
 export async function searchPacientes(query: string): Promise<Paciente[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("pacientes")
     .select("id_paciente, nombre, apellido, telefono, email, documento")
     .or(
@@ -66,7 +66,7 @@ export async function searchPacientes(query: string): Promise<Paciente[]> {
 }
 
 export async function getPacienteById(id: string): Promise<Paciente | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("pacientes")
     .select("id_paciente, nombre, apellido, telefono, email, documento")
     .eq("id_paciente", id)
@@ -112,7 +112,7 @@ export async function crearMovimiento(
       Math.round((input.monto / input.tc_bna_venta) * 100) / 100;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .insert({
       ...input,
@@ -132,7 +132,7 @@ export async function getMovimientosDelDia(
 ): Promise<CajaMovimiento[]> {
   const targetDate = fecha || getLocalISODate();
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .select(
       `
@@ -150,7 +150,7 @@ export async function getMovimientosDelDia(
 export async function getMovimientosPorPaciente(
   pacienteId: string,
 ): Promise<CajaMovimiento[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .select("*")
     .eq("paciente_id", pacienteId)
@@ -165,7 +165,7 @@ export async function anularMovimiento(
   motivo: string,
   usuario: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .update({
       estado: "anulado",
@@ -195,7 +195,7 @@ export async function deleteMovimiento(
     console.error("Error in deletion audit:", e);
   }
 
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .delete()
     .eq("id", id);
@@ -211,7 +211,7 @@ export async function deleteMovimiento(
 export async function getUltimoCierre(
   fechaLimite?: string,
 ): Promise<CajaArqueo | null> {
-  let query = supabase
+  let query = getSupabase()
     .from("caja_recepcion_arqueos")
     .select("*")
     .eq("estado", "cerrado")
@@ -236,7 +236,7 @@ export async function getAperturaDelDia(
 ): Promise<CajaArqueo | null> {
   const targetDate = fecha || getLocalISODate();
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("caja_recepcion_arqueos")
     .select("*")
     .eq("fecha", targetDate)
@@ -258,7 +258,7 @@ export async function abrirCajaDelDia(
   usuario: string,
   tcBnaVenta?: number | null,
 ): Promise<CajaArqueo> {
-  const { data: closedToday, error: closedError } = await supabase
+  const { data: closedToday, error: closedError } = await getSupabase()
     .from("caja_recepcion_arqueos")
     .select("id")
     .eq("fecha", fecha)
@@ -287,7 +287,7 @@ export async function abrirCajaDelDia(
       ? saldoInicialUsd + saldoInicialArs / tcBnaVenta
       : saldoInicialUsd);
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("caja_recepcion_arqueos")
     .insert({
       fecha,
@@ -330,7 +330,7 @@ export async function cerrarCajaDelDia(
 ): Promise<string> {
   // Calculate totals for verification (CASH ONLY)
   // 1. Get pending cash movements (including past days that were not closed)
-  const { data: movimientos } = await supabase
+  const { data: movimientos } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .select("usd_equivalente, metodo_pago")
     .lte("fecha_movimiento", fecha) // Include today and past
@@ -351,7 +351,7 @@ export async function cerrarCajaDelDia(
   const saldoInicialArs = ultimo?.saldo_final_ars_billete || 0;
 
   // For transfers, we look for anything confirmed AFTER the previous close
-  let transQuery = supabase
+  let transQuery = getSupabase()
     .from("transferencias_caja")
     .select("usd_equivalente")
     .eq("estado", "confirmada");
@@ -382,7 +382,7 @@ export async function cerrarCajaDelDia(
   const esperado = saldoInicialEq + totalIngresosUsd - totalTransferenciasUsd;
   const diferenciaUsd = Math.round((saldoFinalEq - esperado) * 100) / 100;
 
-  const { data, error } = await supabase.rpc("cerrar_caja_recepcion", {
+  const { data, error } = await getSupabase().rpc("cerrar_caja_recepcion", {
     p_fecha: fecha,
     p_usuario: usuario,
     p_saldo_final_usd: saldoFinalUsd,
@@ -417,7 +417,7 @@ export async function crearTransferencia(
         ? Math.round((monto / tcBnaVenta) * 100) / 100
         : monto;
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("transferencias_caja")
     .insert({
       moneda,
@@ -453,7 +453,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   // Today's movements
   // Today's movements
-  const { data: movHoyRaw } = await supabase
+  const { data: movHoyRaw } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .select("usd_equivalente, metodo_pago, categoria, estado")
     .eq("fecha_movimiento", today);
@@ -468,7 +468,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     | null;
 
   // Month's movements
-  const { data: movMes } = await supabase
+  const { data: movMes } = await getSupabase()
     .from("caja_recepcion_movimientos")
     .select("usd_equivalente")
     .gte("fecha_movimiento", firstDayOfMonth)
@@ -528,7 +528,7 @@ export interface DiaSinCierre {
 }
 
 export async function getDiasSinCierreRecepcion(): Promise<DiaSinCierre[]> {
-  const { data, error } = await supabase.rpc("get_dias_sin_cierre_recepcion");
+  const { data, error } = await getSupabase().rpc("get_dias_sin_cierre_recepcion");
   if (error) {
     console.error("Error checking alerts:", error);
     return [];
@@ -548,7 +548,7 @@ export async function logMovimientoEdit(
     // Get current user info
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getSupabase().auth.getUser();
 
     const insertData = {
       id_registro: registroId,
@@ -561,7 +561,7 @@ export async function logMovimientoEdit(
       motivo_edicion: motivo,
     };
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from("historial_ediciones")
       .insert(insertData);
 
@@ -572,7 +572,7 @@ export async function logMovimientoEdit(
           "Logging edit without linking to profile due to FK violation (missing profile). Email:",
           user?.email,
         );
-        await supabase.from("historial_ediciones").insert({
+        await getSupabase().from("historial_ediciones").insert({
           ...insertData,
           usuario_editor: null,
         });
@@ -615,7 +615,7 @@ export async function getCurrentBalanceRecepcion(): Promise<{
 
   // 2. Add Movements (Open, not closed)
   // We use IS NULL on cierre_id to get only pending movements
-  let baseQuery = supabase
+  let baseQuery = getSupabase()
     .from("caja_recepcion_movimientos")
     .select("monto, moneda, metodo_pago, estado")
     .is("cierre_id", null)
@@ -642,7 +642,7 @@ export async function getCurrentBalanceRecepcion(): Promise<{
   });
 
   // 3. Subtract Transfers (Egresos)
-  const baseTransQuery = supabase
+  const baseTransQuery = getSupabase()
     .from("transferencias_caja")
     .select("monto, moneda, estado")
     .eq("estado", "confirmada");
