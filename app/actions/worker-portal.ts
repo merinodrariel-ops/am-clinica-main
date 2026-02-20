@@ -1,25 +1,26 @@
 'use server';
 
-import { createClient } from '@/utils/supabase/server'; // Corrected import path
-import { WorkerProfile, WorkLog, Achievement, WorkerAchievement } from '@/types/worker-portal';
+import { createClient } from '@/utils/supabase/server';
+import { WorkerProfile, WorkLog, Achievement, WorkerAchievement, ProviderGoal, GoalProgress, Liquidation } from '@/types/worker-portal';
 import { revalidatePath } from 'next/cache';
 
 const TableNames = {
-    Profiles: 'personal', // Using the main personal table
-    Logs: 'registro_horas', // Renamed to clinical table
+    Profiles: 'personal',
+    Logs: 'registro_horas',
     Achievements: 'achievements',
     WorkerAchievements: 'worker_achievements',
-    Liquidations: 'liquidaciones_mensuales'
+    Liquidations: 'liquidaciones_mensuales',
+    Goals: 'provider_goals',
+    GoalProgress: 'personal_goal_progress',
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PROFILE
+// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Get the worker profile for the currently authenticated user
- */
 export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-
     if (!user) return null;
 
     const { data, error } = await supabase
@@ -32,13 +33,9 @@ export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
         console.error('Error fetching worker profile:', error);
         return null;
     }
-
     return data as WorkerProfile;
 }
 
-/**
- * Get all worker profiles
- */
 export async function getAllWorkers(): Promise<WorkerProfile[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -46,10 +43,7 @@ export async function getAllWorkers(): Promise<WorkerProfile[]> {
         .select('*')
         .order('nombre');
 
-    if (error) {
-        console.error('Error fetching workers:', error);
-        return [];
-    }
+    if (error) { console.error('Error fetching workers:', error); return []; }
 
     return (data as WorkerProfile[]).map(p => ({
         ...p,
@@ -57,12 +51,20 @@ export async function getAllWorkers(): Promise<WorkerProfile[]> {
     }));
 }
 
-/**
- * Create or Update a worker profile
- */
+export async function getWorkerById(id: string): Promise<WorkerProfile | null> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from(TableNames.Profiles)
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (error) return null;
+    return data as WorkerProfile;
+}
+
 export async function upsertWorkerProfile(profile: Partial<WorkerProfile>) {
     const supabase = await createClient();
-
     const { data, error } = await supabase
         .from(TableNames.Profiles)
         .upsert(profile)
@@ -70,43 +72,33 @@ export async function upsertWorkerProfile(profile: Partial<WorkerProfile>) {
         .single();
 
     if (error) throw error;
-
     revalidatePath('/portal/profile');
     return data as WorkerProfile;
 }
 
-/**
- * Upload a worker document (DNI, Contract, etc.)
- */
 export async function uploadWorkerDocument(workerId: string, file: File, type: string) {
     const supabase = await createClient();
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${workerId}/${type}_${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
 
     const { error: uploadError } = await supabase.storage
         .from('personal-documents')
-        .upload(filePath, file);
+        .upload(fileName, file);
 
     if (uploadError) throw uploadError;
 
-    // Get public URL or signed URL
     const { data: { publicUrl } } = supabase.storage
         .from('personal-documents')
-        .getPublicUrl(filePath);
+        .getPublicUrl(fileName);
 
-    // Update the worker profile documents JSONB
-    const { data: worker, error: fetchError } = await supabase.from(TableNames.Profiles).select('documents').eq('id', workerId).single();
+    // Update the JSONB documents column
+    const { data: worker, error: fetchError } = await supabase
+        .from(TableNames.Profiles).select('documents').eq('id', workerId).single();
     if (fetchError) throw fetchError;
 
-    const docs = worker?.documents || {};
-
-    docs[type] = {
-        url: publicUrl,
-        uploaded_at: new Date().toISOString(),
-        status: 'pending_review'
-    };
+    const docs = (worker?.documents as Record<string, any>) || {};
+    docs[type] = { url: publicUrl, uploaded_at: new Date().toISOString(), status: 'pending_review' };
 
     const { error: updateError } = await supabase
         .from(TableNames.Profiles)
@@ -115,26 +107,26 @@ export async function uploadWorkerDocument(workerId: string, file: File, type: s
 
     if (updateError) throw updateError;
 
-    // Check for Compliance Master badge
+    // Auto-award Compliance Master if all required docs present
     const requiredDocs = ['dni_frente', 'dni_dorso', 'licencia', 'poliza'];
     const hasAllDocs = requiredDocs.every(d => docs[d]?.url);
-
     if (hasAllDocs) {
-        try {
-            await awardAchievement(workerId, 'compliance_master');
-        } catch (e) {
-            console.error('Compliance badge awarding failed:', e);
-        }
+        try { await awardAchievement(workerId, 'compliance_master'); } catch { /* already earned */ }
     }
+
+    // Update compliance goal progress
+    const docCount = Object.keys(docs).length;
+    await updateGoalProgressByCode(workerId, 'upload_dni', docCount >= 2 ? 1 : 0);
 
     revalidatePath('/portal/profile');
     revalidatePath('/portal/dashboard');
     return { success: true, url: publicUrl };
 }
 
-/**
- * Get work logs for a specific worker
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// WORK LOGS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function getWorkerLogs(personalId: string, startDate?: string, endDate?: string): Promise<WorkLog[]> {
     const supabase = await createClient();
 
@@ -148,61 +140,39 @@ export async function getWorkerLogs(personalId: string, startDate?: string, endD
     if (endDate) query = query.lte('fecha', endDate);
 
     const { data, error } = await query;
-
-    if (error) {
-        console.error('Error fetching logs:', error);
-        return [];
-    }
-
+    if (error) { console.error('Error fetching logs:', error); return []; }
     return data as WorkLog[];
 }
 
-/**
- * Log a new work entry (Shift, etc.)
- */
 export async function logWorkEntry(entry: Partial<WorkLog>) {
     const supabase = await createClient();
-
     const { data, error } = await supabase
         .from(TableNames.Logs)
         .insert(entry)
         .select()
         .single();
 
-    if (error) {
-        console.error('Error logging work:', error);
-        throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
 
     revalidatePath('/portal/dashboard');
     return data as WorkLog;
 }
 
-/**
- * Get Achievements for a worker
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// ACHIEVEMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function getWorkerAchievements(personalId: string): Promise<WorkerAchievement[]> {
     const supabase = await createClient();
-
     const { data, error } = await supabase
         .from(TableNames.WorkerAchievements)
-        .select(`
-            *,
-            achievement:achievements(*)
-        `)
+        .select(`*, achievement:achievements(*)`)
         .eq('personal_id', personalId);
 
-    if (error) {
-        console.error('Error fetching achievements:', error);
-        return [];
-    }
-
+    if (error) { console.error('Error fetching achievements:', error); return []; }
     return data as any;
 }
 
-/**
- * Award an achievement to a worker
- */
 export async function awardAchievement(personalId: string, achievementCode: string) {
     const supabase = await createClient();
 
@@ -212,27 +182,113 @@ export async function awardAchievement(personalId: string, achievementCode: stri
         .eq('code', achievementCode)
         .single();
 
-    if (achError || !achievement) throw new Error('Achievement not found');
+    if (achError || !achievement) throw new Error('Achievement not found: ' + achievementCode);
 
     const { error } = await supabase
         .from(TableNames.WorkerAchievements)
-        .insert({
-            personal_id: personalId,
-            achievement_id: achievement.id
-        });
+        .insert({ personal_id: personalId, achievement_id: achievement.id });
 
-    if (error && error.code !== '23505') {
-        console.error('Error awarding badge:', error);
-        throw new Error(error.message);
+    // Ignore duplicate error (23505)
+    if (error && error.code !== '23505') throw new Error(error.message);
+
+    revalidatePath('/portal/dashboard');
+    revalidatePath('/portal/medals');
+}
+
+export async function getWorkerXP(personalId: string): Promise<number> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from(TableNames.WorkerAchievements)
+        .select(`achievement:achievements(xp_reward)`)
+        .eq('personal_id', personalId);
+
+    if (error || !data) return 0;
+
+    return data.reduce((sum, wa: any) => sum + (wa.achievement?.xp_reward || 0), 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GOALS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getAllGoals(workerRole?: string): Promise<ProviderGoal[]> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from(TableNames.Goals)
+        .select('*')
+        .order('category');
+
+    if (error) { console.error('Error fetching goals:', error); return []; }
+
+    // Filter by role: include goals for this role or goals for all roles (role_target is null)
+    const goals = data as ProviderGoal[];
+    if (!workerRole) return goals;
+    return goals.filter(g => !g.role_target || g.role_target === workerRole);
+}
+
+export async function getGoalProgress(personalId: string): Promise<GoalProgress[]> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from(TableNames.GoalProgress)
+        .select(`*, goal:provider_goals(*)`)
+        .eq('personal_id', personalId);
+
+    if (error) { console.error('Error fetching goal progress:', error); return []; }
+    return data as any;
+}
+
+export async function updateGoalProgressByCode(personalId: string, goalCode: string, newValue: number) {
+    const supabase = await createClient();
+
+    const { data: goal } = await supabase
+        .from(TableNames.Goals)
+        .select('id, target_value, xp_reward, code')
+        .eq('code', goalCode)
+        .single();
+
+    if (!goal) return;
+
+    const isCompleted = newValue >= goal.target_value;
+
+    const { data: existing } = await supabase
+        .from(TableNames.GoalProgress)
+        .select('id, completed')
+        .eq('personal_id', personalId)
+        .eq('goal_id', goal.id)
+        .single();
+
+    if (existing) {
+        // Update only if not already completed
+        if (!existing.completed) {
+            await supabase.from(TableNames.GoalProgress).update({
+                current_value: newValue,
+                completed: isCompleted,
+                completed_at: isCompleted ? new Date().toISOString() : null,
+                updated_at: new Date().toISOString(),
+            }).eq('id', existing.id);
+        }
+    } else {
+        await supabase.from(TableNames.GoalProgress).insert({
+            personal_id: personalId,
+            goal_id: goal.id,
+            current_value: newValue,
+            completed: isCompleted,
+            completed_at: isCompleted ? new Date().toISOString() : null,
+        });
     }
 
+    revalidatePath('/portal/goals');
     revalidatePath('/portal/dashboard');
 }
 
-/**
- * Get Liquidation History for a worker
- */
-export async function getWorkerLiquidations(personalId: string) {
+// ─────────────────────────────────────────────────────────────────────────────
+// LIQUIDATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getWorkerLiquidations(personalId: string): Promise<Liquidation[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from(TableNames.Liquidations)
@@ -240,31 +296,32 @@ export async function getWorkerLiquidations(personalId: string) {
         .eq('personal_id', personalId)
         .order('mes', { ascending: false });
 
-    if (error) {
-        console.error('Error fetching liquidations:', error);
-        return [];
-    }
-
-    return data;
+    if (error) { console.error('Error fetching liquidations:', error); return []; }
+    return data as Liquidation[];
 }
 
-/**
- * Calculate Monthly Stats
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// MONTHLY STATS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function getWorkerMonthlyStats(personalId: string, month: number, year: number) {
     const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
     const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    const logs = await getWorkerLogs(personalId, startDate, endDate);
+    const [logs, achievements] = await Promise.all([
+        getWorkerLogs(personalId, startDate, endDate),
+        getWorkerAchievements(personalId),
+    ]);
 
-    // Simple calculation based on registro_horas
     const totalHours = logs.reduce((sum, log) => sum + Number(log.horas || 0), 0);
-    const tasksCompleted = logs.length; // Each log entry counts as a task/shift for now
+    const totalXP = achievements.reduce((sum, wa: any) => sum + (wa.achievement?.xp_reward || 0), 0);
 
     return {
-        total_earnings: 0, // Would need to fetch from liquidations_mensuales for accuracy
+        total_earnings: 0, // real value from liquidaciones
         hours_worked: totalHours,
-        tasks_completed: tasksCompleted,
-        period: `${year}-${month}`
+        tasks_completed: logs.length,
+        badges_earned: achievements.length,
+        total_xp: totalXP,
+        period: `${year}-${month}`,
     };
 }

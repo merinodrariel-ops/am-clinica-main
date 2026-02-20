@@ -1,119 +1,134 @@
 import { getCurrentWorkerProfile, getWorkerLiquidations } from '@/app/actions/worker-portal';
-import { DollarSign, Calendar, FileText, CheckCircle, Clock, AlertCircle, ArrowUpRight } from 'lucide-react';
-import Link from 'next/link';
+import { DollarSign, TrendingUp, Calendar, CheckCircle2, Clock, ArrowDown } from 'lucide-react';
+
+const STATUS_CONFIG = {
+    paid: { label: 'Pagado', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+    approved: { label: 'Aprobado', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
+    pending: { label: 'Pendiente', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+    rejected: { label: 'Rechazado', color: 'text-red-400 bg-red-500/10 border-red-500/20' },
+};
 
 export default async function LiquidationPage() {
     const worker = await getCurrentWorkerProfile();
-
-    if (!worker) {
-        return <div className="p-12 text-center text-slate-500">Profile not found.</div>;
-    }
+    if (!worker) return <div className="p-12 text-center text-slate-500">Perfil no encontrado.</div>;
 
     const liquidations = await getWorkerLiquidations(worker.id);
 
+    const totalEarned = liquidations.filter(l => l.estado === 'paid').reduce((s, l) => s + (l.total_ars || 0), 0);
+    const totalHours = liquidations.reduce((s, l) => s + (l.total_horas || 0), 0);
+    const lastLiq = liquidations[0];
+
     return (
-        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in duration-700 pb-16">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-800/50 pb-8">
-                <div>
-                    <h1 className="text-4xl font-extrabold text-white tracking-tighter">Financial Transparency</h1>
-                    <p className="text-slate-400 mt-2 font-medium">Review your earnings, liquidation status, and historical payments.</p>
+            <div className="border-b border-slate-800/50 pb-6">
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">Mis Liquidaciones</h1>
+                <p className="text-slate-400 mt-1 font-medium">Historial de pagos y detalles mensuales.</p>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gradient-to-br from-emerald-900/20 to-slate-900 border border-emerald-500/20 rounded-2xl p-5">
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">Total Cobrado</p>
+                    <p className="text-2xl font-black text-white">${totalEarned.toLocaleString()}</p>
+                    <p className="text-emerald-500/60 text-[11px] mt-1">{liquidations.filter(l => l.estado === 'paid').length} liquidaciones pagas</p>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="text-right">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Payment Model</p>
-                        <p className="text-indigo-400 font-bold capitalize">{worker.rol === 'dentist' ? 'Commission Based' : 'Fixed / Hourly'}</p>
-                    </div>
+                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Horas Totales</p>
+                    <p className="text-2xl font-black text-white">{totalHours}h</p>
+                    <p className="text-slate-600 text-[11px] mt-1">Registradas en el sistema</p>
+                </div>
+                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Valor/Hora</p>
+                    <p className="text-2xl font-black text-white">${(worker.valor_hora_ars || 0).toLocaleString()}</p>
+                    <p className="text-slate-600 text-[11px] mt-1">Tarifa actual</p>
                 </div>
             </div>
 
-            {/* Liquidations List */}
-            <div className="space-y-6">
-                {liquidations.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4">
-                        {liquidations.map((liq) => (
-                            <div key={liq.id} className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-6 backdrop-blur-xl hover:bg-slate-900/60 transition-all group">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                    {/* Period & Date */}
-                                    <div className="flex items-center gap-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-slate-950/50 flex flex-col items-center justify-center border border-slate-800 group-hover:border-indigo-500/30 transition-colors">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase">{new Date(liq.mes).toLocaleString('default', { month: 'short' })}</span>
-                                            <span className="text-xl font-black text-white">{new Date(liq.mes).getFullYear().toString().slice(-2)}</span>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-lg font-bold text-white tracking-tight">Monthly Liquidation</h4>
-                                            <p className="text-slate-500 text-sm font-medium">
-                                                Created on {new Date(liq.created_at).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                    </div>
+            {/* Timeline */}
+            <div className="space-y-4">
+                <h2 className="text-lg font-bold text-white">Historial detallado</h2>
 
-                                    {/* Financial Totals */}
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12 flex-1 max-w-2xl">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Gross Total</p>
-                                            <p className="text-xl font-mono font-bold text-white">${liq.total_ars?.toLocaleString()}</p>
-                                            <p className="text-[10px] text-slate-400 font-medium">ARS</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">USD Equivalent</p>
-                                            <p className="text-xl font-mono font-bold text-emerald-400">${liq.total_usd?.toLocaleString()}</p>
-                                            <p className="text-[10px] text-slate-500 font-medium font-mono">@ {liq.tc_liquidacion}</p>
-                                        </div>
-                                        <div className="hidden lg:block">
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Hours/Units</p>
-                                            <p className="text-xl font-mono font-bold text-slate-200">{liq.total_horas || liq.total_unidades || '---'}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Status & Action */}
-                                    <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-slate-800/50 pt-4 md:pt-0">
-                                        <div className="flex flex-col items-end">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${liq.estado === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                                                <span className={`text-xs font-bold uppercase tracking-widest ${liq.estado === 'paid' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                    {liq.estado}
-                                                </span>
-                                            </div>
-                                            {liq.fecha_pago && (
-                                                <p className="text-[10px] text-slate-500 mt-1 font-medium">Paid on {new Date(liq.fecha_pago).toLocaleDateString()}</p>
-                                            )}
-                                        </div>
-                                        <button className="p-3 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-                                            <FileText size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                {liquidations.length === 0 ? (
+                    <div className="text-center py-20 border border-dashed border-slate-800 rounded-3xl">
+                        <DollarSign size={40} className="mx-auto text-slate-700 mb-4" />
+                        <p className="text-slate-500">No hay liquidaciones registradas aún.</p>
+                        <p className="text-slate-600 text-sm mt-1">Las liquidaciones son generadas por administración cada mes.</p>
                     </div>
                 ) : (
-                    <div className="bg-slate-950/20 border border-slate-800/40 rounded-[3rem] p-24 text-center">
-                        <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-8 border border-slate-800">
-                            <Clock className="text-slate-700" size={32} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-slate-300">No history yet</h3>
-                        <p className="text-slate-500 mt-2 max-w-sm mx-auto font-medium">
-                            Your liquidation history will appear here once your first payment period is finalized.
-                        </p>
-                    </div>
-                )}
-            </div>
+                    liquidations.map((liq, idx) => {
+                        const status = STATUS_CONFIG[liq.estado as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+                        const tc = liq.tc_liquidacion || 1;
+                        const mesLabel = new Date(liq.mes + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
-            {/* Support Zone */}
-            <div className="bg-gradient-to-br from-indigo-950/20 to-slate-900/40 border border-indigo-500/10 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                        <ArrowUpRight className="text-indigo-400" size={32} />
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-white tracking-tight">Financial Inquiry?</h3>
-                        <p className="text-slate-400 text-sm font-medium mt-1">Contact the administrative department for any clarification regarding your settlements.</p>
-                    </div>
-                </div>
-                <button className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all shadow-xl shadow-indigo-500/20 whitespace-nowrap">
-                    Contact Admin
-                </button>
+                        return (
+                            <div
+                                key={liq.id}
+                                className={`bg-slate-900/40 border border-slate-800/60 rounded-3xl overflow-hidden ${idx === 0 ? 'border-indigo-500/20 bg-indigo-500/5' : ''}`}
+                            >
+                                {/* Header row */}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${idx === 0 ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-slate-900 border-slate-800'}`}>
+                                            <Calendar className={idx === 0 ? 'text-indigo-400' : 'text-slate-500'} size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-white capitalize">{mesLabel}</h3>
+                                            {idx === 0 && <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Más reciente</span>}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                        <div className="text-right">
+                                            <p className="text-2xl font-black text-white">${(liq.total_ars || 0).toLocaleString()}</p>
+                                            {liq.total_usd && (
+                                                <p className="text-xs text-slate-400">≈ USD {liq.total_usd.toFixed(2)} @ {tc}</p>
+                                            )}
+                                        </div>
+                                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase border ${status.color}`}>
+                                            {status.label}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Details row */}
+                                <div className="border-t border-slate-800/50 px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-950/20">
+                                    <div>
+                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">Horas</p>
+                                        <div className="flex items-center gap-1.5">
+                                            <Clock size={13} className="text-slate-500" />
+                                            <span className="font-mono font-bold text-slate-300 text-sm">{liq.total_horas}h</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">Valor/hora</p>
+                                        <span className="font-mono font-bold text-slate-300 text-sm">
+                                            ${(liq.valor_hora_snapshot || 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">TC Liquidación</p>
+                                        <span className="font-mono font-bold text-slate-300 text-sm">{tc}</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">Fecha de Pago</p>
+                                        <span className="font-mono font-bold text-slate-300 text-sm">
+                                            {liq.fecha_pago
+                                                ? new Date(liq.fecha_pago + 'T12:00:00').toLocaleDateString('es-AR')
+                                                : '---'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {liq.observaciones && (
+                                    <div className="px-6 py-3 bg-amber-500/5 border-t border-amber-500/10">
+                                        <p className="text-xs text-amber-400/80 font-medium">💬 {liq.observaciones}</p>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })
+                )}
             </div>
         </div>
     );

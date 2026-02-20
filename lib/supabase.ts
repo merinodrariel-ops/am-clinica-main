@@ -142,3 +142,23 @@ export interface HistorialEdicion {
     created_at: string;
 }
 
+// ─── Tareas (Team To-Do List) ──────────────────────────────────────────────
+
+export type TodoStatus = 'pending' | 'in_progress' | 'completed';
+export type TodoPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface Todo {
+    id: string;
+    title: string;
+    description: string | null;
+    status: TodoStatus;
+    priority: TodoPriority;
+    created_by: string | null;
+    created_by_name: string | null;
+    assigned_to_name: string | null;
+    due_date: string | null;
+    is_pinned: boolean;
+    created_at: string;
+    updated_at: string;
+}
+

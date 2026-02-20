@@ -1,0 +1,143 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Service role client (bypasses RLS — solo para este endpoint seguro)
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function GET(
+    _request: Request,
+    { params }: { params: Promise<{ token: string }> }
+) {
+    const { token } = await params;
+
+    if (!token) {
+        return NextResponse.json({ error: 'Token requerido' }, { status: 400 });
+    }
+
+    // 1. Validar token
+    const { data: tokenData, error: tokenError } = await supabase
+        .from('patient_portal_tokens')
+        .select('patient_id, expires_at, is_active')
+        .eq('token', token)
+        .single();
+
+    if (tokenError || !tokenData) {
+        return NextResponse.json({ error: 'Token inválido' }, { status: 404 });
+    }
+
+    if (!tokenData.is_active || new Date(tokenData.expires_at) < new Date()) {
+        return NextResponse.json({ error: 'Token expirado' }, { status: 401 });
+    }
+
+    const patientId = tokenData.patient_id;
+
+    // 2. Fetch de todos los datos del paciente en paralelo
+    const [
+        patientRes,
+        paymentsRes,
+        treatmentRes,
+        planRes,
+        filesRes,
+        appointmentRes,
+    ] = await Promise.all([
+        supabase
+            .from('pacientes')
+            .select('id_paciente, nombre, apellido, email, telefono, estado_paciente')
+            .eq('id_paciente', patientId)
+            .single(),
+
+        supabase
+            .from('caja_recepcion_movimientos')
+            .select('id, fecha_hora, concepto_nombre, monto, moneda, estado, cuota_nro, cuotas_total, comprobante_url')
+            .eq('paciente_id', patientId)
+            .eq('estado_registro', 'activo')
+            .neq('estado', 'anulado')
+            .order('fecha_hora', { ascending: true }),
+
+        supabase
+            .from('patient_treatments')
+            .select('id, status, last_stage_change, workflow_id, current_stage_id')
+            .eq('patient_id', patientId)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(1),
+
+        supabase
+            .from('planes_tratamiento')
+            .select('descripcion, total_usd, senal_usd, saldo_usd, estado_plan')
+            .eq('paciente_id', patientId)
+            .order('created_at', { ascending: false })
+            .limit(1),
+
+        supabase
+            .from('patient_files')
+            .select('id, file_type, label, file_url, thumbnail_url, created_at')
+            .eq('patient_id', patientId)
+            .eq('is_visible_to_patient', true)
+            .order('created_at', { ascending: false }),
+
+        supabase
+            .from('agenda_appointments')
+            .select('start_time, type, doctor_id')
+            .eq('patient_id', patientId)
+            .gte('start_time', new Date().toISOString())
+            .order('start_time', { ascending: true })
+            .limit(1),
+    ]);
+
+    if (!patientRes.data) {
+        return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 });
+    }
+
+    // 3. Si hay tratamiento activo, buscar su workflow + etapas
+    let treatment = null;
+    let allStages = null;
+
+    if (treatmentRes.data && treatmentRes.data.length > 0) {
+        const t = treatmentRes.data[0];
+
+        const [workflowRes, stageRes, allStagesRes] = await Promise.all([
+            supabase
+                .from('clinical_workflows')
+                .select('name')
+                .eq('id', t.workflow_id)
+                .single(),
+
+            supabase
+                .from('workflow_stages')
+                .select('name, order_index')
+                .eq('id', t.current_stage_id)
+                .single(),
+
+            supabase
+                .from('workflow_stages')
+                .select('id, name, order_index')
+                .eq('workflow_id', t.workflow_id)
+                .order('order_index', { ascending: true }),
+        ]);
+
+        treatment = {
+            id: t.id,
+            status: t.status,
+            last_stage_change: t.last_stage_change,
+            workflow_name: workflowRes.data?.name || 'Tratamiento',
+            current_stage_name: stageRes.data?.name || '',
+            current_stage_order: stageRes.data?.order_index || 0,
+        };
+
+        allStages = allStagesRes.data || null;
+    }
+
+    return NextResponse.json({
+        patient: patientRes.data,
+        payments: paymentsRes.data || [],
+        treatment,
+        allStages,
+        plan: planRes.data?.[0] || null,
+        files: filesRes.data || [],
+        nextAppointment: appointmentRes.data?.[0] || null,
+    });
+}

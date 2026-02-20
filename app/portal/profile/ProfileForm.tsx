@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { WorkerProfile } from '@/types/worker-portal';
-import { Save, Upload, FileText, CheckCircle, AlertCircle, Trash2, Camera, ShieldCheck } from 'lucide-react';
+import { Save, Upload, CheckCircle, AlertCircle, Camera, ShieldCheck, FileText, User, Briefcase, MapPin } from 'lucide-react';
 import { uploadWorkerDocument, upsertWorkerProfile } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 
@@ -12,21 +10,31 @@ interface ProfileFormProps {
     worker: WorkerProfile;
 }
 
+type Section = 'identity' | 'contact' | 'professional' | 'documents';
+
 export default function ProfileForm({ worker }: ProfileFormProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [uploading, setUploading] = useState<string | null>(null);
+    const [activeSection, setActiveSection] = useState<Section>('identity');
+
+    const docs = (worker.documents as Record<string, any>) || {};
+
+    const SECTIONS: { id: Section; label: string; icon: any }[] = [
+        { id: 'identity', label: 'Identidad', icon: User },
+        { id: 'contact', label: 'Contacto y Legal', icon: MapPin },
+        { id: 'professional', label: 'Profesional', icon: Briefcase },
+        { id: 'documents', label: 'Documentación', icon: FileText },
+    ];
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         setUploading(type);
         try {
             await uploadWorkerDocument(worker.id, file, type);
-            toast.success(`${type.replace('_', ' ').toUpperCase()} uploaded successfully`);
-        } catch (error) {
-            console.error('Upload failed:', error);
-            toast.error('Failed to upload document');
+            toast.success(`Documento cargado exitosamente`);
+        } catch {
+            toast.error('Error al cargar el documento');
         } finally {
             setUploading(null);
         }
@@ -35,250 +43,303 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsSaving(true);
-        const formData = new FormData(e.currentTarget);
+        const fd = new FormData(e.currentTarget);
 
         try {
             await upsertWorkerProfile({
                 id: worker.id,
-                nombre: formData.get('nombre') as string,
-                apellido: formData.get('apellido') as string,
-                especialidad: formData.get('especialidad') as string,
-                whatsapp: formData.get('whatsapp') as string,
+                nombre: fd.get('nombre') as string,
+                apellido: fd.get('apellido') as string,
+                especialidad: fd.get('especialidad') as string,
+                whatsapp: fd.get('whatsapp') as string,
+                email: fd.get('email') as string,
+                documento: fd.get('documento') as string,
+                direccion: fd.get('direccion') as string,
+                barrio_localidad: fd.get('barrio_localidad') as string,
+                condicion_afip: fd.get('condicion_afip') as string,
+                matricula_provincial: fd.get('matricula_provincial') as string,
+                descripcion: fd.get('descripcion') as string,
             });
-            toast.success('Profile updated successfully');
-        } catch (error) {
-            console.error('Update failed:', error);
-            toast.error('Failed to update profile');
+            toast.success('Perfil actualizado correctamente');
+        } catch {
+            toast.error('Error al guardar los cambios');
         } finally {
             setIsSaving(false);
         }
     };
 
-    const docs = worker.documents as Record<string, any> || {};
+    const DOCUMENT_SLOTS = [
+        { key: 'dni_frente', label: 'DNI (Frente)' },
+        { key: 'dni_dorso', label: 'DNI (Dorso)' },
+        { key: 'licencia', label: 'Matrícula / Licencia' },
+        { key: 'poliza', label: 'Póliza de Seguro' },
+        { key: 'contrato', label: 'Contrato de trabajo' },
+        { key: 'otros', label: 'Otros documentos' },
+    ];
+
+    const completedDocs = DOCUMENT_SLOTS.filter(d => docs[d.key]?.url).length;
+    const profilePct = [
+        worker.nombre, worker.apellido, worker.email, worker.whatsapp,
+        worker.documento, worker.direccion, worker.especialidad, worker.condicion_afip,
+    ].filter(Boolean).length;
+    const profileCompleteness = Math.round((profilePct / 8) * 100);
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left: Basic Info */}
-            <div className="lg:col-span-2 space-y-8">
-                <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-8 backdrop-blur-xl">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                            <ShieldCheck className="text-indigo-400" size={24} />
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+            {/* Left: Profile Card */}
+            <div className="space-y-4">
+                {/* Avatar */}
+                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center relative overflow-hidden">
+                    <div className="relative inline-block mb-4">
+                        <div className="w-28 h-28 rounded-full bg-slate-900 flex items-center justify-center border-4 border-slate-800 shadow-2xl overflow-hidden">
+                            {worker.foto_url ? (
+                                <img src={worker.foto_url} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-5xl text-slate-700 font-black">{worker.nombre?.[0]}</span>
+                            )}
                         </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-white">Personal Information</h3>
-                            <p className="text-slate-500 text-sm">Verified identification and contact details</p>
-                        </div>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">First Name</label>
-                                <Input
-                                    name="nombre"
-                                    defaultValue={worker.nombre}
-                                    className="h-12 bg-slate-950/50 border-slate-800/50 focus:border-indigo-500/50 focus:ring-indigo-500/20 text-slate-200 rounded-xl"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Last Name</label>
-                                <Input
-                                    name="apellido"
-                                    defaultValue={worker.apellido}
-                                    className="h-12 bg-slate-950/50 border-slate-800/50 focus:border-indigo-500/50 focus:ring-indigo-500/20 text-slate-200 rounded-xl"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Specialty</label>
-                                <Input
-                                    name="especialidad"
-                                    defaultValue={worker.especialidad}
-                                    className="h-12 bg-slate-950/50 border-slate-800/50 focus:border-indigo-500/50 focus:ring-indigo-500/20 text-slate-200 rounded-xl"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">WhatsApp</label>
-                                <Input
-                                    name="whatsapp"
-                                    defaultValue={worker.whatsapp}
-                                    placeholder="+54 9 11 ..."
-                                    className="h-12 bg-slate-950/50 border-slate-800/50 focus:border-indigo-500/50 focus:ring-indigo-500/20 text-slate-200 rounded-xl"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="pt-6 flex justify-end">
-                            <Button
-                                type="submit"
-                                disabled={isSaving}
-                                className="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all shadow-xl shadow-indigo-500/20 gap-2"
-                            >
-                                {isSaving ? 'Saving...' : (
-                                    <>
-                                        <Save size={18} />
-                                        Save Changes
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </form>
-                </div>
-
-                {/* Documents Grid */}
-                <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-8 backdrop-blur-xl">
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                                <FileText className="text-emerald-400" size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white">Compliance & Documents</h3>
-                                <p className="text-slate-500 text-sm">Required legal and professional documentation</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <DocumentCard
-                            title="DNI (Front)"
-                            type="dni_frente"
-                            doc={docs['dni_frente']}
-                            isUploading={uploading === 'dni_frente'}
-                            onUpload={(e) => handleFileUpload(e, 'dni_frente')}
-                        />
-                        <DocumentCard
-                            title="DNI (Back)"
-                            type="dni_dorso"
-                            doc={docs['dni_dorso']}
-                            isUploading={uploading === 'dni_dorso'}
-                            onUpload={(e) => handleFileUpload(e, 'dni_dorso')}
-                        />
-                        <DocumentCard
-                            title="Professional License"
-                            type="licencia"
-                            doc={docs['licencia']}
-                            isUploading={uploading === 'licencia'}
-                            onUpload={(e) => handleFileUpload(e, 'licencia')}
-                        />
-                        <DocumentCard
-                            title="Insurance Policy"
-                            type="poliza"
-                            doc={docs['poliza']}
-                            isUploading={uploading === 'poliza'}
-                            onUpload={(e) => handleFileUpload(e, 'poliza')}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Side: Profile Card & Status */}
-            <div className="space-y-6">
-                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-[2.5rem] p-8 text-center relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
-
-                    <div className="relative z-10">
-                        <div className="relative inline-block mb-6">
-                            <div className="w-32 h-32 rounded-full bg-slate-900 flex items-center justify-center border-4 border-slate-800 shadow-2xl overflow-hidden group-hover:border-indigo-500/30 transition-all">
-                                {worker.foto_url ? (
-                                    <img src={worker.foto_url} alt="Profile" className="w-full h-full object-cover" />
-                                ) : (
-                                    <span className="text-4xl text-slate-700 font-bold">{worker.nombre[0]}</span>
-                                )}
-                            </div>
-                            <button className="absolute bottom-1 right-1 p-2.5 bg-indigo-600 rounded-2xl text-white hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/40 border-2 border-slate-950 scale-90 group-hover:scale-100">
-                                <Camera size={16} />
-                            </button>
-                        </div>
-
-                        <h4 className="text-2xl font-bold text-white tracking-tight">{worker.nombre} {worker.apellido}</h4>
-                        <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest mt-1">{worker.rol}</p>
-
-                        <div className="mt-8 pt-8 border-t border-slate-800/50 space-y-4">
-                            <StatusBadge label="Compliance" status={Object.keys(docs).length >= 4 ? 'verified' : 'pending'} />
-                            <StatusBadge label="Account" status="active" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-3xl p-8 backdrop-blur-xl">
-                    <h5 className="text-indigo-300 font-bold text-sm mb-4">Contract Status</h5>
-                    <div className="bg-indigo-950/30 rounded-2xl p-4 border border-indigo-500/10">
-                        <div className="flex items-center gap-3">
-                            <FileText size={20} className="text-indigo-400" />
-                            <div>
-                                <p className="text-slate-200 text-sm font-bold">Standard Agreement</p>
-                                <p className="text-indigo-400/60 text-xs">Awaiting Signature</p>
-                            </div>
-                        </div>
-                        <button className="mt-4 w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-lg shadow-indigo-500/20">
-                            Open & Sign
+                        <button type="button" className="absolute bottom-1 right-1 p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all shadow-lg border-2 border-slate-950">
+                            <Camera size={14} />
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
-    );
-}
+                    <h4 className="text-lg font-bold text-white">{worker.nombre} {worker.apellido}</h4>
+                    <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest mt-0.5">{worker.rol}</p>
+                    {worker.especialidad && (
+                        <p className="text-slate-500 text-xs mt-0.5">{worker.especialidad}</p>
+                    )}
 
-function DocumentCard({ title, type, doc, isUploading, onUpload }: { title: string, type: string, doc?: any, isUploading: boolean, onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
-    const isVerified = doc?.status === 'verified';
-    const isPending = doc?.status === 'pending_review';
-
-    return (
-        <div className={`p-5 rounded-2xl border transition-all ${isVerified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700'}`}>
-            <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-bold text-slate-300">{title}</span>
-                {isVerified ? (
-                    <CheckCircle className="text-emerald-400" size={18} />
-                ) : isPending ? (
-                    <AlertCircle className="text-amber-400" size={18} />
-                ) : (
-                    <div className="w-2 h-2 rounded-full bg-slate-800"></div>
-                )}
-            </div>
-
-            {doc ? (
-                <div className="flex items-center justify-between">
-                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline font-bold">View Document</a>
-                    <button className="p-1.5 text-slate-600 hover:text-red-400 transition-colors">
-                        <Trash2 size={14} />
-                    </button>
-                </div>
-            ) : (
-                <div className="relative">
-                    <input
-                        type="file"
-                        onChange={onUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        disabled={isUploading}
-                    />
-                    <div className="flex items-center justify-center gap-2 py-2 text-xs font-bold text-slate-500 bg-slate-900/50 border border-dashed border-slate-800 rounded-xl group-hover:border-slate-700">
-                        {isUploading ? (
-                            <span className="animate-pulse">Uploading...</span>
-                        ) : (
-                            <>
-                                <Upload size={14} />
-                                Upload File
-                            </>
-                        )}
+                    {/* Completeness */}
+                    <div className="mt-5 pt-5 border-t border-slate-800/50 space-y-3">
+                        <div>
+                            <div className="flex justify-between text-[10px] font-bold mb-1">
+                                <span className="text-slate-500 uppercase tracking-wider">Perfil</span>
+                                <span className="text-indigo-400">{profileCompleteness}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${profileCompleteness}%` }} />
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex justify-between text-[10px] font-bold mb-1">
+                                <span className="text-slate-500 uppercase tracking-wider">Documentos</span>
+                                <span className="text-emerald-400">{completedDocs}/{DOCUMENT_SLOTS.length}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(completedDocs / DOCUMENT_SLOTS.length) * 100}%` }} />
+                            </div>
+                        </div>
                     </div>
                 </div>
-            )}
+
+                {/* Section Nav */}
+                <nav className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-2 space-y-0.5">
+                    {SECTIONS.map(sec => {
+                        const Icon = sec.icon;
+                        return (
+                            <button
+                                key={sec.id}
+                                type="button"
+                                onClick={() => setActiveSection(sec.id)}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${activeSection === sec.id
+                                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                                    }`}
+                            >
+                                <Icon size={15} />
+                                {sec.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+
+                {/* Save Button */}
+                <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="w-full h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                    <Save size={18} />
+                    {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+            </div>
+
+            {/* Right: Form Sections */}
+            <div className="lg:col-span-3 space-y-6">
+
+                {/* Identity */}
+                {activeSection === 'identity' && (
+                    <FormSection title="Información Personal" icon={<User size={20} className="text-indigo-400" />}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField label="Nombre" name="nombre" defaultValue={worker.nombre} />
+                            <FormField label="Apellido" name="apellido" defaultValue={worker.apellido} />
+                            <FormField label="Email" name="email" defaultValue={worker.email} type="email" />
+                            <FormField label="DNI / Documento" name="documento" defaultValue={worker.documento} />
+                        </div>
+                        <div className="mt-4">
+                            <FormField label="Descripción / Bio breve" name="descripcion" defaultValue={worker.descripcion} isTextarea />
+                        </div>
+                    </FormSection>
+                )}
+
+                {/* Contact & Legal */}
+                {activeSection === 'contact' && (
+                    <FormSection title="Contacto y Datos Legales" icon={<MapPin size={20} className="text-cyan-400" />}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField label="WhatsApp" name="whatsapp" defaultValue={worker.whatsapp} placeholder="+54 9 11..." />
+                            <FormField label="Condición AFIP" name="condicion_afip" defaultValue={worker.condicion_afip} />
+                            <FormField label="Dirección" name="direccion" defaultValue={worker.direccion} />
+                            <FormField label="Barrio / Localidad" name="barrio_localidad" defaultValue={worker.barrio_localidad} />
+                        </div>
+                    </FormSection>
+                )}
+
+                {/* Professional */}
+                {activeSection === 'professional' && (
+                    <FormSection title="Datos Profesionales" icon={<Briefcase size={20} className="text-violet-400" />}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField label="Especialidad" name="especialidad" defaultValue={worker.especialidad} />
+                            <FormField label="Matrícula Provincial" name="matricula_provincial" defaultValue={worker.matricula_provincial} />
+                        </div>
+                        <div className="mt-5 p-4 bg-slate-950/30 rounded-2xl border border-slate-800/50">
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Datos de Pago (sólo lectura)</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">Valor Hora</p>
+                                    <p className="text-white font-mono font-bold mt-1">${worker.valor_hora_ars?.toLocaleString() || '---'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">% Honorarios</p>
+                                    <p className="text-white font-mono font-bold mt-1">{worker.porcentaje_honorarios || 0}%</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">Fecha Ingreso</p>
+                                    <p className="text-white font-mono font-bold mt-1">
+                                        {worker.fecha_ingreso ? new Date(worker.fecha_ingreso + 'T12:00:00').toLocaleDateString('es-AR') : '---'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">Último Pago</p>
+                                    <p className="text-white font-mono font-bold mt-1">
+                                        {worker.ultimo_pago_fecha ? new Date(worker.ultimo_pago_fecha + 'T12:00:00').toLocaleDateString('es-AR') : '---'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </FormSection>
+                )}
+
+                {/* Documents */}
+                {activeSection === 'documents' && (
+                    <FormSection title="Documentación Requerida" icon={<ShieldCheck size={20} className="text-emerald-400" />}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {DOCUMENT_SLOTS.map(slot => {
+                                const doc = docs[slot.key];
+                                const isVerified = doc?.status === 'verified';
+                                const isPending = doc?.status === 'pending_review';
+                                const isUploading = uploading === slot.key;
+
+                                return (
+                                    <div key={slot.key} className={`p-4 rounded-2xl border transition-all ${isVerified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-slate-950/30 border-slate-800/50 hover:border-slate-700'}`}>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-sm font-bold text-slate-300">{slot.label}</span>
+                                            {isVerified ? (
+                                                <CheckCircle className="text-emerald-400" size={16} />
+                                            ) : isPending ? (
+                                                <AlertCircle className="text-amber-400" size={16} />
+                                            ) : (
+                                                <div className="w-2 h-2 rounded-full bg-slate-700" />
+                                            )}
+                                        </div>
+
+                                        {doc ? (
+                                            <div className="flex items-center justify-between">
+                                                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline font-bold">
+                                                    Ver Documento
+                                                </a>
+                                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${isVerified ? 'text-emerald-500 bg-emerald-500/10' : 'text-amber-500 bg-amber-500/10'}`}>
+                                                    {isVerified ? 'Verificado' : 'En revisión'}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="relative">
+                                                <input
+                                                    type="file"
+                                                    onChange={(e) => handleFileUpload(e, slot.key)}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    disabled={isUploading}
+                                                />
+                                                <div className="flex items-center justify-center gap-2 py-2 text-xs font-bold text-slate-500 bg-slate-900/50 border border-dashed border-slate-800 rounded-xl hover:border-slate-600 transition-colors">
+                                                    {isUploading ? (
+                                                        <span className="animate-pulse">Subiendo...</span>
+                                                    ) : (
+                                                        <>
+                                                            <Upload size={13} />
+                                                            Subir archivo
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </FormSection>
+                )}
+
+                {/* Footer */}
+                <div className="pt-4 border-t border-slate-800/50">
+                    <p className="text-center text-slate-600 text-[10px] font-bold uppercase tracking-widest">
+                        AM Clínica © 2026 • Portal Verificado • Todos los datos encriptados
+                    </p>
+                </div>
+            </div>
+        </form>
+    );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function FormSection({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+    return (
+        <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-6 backdrop-blur-xl">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700">
+                    {icon}
+                </div>
+                <h3 className="text-base font-bold text-white">{title}</h3>
+            </div>
+            {children}
         </div>
     );
 }
 
-function StatusBadge({ label, status }: { label: string, status: string }) {
+function FormField({ label, name, defaultValue, type = 'text', placeholder, isTextarea }: {
+    label: string; name: string; defaultValue?: string; type?: string; placeholder?: string; isTextarea?: boolean;
+}) {
+    const baseClass = "w-full bg-slate-950/50 border border-slate-800/50 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 text-slate-200 rounded-xl px-4 text-sm transition-all outline-none placeholder:text-slate-600";
+
     return (
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl">
-            <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">{label}</span>
-            <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${status === 'verified' || status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                <span className={`text-[10px] font-extrabold uppercase tracking-widest ${status === 'verified' || status === 'active' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                    {status}
-                </span>
-            </div>
+        <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+            {isTextarea ? (
+                <textarea
+                    name={name}
+                    defaultValue={defaultValue || ''}
+                    placeholder={placeholder}
+                    rows={3}
+                    className={`${baseClass} py-3 resize-none`}
+                />
+            ) : (
+                <input
+                    type={type}
+                    name={name}
+                    defaultValue={defaultValue || ''}
+                    placeholder={placeholder}
+                    className={`${baseClass} h-11`}
+                />
+            )}
         </div>
     );
 }

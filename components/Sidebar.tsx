@@ -20,7 +20,9 @@ import {
     ChevronRight,
     Menu,
     X,
-    SlidersHorizontal
+    SlidersHorizontal,
+    CheckSquare,
+    Stethoscope,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -75,6 +77,18 @@ const MENU_ITEMS = [
         label: 'Recall Engine',
         href: '/recalls',
         roles: ['owner', 'admin', 'reception', 'developer']
+    },
+    {
+        icon: CheckSquare,
+        label: 'Tareas',
+        href: '/todos',
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio']
+    },
+    {
+        icon: Stethoscope,
+        label: 'Prestadores',
+        href: '/admin/staff',
+        roles: ['owner', 'admin']
     },
 ];
 
@@ -135,7 +149,7 @@ export default function Sidebar() {
     useEffect(() => { if (isDesktop) setMobileOpen(false); }, [isDesktop]);
 
     // Hide sidebar on login page or if not authenticated (optional, depends on layout)
-    if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional')) return null;
+    if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional') || pathname.startsWith('/portal')) return null;
 
     const userRole = role || 'partner_viewer';
 
