@@ -5,20 +5,22 @@ import { WorkerProfile, WorkLog, Achievement, WorkerAchievement } from '@/types/
 import { revalidatePath } from 'next/cache';
 
 const TableNames = {
-    Profiles: 'worker_profiles',
-    Logs: 'work_logs',
+    Profiles: 'personal', // Using the main personal table
+    Logs: 'registro_horas', // Renamed to clinical table
     Achievements: 'achievements',
-    WorkerAchievements: 'worker_achievements'
+    WorkerAchievements: 'worker_achievements',
+    Liquidations: 'liquidaciones_mensuales'
 };
+
 
 /**
  * Get the worker profile for the currently authenticated user
  */
 export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (authError || !user) return null;
+    if (!user) return null;
 
     const { data, error } = await supabase
         .from(TableNames.Profiles)
@@ -35,21 +37,24 @@ export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
 }
 
 /**
- * Get all worker profiles (Admin only usually, but RLS handles security)
+ * Get all worker profiles
  */
 export async function getAllWorkers(): Promise<WorkerProfile[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from(TableNames.Profiles)
         .select('*')
-        .order('full_name');
+        .order('nombre');
 
     if (error) {
         console.error('Error fetching workers:', error);
         return [];
     }
 
-    return data as WorkerProfile[];
+    return (data as WorkerProfile[]).map(p => ({
+        ...p,
+        full_name: `${p.nombre} ${p.apellido || ''}`.trim()
+    }));
 }
 
 /**
@@ -58,40 +63,89 @@ export async function getAllWorkers(): Promise<WorkerProfile[]> {
 export async function upsertWorkerProfile(profile: Partial<WorkerProfile>) {
     const supabase = await createClient();
 
-    // Remove undefined fields to avoid overwriting with null
-    const cleanProfile = Object.fromEntries(
-        Object.entries(profile).filter(([_, v]) => v !== undefined)
-    );
-
     const { data, error } = await supabase
         .from(TableNames.Profiles)
-        .upsert(cleanProfile)
+        .upsert(profile)
         .select()
         .single();
 
-    if (error) {
-        console.error('Error upserting worker:', error);
-        throw new Error(error.message);
+    if (error) throw error;
+
+    revalidatePath('/portal/profile');
+    return data as WorkerProfile;
+}
+
+/**
+ * Upload a worker document (DNI, Contract, etc.)
+ */
+export async function uploadWorkerDocument(workerId: string, file: File, type: string) {
+    const supabase = await createClient();
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${workerId}/${type}_${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('personal-documents')
+        .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL or signed URL
+    const { data: { publicUrl } } = supabase.storage
+        .from('personal-documents')
+        .getPublicUrl(filePath);
+
+    // Update the worker profile documents JSONB
+    const { data: worker, error: fetchError } = await supabase.from(TableNames.Profiles).select('documents').eq('id', workerId).single();
+    if (fetchError) throw fetchError;
+
+    const docs = worker?.documents || {};
+
+    docs[type] = {
+        url: publicUrl,
+        uploaded_at: new Date().toISOString(),
+        status: 'pending_review'
+    };
+
+    const { error: updateError } = await supabase
+        .from(TableNames.Profiles)
+        .update({ documents: docs })
+        .eq('id', workerId);
+
+    if (updateError) throw updateError;
+
+    // Check for Compliance Master badge
+    const requiredDocs = ['dni_frente', 'dni_dorso', 'licencia', 'poliza'];
+    const hasAllDocs = requiredDocs.every(d => docs[d]?.url);
+
+    if (hasAllDocs) {
+        try {
+            await awardAchievement(workerId, 'compliance_master');
+        } catch (e) {
+            console.error('Compliance badge awarding failed:', e);
+        }
     }
 
-    revalidatePath('/portal');
-    return data as WorkerProfile;
+    revalidatePath('/portal/profile');
+    revalidatePath('/portal/dashboard');
+    return { success: true, url: publicUrl };
 }
 
 /**
  * Get work logs for a specific worker
  */
-export async function getWorkerLogs(workerId: string, startDate?: string, endDate?: string): Promise<WorkLog[]> {
+export async function getWorkerLogs(personalId: string, startDate?: string, endDate?: string): Promise<WorkLog[]> {
     const supabase = await createClient();
 
     let query = supabase
         .from(TableNames.Logs)
         .select('*')
-        .eq('worker_id', workerId)
-        .order('date', { ascending: false });
+        .eq('personal_id', personalId)
+        .order('fecha', { ascending: false });
 
-    if (startDate) query = query.gte('date', startDate);
-    if (endDate) query = query.lte('date', endDate);
+    if (startDate) query = query.gte('fecha', startDate);
+    if (endDate) query = query.lte('fecha', endDate);
 
     const { data, error } = await query;
 
@@ -104,7 +158,7 @@ export async function getWorkerLogs(workerId: string, startDate?: string, endDat
 }
 
 /**
- * Log a new work entry (Shift, Procedure, etc.)
+ * Log a new work entry (Shift, etc.)
  */
 export async function logWorkEntry(entry: Partial<WorkLog>) {
     const supabase = await createClient();
@@ -120,15 +174,14 @@ export async function logWorkEntry(entry: Partial<WorkLog>) {
         throw new Error(error.message);
     }
 
-    revalidatePath('/portal');
-    revalidatePath('/admin/staff/liquidation');
+    revalidatePath('/portal/dashboard');
     return data as WorkLog;
 }
 
 /**
  * Get Achievements for a worker
  */
-export async function getWorkerAchievements(workerId: string): Promise<WorkerAchievement[]> {
+export async function getWorkerAchievements(personalId: string): Promise<WorkerAchievement[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -137,24 +190,22 @@ export async function getWorkerAchievements(workerId: string): Promise<WorkerAch
             *,
             achievement:achievements(*)
         `)
-        .eq('worker_id', workerId);
+        .eq('personal_id', personalId);
 
     if (error) {
         console.error('Error fetching achievements:', error);
         return [];
     }
 
-    // Map nested data to match interface if needed, relying on Supabase join structure for now
     return data as any;
 }
 
 /**
  * Award an achievement to a worker
  */
-export async function awardAchievement(workerId: string, achievementCode: string) {
+export async function awardAchievement(personalId: string, achievementCode: string) {
     const supabase = await createClient();
 
-    // 1. Get Achievement ID
     const { data: achievement, error: achError } = await supabase
         .from(TableNames.Achievements)
         .select('id')
@@ -163,44 +214,56 @@ export async function awardAchievement(workerId: string, achievementCode: string
 
     if (achError || !achievement) throw new Error('Achievement not found');
 
-    // 2. Insert Record
     const { error } = await supabase
         .from(TableNames.WorkerAchievements)
         .insert({
-            worker_id: workerId,
+            personal_id: personalId,
             achievement_id: achievement.id
         });
 
-    if (error) {
-        // Ignore duplicate key error (already awarded)
-        if (error.code !== '23505') {
-            console.error('Error awarding badge:', error);
-            throw new Error(error.message);
-        }
+    if (error && error.code !== '23505') {
+        console.error('Error awarding badge:', error);
+        throw new Error(error.message);
     }
 
     revalidatePath('/portal/dashboard');
 }
 
 /**
- * Calculate Monthly Stats (Simple Aggregation)
+ * Get Liquidation History for a worker
  */
-export async function getWorkerMonthlyStats(workerId: string, month: number, year: number) {
+export async function getWorkerLiquidations(personalId: string) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from(TableNames.Liquidations)
+        .select('*')
+        .eq('personal_id', personalId)
+        .order('mes', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching liquidations:', error);
+        return [];
+    }
+
+    return data;
+}
+
+/**
+ * Calculate Monthly Stats
+ */
+export async function getWorkerMonthlyStats(personalId: string, month: number, year: number) {
     const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
     const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    const logs = await getWorkerLogs(workerId, startDate, endDate);
+    const logs = await getWorkerLogs(personalId, startDate, endDate);
 
-    const totalEarnings = logs.reduce((sum, log) => sum + (log.amount_calculated || 0), 0);
-    const totalMinutes = logs
-        .filter(l => l.type === 'shift')
-        .reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
-
-    const tasksCompleted = logs.filter(l => l.type === 'task' || l.type === 'procedure').length;
+    // Simple calculation based on registro_horas
+    const totalHours = logs.reduce((sum, log) => sum + Number(log.horas || 0), 0);
+    const tasksCompleted = logs.length; // Each log entry counts as a task/shift for now
 
     return {
-        total_earnings: totalEarnings,
-        hours_worked: Math.round(totalMinutes / 60 * 10) / 10,
+        total_earnings: 0, // Would need to fetch from liquidations_mensuales for accuracy
+        hours_worked: totalHours,
         tasks_completed: tasksCompleted,
         period: `${year}-${month}`
     };

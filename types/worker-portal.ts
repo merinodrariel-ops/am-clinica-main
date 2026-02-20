@@ -4,45 +4,59 @@ export type WorkerRole = 'dentist' | 'assistant' | 'technician' | 'cleaning' | '
 
 export type WorkLogType = 'shift' | 'procedure' | 'task' | 'bonus' | 'deduction';
 
-export type WorkLogStatus = 'pending' | 'approved' | 'paid' | 'rejected';
+export type WorkLogStatus = 'pending' | 'approved' | 'paid' | 'rejected' | 'observado';
 
 export interface WorkerProfile {
     id: string;
     user_id?: string;
-    full_name: string;
-    role: WorkerRole;
-    specialty?: string;
-    photo_url?: string;
+    nombre: string;
+    apellido?: string;
+    rol: string;
+    especialidad?: string;
+    foto_url?: string;
+    email?: string;
+    whatsapp?: string;
+    documento?: string;
 
     // Financial Config
-    payment_model: PaymentModel;
-    hourly_rate?: number;
-    commission_percentage?: number;
-    fixed_salary?: number;
+    valor_hora_ars?: number;
+    porcentaje_honorarios?: number;
 
-    status: 'active' | 'inactive' | 'on_leave';
-    hire_date: string;
+    // UI/UX compatibility fields (mapping from personal table)
+    full_name?: string; // Virtual field for UI
 
-    created_at: string;
-    updated_at: string;
+    // Documents
+    dni_frente_url?: string;
+    dni_dorso_url?: string;
+    poliza_url?: string;
+    poliza_vencimiento?: string;
+    documents?: any[]; // JSONB array for extra docs
+
+    status?: 'active' | 'inactive' | 'on_leave';
+    fecha_ingreso?: string;
+
+    sanciones_notas?: string;
+
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface WorkLog {
     id: string;
-    worker_id: string;
-    date: string; // ISO Date YYYY-MM-DD
-    type: WorkLogType;
+    personal_id: string;
+    fecha: string; // ISO Date YYYY-MM-DD
+    horas: number;
 
-    reference_id?: string;
-    description?: string;
+    type?: WorkLogType; // Virtual or mapped from category
 
-    duration_minutes?: number;
-    amount_calculated?: number;
+    observaciones?: string;
+    estado: WorkLogStatus;
 
-    status: WorkLogStatus;
+    hora_ingreso?: string;
+    hora_egreso?: string;
+    evidencia_url?: string;
 
     created_at: string;
-    updated_at: string;
 }
 
 export interface Achievement {
@@ -56,7 +70,7 @@ export interface Achievement {
 
 export interface WorkerAchievement {
     id: string;
-    worker_id: string;
+    personal_id: string;
     achievement_id: string;
     awarded_at: string;
     achievement?: Achievement; // Joined data

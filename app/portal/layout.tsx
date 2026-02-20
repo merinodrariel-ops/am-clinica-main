@@ -34,7 +34,7 @@ export default function WorkerPortalLayout({
                         <NavLink href="/portal/schedule" icon={<CalendarDays size={18} />} label="Schedule" />
                         <NavLink href="/portal/earnings" icon={<DollarSign size={18} />} label="Earnings & Logs" />
                         <NavLink href="/portal/profile" icon={<Users size={18} />} label="My Profile" />
-                        <NavLink href="/portal/achievements" icon={<Award size={18} />} label="Achievements" />
+                        <NavLink href="/portal/medals" icon={<Award size={18} />} label="Medals" />
                     </nav>
                 </div>
 
