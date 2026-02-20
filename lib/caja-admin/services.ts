@@ -1356,14 +1356,52 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
 
             if (efectivoCuentas.length === 0) continue;
 
-            const cierre = await getUltimoCierreAdmin(sucursal.id);
-            const saldos = cierre?.saldos_finales || {};
+            const closure = await getUltimoCierreAdmin(sucursal.id);
+            const saldos = closure?.saldos_finales || {};
 
+            // Initial balance from closure
             efectivoCuentas.forEach(c => {
                 const val = saldos[c.id] || 0;
                 if (c.moneda === 'ARS') totalArs += val;
                 if (c.moneda === 'USD') totalUsd += val;
             });
+
+            // Add pending movements (cierre_id is null)
+            const { data: pendingMovs } = await getSupabase()
+                .from('caja_admin_movimientos')
+                .select(`
+                    tipo_movimiento,
+                    caja_admin_movimiento_lineas (
+                        cuenta_id,
+                        importe
+                    )
+                `)
+                .eq('sucursal_id', sucursal.id)
+                .is('cierre_id', null)
+                .neq('estado', 'Anulado')
+                .eq('is_deleted', false);
+
+            if (pendingMovs) {
+                pendingMovs.forEach(m => {
+                    const tipo = m.tipo_movimiento;
+                    let multiplier = 0;
+                    if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') multiplier = 1;
+                    else if (tipo === 'EGRESO' || tipo === 'RETIRO') multiplier = -1;
+                    else if (['CAMBIO_MONEDA', 'TRANSFERENCIA', 'AJUSTE_CAJA'].includes(tipo)) {
+                        multiplier = 1; // Signed
+                    }
+
+                    if (multiplier !== 0) {
+                        m.caja_admin_movimiento_lineas.forEach((l: any) => {
+                            const cuenta = efectivoCuentas.find(ec => ec.id === l.cuenta_id);
+                            if (cuenta) {
+                                if (cuenta.moneda === 'ARS') totalArs += Number(l.importe || 0) * multiplier;
+                                if (cuenta.moneda === 'USD') totalUsd += Number(l.importe || 0) * multiplier;
+                            }
+                        });
+                    }
+                });
+            }
         } catch (e) {
             console.error(`Error calculating balance for sucursal ${sucursal.id}`, e);
         }
@@ -1427,7 +1465,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     }
 
     // 2. Add Movements
-    // Fetch movements > ultimo.fecha
+    // Fetch movements where cierre_id IS NULL (pending closure)
     let query = getSupabase()
         .from('caja_admin_movimientos')
         .select(`
@@ -1439,12 +1477,9 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
             )
         `)
         .eq('sucursal_id', sucursalId)
+        .is('cierre_id', null)
         .neq('estado', 'Anulado')
         .eq('is_deleted', false);
-
-    if (ultimo) {
-        query = query.gt('fecha_movimiento', ultimo.fecha);
-    }
 
     const { data: movs } = await query;
 
