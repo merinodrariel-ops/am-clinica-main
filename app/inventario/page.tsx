@@ -29,6 +29,7 @@ import NuevoItemForm from '@/components/inventario/NuevoItemForm';
 import EditarItemModal from '@/components/inventario/EditarItemModal'; // Import Modal
 import MovimientoStockForm from '@/components/inventario/MovimientoStockForm';
 import HistorialMovimientosModal from '@/components/inventario/HistorialMovimientosModal';
+import SubirFotoInventario from '@/components/inventario/SubirFotoInventario';
 
 interface Item {
     id: string;
@@ -455,6 +456,7 @@ function InventarioContent() {
                                         </div>
                                         <div className="flex gap-2">
                                             <button className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" onClick={() => setEditingItem(item)} title="Editar Detalles"><Edit size={18} /></button>
+                                            <SubirFotoInventario itemId={item.id} onSuccess={loadItems} />
                                             <button className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={18} /></button>
                                             <button className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={18} /></button>
                                         </div>
@@ -499,6 +501,7 @@ function InventarioContent() {
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <button className="p-1.5 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" title="Editar" onClick={() => setEditingItem(item)}><Edit size={16} /></button>
+                                                    <SubirFotoInventario itemId={item.id} onSuccess={loadItems} />
                                                     <button className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="Entrada" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={16} /></button>
                                                     <button className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Salida" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={16} /></button>
                                                 </div>
