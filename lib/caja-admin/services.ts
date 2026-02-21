@@ -1542,8 +1542,6 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .eq('is_deleted', false);
 
     let gastosTotalesUsd = 0;
-    let giroArs = 0;
-    let giroUsd = 0;
 
     if (movs) {
         movs.forEach((m: {
@@ -1596,11 +1594,13 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         if (idsUsd.has(id)) totalUsd += monto;
     });
 
-    // ── GIRO ACTIVO: cumulative all-time balance ────────────────────────────
-    // Sum ALL GIRO_ACTIVO debt movements (regardless of closure)
+    // ── GIRO ACTIVO: cumulative all-time balance (using usd_equivalente_total) ──
+    // Everything normalized to USD to avoid currency mismatch between debt and payment.
+    // Debt: GIRO_ACTIVO tipo movements (acumula deuda, no impacta efectivo)
+    // Payment: EGRESO con subtipo containing 'giro' (paga la deuda con efectivo físico)
     const { data: allGiroDeuda, error: giroDeudaError } = await getSupabase()
         .from('caja_admin_movimientos')
-        .select('caja_admin_movimiento_lineas(importe, moneda)')
+        .select('usd_equivalente_total')
         .eq('sucursal_id', sucursalId)
         .eq('tipo_movimiento', 'GIRO_ACTIVO')
         .neq('estado', 'Anulado')
@@ -1610,11 +1610,10 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         console.error('[getCurrentBalanceAdmin] Error fetching giro deuda:', giroDeudaError);
     }
 
-    // Subtract ALL EGRESO "Pago Giro Activo" payments (actually paid with physical cash)
-    // Matches exact category name OR any subtipo containing 'giro' (case-insensitive)
+    // EGRESO con subtipo que contiene 'giro' = pago de la deuda (sale efectivo físico USD)
     const { data: allGiroPagos, error: giroPagosError } = await getSupabase()
         .from('caja_admin_movimientos')
-        .select('caja_admin_movimiento_lineas(importe, moneda)')
+        .select('usd_equivalente_total')
         .eq('sucursal_id', sucursalId)
         .eq('tipo_movimiento', 'EGRESO')
         .ilike('subtipo', '%giro%')
@@ -1625,25 +1624,16 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         console.error('[getCurrentBalanceAdmin] Error fetching giro pagos:', giroPagosError);
     }
 
-    let giroArsTotal = 0;
     let giroUsdTotal = 0;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     allGiroDeuda?.forEach((m: any) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        m.caja_admin_movimiento_lineas?.forEach((l: any) => {
-            if (l.moneda === 'ARS') giroArsTotal += Number(l.importe || 0);
-            if (l.moneda === 'USD') giroUsdTotal += Number(l.importe || 0);
-        });
+        giroUsdTotal += Number(m.usd_equivalente_total || 0);
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     allGiroPagos?.forEach((m: any) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        m.caja_admin_movimiento_lineas?.forEach((l: any) => {
-            if (l.moneda === 'ARS') giroArsTotal -= Number(l.importe || 0);
-            if (l.moneda === 'USD') giroUsdTotal -= Number(l.importe || 0);
-        });
+        giroUsdTotal -= Number(m.usd_equivalente_total || 0);
     });
 
     return {
@@ -1652,7 +1642,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         saldoArs: totalArs,
         saldoUsd: totalUsd,
         gastosTotalesUsd,
-        giroArs: Math.max(0, giroArsTotal),
+        giroArs: 0,
         giroUsd: Math.max(0, giroUsdTotal),
         saldosPorCuenta
     };
