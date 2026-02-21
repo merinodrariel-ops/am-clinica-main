@@ -125,7 +125,14 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const isCajaAbierta = aperturaHoy?.estado === "Abierto";
   const [arqueos, setArqueos] = useState<CajaAdminArqueo[]>([]);
   const [showArqueos, setShowArqueos] = useState(false);
-  const [balanceVivo, setBalanceVivo] = useState<{ saldoArs: number; saldoUsd: number; gastosTotalesUsd: number; status: string } | null>(null);
+  const [balanceVivo, setBalanceVivo] = useState<{
+    saldoArs: number;
+    saldoUsd: number;
+    gastosTotalesUsd: number;
+    giroArs: number;
+    giroUsd: number;
+    status: string
+  } | null>(null);
 
   // Giro Activo form state
   const [giroMoneda, setGiroMoneda] = useState<'ARS' | 'USD'>('ARS');
@@ -909,13 +916,6 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     .filter((m) => (m.tipo_movimiento === "EGRESO" || m.tipo_movimiento === "RETIRO") && m.estado !== "Anulado")
     .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
 
-  // --- Giro Activo accumulators (per currency, for reconciliation with external agent) ---
-  const giroActivoArs = movimientos
-    .filter((m) => m.tipo_movimiento === "GIRO_ACTIVO" && m.subtipo === "ARS" && m.estado !== "Anulado")
-    .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
-  const giroActivoUsd = movimientos
-    .filter((m) => m.tipo_movimiento === "GIRO_ACTIVO" && m.subtipo === "USD" && m.estado !== "Anulado")
-    .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
 
   // --- Helper for Privacy Mode ---
   const formatPrivacy = (content: React.ReactNode) => {
@@ -958,20 +958,21 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           </div>
 
           {/* Giro Activo — independent accumulator, does NOT affect cash balances */}
+          {/* NOTE: immediate UI update is handled via refreshBalance() call in handleSubmit, which emulates SpreadsheetApp.flush() behavior */}
           <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-amber-200 dark:border-amber-800/40 shadow-sm">
             <div>
               <p className="text-xs text-amber-600 uppercase font-semibold tracking-wide">Giro Activo (Deuda)</p>
-              {giroActivoArs > 0 && (
+              {balanceVivo.giroArs > 0 && (
                 <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
-                  {formatPrivacy(new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(giroActivoArs))}
+                  {formatPrivacy(new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(balanceVivo.giroArs))}
                 </p>
               )}
-              {giroActivoUsd > 0 && (
+              {balanceVivo.giroUsd > 0 && (
                 <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
-                  {formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(giroActivoUsd))}
+                  {formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.giroUsd))}
                 </p>
               )}
-              {giroActivoArs === 0 && giroActivoUsd === 0 && (
+              {balanceVivo.giroArs === 0 && balanceVivo.giroUsd === 0 && (
                 <p className="text-sm text-slate-400 mt-0.5">Sin giros</p>
               )}
             </div>

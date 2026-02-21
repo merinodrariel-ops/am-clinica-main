@@ -1466,6 +1466,8 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     saldoArs: number;
     saldoUsd: number;
     gastosTotalesUsd: number;
+    giroArs: number;
+    giroUsd: number;
     saldosPorCuenta: Record<string, number>;
 }> {
     const today = getLocalISODate();
@@ -1503,10 +1505,11 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
                 saldoArs: ars,
                 saldoUsd: usd,
                 gastosTotalesUsd: 0,
+                giroArs: 0,
+                giroUsd: 0,
                 saldosPorCuenta
             };
         }
-        // Active apertura found after today's closure — fall through to add pending movements
     }
 
     // 1. Initial from Last Closure
@@ -1520,16 +1523,17 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
     // 2. Add Movements
     // Fetch movements where cierre_id IS NULL (pending closure)
-    // usd_equivalente_total is used for the "total gastos en USD" indicator (all accounts, all currencies)
     const { data: movs } = await getSupabase()
         .from('caja_admin_movimientos')
         .select(`
             tipo_movimiento,
             usd_equivalente_total,
+            subtipo,
             caja_admin_movimiento_lineas (
                 cuenta_id,
                 importe,
-                moneda
+                moneda,
+                usd_equivalente
             )
         `)
         .eq('sucursal_id', sucursalId)
@@ -1538,14 +1542,31 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .eq('is_deleted', false);
 
     let gastosTotalesUsd = 0;
+    let giroArs = 0;
+    let giroUsd = 0;
 
     if (movs) {
         movs.forEach((m: {
             tipo_movimiento: string;
             usd_equivalente_total: number | null;
+            subtipo: string | null;
             caja_admin_movimiento_lineas: MovimientoLinea[];
         }) => {
             const tipo = m.tipo_movimiento;
+
+            // ── GIRO ACTIVO SPECIAL HANDLING ───────────────────────────
+            // Rule: No operation on ARS/USD/GASTOS. Only adds to GIRO cards.
+            if (tipo === 'GIRO_ACTIVO') {
+                if (m.caja_admin_movimiento_lineas) {
+                    m.caja_admin_movimiento_lineas.forEach(l => {
+                        if (l.moneda === 'ARS') giroArs += Number(l.importe || 0);
+                        if (l.moneda === 'USD') giroUsd += Number(l.importe || 0);
+                    });
+                }
+                return; // EXCLUSION TOTAL: skip rest of the calculation
+            }
+
+            // ── STANDARD MOVEMENTS ─────────────────────────────────────
             let multiplier = 0;
             if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') multiplier = 1;
             else if (tipo === 'EGRESO' || tipo === 'RETIRO') multiplier = -1;
@@ -1553,7 +1574,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
                 multiplier = 1; // Signed amount
             }
 
-            // Track total gastos in USD (all account types, all currencies → use usd_equivalente_total)
+            // Track total gastos in USD (excludes GIRO_ACTIVO due to return above)
             if (tipo === 'EGRESO' && m.usd_equivalente_total) {
                 gastosTotalesUsd += Number(m.usd_equivalente_total);
             }
@@ -1562,9 +1583,10 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
             // Update per-account cash balances (efectivo accounts only)
             const lineas = m.caja_admin_movimiento_lineas;
-            if (lineas && tipo !== 'GIRO_ACTIVO') {
+            if (lineas) {
                 lineas.forEach((l: MovimientoLinea) => {
                     if (saldosPorCuenta.hasOwnProperty(l.cuenta_id)) {
+                        // REGRE DE ORO: No Conversion. Only update with the line currency amount.
                         saldosPorCuenta[l.cuenta_id] += Number(l.importe || 0) * multiplier;
                     }
                 });
@@ -1572,7 +1594,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         });
     }
 
-    // Calculate totals
+    // Calculate totals for summary cards
     let totalArs = 0;
     let totalUsd = 0;
     Object.entries(saldosPorCuenta).forEach(([id, monto]) => {
@@ -1586,6 +1608,8 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         saldoArs: totalArs,
         saldoUsd: totalUsd,
         gastosTotalesUsd,
+        giroArs,
+        giroUsd,
         saldosPorCuenta
     };
 }
