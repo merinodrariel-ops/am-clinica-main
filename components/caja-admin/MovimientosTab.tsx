@@ -137,6 +137,16 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const [manualRate, setManualRate] = useState<string>("");
   const [exchangeAmountUSD, setExchangeAmountUSD] = useState<string>("");
 
+  // Lightweight refresh: only updates the balance strip cards (single request)
+  async function refreshBalance() {
+    try {
+      const balanceData = await getCurrentBalanceAdmin(sucursal.id);
+      setBalanceVivo(balanceData);
+    } catch (error) {
+      console.error("Error refreshing balance:", error);
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     try {
@@ -155,7 +165,6 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       setBalanceVivo(balanceData);
     } catch (error) {
       console.error("Error loading Caja Admin data:", error);
-      // Optional: set specific error state to show to user
     } finally {
       setLoading(false);
     }
@@ -283,13 +292,6 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const statsEgresos = movimientos
     .filter((m) => m.tipo_movimiento === "EGRESO" && m.estado !== "Anulado")
     .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
-
-  // ...
-
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sucursal.id, mesActual]);
 
   function addLinea() {
     if (cuentas.length === 0) return;
@@ -746,7 +748,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       return;
     }
 
-    // Reset form and reload
+    // Reset form
     setShowForm(false);
     setFormData({
       tipo_movimiento: "EGRESO",
@@ -757,6 +759,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     });
     setFormLineas([]);
     setAdjuntos([]);
+    // Update balance strip immediately (fast), then full reload in background
+    refreshBalance();
     loadData();
   }
 
