@@ -24,7 +24,7 @@ export interface CajaAdminMovimiento {
     usuario?: string;
     sucursal_id: string;
     descripcion: string;
-    tipo_movimiento: 'INGRESO_ADMIN' | 'INGRESO_PACIENTE' | 'EGRESO' | 'CAMBIO_MONEDA' | 'RETIRO' | 'TRANSFERENCIA' | 'AJUSTE_CAJA' | 'APORTE_CAPITAL';
+    tipo_movimiento: 'INGRESO_ADMIN' | 'INGRESO_PACIENTE' | 'EGRESO' | 'CAMBIO_MONEDA' | 'RETIRO' | 'TRANSFERENCIA' | 'AJUSTE_CAJA' | 'APORTE_CAPITAL' | 'GIRO_ACTIVO';
     subtipo?: string;
     nota?: string;
     adjuntos?: string[];
