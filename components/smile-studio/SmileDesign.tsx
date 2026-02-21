@@ -46,8 +46,8 @@ async function fileToBase64(file: File): Promise<{ base64: string; mimeType: str
 /** Compress image to max width, returns { base64, mimeType, dataUrl } */
 async function compressImage(
     file: File,
-    maxW = 1920,
-    quality = 0.88
+    maxW = 2000,
+    quality = 0.75
 ): Promise<{ base64: string; mimeType: string; dataUrl: string; width: number; height: number }> {
     return new Promise((resolve, reject) => {
         const img = new window.Image();
@@ -66,10 +66,10 @@ async function compressImage(
                 reader.onload = () => {
                     const dataUrl = reader.result as string;
                     const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-                    resolve({ base64, mimeType: 'image/jpeg', dataUrl, width: w, height: h });
+                    resolve({ base64, mimeType: 'image/webp', dataUrl, width: w, height: h });
                 };
                 reader.readAsDataURL(blob);
-            }, 'image/jpeg', quality);
+            }, 'image/webp', quality);
         };
         img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load failed')); };
         img.src = url;

@@ -27,8 +27,8 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // ─── Image compression constants ──────────────────────────────────────────────
-const WEBP_QUALITY = 0.80;   // 80 % quality
-const MAX_WIDTH_PX = 1920;   // max dimension
+const WEBP_QUALITY = 0.75;   // 75% quality as requested
+const MAX_WIDTH_PX = 2000;   // 2000px max dimension as requested
 const IMAGE_TYPES = new Set(['smile_design', 'photo_before', 'photo_after']);
 
 /** Compress any image File → WebP Blob using the Canvas API */
@@ -107,6 +107,8 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
     const [filesLoading, setFilesLoading] = useState(true);
 
     const [uploading, setUploading] = useState(false);
+    const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     const [uploadType, setUploadType] = useState<string>('stl');
     const [uploadLabel, setUploadLabel] = useState('');
     const [showUploadForm, setShowUploadForm] = useState(false);
@@ -197,28 +199,42 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
             return;
         }
 
+        const originalSize = file.size;
         setUploading(true);
+        setProcessingStatus('Preparando archivo...');
+
         try {
             const isImage = IMAGE_TYPES.has(uploadType);
+            const isSTL = file.name.toLowerCase().endsWith('.stl') || uploadType === 'stl';
 
-            // ── Compress images to WebP before upload ──────────────────────────
+            // ── Compression / Optimization ──────────────────────────────────
             let uploadBlob: Blob | File = file;
             let storagePath: string;
+            let finalContentType: string | undefined = undefined;
 
             if (isImage) {
+                setProcessingStatus('Optimizando imagen (WebP 2000px)...');
                 uploadBlob = await compressToWebP(file);
                 storagePath = `portal/${patientId}/${Date.now()}_${uploadType}.webp`;
+                finalContentType = 'image/webp';
+            } else if (isSTL) {
+                setProcessingStatus('Procesando modelo 3D (STL)...');
+                // Future: Prepare for GLB conversion here
+                const ext = file.name.split('.').pop() ?? 'stl';
+                storagePath = `portal/${patientId}/${Date.now()}_${uploadType}.${ext}`;
             } else {
+                setProcessingStatus('Preparando carga...');
                 const ext = file.name.split('.').pop() ?? 'bin';
                 storagePath = `portal/${patientId}/${Date.now()}_${uploadType}.${ext}`;
             }
 
-            // ── Upload to Supabase Storage (bucket: patient-portal-files) ──────
+            // ── Upload to Storage ───────────────────────────────────────────
+            setProcessingStatus('Subiendo a la nube...');
             const { data: storageData, error: storageError } = await supabase.storage
                 .from('patient-portal-files')
                 .upload(storagePath, uploadBlob, {
                     upsert: false,
-                    contentType: isImage ? 'image/webp' : undefined,
+                    contentType: finalContentType,
                 });
 
             if (storageError) throw storageError;
@@ -227,7 +243,8 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
                 .from('patient-portal-files')
                 .getPublicUrl(storageData.path);
 
-            // ── Save file record ───────────────────────────────────────────────
+            // ── Save Database Record ────────────────────────────────────────
+            setProcessingStatus('Guardando registro...');
             const { error: dbError } = await supabase
                 .from('patient_files')
                 .insert({
@@ -236,12 +253,25 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
                     label: uploadLabel.trim(),
                     file_url: urlData.publicUrl,
                     is_visible_to_patient: true,
+                    // Metadata could include original size and compressed size for analytics
                 });
 
             if (dbError) throw dbError;
 
-            const sizeKb = Math.round(uploadBlob.size / 1024);
-            toast.success(`Archivo subido · ${sizeKb} KB${isImage ? ' (WebP)' : ''}`);
+            // ── Completion Feedback ─────────────────────────────────────────
+            const finalSize = uploadBlob.size;
+            const reduction = originalSize > finalSize
+                ? Math.round(((originalSize - finalSize) / originalSize) * 100)
+                : 0;
+
+            const sizeKb = Math.round(finalSize / 1024);
+
+            if (reduction > 10) {
+                toast.success(`¡Optimizado! -${reduction}% (${sizeKb} KB)`);
+            } else {
+                toast.success(`Archivo subido · ${sizeKb} KB`);
+            }
+
             setUploadLabel('');
             setShowUploadForm(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -251,6 +281,7 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
             toast.error('Error al subir el archivo');
         } finally {
             setUploading(false);
+            setProcessingStatus(null);
         }
     }
 
@@ -421,33 +452,124 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
                                     />
                                 </div>
 
-                                {/* File input */}
-                                <div>
-                                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block">Archivo</label>
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="flex flex-col items-center gap-2 p-6 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer transition-colors"
+                                {/* Drag & Drop Premium Zone */}
+                                <div className="space-y-3">
+                                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider ml-1">
+                                        Archivo
+                                    </label>
+
+                                    <motion.div
+                                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                        onDragLeave={() => setIsDragging(false)}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            setIsDragging(false);
+                                            const file = e.dataTransfer.files?.[0];
+                                            if (file) {
+                                                const mockEvent = { target: { files: [file] } } as any;
+                                                handleUpload(mockEvent);
+                                            }
+                                        }}
+                                        onClick={() => !uploading && fileInputRef.current?.click()}
+                                        whileHover={!uploading ? { scale: 1.01 } : {}}
+                                        whileTap={!uploading ? { scale: 0.99 } : {}}
+                                        className={clsx(
+                                            "relative group cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-300",
+                                            "flex flex-col items-center justify-center gap-4 p-10 min-h-[220px]",
+                                            isDragging
+                                                ? "border-blue-500 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.15)]"
+                                                : "border-gray-200 dark:border-gray-700 hover:border-blue-400/50 bg-white dark:bg-gray-800/50"
+                                        )}
                                     >
-                                        <Upload size={22} className="text-gray-400" />
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                                            {uploading ? 'Subiendo...' : 'Hacé clic o arrastrá el archivo acá'}
-                                        </p>
-                                        <p className="text-xs text-gray-400">{selectedTypeCfg.accept}</p>
-                                    </div>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept={selectedTypeCfg.accept}
-                                        onChange={handleUpload}
-                                        className="hidden"
-                                        disabled={uploading}
-                                    />
+                                        <AnimatePresence>
+                                            {isDragging && (
+                                                <motion.div
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    exit={{ opacity: 0 }}
+                                                    className="absolute inset-0 bg-blue-500/5 pointer-events-none"
+                                                />
+                                            )}
+                                        </AnimatePresence>
+
+                                        {/* Animated Background Elements */}
+                                        <div className="absolute top-0 right-0 -m-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors" />
+                                        <div className="absolute bottom-0 left-0 -m-4 w-24 h-24 bg-violet-500/5 rounded-full blur-2xl group-hover:bg-violet-500/10 transition-colors" />
+
+                                        {/* Icon Container */}
+                                        <div className="relative">
+                                            <div className={clsx(
+                                                "w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-500",
+                                                uploading ? "bg-blue-500/20" : "bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30",
+                                                isDragging && "scale-110 rotate-12 bg-blue-500/20"
+                                            )}>
+                                                {uploading ? (
+                                                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                                                ) : (
+                                                    <Upload className={clsx(
+                                                        "w-8 h-8 transition-colors duration-300",
+                                                        isDragging ? "text-blue-500" : "text-gray-400 group-hover:text-blue-500"
+                                                    )} />
+                                                )}
+                                            </div>
+                                            {!uploading && (
+                                                <motion.div
+                                                    animate={{ y: [0, -4, 0] }}
+                                                    transition={{ duration: 2, repeat: Infinity }}
+                                                    className="absolute -top-1 -right-1"
+                                                >
+                                                    <Plus className="w-5 h-5 text-blue-500 bg-white dark:bg-gray-900 rounded-lg shadow-sm" />
+                                                </motion.div>
+                                            )}
+                                        </div>
+
+                                        <div className="text-center space-y-1 z-10">
+                                            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                                                {uploading ? 'Procesando archivos...' : isDragging ? '¡Soltalo ahí!' : 'Arrastrá o hacé clic'}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                Soporta {selectedTypeCfg.accept.replace('.', '').toUpperCase()} y formatos comunes
+                                            </p>
+                                        </div>
+
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept={selectedTypeCfg.accept}
+                                            onChange={handleUpload}
+                                            className="hidden"
+                                            disabled={uploading}
+                                        />
+                                    </motion.div>
                                 </div>
 
                                 {uploading && (
-                                    <div className="flex items-center gap-2 text-blue-600 text-sm">
-                                        <Loader2 size={16} className="animate-spin" />
-                                        Subiendo archivo a Supabase Storage...
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex flex-col gap-2 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20"
+                                    >
+                                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm font-bold">
+                                            <RefreshCw size={16} className="animate-spin" />
+                                            {processingStatus || 'Procesando...'}
+                                        </div>
+                                        <div className="w-full h-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className="h-full bg-blue-500"
+                                                initial={{ width: '0%' }}
+                                                animate={{ width: '100%' }}
+                                                transition={{ duration: 15, ease: "linear" }}
+                                            />
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {uploadType === 'stl' && (
+                                    <div className="flex items-start gap-3 p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
+                                        <Box size={18} className="text-violet-500 shrink-0 mt-0.5" />
+                                        <p className="text-xs text-violet-600 dark:text-violet-400 leading-relaxed">
+                                            Los archivos STL se subirán para su procesamiento. Próximamente se convertirán a formato GLB (Web-Ready) para una carga ultra rápida en el móvil del paciente.
+                                        </p>
                                     </div>
                                 )}
                             </div>
