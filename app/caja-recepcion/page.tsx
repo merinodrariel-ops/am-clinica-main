@@ -14,7 +14,7 @@ import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
 import { ReciboGenerator, generateReciboNumber } from '@/components/caja/ReciboGenerator';
-import { logMovimientoEdit, deleteMovimiento } from '@/lib/caja-recepcion';
+import { logMovimientoEdit, deleteMovimiento, getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
 import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
@@ -178,6 +178,7 @@ export default function CajaRecepcionPage() {
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
+    const [efectivo, setEfectivo] = useState<{ usd: number; ars: number } | null>(null);
 
     useEffect(() => {
         const saved = localStorage.getItem('am.caja-recepcion.sidebar.visible');
@@ -242,6 +243,10 @@ export default function CajaRecepcionPage() {
 
     const loadData = useCallback(async () => {
         try {
+            // Fetch cash balance
+            const balance = await getCurrentBalanceRecepcion();
+            setEfectivo({ usd: balance.saldoUsd, ars: balance.saldoArs });
+
             // Fetch BNA rate
             const rateRes = await fetch('/api/bna-cotizacion');
             const rateData = await rateRes.json();
@@ -791,6 +796,29 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     </div>
                 </div>
             )}
+
+            {/* Efectivo en Caja — recuadro principal */}
+            <div className="mb-6 bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 shadow-lg border border-slate-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <DollarSign size={28} className="text-emerald-400" />
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Efectivo en Caja</p>
+                        <p className="text-4xl font-black text-white tracking-tight">
+                            {formatPrivacy(efectivo ? formatCurrency(efectivo.usd, 'USD') : '—')}
+                        </p>
+                        {efectivo && efectivo.ars > 0 && (
+                            <p className="text-sm font-semibold text-slate-400 mt-1">
+                                + {formatPrivacy(new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(efectivo.ars))} ARS
+                            </p>
+                        )}
+                    </div>
+                </div>
+                <div className="text-right text-xs text-slate-500 shrink-0">
+                    Saldo desde último cierre
+                </div>
+            </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
