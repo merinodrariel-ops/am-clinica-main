@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ArrowRightLeft, DollarSign, Loader2, X, Send } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import MoneyInput from "@/components/ui/MoneyInput";
 import { Textarea } from "@/components/ui/Textarea";
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
@@ -114,13 +115,12 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                         </label>
                         <div className="flex gap-3">
                             <div className="relative flex-1">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <Input
-                                    type="number"
-                                    value={monto || ''}
-                                    onChange={(e) => setMonto(parseFloat(e.target.value) || 0)}
+                                <MoneyInput
+                                    value={monto}
+                                    onChange={(val) => setMonto(val)}
                                     className="w-full pl-10 pr-4 py-2.5 border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 h-auto"
-                                    placeholder="0.00"
+                                    placeholder="0"
+                                    currency={moneda}
                                 />
                             </div>
                             <select

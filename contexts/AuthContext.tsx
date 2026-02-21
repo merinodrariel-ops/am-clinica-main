@@ -9,7 +9,7 @@ const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-type Role = 'owner' | 'admin' | 'pricing_manager' | 'reception' | 'partner_viewer' | 'developer' | 'laboratorio' | 'asistente';
+type Role = 'owner' | 'admin' | 'pricing_manager' | 'reception' | 'partner_viewer' | 'developer' | 'laboratorio' | 'asistente' | 'odontologo';
 
 interface Profile {
     id: string;
@@ -201,6 +201,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Asistente
         if (role === 'asistente') {
             return ['inventario', 'pacientes', 'recalls', 'todos', 'turnos'].includes(module);
+        }
+
+        // Odontólogo
+        if (role === 'odontologo') {
+            return ['pacientes', 'turnos', 'recalls', 'todos'].includes(module);
         }
 
         return false;

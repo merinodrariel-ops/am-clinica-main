@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Package, Loader2, Save, Tag, BarChart3 } from 'lucide-react';
 import clsx from 'clsx';
+import MoneyInput from '@/components/ui/MoneyInput';
 import { useAuth } from '@/contexts/AuthContext';
 import { crearItem } from '@/app/actions/inventory-create';
 
@@ -197,22 +198,22 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Stock Inicial</label>
-                            <input
-                                type="number"
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            <MoneyInput
                                 value={formData.stock_actual}
-                                onChange={(e) => setFormData(prev => ({ ...prev, stock_actual: parseFloat(e.target.value) || 0 }))}
+                                onChange={(val) => setFormData(prev => ({ ...prev, stock_actual: val }))}
+                                hideSymbol
+                                className="w-full text-lg font-bold"
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="block text-sm font-bold text-red-600 dark:text-red-400">Stock Mínimo (Alerta)</label>
                             <div className="relative">
                                 <BarChart3 className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400" size={18} />
-                                <input
-                                    type="number"
-                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-red-200 dark:border-red-900/30 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                                <MoneyInput
                                     value={formData.stock_minimo}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, stock_minimo: parseFloat(e.target.value) || 0 }))}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, stock_minimo: val }))}
+                                    hideSymbol
+                                    className="w-full pl-10 text-lg font-bold border-red-200 dark:border-red-900/30 focus:ring-red-500"
                                 />
                             </div>
                         </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Package, Loader2, Save, Tag, BarChart3, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
+import MoneyInput from '@/components/ui/MoneyInput';
 import { useAuth } from '@/contexts/AuthContext';
 import { actualizarItem } from '@/app/actions/inventory-update';
 
@@ -238,11 +239,11 @@ export default function EditarItemModal({ isOpen, onClose, onSuccess, item }: Ed
                                 Stock Actual
                                 <span className="ml-2 text-xs font-normal text-gray-500">(Corrección manual)</span>
                             </label>
-                            <input
-                                type="number"
-                                className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            <MoneyInput
                                 value={formData.stock_actual}
-                                onChange={(e) => setFormData({ ...formData, stock_actual: parseFloat(e.target.value) || 0 })}
+                                onChange={(val) => setFormData({ ...formData, stock_actual: val })}
+                                hideSymbol
+                                className="w-full text-lg font-bold"
                             />
                             <p className="text-xs text-orange-500">
                                 ⚠️ Para movimientos diarios usa los botones de Entrada/Salida en la lista.
@@ -252,11 +253,11 @@ export default function EditarItemModal({ isOpen, onClose, onSuccess, item }: Ed
                             <label className="block text-sm font-bold text-red-600 dark:text-red-400">Stock Mínimo (Alerta)</label>
                             <div className="relative">
                                 <BarChart3 className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400" size={18} />
-                                <input
-                                    type="number"
-                                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/30 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                                <MoneyInput
                                     value={formData.stock_minimo}
-                                    onChange={(e) => setFormData({ ...formData, stock_minimo: parseFloat(e.target.value) || 0 })}
+                                    onChange={(val) => setFormData({ ...formData, stock_minimo: val })}
+                                    hideSymbol
+                                    className="w-full pl-10 text-lg font-bold border-red-200 dark:border-red-900/30 focus:ring-red-500"
                                 />
                             </div>
                         </div>

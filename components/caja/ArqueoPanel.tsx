@@ -10,6 +10,7 @@ import { formatDateForLocale, getLocalISODate } from '@/lib/local-date';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import MoneyInput from "@/components/ui/MoneyInput";
 
 interface ArqueoPanelProps {
     bnaRate: number;
@@ -383,16 +384,15 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                                         <span className="text-[10px] text-gray-400 font-medium">SISTEMA: {formatCurrency(saldosEsperados.usd, 'USD')}</span>
                                     </div>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <Input
-                                            type="number"
-                                            value={saldoFinalUsd || ''}
-                                            onChange={(e) => setSaldoFinalUsd(parseFloat(e.target.value) || 0)}
+                                        <MoneyInput
+                                            value={saldoFinalUsd || 0}
+                                            onChange={(val) => setSaldoFinalUsd(val)}
                                             className={clsx(
-                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold h-auto",
+                                                "w-full py-3 h-auto text-lg font-bold",
                                                 (saldoFinalUsd === saldosEsperados.usd) ? "border-gray-200 dark:border-gray-700" : "border-amber-200 dark:border-amber-800 ring-amber-500/10"
                                             )}
-                                            placeholder="0.00"
+                                            placeholder="0"
+                                            currency="USD"
                                         />
                                     </div>
                                     {saldoFinalUsd !== saldosEsperados.usd && (
@@ -410,16 +410,15 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
                                         <span className="text-[10px] text-gray-400 font-medium">SISTEMA: {formatCurrency(saldosEsperados.ars, 'ARS')}</span>
                                     </div>
                                     <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">$</span>
-                                        <Input
-                                            type="number"
-                                            value={saldoFinalArs || ''}
-                                            onChange={(e) => setSaldoFinalArs(parseFloat(e.target.value) || 0)}
+                                        <MoneyInput
+                                            value={saldoFinalArs || 0}
+                                            onChange={(val) => setSaldoFinalArs(val)}
                                             className={clsx(
-                                                "w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50 dark:bg-gray-900 focus:ring-2 outline-none transition-all text-lg font-bold h-auto",
+                                                "w-full py-3 h-auto text-lg font-bold",
                                                 (saldoFinalArs === saldosEsperados.ars) ? "border-gray-200 dark:border-gray-700" : "border-amber-200 dark:border-amber-800 ring-amber-500/10"
                                             )}
-                                            placeholder="0.00"
+                                            placeholder="0"
+                                            currency="ARS"
                                         />
                                     </div>
                                     {saldoFinalArs !== saldosEsperados.ars && (

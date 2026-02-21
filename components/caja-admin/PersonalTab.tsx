@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import MoneyInput from "@/components/ui/MoneyInput";
 import { Textarea } from "@/components/ui/Textarea";
 import {
     type Sucursal,
@@ -105,7 +106,7 @@ export default function PersonalTab({ tcBna }: Props) {
     const [formData, setFormData] = useState<CreatePersonalInput>({
         nombre: '',
         apellido: '',
-        tipo: 'empleado',
+        tipo: 'prestador',
         area: '',
         email: '',
         whatsapp: '',
@@ -158,7 +159,7 @@ export default function PersonalTab({ tcBna }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mesActual]);
 
-    function openNewPersonalForm(tipo: 'empleado' | 'profesional') {
+    function openNewPersonalForm(tipo: 'prestador' | 'profesional') {
         setEditingPersonal(null);
         setFormData({
             nombre: '',
@@ -322,7 +323,7 @@ export default function PersonalTab({ tcBna }: Props) {
     }
 
     // Filter personal by type and search
-    const empleados = personal.filter(p => p.tipo === 'empleado' || !p.tipo);
+    const empleados = personal.filter(p => p.tipo === 'prestador' || !p.tipo);
     const profesionales = personal.filter(p => p.tipo === 'profesional');
 
     const filteredEmpleados = empleados.filter(p =>
@@ -443,7 +444,7 @@ export default function PersonalTab({ tcBna }: Props) {
                             />
                         </div>
                         <Button
-                            onClick={() => openNewPersonalForm(activeTab === 'profesionales' ? 'profesional' : 'empleado')}
+                            onClick={() => openNewPersonalForm(activeTab === 'profesionales' ? 'profesional' : 'prestador')}
                             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg hover:opacity-90 transition-opacity"
                         >
                             <UserPlus className="w-5 h-5" />
@@ -523,8 +524,8 @@ export default function PersonalTab({ tcBna }: Props) {
                                 <div className="flex gap-2">
                                     <Button
                                         type="button"
-                                        onClick={() => setFormData({ ...formData, tipo: 'empleado', area: '' })}
-                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all h-auto ${formData.tipo === 'empleado'
+                                        onClick={() => setFormData({ ...formData, tipo: 'prestador', area: '' })}
+                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all h-auto ${formData.tipo === 'prestador'
                                             ? 'bg-indigo-600 text-white shadow-lg hover:bg-indigo-700'
                                             : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                                             }`}
@@ -682,12 +683,12 @@ export default function PersonalTab({ tcBna }: Props) {
                                                 <DollarSign className="w-4 h-4 inline mr-1" />
                                                 Valor Hora (ARS)
                                             </label>
-                                            <Input
-                                                type="number"
-                                                value={formData.valor_hora_ars}
-                                                onChange={(e) => setFormData({ ...formData, valor_hora_ars: parseFloat(e.target.value) || 0 })}
+                                            <MoneyInput
+                                                value={formData.valor_hora_ars ?? 0}
+                                                onChange={(val) => setFormData({ ...formData, valor_hora_ars: val })}
                                                 className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                                 placeholder="0"
+                                                currency="ARS"
                                             />
                                         </div>
                                         {formData.tipo === 'profesional' && (
@@ -839,15 +840,13 @@ export default function PersonalTab({ tcBna }: Props) {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">Valor Cobrado</label>
-                                        <Input
-                                            type="number"
-                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
-                                            value={prestacionForm.valor_cobrado}
-                                            onChange={e => setPrestacionForm({ ...prestacionForm, valor_cobrado: parseFloat(e.target.value) || 0 })}
-                                        />
-                                    </div>
+                                    <MoneyInput
+                                        className="w-full"
+                                        value={prestacionForm.valor_cobrado}
+                                        onChange={val => setPrestacionForm({ ...prestacionForm, valor_cobrado: val })}
+                                        currency={prestacionForm.moneda}
+                                    />
+
                                     <div>
                                         <label className="block text-sm font-medium mb-1">Moneda</label>
                                         <select
@@ -893,7 +892,7 @@ export default function PersonalTab({ tcBna }: Props) {
                 )}
             </AnimatePresence>
 
-            {/* Equipo (Empleados) Tab Content */}
+            {/* Equipo (Prestadores de Servicio) Tab Content */}
             {activeTab === 'equipo' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredEmpleados.length === 0 ? (
@@ -902,7 +901,7 @@ export default function PersonalTab({ tcBna }: Props) {
                             <p>No hay miembros del staff registrados</p>
                             <Button
                                 variant="link"
-                                onClick={() => openNewPersonalForm('empleado')}
+                                onClick={() => openNewPersonalForm('prestador')}
                                 className="mt-4 text-indigo-600 hover:text-indigo-700 font-medium h-auto p-0"
                             >
                                 + Agregar primer prestador

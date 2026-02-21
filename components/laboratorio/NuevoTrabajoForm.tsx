@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, User, Loader2, Calendar, FlaskConical, Stethoscope, Landmark, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import MoneyInput from '@/components/ui/MoneyInput';
 
 
 interface Paciente {
@@ -270,16 +271,13 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
                         {/* Cost */}
                         <div className="space-y-2">
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Costo Estimado (USD)</label>
-                            <div className="relative">
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-400">USD</div>
-                                <input
-                                    type="number"
-                                    placeholder="0.00"
-                                    className="w-full pl-14 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-gray-900 dark:text-white font-bold"
-                                    value={formData.costo_usd || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, costo_usd: parseFloat(e.target.value) || 0 }))}
-                                />
-                            </div>
+                            <MoneyInput
+                                value={formData.costo_usd}
+                                onChange={(val) => setFormData(prev => ({ ...prev, costo_usd: val }))}
+                                placeholder="0.00"
+                                currency="USD"
+                                className="font-bold"
+                            />
                         </div>
                     </div>
 

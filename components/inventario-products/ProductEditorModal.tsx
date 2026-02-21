@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Save, Sparkles, X } from 'lucide-react';
+import MoneyInput from '@/components/ui/MoneyInput';
 import { toast } from 'sonner';
 import {
     createInventoryProduct,
@@ -66,8 +67,8 @@ export default function ProductEditorModal({
         unit: product?.unit || 'unidad',
         barcode: product?.barcode || '',
         qrCode: product?.qr_code || '',
-        thresholdMin: String(product?.threshold_min ?? ''),
-        stockInitial: mode === 'create' ? '0' : String(product?.stock_current ?? 0),
+        thresholdMin: product?.threshold_min ?? 0,
+        stockInitial: mode === 'create' ? 0 : (product?.stock_current ?? 0),
         notes: product?.notes || '',
         isActive: product?.is_active ?? true,
     }));
@@ -84,8 +85,8 @@ export default function ProductEditorModal({
             unit: product?.unit || 'unidad',
             barcode: product?.barcode || '',
             qrCode: product?.qr_code || '',
-            thresholdMin: String(product?.threshold_min ?? ''),
-            stockInitial: mode === 'create' ? '0' : String(product?.stock_current ?? 0),
+            thresholdMin: product?.threshold_min ?? 0,
+            stockInitial: mode === 'create' ? 0 : (product?.stock_current ?? 0),
             notes: product?.notes || '',
             isActive: product?.is_active ?? true,
         });
@@ -159,7 +160,7 @@ export default function ProductEditorModal({
             barcode: form.barcode,
             qrCode: form.qrCode,
             notes: form.notes,
-            thresholdMin: form.thresholdMin ? Number(form.thresholdMin) : null,
+            thresholdMin: form.thresholdMin ? Number(form.thresholdMin) : 0,
             imagePayload: serverImagePayload,
             isActive: form.isActive,
         };
@@ -307,26 +308,22 @@ export default function ProductEditorModal({
 
                         <div>
                             <label className="block text-sm font-medium mb-1">Stock minimo</label>
-                            <input
-                                type="number"
-                                min="0"
-                                step="1"
+                            <MoneyInput
                                 value={form.thresholdMin}
-                                onChange={(event) => setForm(prev => ({ ...prev, thresholdMin: event.target.value }))}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                onChange={(val) => setForm(prev => ({ ...prev, thresholdMin: val }))}
+                                hideSymbol
+                                className="w-full text-sm"
                             />
                         </div>
 
                         {mode === 'create' && (
                             <div>
                                 <label className="block text-sm font-medium mb-1">Stock inicial</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="1"
+                                <MoneyInput
                                     value={form.stockInitial}
-                                    onChange={(event) => setForm(prev => ({ ...prev, stockInitial: event.target.value }))}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                    onChange={(val) => setForm(prev => ({ ...prev, stockInitial: val }))}
+                                    hideSymbol
+                                    className="w-full text-sm"
                                 />
                             </div>
                         )}

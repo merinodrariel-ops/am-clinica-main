@@ -25,6 +25,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import MoneyInput from '@/components/ui/MoneyInput';
 
 interface Props {
     sucursal: Sucursal;
@@ -330,11 +331,11 @@ export default function ProfesionalesTab({ tcBna }: Props) {
                                 Precio
                             </label>
                             <div className="flex gap-2">
-                                <Input
-                                    type="number"
-                                    value={formData.precio || ''}
-                                    onChange={(e) => setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })}
-                                    className="flex-1 px-4 py-2.5 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm focus-visible:ring-indigo-500"
+                                <MoneyInput
+                                    value={formData.precio}
+                                    onChange={(val) => setFormData({ ...formData, precio: val })}
+                                    className="flex-1"
+                                    currency={formData.moneda}
                                 />
                                 <select
                                     value={formData.moneda}

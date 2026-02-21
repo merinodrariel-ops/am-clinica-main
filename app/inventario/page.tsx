@@ -69,8 +69,9 @@ function InventarioContent() {
     const [smartFilter, setSmartFilter] = useState<'ALL' | 'LOW_STOCK'>('ALL');
 
     // Add useAuth
-    const { loading: authLoading, role } = useAuth();
+    const { loading: authLoading, role, canEdit } = useAuth();
     const isLabUser = role === 'laboratorio';
+    const canEditInventario = canEdit('inventario');
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -175,27 +176,31 @@ function InventarioContent() {
                     <p className="text-gray-500 dark:text-gray-400">Control de stock de insumos y materiales</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link
-                        href="/inventario/productos"
-                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
-                    >
-                        <Package size={20} />
-                        <span className="hidden sm:inline">Inventario MVP</span>
-                    </Link>
-                    <Link
-                        href="/inventario/productos/rapido"
-                        className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
-                    >
-                        <Smartphone size={20} />
-                        <span className="hidden sm:inline">Alta Rápida</span>
-                    </Link>
-                    <Link
-                        href="/inventario/escanear"
-                        className="flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
-                    >
-                        <Search size={20} />
-                        <span className="hidden sm:inline">Escanear</span>
-                    </Link>
+                    {canEditInventario && (
+                        <>
+                            <Link
+                                href="/inventario/productos"
+                                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                            >
+                                <Package size={20} />
+                                <span className="hidden sm:inline">Inventario MVP</span>
+                            </Link>
+                            <Link
+                                href="/inventario/productos/rapido"
+                                className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                            >
+                                <Smartphone size={20} />
+                                <span className="hidden sm:inline">Alta Rápida</span>
+                            </Link>
+                            <Link
+                                href="/inventario/escanear"
+                                className="flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                            >
+                                <Search size={20} />
+                                <span className="hidden sm:inline">Escanear</span>
+                            </Link>
+                        </>
+                    )}
                     <div className="flex bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1">
                         <button
                             onClick={() => setViewMode('GRID')}
@@ -226,13 +231,15 @@ function InventarioContent() {
                         <History size={20} />
                         <span className="hidden sm:inline">Historial</span>
                     </button>
-                    <button
-                        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
-                        onClick={() => setShowNuevoItem(true)}
-                    >
-                        <Plus size={20} />
-                        <span className="hidden sm:inline">Nuevo Item</span>
-                    </button>
+                    {canEditInventario && (
+                        <button
+                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-sm"
+                            onClick={() => setShowNuevoItem(true)}
+                        >
+                            <Plus size={20} />
+                            <span className="hidden sm:inline">Nuevo Item</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -454,12 +461,14 @@ function InventarioContent() {
                                             </div>
                                             <div className="text-xs text-gray-500">Min: {item.stock_minimo}</div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" onClick={() => setEditingItem(item)} title="Editar Detalles"><Edit size={18} /></button>
-                                            <SubirFotoInventario itemId={item.id} onSuccess={loadItems} />
-                                            <button className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={18} /></button>
-                                            <button className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={18} /></button>
-                                        </div>
+                                        {canEditInventario && (
+                                            <div className="flex gap-2">
+                                                <button className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" onClick={() => setEditingItem(item)} title="Editar Detalles"><Edit size={18} /></button>
+                                                <SubirFotoInventario itemId={item.id} onSuccess={loadItems} />
+                                                <button className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={18} /></button>
+                                                <button className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={18} /></button>
+                                            </div>
+                                        )}
                                     </div>
                                     {isLow && <div className="mt-3 text-xs font-bold text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100 flex items-center gap-2"><AlertTriangle size={14} /> REPOSICIÓN NECESARIA</div>}
                                 </div>
@@ -476,7 +485,7 @@ function InventarioContent() {
                                     <th className="px-6 py-3">Item</th>
                                     <th className="px-6 py-3">Categoría</th>
                                     <th className="px-6 py-3">Stock</th>
-                                    <th className="px-6 py-3 text-right">Acciones</th>
+                                    {canEditInventario && <th className="px-6 py-3 text-right">Acciones</th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -498,14 +507,16 @@ function InventarioContent() {
                                                     {isLow && <AlertTriangle size={14} className="text-red-500" />}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <button className="p-1.5 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" title="Editar" onClick={() => setEditingItem(item)}><Edit size={16} /></button>
-                                                    <SubirFotoInventario itemId={item.id} onSuccess={loadItems} />
-                                                    <button className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="Entrada" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={16} /></button>
-                                                    <button className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Salida" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={16} /></button>
-                                                </div>
-                                            </td>
+                                            {canEditInventario && (
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button className="p-1.5 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600" title="Editar" onClick={() => setEditingItem(item)}><Edit size={16} /></button>
+                                                        <SubirFotoInventario itemId={item.id} onSuccess={loadItems} />
+                                                        <button className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="Entrada" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'ENTRADA' })}><ArrowUpRight size={16} /></button>
+                                                        <button className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Salida" onClick={() => setShowMovimiento({ isOpen: true, item, tipo: 'SALIDA' })}><ArrowDownRight size={16} /></button>
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}

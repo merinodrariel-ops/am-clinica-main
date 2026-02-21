@@ -19,8 +19,51 @@ import {
     DiaSinCierreAdmin,
     ResolucionData,
     CreatePersonalInput,
+    type CajaAdminCategoria,
     MotivoObservado,
 } from './types';
+
+// ==========================================
+// MÉTODOS DE CATEGORÍAS (NEW)
+// ==========================================
+
+export async function getCategorias(sucursalId: string): Promise<CajaAdminCategoria[]> {
+    const { data, error } = await getSupabase()
+        .from('caja_admin_categorias')
+        .select('*')
+        .eq('sucursal_id', sucursalId)
+        .order('orden', { ascending: true })
+        .order('nombre', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching categorias:', error);
+        return [];
+    }
+    return data || [];
+}
+
+export async function createCategoria(data: Partial<CajaAdminCategoria>) {
+    const { error } = await getSupabase()
+        .from('caja_admin_categorias')
+        .insert([data]);
+    if (error) throw error;
+}
+
+export async function updateCategoria(id: string, updates: Partial<CajaAdminCategoria>) {
+    const { error } = await getSupabase()
+        .from('caja_admin_categorias')
+        .update(updates)
+        .eq('id', id);
+    if (error) throw error;
+}
+
+export async function deleteCategoria(id: string) {
+    const { error } = await getSupabase()
+        .from('caja_admin_categorias')
+        .delete()
+        .eq('id', id);
+    if (error) throw error;
+}
 
 const getSupabase = () => createClient();
 
@@ -145,7 +188,10 @@ export async function createMovimiento(
 
     // Insert lines
     const lineasWithMovId = lineas.map(l => ({
-        ...l,
+        cuenta_id: l.cuenta_id,
+        importe: l.importe,
+        moneda: l.moneda,
+        usd_equivalente: l.usd_equivalente,
         admin_movimiento_id: mov.id,
     }));
 
@@ -155,6 +201,8 @@ export async function createMovimiento(
 
     if (lineasError) {
         console.error('Error creating lineas:', lineasError);
+        // Supabase REST error, we should throw it so the user sees the error instead of silently failing
+        return { data: null, error: new Error(`Error insertando líneas: ${lineasError.message}`) };
     }
 
     return { data: mov, error: null };
@@ -533,7 +581,7 @@ export async function createPrestacion(
 // =============================================
 
 export async function getPersonal(options?: {
-    tipo?: 'empleado' | 'profesional';
+    tipo?: 'prestador' | 'profesional';
     area?: string;
     includeInactive?: boolean;
 }): Promise<Personal[]> {
@@ -596,7 +644,7 @@ export async function createPersonal(input: CreatePersonalInput): Promise<{ data
         .from('personal')
         .insert({
             ...input,
-            rol: input.rol || (input.tipo === 'profesional' ? 'Doctor' : 'Empleado'),
+            rol: input.rol || (input.tipo === 'profesional' ? 'Profesional' : 'Prestador'),
             valor_hora_ars: input.valor_hora_ars || 0,
             activo: true,
             fecha_ingreso: input.fecha_ingreso || new Date().toISOString().split('T')[0],
@@ -1505,16 +1553,16 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
                 multiplier = 1; // Signed amount
             }
 
-            if (multiplier === 0) return;
-
             // Track total gastos in USD (all account types, all currencies → use usd_equivalente_total)
-            if ((tipo === 'EGRESO' || tipo === 'RETIRO') && m.usd_equivalente_total) {
+            if (tipo === 'EGRESO' && m.usd_equivalente_total) {
                 gastosTotalesUsd += Number(m.usd_equivalente_total);
             }
 
+            if (multiplier === 0) return;
+
             // Update per-account cash balances (efectivo accounts only)
             const lineas = m.caja_admin_movimiento_lineas;
-            if (lineas) {
+            if (lineas && tipo !== 'GIRO_ACTIVO') {
                 lineas.forEach((l: MovimientoLinea) => {
                     if (saldosPorCuenta.hasOwnProperty(l.cuenta_id)) {
                         saldosPorCuenta[l.cuenta_id] += Number(l.importe || 0) * multiplier;

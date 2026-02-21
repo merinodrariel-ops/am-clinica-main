@@ -21,7 +21,7 @@ import {
 } from '@/lib/caja-admin';
 import { useAuth } from '@/contexts/AuthContext';
 import { getLocalISODate, formatDateForLocale } from '@/lib/local-date';
-import CurrencyInput from '@/components/ui/CurrencyInput';
+import MoneyInput from '@/components/ui/MoneyInput';
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 
@@ -374,11 +374,11 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-gray-500">{cuenta.moneda}</span>
                                                     <div className="w-32">
-                                                        <CurrencyInput
+                                                        <MoneyInput
                                                             value={saldosIniciales[cuenta.id] || 0}
                                                             onChange={(val) => setSaldosIniciales({ ...saldosIniciales, [cuenta.id]: val })}
                                                             currency={cuenta.moneda}
-                                                            placeholder="0.00"
+                                                            placeholder="0"
                                                         />
                                                     </div>
                                                 </div>
@@ -400,11 +400,11 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-gray-500">{cuenta.moneda}</span>
                                         <div className="flex-1">
-                                            <CurrencyInput
+                                            <MoneyInput
                                                 value={saldos[cuenta.id] || 0}
                                                 onChange={(val) => setSaldos({ ...saldos, [cuenta.id]: val })}
                                                 currency={cuenta.moneda}
-                                                placeholder="0.00"
+                                                placeholder="0"
                                             />
                                         </div>
                                     </div>

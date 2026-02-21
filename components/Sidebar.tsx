@@ -35,19 +35,19 @@ const MENU_ITEMS = [
         icon: LayoutDashboard,
         label: 'Dashboard',
         href: '/dashboard',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'odontologo']
     },
     {
         icon: CalendarDays,
         label: 'Agenda 360',
         href: '/agenda',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'asistente']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'asistente', 'odontologo']
     },
     {
         icon: Users,
         label: 'Pacientes',
         href: '/patients',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo']
     },
     {
         icon: Banknote,
@@ -68,22 +68,22 @@ const MENU_ITEMS = [
         roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio', 'asistente']
     },
     {
-        icon: GitGraph, // Using GitGraph as a metaphor for workflows/branches
+        icon: GitGraph,
         label: 'Workflows',
         href: '/workflows',
-        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio', 'asistente']
+        roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio', 'asistente', 'odontologo']
     },
     {
         icon: Bell,
         label: 'Recall Engine',
         href: '/recalls',
-        roles: ['owner', 'admin', 'reception', 'developer', 'asistente']
+        roles: ['owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo']
     },
     {
         icon: CheckSquare,
         label: 'Tareas',
         href: '/todos',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio', 'asistente']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio', 'asistente', 'odontologo']
     },
     {
         icon: Stethoscope,

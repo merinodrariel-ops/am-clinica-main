@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, ArrowUpCircle, ArrowDownCircle, Loader2, Save, MessageSquare } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
+import MoneyInput from '@/components/ui/MoneyInput';
 import { registrarMovimiento } from '@/app/actions/inventory';
 
 interface Item {
@@ -113,19 +114,19 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
                             Cantidad a {isEntrada ? 'ingresar' : isSalida ? 'retirar' : 'ajustar'} ({item.unidad_medida}) *
                         </label>
-                        <input
-                            type="number"
+                        <MoneyInput
+                            value={cantidad}
+                            onChange={(val) => setCantidad(val)}
+                            hideSymbol
+                            required
+                            autoFocus
+                            placeholder="0"
                             className={clsx(
-                                "w-full px-4 py-4 text-2xl font-black rounded-2xl outline-none transition-all border",
+                                "w-full text-2xl font-black rounded-2xl outline-none transition-all border",
                                 isEntrada ? "focus:ring-2 focus:ring-emerald-500 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900" :
                                     isSalida ? "focus:ring-2 focus:ring-red-500 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900" :
                                         "focus:ring-2 focus:ring-blue-500 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
                             )}
-                            value={cantidad || ''}
-                            onChange={(e) => setCantidad(parseFloat(e.target.value) || 0)}
-                            required
-                            autoFocus
-                            placeholder="0"
                         />
                     </div>
 

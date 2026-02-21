@@ -43,6 +43,83 @@ export function generateWelcomeMessage(nombre: string): string {
     </html>`;
 }
 
+export function generatePatientMagicLinkEmail(nombre: string, link: string): string {
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceso a tu Portal — AM Clínica</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f4f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f4f8;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td align="center" style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);padding:40px 40px 32px;">
+            <p style="margin:0 0 8px;color:rgba(255,255,255,0.6);font-size:12px;letter-spacing:3px;text-transform:uppercase;">AM Clínica · Puerto Madero</p>
+            <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:-0.5px;">Portal de Pacientes</h1>
+            <p style="margin:12px 0 0;color:rgba(255,255,255,0.5);font-size:13px;">Acceso seguro y personalizado</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:40px 40px 32px;">
+            <p style="margin:0 0 8px;color:#64748b;font-size:13px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Hola, ${nombre}</p>
+            <h2 style="margin:0 0 20px;color:#0f172a;font-size:22px;font-weight:700;line-height:1.3;">Tu portal de clínica está listo para que lo explores</h2>
+            <p style="margin:0 0 32px;color:#475569;font-size:15px;line-height:1.7;">
+              Desde tu portal podés ver tu historia clínica, estudios, diseño de sonrisa y mucho más.
+              Pulsá el botón de abajo para entrar. <strong>Este enlace expira en 24 horas</strong> y es de uso personal.
+            </p>
+
+            <!-- CTA Button -->
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td align="center" style="padding:0 0 32px;">
+                <a href="${link}"
+                   style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:16px 48px;border-radius:12px;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(99,102,241,0.35);">
+                  ✨ &nbsp; Ingresar a Mi Portal
+                </a>
+              </td></tr>
+            </table>
+
+            <!-- Security note -->
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;">
+              <p style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">
+                🔒 <strong>Enlace de uso único.</strong> Si no solicitaste este acceso, podés ignorar este correo — nadie podrá entrar sin el enlace.<br><br>
+                ¿Problemas? Escribinos por WhatsApp o respondé este mail.
+              </p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Fallback link -->
+        <tr>
+          <td style="padding:0 40px 16px;">
+            <p style="margin:0;color:#94a3b8;font-size:12px;">Si el botón no funciona, copiá este enlace en tu navegador:</p>
+            <p style="margin:4px 0 0;"><a href="${link}" style="color:#6366f1;font-size:11px;word-break:break-all;">${link}</a></p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td align="center" style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 40px;">
+            <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.6;">
+              AM Clínica · Camila O'Gorman 412, Piso 17 · Puerto Madero, CABA<br>
+              Este correo fue enviado de forma segura y automática.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 export function generateInvitationMessage(nombre: string, link: string): string {
     return `
     <!DOCTYPE html>

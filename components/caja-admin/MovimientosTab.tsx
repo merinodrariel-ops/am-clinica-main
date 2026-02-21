@@ -29,6 +29,7 @@ import {
   PlayCircle,
   Lock,
   BookOpen,
+  TrendingDown,
 } from "lucide-react";
 
 import {
@@ -45,8 +46,8 @@ import {
   getCurrentBalanceAdmin,
   logMovimientoEdit,
   deleteMovimiento,
-  SUBTIPOS_MOVIMIENTO,
-  SUBTIPOS_ADJUNTO_OBLIGATORIO,
+  getCategorias,
+  type CajaAdminCategoria,
 } from "@/lib/caja-admin";
 import { updateCajaAdminMovimientoSecure } from "@/app/actions/caja-admin";
 import { createClient } from "@/utils/supabase/client";
@@ -56,6 +57,7 @@ import { ComprobanteUpload } from "@/components/caja/ComprobanteUpload";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import MoneyInput from "@/components/ui/MoneyInput";
 
 interface Props {
   sucursal: Sucursal;
@@ -73,7 +75,7 @@ const TIPOS_MOVIMIENTO = [
   { value: "TRANSFERENCIA", label: "Transferencia" },
   { value: "AJUSTE_CAJA", label: "Ajuste de Caja" },
   { value: "APORTE_CAPITAL", label: "Aporte de Capital (No Ingreso)" },
-  { value: "GIRO_ACTIVO", label: "Giro Activo (Transferencia Externa)" },
+  { value: "GIRO_ACTIVO", label: "Giro Activo (Deuda Externa)" },
 ];
 
 export default function MovimientosTab({ sucursal, tcBna }: Props) {
@@ -81,6 +83,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const canEditAdminAmounts = role === "owner" || role === "admin";
   const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
   const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
+  const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [mesActual, setMesActual] = useState(() => {
@@ -126,6 +129,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   // Giro Activo form state
   const [giroMoneda, setGiroMoneda] = useState<'ARS' | 'USD'>('ARS');
   const [giroMonto, setGiroMonto] = useState<string>('');
+  const [giroRate, setGiroRate] = useState<string>('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -141,6 +145,39 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
   const [manualRate, setManualRate] = useState<string>("");
   const [exchangeAmountUSD, setExchangeAmountUSD] = useState<string>("");
+
+  const formatArqueoSaldos = (saldos: Record<string, number> | undefined | null) => {
+    if (!saldos) return <span className="text-slate-400">—</span>;
+    const totals: Record<string, number> = {};
+    Object.entries(saldos).forEach(([cuentaId, monto]) => {
+      const cuenta = cuentas.find((c) => c.id === cuentaId);
+      if (cuenta) {
+        totals[cuenta.moneda] = (totals[cuenta.moneda] || 0) + Number(monto);
+      }
+    });
+
+    const currencies = Object.keys(totals).sort().reverse(); // USD first, then ARS or others
+    if (currencies.length === 0) return <span className="text-slate-400">—</span>;
+
+    return (
+      <div className="flex flex-col items-end space-y-0.5">
+        {currencies.map((curr) => (
+          <span
+            key={curr}
+            className={`text-xs font-mono ${curr === "ARS"
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-slate-600 dark:text-slate-300"
+              }`}
+          >
+            {new Intl.NumberFormat(curr === "ARS" ? "es-AR" : "en-US", {
+              style: "currency",
+              currency: curr,
+            }).format(totals[curr])}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   // Lightweight refresh: only updates the balance strip cards (single request)
   async function refreshBalance() {
@@ -159,12 +196,14 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       // and ensure explicit error handling
       const movData = await getMovimientos({ sucursalId: sucursal.id, mes: mesActual });
       const cuentasData = await getCuentas(sucursal.id);
+      const categoriasData = await getCategorias(sucursal.id);
       const aperturaHoy = await getAperturaAdminDelDia(sucursal.id);
       const arqueosData = await getArqueosForMonth(sucursal.id, mesActual);
       const balanceData = await getCurrentBalanceAdmin(sucursal.id);
 
       setMovimientos(movData || []);
       setCuentas(cuentasData || []);
+      setCategorias((categoriasData || []).filter(c => c.activo));
       setAperturaHoy(aperturaHoy);
       setArqueos(arqueosData || []);
       setBalanceVivo(balanceData);
@@ -688,6 +727,15 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         setFormError("El monto del giro debe ser mayor a cero");
         return;
       }
+
+      const rateParsed = parseFloat(giroRate);
+      if (giroMoneda === 'ARS' && (!giroRate || rateParsed <= 0)) {
+        setFormError("Debes especificar la tasa de cambio aplicable (cotización pactada)");
+        return;
+      }
+
+      const usdEqParsed = giroMoneda === 'ARS' ? (montoParsed / rateParsed) : montoParsed;
+
       setSubmitting(true);
       // Create a single reference linea (won't affect cash balance since multiplier=0 for GIRO_ACTIVO)
       const cuentaRef = cuentas.find(c => c.moneda === giroMoneda) || cuentas[0];
@@ -695,7 +743,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         cuenta_id: cuentaRef.id,
         importe: montoParsed,
         moneda: giroMoneda,
-        usd_equivalente: montoParsed, // raw amount stored here for accumulator queries
+        usd_equivalente: usdEqParsed, // raw amount stored here for accumulator queries
       }] : [];
       const { error } = await createMovimiento({
         sucursal_id: sucursal.id,
@@ -705,7 +753,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         nota: formData.nota || undefined,
         fecha_movimiento: formData.fecha_movimiento,
         adjuntos: adjuntos,
-        tc_fuente: "N/A",
+        tc_fuente: giroMoneda === 'ARS' ? "MANUAL" : "N/A",
+        tc_bna_venta: rateParsed || undefined,
       }, lineas);
       setSubmitting(false);
       if (error) { setFormError(error.message); return; }
@@ -713,6 +762,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       setFormData({ tipo_movimiento: "EGRESO", subtipo: "", descripcion: "", nota: "", fecha_movimiento: new Date().toISOString().split("T")[0] });
       setGiroMonto("");
       setGiroMoneda("ARS");
+      setGiroRate("");
       setAdjuntos([]);
       refreshBalance();
       loadData();
@@ -724,8 +774,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       return;
     }
 
-    // Check adjunto obligatorio
-    if (SUBTIPOS_ADJUNTO_OBLIGATORIO.includes(formData.subtipo)) {
+    // Check adjunto / Validations
+    const requiereAdjunto = categorias.find(c => c.nombre === formData.subtipo)?.requiere_adjunto;
+    if (requiereAdjunto && adjuntos.length === 0) {
       // For now, just warn - in production would block
       console.warn("Adjunto obligatorio para este subtipo");
     }
@@ -876,7 +927,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
       {/* ── Live Balance Strip ── */}
       {balanceVivo && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Efectivo ARS */}
           <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm">
             <div>
@@ -908,7 +959,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           {/* Giro Activo — independent accumulator, does NOT affect cash balances */}
           <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-amber-200 dark:border-amber-800/40 shadow-sm">
             <div>
-              <p className="text-xs text-amber-600 uppercase font-semibold tracking-wide">Giro Activo</p>
+              <p className="text-xs text-amber-600 uppercase font-semibold tracking-wide">Giro Activo (Deuda)</p>
               {giroActivoArs > 0 && (
                 <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
                   {formatPrivacy(new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(giroActivoArs))}
@@ -926,17 +977,30 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             <ArrowRightLeft className="w-5 h-5 text-amber-500" />
           </div>
 
-          {/* Gastos del mes */}
-          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-red-100 dark:border-red-900/30 shadow-sm">
+          {/* Gastos Totales del Día (Equiv. USD) */}
+          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-red-200 dark:border-red-900/40 shadow-sm">
             <div>
-              <p className="text-xs text-red-400 uppercase font-semibold tracking-wide">Gastos del mes</p>
+              <p className="text-xs text-red-500 uppercase font-semibold tracking-wide">Gastos Diarios</p>
               <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-0.5">
+                {formatPrivacy(
+                  `−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.gastosTotalesUsd)}`
+                )}
+              </p>
+            </div>
+            <TrendingDown className="w-5 h-5 text-red-500" />
+          </div>
+
+          {/* Gastos del mes (Histórico acumulado) */}
+          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm opacity-80">
+            <div>
+              <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Gastos Mes</p>
+              <p className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-0.5">
                 {formatPrivacy(
                   `−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalGastosMesUsd)}`
                 )}
               </p>
             </div>
-            <DollarSign className="w-5 h-5 text-red-400" />
+            <DollarSign className="w-5 h-5 text-slate-400" />
           </div>
         </div>
       )}
@@ -1094,17 +1158,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5 p-3 sm:p-4 bg-slate-50/50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Tipo de Movimiento *
+              <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
+                Tipo *
               </label>
               <select
                 value={formData.tipo_movimiento}
                 onChange={(e) =>
                   setFormData({ ...formData, tipo_movimiento: e.target.value })
                 }
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                className="w-full px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 h-10"
               >
                 {tiposDisponibles.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -1116,29 +1180,34 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
             {formData.tipo_movimiento !== "GIRO_ACTIVO" && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Subtipo / Categoría
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
+                  Categoría
                 </label>
                 <select
                   value={formData.subtipo}
                   onChange={(e) =>
                     setFormData({ ...formData, subtipo: e.target.value })
                   }
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                  className="w-full px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 h-10"
                 >
-                  <option value="">Seleccionar...</option>
-                  {SUBTIPOS_MOVIMIENTO.map((s) => (
-                    <option key={s} value={s}>
-                      {s} {SUBTIPOS_ADJUNTO_OBLIGATORIO.includes(s) ? "📎" : ""}
-                    </option>
-                  ))}
+                  <option value="" disabled>Seleccionar...</option>
+                  {categorias
+                    .filter(c => c.tipo_movimiento === formData.tipo_movimiento)
+                    .map((c) => (
+                      <option key={c.id} value={c.nombre}>
+                        {c.nombre} {c.requiere_adjunto ? "📎" : ""}
+                      </option>
+                    ))}
+                  {categorias.filter(c => c.tipo_movimiento === formData.tipo_movimiento).length === 0 && (
+                    <option value="" disabled>Sin categorías</option>
+                  )}
                 </select>
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Fecha del Movimiento *
+            <div className={formData.tipo_movimiento === "GIRO_ACTIVO" ? "md:col-span-1" : ""}>
+              <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
+                Fecha *
               </label>
               <Input
                 type="date"
@@ -1146,17 +1215,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 onChange={(e) =>
                   setFormData({ ...formData, fecha_movimiento: e.target.value })
                 }
-                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                className="w-full px-3 py-2 text-sm font-medium rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 h-10"
                 required
               />
             </div>
 
             <div className="md:col-span-1">
-              {/* Empty space or another field if needed */}
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
                 Descripción *
               </label>
               <Input
@@ -1165,22 +1230,23 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 onChange={(e) =>
                   setFormData({ ...formData, descripcion: e.target.value })
                 }
-                placeholder="Descripción del movimiento..."
-                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                placeholder="Ej. Insumos..."
+                className="w-full px-3 py-2 text-sm font-medium rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 h-10"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Nota adicional
+              <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
+                Aclaración <span className="text-[10px] text-slate-400 font-medium normal-case">(Opcional)</span>
               </label>
-              <Textarea
+              <Input
+                type="text"
                 value={formData.nota}
                 onChange={(e) =>
                   setFormData({ ...formData, nota: e.target.value })
                 }
-                rows={2}
-                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                placeholder="Alguna nota extra..."
+                className="w-full px-3 py-2 text-sm font-medium rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 h-10"
               />
             </div>
           </div>
@@ -1204,119 +1270,127 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               </div>
             )}
             {formData.tipo_movimiento === "GIRO_ACTIVO" ? (
-              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
-                <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-3 flex items-center gap-2">
-                  <ArrowRightLeft className="w-4 h-4" />
-                  Monto del Giro
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">
-                      Moneda pactada
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800">
+                <div className="flex flex-col md:flex-row md:items-end gap-3">
+                  <div className="flex-[1.5]">
+                    <label className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 mb-1.5 uppercase tracking-wider">
+                      Monto del Giro
                     </label>
-                    <select
-                      value={giroMoneda}
-                      onChange={(e) => setGiroMoneda(e.target.value as 'ARS' | 'USD')}
-                      className="w-full px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-900 text-sm"
-                    >
-                      <option value="ARS">ARS — Pesos Argentinos</option>
-                      <option value="USD">USD — Dólares</option>
-                    </select>
+                    <div className="flex gap-2 h-11">
+                      <select
+                        value={giroMoneda}
+                        onChange={(e) => setGiroMoneda(e.target.value as 'ARS' | 'USD')}
+                        className="w-[85px] px-3 py-1 rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-100/50 dark:bg-amber-900/50 text-sm font-bold text-amber-900 dark:text-amber-100"
+                      >
+                        <option value="ARS">AR$</option>
+                        <option value="USD">U$D</option>
+                      </select>
+                      <MoneyInput
+                        value={Number(giroMonto) || 0}
+                        onChange={(val) => setGiroMonto(String(val))}
+                        placeholder="0"
+                        className="w-full h-11 text-lg font-bold border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-950"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">
-                      Monto
-                    </label>
-                    <Input
-                      type="number"
-                      value={giroMonto}
-                      onChange={(e) => setGiroMonto(e.target.value)}
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                      className="w-full border-amber-200 dark:border-amber-700"
-                    />
+
+                  {giroMoneda === 'ARS' && (
+                    <div className="flex-[1.5]">
+                      <label className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 mb-1.5 uppercase tracking-wider">
+                        Tasa de Cambio (AR$ ➔ 1 U$D)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
+                          $
+                        </span>
+                        <MoneyInput
+                          value={Number(giroRate) || 0}
+                          onChange={(val) => setGiroRate(String(val))}
+                          placeholder="0"
+                          className="w-full h-11 text-lg font-bold border-amber-200 dark:border-amber-700 pl-8 bg-white dark:bg-slate-950"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex-[2] min-w-[180px]">
+                    <div className="px-3 bg-amber-100/40 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-800 flex flex-col justify-center h-11">
+                      {giroMoneda === 'ARS' && Number(giroMonto) > 0 && Number(giroRate) > 0 ? (
+                        <div className="flex justify-between items-center mt-[-2px]">
+                          <span className="text-[10px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider">
+                            Equivale a:
+                          </span>
+                          <span className="text-lg font-black text-amber-800 dark:text-amber-200">
+                            U$D {(Number(giroMonto) / Number(giroRate)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium leading-tight">Monto no afecta la caja. Es Deuda (Pasivo).</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                  Este monto no afecta el saldo de efectivo. Se acumula en el contador de Giro Activo para conciliación con el agente externo al cierre del período.
-                </p>
               </div>
             ) : formData.tipo_movimiento === "CAMBIO_MONEDA" ? (
-              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Calculadora de Cambio
-                </h4>
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex flex-col md:flex-row md:items-end gap-3">
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Monto a Cambiar (USD)
+                  <div className="flex-[1.5]">
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+                      Monto a Cambiar
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                        $
-                      </span>
-                      <Input
-                        type="number"
-                        value={exchangeAmountUSD}
-                        onChange={(e) => setExchangeAmountUSD(e.target.value)}
-                        placeholder="0.00"
-                        className="w-full pl-8 pr-4 py-2 rounded-lg border-slate-200 dark:border-slate-700"
+                      <span className="absolute left-3 top-1/2 -translate-y-[45%] text-slate-400 font-bold">U$D</span>
+                      <MoneyInput
+                        value={Number(exchangeAmountUSD) || 0}
+                        onChange={(val) => setExchangeAmountUSD(String(val))}
+                        placeholder="0"
+                        className="w-full h-12 text-xl font-bold pl-[2.8rem] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 rounded-lg"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Cotización Pactada (ARS/USD)
+                  <div className="flex-[1.5]">
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+                      Cotización Pactada <span className="text-[10px] lowercase font-medium ml-1 text-slate-400">(Oficial: ${tcBna})</span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                        $
-                      </span>
-                      <Input
-                        type="number"
-                        value={manualRate}
-                        onChange={(e) => setManualRate(e.target.value)}
-                        placeholder={tcBna ? String(tcBna) : "0.00"}
-                        className="w-full pl-8 pr-4 py-2 rounded-lg border-slate-200 dark:border-slate-700"
+                      <span className="absolute left-3 top-1/2 -translate-y-[45%] text-slate-400 font-bold">AR$</span>
+                      <MoneyInput
+                        value={Number(manualRate) || tcBna || 0}
+                        onChange={(val) => setManualRate(String(val))}
+                        placeholder={tcBna ? String(tcBna) : "0"}
+                        className="w-full h-12 text-xl font-bold pl-[2.8rem] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 rounded-lg"
                       />
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">
-                      Oficial BNA: ${tcBna}
-                    </div>
                   </div>
-                </div>
 
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-blue-700 dark:text-blue-300">
-                      Total a Recibir:
-                    </span>
-                    <span className="text-lg font-bold text-blue-800 dark:text-blue-200">
-                      {new Intl.NumberFormat("es-AR", {
-                        style: "currency",
-                        currency: "ARS",
-                      }).format(
-                        (parseFloat(exchangeAmountUSD) || 0) *
-                        (parseFloat(manualRate) || tcBna || 0),
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Hidden technical details for transparency */}
-                <details className="text-xs text-slate-400 mt-2">
-                  <summary className="cursor-pointer hover:text-slate-600">
-                    Ver líneas generadas (Técnico)
-                  </summary>
-                  <div className="mt-2 pl-2 border-l-2 border-slate-200">
-                    {formLineas.map((l, i) => (
-                      <div key={i}>
-                        {l.moneda} {l.importe} (USD Eq: {l.usd_equivalente})
+                  <div className="flex-[2] min-w-[200px]">
+                    <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 flex flex-col justify-center h-12">
+                      <div className="flex justify-between items-center -mt-1">
+                        <span className="text-[10px] text-blue-600 dark:text-blue-400 uppercase tracking-wider font-bold">Recibir</span>
+                        <span className="text-xl font-black text-blue-700 dark:text-blue-300">
+                          {new Intl.NumberFormat("es-AR", {
+                            style: "currency",
+                            currency: "ARS",
+                            maximumFractionDigits: 0
+                          }).format(
+                            (parseFloat(exchangeAmountUSD) || 0) *
+                            (parseFloat(manualRate) || tcBna || 0),
+                          )}
+                        </span>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+                </div>
+
+                <details className="text-[11px] text-slate-400 mt-3 ml-1">
+                  <summary className="cursor-pointer hover:text-slate-600 outline-none w-max">
+                    Ver configuración interna de cajas (Técnico)
+                  </summary>
+                  <div className="mt-1">
+                    Caja USD Físico registra: <b>-U$D {Number(exchangeAmountUSD) || 0}</b> <br />
+                    Caja ARS Físico registra: <b>+AR$ {((parseFloat(exchangeAmountUSD) || 0) * (parseFloat(manualRate) || tcBna || 0)).toLocaleString('es-AR')}</b>
                   </div>
                 </details>
               </div>
@@ -1361,18 +1435,15 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                         </option>
                       ))}
                     </select>
-                    <Input
-                      type="number"
+                    <MoneyInput
                       value={linea.importe}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         updateLinea(idx, {
-                          importe: Math.abs(parseFloat(e.target.value) || 0),
+                          importe: Math.abs(val),
                         })
                       }
-                      placeholder="Importe"
-                      min="0"
-                      step="0.01"
-                      className="w-32 px-3 py-2 rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                      placeholder="0"
+                      className="w-32"
                     />
                     <span className="text-sm text-slate-500 w-12">
                       {linea.moneda}
@@ -1398,7 +1469,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           </div>
 
           {/* Adjunto warning */}
-          {SUBTIPOS_ADJUNTO_OBLIGATORIO.includes(formData.subtipo) && (
+          {categorias.find(c => c.nombre === formData.subtipo)?.requiere_adjunto && (
             <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl mb-4">
               <Paperclip className="w-5 h-5 text-amber-600" />
               <span className="text-sm text-amber-700 dark:text-amber-400">
@@ -1514,7 +1585,13 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                   Subtipo
                 </th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase">
-                  USD Equiv.
+                  Monto ARS
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase">
+                  Monto USD
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">
+                  Equiv. USD
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">
                   Estado
@@ -1548,12 +1625,26 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                       <td className="px-6 py-3 text-sm font-medium text-slate-600 dark:text-slate-300">
                         Apertura de caja{a.usuario ? ` · ${a.usuario}` : ""}
                       </td>
-                      <td className="px-6 py-3 text-sm text-slate-400">—</td>
-                      <td className="px-6 py-3 text-sm text-right font-mono text-slate-400">
-                        {a.saldo_final_usd_equivalente != null
-                          ? `$${Number(a.saldo_final_usd_equivalente).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                          : "—"}
+                      <td className="px-6 py-3 text-sm text-center text-slate-300">—</td>
+                      <td className="px-6 py-3 text-sm text-right font-mono text-blue-600 dark:text-blue-400">
+                        {(() => {
+                          let total = 0;
+                          Object.entries(a.saldos_iniciales || {}).forEach(([id, val]) => {
+                            if (cuentas.find(c => c.id === id)?.moneda === 'ARS') total += Number(val);
+                          });
+                          return total !== 0 ? new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(total) : "—";
+                        })()}
                       </td>
+                      <td className="px-6 py-3 text-sm text-right font-mono text-slate-600 dark:text-slate-300">
+                        {(() => {
+                          let total = 0;
+                          Object.entries(a.saldos_iniciales || {}).forEach(([id, val]) => {
+                            if (cuentas.find(c => c.id === id)?.moneda === 'USD') total += Number(val);
+                          });
+                          return total !== 0 ? `$${total.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—";
+                        })()}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-center text-slate-300">—</td>
                       <td className="px-6 py-3 text-center">
                         <PlayCircle className="w-5 h-5 text-teal-500 mx-auto" />
                       </td>
@@ -1585,19 +1676,33 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                       <td className="px-6 py-3 text-sm font-medium text-slate-600 dark:text-slate-300">
                         Cierre de caja{a.usuario ? ` · ${a.usuario}` : ""}
                       </td>
-                      <td className="px-6 py-3 text-sm">
-                        {dif !== 0 ? (
-                          <span className={`font-medium ${dif > 0 ? "text-green-600" : "text-red-500"}`}>
-                            Dif: {dif > 0 ? "+" : ""}${dif.toFixed(2)} USD
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">Sin diferencia</span>
-                        )}
+                      <td className="px-6 py-3 text-sm text-center text-slate-300">—</td>
+                      <td className="px-6 py-3 text-sm text-right font-mono text-blue-600 dark:text-blue-400">
+                        {(() => {
+                          let total = 0;
+                          Object.entries(a.saldos_finales || {}).forEach(([id, val]) => {
+                            if (cuentas.find(c => c.id === id)?.moneda === 'ARS') total += Number(val);
+                          });
+                          return total !== 0 ? new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(total) : "—";
+                        })()}
                       </td>
                       <td className="px-6 py-3 text-sm text-right font-mono text-slate-600 dark:text-slate-300">
-                        {a.saldo_final_usd_equivalente != null
-                          ? `$${Number(a.saldo_final_usd_equivalente).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                          : "—"}
+                        {(() => {
+                          let total = 0;
+                          Object.entries(a.saldos_finales || {}).forEach(([id, val]) => {
+                            if (cuentas.find(c => c.id === id)?.moneda === 'USD') total += Number(val);
+                          });
+                          return total !== 0 ? `$${total.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—";
+                        })()}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-center">
+                        {dif !== 0 ? (
+                          <span className={`font-medium text-xs ${dif > 0 ? "text-green-600" : "text-red-500"}`}>
+                            Dif: {dif > 0 ? "+" : ""}${dif.toFixed(1)} USD
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-3 text-center">
                         <Lock className="w-5 h-5 text-slate-400 mx-auto" />
@@ -1641,15 +1746,54 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     <td className="px-6 py-4 text-sm text-slate-500">
                       {mov.subtipo || "-"}
                     </td>
-                    <td className="px-6 py-4 text-sm text-right font-mono">
-                      {formatPrivacy(
-                        mov.tipo_movimiento === "GIRO_ACTIVO"
-                          ? (mov.subtipo === "ARS"
-                            ? new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(mov.usd_equivalente_total)
-                            : `$${mov.usd_equivalente_total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`)
-                          : `$${mov.usd_equivalente_total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                      )}
-                    </td>
+                    {(() => {
+                      let finalArs = (mov.caja_admin_movimiento_lineas || [])
+                        .filter(l => l.moneda === 'ARS')
+                        .reduce((sum, l) => sum + Number(l.importe || 0), 0);
+
+                      let finalUsd = (mov.caja_admin_movimiento_lineas || [])
+                        .filter(l => l.moneda === 'USD')
+                        .reduce((sum, l) => sum + Number(l.importe || 0), 0);
+
+                      // Fallback for movements without lines (e.g. historical/imported data)
+                      if (finalArs === 0 && finalUsd === 0 && mov.usd_equivalente_total) {
+                        const usdTotal = Number(mov.usd_equivalente_total);
+                        const tc = Number(mov.tc_bna_venta || 0);
+                        if (tc > 1) {
+                          finalArs = usdTotal * tc;
+                        } else {
+                          finalUsd = usdTotal;
+                        }
+                      }
+
+                      const isExpense = mov.tipo_movimiento === 'EGRESO' || mov.tipo_movimiento === 'RETIRO' || mov.tipo_movimiento === 'GIRO_ACTIVO';
+                      const signMultiplier = (isExpense && Number(mov.usd_equivalente_total || 0) >= 0) ? -1 : 1;
+
+                      const displayArs = finalArs * signMultiplier;
+                      const displayUsd = finalUsd * signMultiplier;
+
+                      return (
+                        <>
+                          <td className={`px-6 py-4 text-sm text-right font-mono ${displayArs < 0 ? 'text-red-500 font-bold' : 'text-blue-600 dark:text-blue-400'}`}>
+                            {formatPrivacy(
+                              finalArs !== 0 ? new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(displayArs) : "—"
+                            )}
+                          </td>
+                          <td className={`px-6 py-4 text-sm text-right font-mono ${displayUsd < 0 ? 'text-red-500 font-bold' : 'text-slate-600 dark:text-slate-300'}`}>
+                            {formatPrivacy(
+                              finalUsd !== 0 ? `$${displayUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"
+                            )}
+                          </td>
+                          <td className={`px-6 py-4 text-sm text-center font-mono text-xs italic ${signMultiplier < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                            {formatPrivacy(
+                              mov.usd_equivalente_total
+                                ? `$${(Number(mov.usd_equivalente_total) * signMultiplier).toLocaleString("en-US", { minimumFractionDigits: 1 })} equiv.`
+                                : "—"
+                            )}
+                          </td>
+                        </>
+                      );
+                    })()}
                     <td className="px-6 py-4 text-center">
                       {mov.estado === "Registrado" ? (
                         <Check className="w-5 h-5 text-green-500 mx-auto" />
@@ -2024,12 +2168,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                           </option>
                         ))}
                       </select>
-                      <Input
-                        type="number"
+                      <MoneyInput
                         value={line.importe}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          // Allow negative for specific types
+                        onChange={(val) => {
                           const allowNegative = [
                             "CAMBIO_MONEDA",
                             "TRANSFERENCIA",
@@ -2040,17 +2181,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                             : Math.abs(val);
                           updateEditLinea(idx, { importe: newImporte });
                         }}
-                        min={
-                          [
-                            "CAMBIO_MONEDA",
-                            "TRANSFERENCIA",
-                            "AJUSTE_CAJA",
-                          ].includes(editingMov?.tipo_movimiento || "")
-                            ? undefined
-                            : "0"
-                        }
-                        step="0.01"
-                        className="w-28 px-2 py-1 text-sm border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                        className="w-28"
+                        currency={line.moneda}
                       />
                       <span className="text-xs font-mono text-slate-500 w-10 text-center">
                         {line.moneda}
@@ -2082,21 +2214,16 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                         <span className="text-xs font-mono text-slate-500 w-12">
                           USD
                         </span>
-                        <Input
-                          type="number"
+                        <MoneyInput
                           value={editData.totalUsd}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             setEditData({
                               ...editData,
-                              totalUsd: Math.max(
-                                0,
-                                parseFloat(e.target.value) || 0,
-                              ),
+                              totalUsd: Math.max(0, val),
                             })
                           }
-                          min="0"
-                          step="0.01"
-                          className="flex-1 px-2 py-1 text-sm border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                          className="flex-1"
+                          currency="USD"
                         />
                       </div>
                     </div>

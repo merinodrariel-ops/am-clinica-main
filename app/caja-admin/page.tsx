@@ -10,7 +10,8 @@ import {
     Clock,
     BarChart3,
     ExternalLink,
-    RefreshCw
+    RefreshCw,
+    Settings
 } from 'lucide-react';
 import { getSucursales, type Sucursal } from '@/lib/caja-admin';
 import MovimientosTab from '@/components/caja-admin/MovimientosTab';
@@ -18,6 +19,7 @@ import ArqueoTab from '@/components/caja-admin/ArqueoTab';
 import ProfesionalesTab from '@/components/caja-admin/ProfesionalesTab';
 import PersonalTab from '@/components/caja-admin/PersonalTab';
 import ReportesTab from '@/components/caja-admin/ReportesTab';
+import ConfiguracionTab from '@/components/caja-admin/ConfiguracionTab';
 import RoleGuard from "@/components/auth/RoleGuard";
 
 const TABS = [
@@ -26,6 +28,7 @@ const TABS = [
     { id: 'profesionales', label: 'Profesionales', icon: Users },
     { id: 'personal', label: 'Personal', icon: Clock },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+    { id: 'configuracion', label: 'Configuración', icon: Settings },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -90,6 +93,8 @@ export default function CajaAdminPage() {
                 return <PersonalTab sucursal={selectedSucursal} tcBna={tcBna} />;
             case 'reportes':
                 return <ReportesTab sucursal={selectedSucursal} />;
+            case 'configuracion':
+                return <ConfiguracionTab sucursal={selectedSucursal} />;
             default:
                 return null;
         }

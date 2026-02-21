@@ -1,13 +1,8 @@
 import 'server-only';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-    },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM = process.env.RESEND_FROM ?? 'AM Clínica <noreply@amclinica.com.ar>';
 
 interface EmailAttachment {
     filename: string;
@@ -28,17 +23,26 @@ export async function sendEmail({
     attachments?: EmailAttachment[];
 }) {
     try {
-        const info = await transporter.sendMail({
-            from: `"AM Clínica" <${process.env.GMAIL_USER}>`,
+        const { data, error } = await resend.emails.send({
+            from: FROM,
             to,
             subject,
             html,
-            attachments,
+            attachments: attachments?.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+            })),
         });
-        console.log("Message sent: %s", info.messageId);
-        return { success: true, messageId: info.messageId };
+
+        if (error) {
+            console.error('Resend error:', error);
+            return { success: false, error };
+        }
+
+        console.log('Email sent via Resend:', data?.id);
+        return { success: true, messageId: data?.id };
     } catch (error) {
-        console.error("Error sending email:", error);
+        console.error('Error sending email:', error);
         return { success: false, error };
     }
 }

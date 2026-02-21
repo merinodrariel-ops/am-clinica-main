@@ -299,37 +299,30 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
         let actionType = '';
         const publicUrl = getAppPublicUrl();
 
-        // 3. Determine Action
-        if (!targetUser.email_confirmed_at) {
-            // Case A: User never confirmed -> Resend Invite via EmailJS
-            const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-                type: 'invite',
-                email: targetUser.email!,
-                options: {
-                    redirectTo: `${publicUrl}/auth/update-password`
-                }
-            });
-
-            if (linkError) throw linkError;
-
-            // Send manual email
-            const emailRes = await sendInvitationEmail({
-                to_email: targetUser.email!,
-                to_name: targetUser.user_metadata?.full_name || 'Usuario',
-                action_link: linkData.properties.action_link
-            });
-
-            if (!emailRes.success) throw new Error(`Email failed: ${emailRes.error}`);
-
-            actionType = 'resend_invite';
-        } else {
-            // Case B: User confirmed -> Send Password Reset
-            const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(targetUser.email!, {
+        // 3. Determine link type and send via nodemailer (both cases)
+        // Case A (unconfirmed): generate invite link
+        // Case B (confirmed): generate recovery link
+        // Both paths use our own email (Gmail/nodemailer) — avoids Supabase rate limits
+        const linkType = !targetUser.email_confirmed_at ? 'invite' : 'recovery';
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: linkType,
+            email: targetUser.email!,
+            options: {
                 redirectTo: `${publicUrl}/auth/update-password`
-            });
-            if (resetError) throw resetError;
-            actionType = 'send_reset_password';
-        }
+            }
+        });
+
+        if (linkError) throw linkError;
+
+        const emailRes = await sendInvitationEmail({
+            to_email: targetUser.email!,
+            to_name: targetUser.user_metadata?.full_name || 'Usuario',
+            action_link: linkData.properties.action_link
+        });
+
+        if (!emailRes.success) throw new Error(`Email failed: ${emailRes.error}`);
+
+        actionType = linkType === 'invite' ? 'resend_invite' : 'send_reset_password';
 
         // 4. Audit Log
         await supabaseAdmin.from('audit_logs').insert({

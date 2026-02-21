@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 import {
     FileText,
     Bell,
@@ -22,7 +23,10 @@ import {
     TrendingUp,
     Check,
     Sparkles,
+    Send,
+    Loader2,
 } from 'lucide-react';
+import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
 import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
@@ -76,11 +80,42 @@ const TABS = [
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
 ];
 
+// Payment-related tabs hidden from odontólogos
+const PAYMENT_TABS = new Set(['financiamiento', 'pagos', 'planes']);
+
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'datos');
+    const { role } = useAuth();
+    const isOdontologo = role === 'odontologo';
+    const visibleTabs = isOdontologo ? TABS.filter(t => !PAYMENT_TABS.has(t.id)) : TABS;
+    const defaultTab = searchParams.get('tab') || 'datos';
+    const [activeTab, setActiveTab] = useState(
+        isOdontologo && PAYMENT_TABS.has(defaultTab) ? 'datos' : defaultTab
+    );
     const [isEditing, setIsEditing] = useState(false);
+
+    // Portal magic link state
+    const [sendingPortalLink, setSendingPortalLink] = useState(false);
+    const [portalLinkSent, setPortalLinkSent] = useState(false);
+
+    async function handleSendPortalLink() {
+        if (!patient.email || sendingPortalLink) return;
+        setSendingPortalLink(true);
+        try {
+            const res = await fetch('/api/patient-portal/magic-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: patient.email }),
+            });
+            if (res.ok) {
+                setPortalLinkSent(true);
+                setTimeout(() => setPortalLinkSent(false), 4000);
+            }
+        } finally {
+            setSendingPortalLink(false);
+        }
+    }
 
     // Financing State
     const [finData, setFinData] = useState({
@@ -188,12 +223,36 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     <Mail size={20} />
                                 </a>
                             )}
+                            {patient.email && (
+                                <button
+                                    onClick={handleSendPortalLink}
+                                    disabled={sendingPortalLink || portalLinkSent}
+                                    title="Enviar acceso al portal al paciente"
+                                    className={clsx(
+                                        "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                                        portalLinkSent
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60"
+                                    )}
+                                >
+                                    {sendingPortalLink ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                    ) : portalLinkSent ? (
+                                        <Check size={16} />
+                                    ) : (
+                                        <Send size={16} />
+                                    )}
+                                    <span className="hidden sm:inline">
+                                        {portalLinkSent ? '¡Enviado!' : 'Portal'}
+                                    </span>
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     {/* Tabs */}
                     <div className="flex mt-4 -mb-px">
-                        {TABS.map((tab) => {
+                        {visibleTabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
                             return (
@@ -600,13 +659,12 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             <div>
                                                 <label className="block text-xs font-medium text-gray-500 mb-1">Monto Total a Financiar (USD)</label>
                                                 <div className="relative">
-                                                    <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                                    <input
-                                                        type="number"
+                                                    <MoneyInput
                                                         value={finData.monto}
-                                                        onChange={(e) => setFinData({ ...finData, monto: Number(e.target.value) })}
-                                                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-                                                        placeholder="0.00"
+                                                        onChange={(val) => setFinData({ ...finData, monto: val })}
+                                                        className="w-full h-auto"
+                                                        placeholder="0"
+                                                        currency="USD"
                                                     />
                                                 </div>
                                             </div>

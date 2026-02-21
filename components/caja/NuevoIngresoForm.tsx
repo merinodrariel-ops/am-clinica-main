@@ -6,6 +6,7 @@ import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import MoneyInput from "@/components/ui/MoneyInput";
 import clsx from 'clsx';
 import { supabase, TarifarioItem } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
@@ -447,13 +448,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                                 <div className="flex gap-3">
                                     <div className="relative flex-1">
                                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                        <Input
-                                            type="number"
-                                            value={formData.monto || ''}
-                                            onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
-                                            className="w-full pl-10 pr-4 py-4 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus-visible:ring-blue-500 text-2xl font-bold h-auto"
-                                            placeholder="0.00"
-                                            autoFocus
+                                        <MoneyInput
+                                            value={formData.monto || 0}
+                                            onChange={(val) => setFormData({ ...formData, monto: val })}
+                                            className="w-full h-auto text-2xl font-bold py-4 focus-visible:ring-blue-500"
+                                            placeholder="0"
                                         />
                                     </div>
                                     <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">

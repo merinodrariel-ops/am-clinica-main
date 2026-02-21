@@ -48,6 +48,16 @@ export interface MovimientoLinea {
     usd_equivalente?: number;
 }
 
+export interface CajaAdminCategoria {
+    id: string;
+    sucursal_id: string;
+    nombre: string;
+    tipo_movimiento: string;
+    requiere_adjunto: boolean;
+    activo: boolean;
+    orden: number;
+}
+
 export interface CajaAdminArqueo {
     id: string;
     fecha: string;
@@ -100,9 +110,10 @@ export interface Prestacion {
 
 export interface Personal {
     id: string;
+    user_id?: string | null;  // Linked auth user (null if not yet linked)
     nombre: string;
     apellido?: string;
-    tipo: 'empleado' | 'profesional';
+    tipo: 'prestador' | 'profesional';
     area: string;
     rol: string;
     email?: string;
@@ -137,7 +148,7 @@ export interface PersonalArea {
     id: string;
     nombre: string;
     descripcion?: string;
-    tipo_personal: 'empleado' | 'profesional' | 'ambos';
+    tipo_personal: 'prestador' | 'profesional' | 'ambos';
     color: string;
     icono: string;
     activo: boolean;
@@ -225,7 +236,7 @@ export interface ResolucionData {
 export interface CreatePersonalInput {
     nombre: string;
     apellido?: string;
-    tipo: 'empleado' | 'profesional';
+    tipo: 'prestador' | 'profesional';
     area: string;
     rol?: string;
     email?: string;

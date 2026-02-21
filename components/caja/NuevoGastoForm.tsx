@@ -5,6 +5,7 @@ import { X, DollarSign, Check, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import MoneyInput from "@/components/ui/MoneyInput";
 
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
@@ -148,12 +149,12 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                         <div className="flex gap-3">
                             <div className="relative flex-1">
                                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                <Input
-                                    type="number"
-                                    value={formData.monto || ''}
-                                    onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
-                                    className="w-full pl-10 pr-4 py-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus-visible:ring-red-500 h-auto"
-                                    placeholder="0.00"
+                                <MoneyInput
+                                    value={formData.monto || 0}
+                                    onChange={(val) => setFormData({ ...formData, monto: val })}
+                                    className="w-full h-auto py-3 focus-visible:ring-red-500"
+                                    placeholder="0"
+                                    currency={formData.moneda}
                                 />
                             </div>
                             <select
