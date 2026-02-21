@@ -123,7 +123,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
   const isCajaAbierta = aperturaHoy?.estado === "Abierto";
   const [arqueos, setArqueos] = useState<CajaAdminArqueo[]>([]);
-  const [showArqueos, setShowArqueos] = useState(true);
+  const [showArqueos, setShowArqueos] = useState(false);
   const [balanceVivo, setBalanceVivo] = useState<{ saldoArs: number; saldoUsd: number; gastosTotalesUsd: number; status: string } | null>(null);
 
   // Giro Activo form state
@@ -1235,20 +1235,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
-                Aclaración <span className="text-[10px] text-slate-400 font-medium normal-case">(Opcional)</span>
-              </label>
-              <Input
-                type="text"
-                value={formData.nota}
-                onChange={(e) =>
-                  setFormData({ ...formData, nota: e.target.value })
-                }
-                placeholder="Alguna nota extra..."
-                className="w-full px-3 py-2 text-sm font-medium rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 h-10"
-              />
-            </div>
+
           </div>
 
           {/* Lines / Giro Activo amount section */}
