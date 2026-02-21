@@ -55,11 +55,12 @@ Output only the enhanced portrait image.`;
             config: { responseModalities: ['IMAGE', 'TEXT'] }
         });
 
-        const parts = response.candidates?.[0]?.content?.parts ?? [];
-        const imagePart = parts.find((p: { inlineData?: { data: string; mimeType: string } }) => p.inlineData?.data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parts: any[] = response.candidates?.[0]?.content?.parts ?? [];
+        const imagePart = parts.find((p) => p.inlineData?.data);
 
         if (!imagePart?.inlineData?.data) {
-            const textPart = parts.find((p: { text?: string }) => p.text);
+            const textPart = parts.find((p) => p.text);
             console.error('[smile-design/enhance] No image in response. Text:', textPart?.text);
             return NextResponse.json({ error: 'Gemini did not return an image. Try again or use a different photo.' }, { status: 502 });
         }
