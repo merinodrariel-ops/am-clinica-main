@@ -1555,15 +1555,9 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
             const tipo = m.tipo_movimiento;
 
             // ── GIRO ACTIVO SPECIAL HANDLING ───────────────────────────
-            // Rule: No operation on ARS/USD/GASTOS. Only adds to GIRO cards.
+            // Rule: No operation on ARS/USD/GASTOS. Giro balance calculated separately (all-time).
             if (tipo === 'GIRO_ACTIVO') {
-                if (m.caja_admin_movimiento_lineas) {
-                    m.caja_admin_movimiento_lineas.forEach(l => {
-                        if (l.moneda === 'ARS') giroArs += Number(l.importe || 0);
-                        if (l.moneda === 'USD') giroUsd += Number(l.importe || 0);
-                    });
-                }
-                return; // EXCLUSION TOTAL: skip rest of the calculation
+                return; // EXCLUSION TOTAL: skip cash calculation
             }
 
             // ── STANDARD MOVEMENTS ─────────────────────────────────────
@@ -1602,14 +1596,55 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         if (idsUsd.has(id)) totalUsd += monto;
     });
 
+    // ── GIRO ACTIVO: cumulative all-time balance ────────────────────────────
+    // Sum ALL GIRO_ACTIVO debt movements (regardless of closure)
+    const { data: allGiroDeuda } = await getSupabase()
+        .from('caja_admin_movimientos')
+        .select('caja_admin_movimiento_lineas(importe, moneda)')
+        .eq('sucursal_id', sucursalId)
+        .eq('tipo_movimiento', 'GIRO_ACTIVO')
+        .neq('estado', 'Anulado')
+        .eq('is_deleted', false);
+
+    // Subtract ALL EGRESO "Pago Giro Activo" payments (actually paid with physical cash)
+    const { data: allGiroPagos } = await getSupabase()
+        .from('caja_admin_movimientos')
+        .select('caja_admin_movimiento_lineas(importe, moneda)')
+        .eq('sucursal_id', sucursalId)
+        .eq('tipo_movimiento', 'EGRESO')
+        .eq('subtipo', 'Pago Giro Activo')
+        .neq('estado', 'Anulado')
+        .eq('is_deleted', false);
+
+    let giroArsTotal = 0;
+    let giroUsdTotal = 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allGiroDeuda?.forEach((m: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        m.caja_admin_movimiento_lineas?.forEach((l: any) => {
+            if (l.moneda === 'ARS') giroArsTotal += Number(l.importe || 0);
+            if (l.moneda === 'USD') giroUsdTotal += Number(l.importe || 0);
+        });
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allGiroPagos?.forEach((m: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        m.caja_admin_movimiento_lineas?.forEach((l: any) => {
+            if (l.moneda === 'ARS') giroArsTotal -= Number(l.importe || 0);
+            if (l.moneda === 'USD') giroUsdTotal -= Number(l.importe || 0);
+        });
+    });
+
     return {
         status: 'Abierto',
         lastCloseDate: ultimo?.fecha || null,
         saldoArs: totalArs,
         saldoUsd: totalUsd,
         gastosTotalesUsd,
-        giroArs,
-        giroUsd,
+        giroArs: Math.max(0, giroArsTotal),
+        giroUsd: Math.max(0, giroUsdTotal),
         saldosPorCuenta
     };
 }
