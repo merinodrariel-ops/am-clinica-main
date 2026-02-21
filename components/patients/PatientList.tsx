@@ -200,12 +200,15 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                     className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50"
                                 >
                                     <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                                        <Link
+                                            href={`/patients/${patient.id_paciente}`}
+                                            className="flex items-center gap-3 group"
+                                        >
+                                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors">
                                                 <User size={20} />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-gray-900 dark:text-white">
+                                                <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                                     {patient.apellido}, {patient.nombre}
                                                 </p>
                                                 {patient.documento && (
@@ -214,8 +217,9 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                     </p>
                                                 )}
                                             </div>
-                                        </div>
+                                        </Link>
                                     </td>
+
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(patient.estado_paciente)}`}>
                                             {patient.estado_paciente || 'Sin estado'}
