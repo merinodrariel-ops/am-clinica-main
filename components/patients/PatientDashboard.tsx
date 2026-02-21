@@ -24,6 +24,8 @@ import {
     Sparkles,
 } from 'lucide-react';
 import PatientPortalPanel from './PatientPortalPanel';
+import dynamic from 'next/dynamic';
+const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -70,6 +72,7 @@ const TABS = [
     { id: 'pagos', label: 'Historial de Pagos', icon: CreditCard },
     { id: 'planes', label: 'Planes (Presupuestos)', icon: DollarSign },
     { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
+    { id: 'smile_design', label: 'Smile Design ✨', icon: Sparkles },
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
 ];
 
@@ -763,6 +766,16 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             </div>
                         )}
 
+                        {/* Tab: Smile Design ✨ */}
+                        {activeTab === 'smile_design' && (
+                            <div className="py-2">
+                                <SmileDesign
+                                    patientId={patient.id_paciente}
+                                    onSaved={() => setActiveTab('portal')}
+                                />
+                            </div>
+                        )}
+
                         {/* Tab: Portal 360 */}
                         {activeTab === 'portal' && (
                             <PatientPortalPanel
@@ -770,6 +783,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 patientName={`${patient.nombre} ${patient.apellido}`}
                             />
                         )}
+
                     </motion.div>
                 </AnimatePresence>
             </div>

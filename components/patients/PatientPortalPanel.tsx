@@ -26,17 +26,59 @@ import clsx from 'clsx';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// ─── Image compression constants ──────────────────────────────────────────────
+const WEBP_QUALITY = 0.80;   // 80 % quality
+const MAX_WIDTH_PX = 1920;   // max dimension
+const IMAGE_TYPES = new Set(['smile_design', 'photo_before', 'photo_after']);
+
+/** Compress any image File → WebP Blob using the Canvas API */
+async function compressToWebP(file: File): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+
+            const scale = img.width > MAX_WIDTH_PX ? MAX_WIDTH_PX / img.width : 1;
+            const targetW = Math.round(img.width * scale);
+            const targetH = Math.round(img.height * scale);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { reject(new Error('Canvas 2D not available')); return; }
+
+            ctx.drawImage(img, 0, 0, targetW, targetH);
+            canvas.toBlob(
+                blob => blob ? resolve(blob) : reject(new Error('Compression failed')),
+                'image/webp',
+                WEBP_QUALITY,
+            );
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Image load failed'));
+        };
+
+        img.src = objectUrl;
+    });
+}
+
+
 const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 const FILE_TYPES = [
-    { key: 'stl',          label: 'Modelo 3D (STL)',    icon: Box,      accept: '.stl',         color: 'text-violet-500 bg-violet-50 dark:bg-violet-900/20' },
-    { key: 'smile_design', label: 'Diseño de Sonrisa',  icon: Smile,    accept: 'image/*,.pdf', color: 'text-pink-500 bg-pink-50 dark:bg-pink-900/20' },
-    { key: 'photo_before', label: 'Foto Antes',         icon: Image,    accept: 'image/*',      color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' },
-    { key: 'photo_after',  label: 'Foto Después',       icon: Image,    accept: 'image/*',      color: 'text-green-500 bg-green-50 dark:bg-green-900/20' },
-    { key: 'document',     label: 'Documento / Informe',icon: FileText, accept: '*',            color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
+    { key: 'stl', label: 'Modelo 3D (STL)', icon: Box, accept: '.stl', color: 'text-violet-500 bg-violet-50 dark:bg-violet-900/20' },
+    { key: 'smile_design', label: 'Diseño de Sonrisa', icon: Smile, accept: 'image/*,.pdf', color: 'text-pink-500 bg-pink-50 dark:bg-pink-900/20' },
+    { key: 'photo_before', label: 'Foto Antes', icon: Image, accept: 'image/*', color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' },
+    { key: 'photo_after', label: 'Foto Después', icon: Image, accept: 'image/*', color: 'text-green-500 bg-green-50 dark:bg-green-900/20' },
+    { key: 'document', label: 'Documento / Informe', icon: FileText, accept: '*', color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
 ];
 
 interface PatientFile {
@@ -157,13 +199,27 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
 
         setUploading(true);
         try {
-            const ext = file.name.split('.').pop();
-            const path = `portal/${patientId}/${Date.now()}_${uploadType}.${ext}`;
+            const isImage = IMAGE_TYPES.has(uploadType);
 
-            // Upload to Supabase Storage (bucket: patient-portal-files)
+            // ── Compress images to WebP before upload ──────────────────────────
+            let uploadBlob: Blob | File = file;
+            let storagePath: string;
+
+            if (isImage) {
+                uploadBlob = await compressToWebP(file);
+                storagePath = `portal/${patientId}/${Date.now()}_${uploadType}.webp`;
+            } else {
+                const ext = file.name.split('.').pop() ?? 'bin';
+                storagePath = `portal/${patientId}/${Date.now()}_${uploadType}.${ext}`;
+            }
+
+            // ── Upload to Supabase Storage (bucket: patient-portal-files) ──────
             const { data: storageData, error: storageError } = await supabase.storage
                 .from('patient-portal-files')
-                .upload(path, file, { upsert: false });
+                .upload(storagePath, uploadBlob, {
+                    upsert: false,
+                    contentType: isImage ? 'image/webp' : undefined,
+                });
 
             if (storageError) throw storageError;
 
@@ -171,7 +227,7 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
                 .from('patient-portal-files')
                 .getPublicUrl(storageData.path);
 
-            // Save file record
+            // ── Save file record ───────────────────────────────────────────────
             const { error: dbError } = await supabase
                 .from('patient_files')
                 .insert({
@@ -184,7 +240,8 @@ export default function PatientPortalPanel({ patientId, patientName }: Props) {
 
             if (dbError) throw dbError;
 
-            toast.success('Archivo subido correctamente');
+            const sizeKb = Math.round(uploadBlob.size / 1024);
+            toast.success(`Archivo subido · ${sizeKb} KB${isImage ? ' (WebP)' : ''}`);
             setUploadLabel('');
             setShowUploadForm(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
