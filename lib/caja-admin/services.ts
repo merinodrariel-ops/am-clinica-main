@@ -1612,7 +1612,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .select('caja_admin_movimiento_lineas(importe, moneda)')
         .eq('sucursal_id', sucursalId)
         .eq('tipo_movimiento', 'EGRESO')
-        .eq('subtipo', 'Pago Giro Activo')
+        .ilike('subtipo', '%giro%')
         .neq('estado', 'Anulado')
         .eq('is_deleted', false);
 
