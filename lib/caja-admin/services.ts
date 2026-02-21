@@ -1417,6 +1417,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     lastCloseDate: string | null;
     saldoArs: number;
     saldoUsd: number;
+    gastosTotalesUsd: number;
     saldosPorCuenta: Record<string, number>;
 }> {
     const today = getLocalISODate();
@@ -1453,6 +1454,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
                 lastCloseDate: ultimo.fecha,
                 saldoArs: ars,
                 saldoUsd: usd,
+                gastosTotalesUsd: 0,
                 saldosPorCuenta
             };
         }
@@ -1470,10 +1472,12 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
     // 2. Add Movements
     // Fetch movements where cierre_id IS NULL (pending closure)
+    // usd_equivalente_total is used for the "total gastos en USD" indicator (all accounts, all currencies)
     const { data: movs } = await getSupabase()
         .from('caja_admin_movimientos')
         .select(`
             tipo_movimiento,
+            usd_equivalente_total,
             caja_admin_movimiento_lineas (
                 cuenta_id,
                 importe,
@@ -1485,9 +1489,12 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .neq('estado', 'Anulado')
         .eq('is_deleted', false);
 
+    let gastosTotalesUsd = 0;
+
     if (movs) {
         movs.forEach((m: {
             tipo_movimiento: string;
+            usd_equivalente_total: number | null;
             caja_admin_movimiento_lineas: MovimientoLinea[];
         }) => {
             const tipo = m.tipo_movimiento;
@@ -1500,6 +1507,12 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
             if (multiplier === 0) return;
 
+            // Track total gastos in USD (all account types, all currencies → use usd_equivalente_total)
+            if ((tipo === 'EGRESO' || tipo === 'RETIRO') && m.usd_equivalente_total) {
+                gastosTotalesUsd += Number(m.usd_equivalente_total);
+            }
+
+            // Update per-account cash balances (efectivo accounts only)
             const lineas = m.caja_admin_movimiento_lineas;
             if (lineas) {
                 lineas.forEach((l: MovimientoLinea) => {
@@ -1524,6 +1537,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         lastCloseDate: ultimo?.fecha || null,
         saldoArs: totalArs,
         saldoUsd: totalUsd,
+        gastosTotalesUsd,
         saldosPorCuenta
     };
 }

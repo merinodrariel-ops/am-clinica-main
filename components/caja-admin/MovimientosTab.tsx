@@ -121,7 +121,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const isCajaAbierta = aperturaHoy?.estado === "Abierto";
   const [arqueos, setArqueos] = useState<CajaAdminArqueo[]>([]);
   const [showArqueos, setShowArqueos] = useState(true);
-  const [balanceVivo, setBalanceVivo] = useState<{ saldoArs: number; saldoUsd: number; status: string } | null>(null);
+  const [balanceVivo, setBalanceVivo] = useState<{ saldoArs: number; saldoUsd: number; gastosTotalesUsd: number; status: string } | null>(null);
 
   // Giro Activo form state
   const [giroMoneda, setGiroMoneda] = useState<'ARS' | 'USD'>('ARS');
@@ -836,15 +836,15 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     })),
     ...(arqueoVisible
       ? arqueos.flatMap((a): TableRow[] => {
-          const rows: TableRow[] = [];
-          if (a.hora_inicio) {
-            rows.push({ kind: "apertura", data: a, sortTs: a.hora_inicio });
-          }
-          if (a.hora_cierre) {
-            rows.push({ kind: "cierre", data: a, sortTs: a.hora_cierre });
-          }
-          return rows;
-        })
+        const rows: TableRow[] = [];
+        if (a.hora_inicio) {
+          rows.push({ kind: "apertura", data: a, sortTs: a.hora_inicio });
+        }
+        if (a.hora_cierre) {
+          rows.push({ kind: "cierre", data: a, sortTs: a.hora_cierre });
+        }
+        return rows;
+      })
       : []),
   ].sort((a, b) => b.sortTs.localeCompare(a.sortTs));
 
@@ -852,9 +852,9 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     (t) => !t.onlyUnificada || sucursal.modo_caja === "UNIFICADA",
   );
 
-  // --- Gastos del mes (EGRESO only, excludes Giro Activo) ---
+  // --- Gastos del mes (EGRESO + RETIRO, todas las cuentas, en USD equivalente) ---
   const totalGastosMesUsd = movimientos
-    .filter((m) => m.tipo_movimiento === "EGRESO" && m.estado !== "Anulado")
+    .filter((m) => (m.tipo_movimiento === "EGRESO" || m.tipo_movimiento === "RETIRO") && m.estado !== "Anulado")
     .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
 
   // --- Giro Activo accumulators (per currency, for reconciliation with external agent) ---
