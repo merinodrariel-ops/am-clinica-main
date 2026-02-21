@@ -1598,7 +1598,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
     // ── GIRO ACTIVO: cumulative all-time balance ────────────────────────────
     // Sum ALL GIRO_ACTIVO debt movements (regardless of closure)
-    const { data: allGiroDeuda } = await getSupabase()
+    const { data: allGiroDeuda, error: giroDeudaError } = await getSupabase()
         .from('caja_admin_movimientos')
         .select('caja_admin_movimiento_lineas(importe, moneda)')
         .eq('sucursal_id', sucursalId)
@@ -1606,8 +1606,13 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .neq('estado', 'Anulado')
         .eq('is_deleted', false);
 
+    if (giroDeudaError) {
+        console.error('[getCurrentBalanceAdmin] Error fetching giro deuda:', giroDeudaError);
+    }
+
     // Subtract ALL EGRESO "Pago Giro Activo" payments (actually paid with physical cash)
-    const { data: allGiroPagos } = await getSupabase()
+    // Matches exact category name OR any subtipo containing 'giro' (case-insensitive)
+    const { data: allGiroPagos, error: giroPagosError } = await getSupabase()
         .from('caja_admin_movimientos')
         .select('caja_admin_movimiento_lineas(importe, moneda)')
         .eq('sucursal_id', sucursalId)
@@ -1615,6 +1620,10 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .ilike('subtipo', '%giro%')
         .neq('estado', 'Anulado')
         .eq('is_deleted', false);
+
+    if (giroPagosError) {
+        console.error('[getCurrentBalanceAdmin] Error fetching giro pagos:', giroPagosError);
+    }
 
     let giroArsTotal = 0;
     let giroUsdTotal = 0;
