@@ -6,8 +6,11 @@ import { createBrowserClient } from '@supabase/ssr';
 import { toast } from 'sonner';
 import {
     Loader2, Save, Sparkles, RotateCcw, Download,
-    ScanFace, Wand2, AlertCircle
+    ScanFace, Wand2, AlertCircle, Camera, CheckCircle2, ChevronRight, Share2
 } from 'lucide-react';
+import { ImageComparator } from '../patients/ImageComparator';
+import { IntensitySlider } from '../patients/IntensitySlider';
+
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const supabase = createBrowserClient(
@@ -392,12 +395,6 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
         }
     };
 
-    // ── Compare slider ────────────────────────────────────────────────────────
-    function updateCompare(clientX: number) {
-        if (!compareRef.current) return;
-        const { left, width } = compareRef.current.getBoundingClientRect();
-        setSliderPos(Math.max(5, Math.min(95, ((clientX - left) / width) * 100)));
-    }
 
     const reset = () => {
         setPhase('drop');
@@ -409,29 +406,36 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
-        <div className="min-h-[600px] flex flex-col gap-0 select-none">
+        <div className="min-h-[700px] flex flex-col gap-0 select-none bg-slate-950 p-6 md:p-8 rounded-[2.5rem] border border-white/5 shadow-3xl overflow-hidden relative">
+
+            {/* Background Glow */}
+            <div className="absolute -top-24 -right-24 w-96 h-96 bg-violet-600/10 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-teal-600/10 blur-[120px] rounded-full pointer-events-none" />
 
             {/* ── Header ──────────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h2 className="text-3xl font-black tracking-tighter text-gray-900 dark:text-white">
-                        SMILE<span className="text-violet-500"> DESIGN</span>
-                        <span className="ml-2 text-xs font-medium text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2 py-0.5 rounded-full align-middle">
-                            IA Real
-                        </span>
-                    </h2>
-                    <p className="text-sm text-gray-400 mt-0.5">
-                        Arrastrá · Auto-alinear · Ajustar · Gemini genera · Guardar
+            <div className="relative z-10 flex items-center justify-between mb-10">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                            <Sparkles className="text-white w-5 h-5" />
+                        </div>
+                        <h2 className="text-3xl font-black tracking-tighter text-white uppercase">
+                            Smile<span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-teal-300"> Studio</span>
+                        </h2>
+                    </div>
+                    <p className="text-xs uppercase tracking-[0.2em] font-bold text-slate-500 flex items-center gap-2">
+                        Powered by Gemini AI <span className="w-1 h-1 rounded-full bg-slate-700" /> Professional Design
                     </p>
                 </div>
                 {phase !== 'drop' && (
                     <motion.button
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
                         onClick={reset}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-white border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-all"
+                        className="group flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-slate-400 hover:text-white border border-white/10 hover:bg-white/5 transition-all duration-300 backdrop-blur-md"
                     >
-                        <RotateCcw size={12} /> Nueva foto
+                        <RotateCcw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
+                        Reiniciar
                     </motion.button>
                 )}
             </div>
