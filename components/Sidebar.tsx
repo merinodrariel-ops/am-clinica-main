@@ -28,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
 import { readSidebarCollapsed, writeSidebarCollapsed } from '@/lib/sidebar-preferences';
 import SettingsModal from '@/components/settings/SettingsModal';
+import NotificationBell from '@/components/NotificationBell';
 
 const MENU_ITEMS = [
     {
@@ -315,7 +316,7 @@ export default function Sidebar() {
                     )}
 
                     <div className={clsx('flex items-center py-3', compactMode ? 'justify-center px-2' : 'gap-3 px-4')}>
-                        <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                        <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
                             <UserCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                         </div>
                         {!compactMode && (
@@ -328,6 +329,9 @@ export default function Sidebar() {
                                     {impersonatedRole && <span className="ml-1 text-amber-600">(Imitando)</span>}
                                 </p>
                             </div>
+                        )}
+                        {!compactMode && user.id && (
+                            <NotificationBell userId={user.id} />
                         )}
                         <button
                             onClick={async () => {

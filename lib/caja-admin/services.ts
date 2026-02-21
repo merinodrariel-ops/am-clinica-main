@@ -1470,12 +1470,10 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
     // 2. Add Movements
     // Fetch movements where cierre_id IS NULL (pending closure)
-    // Also fetch usd_equivalente_total for defensive fallback when lineas are missing
     const { data: movs } = await getSupabase()
         .from('caja_admin_movimientos')
         .select(`
             tipo_movimiento,
-            usd_equivalente_total,
             caja_admin_movimiento_lineas (
                 cuenta_id,
                 importe,
@@ -1487,14 +1485,9 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .neq('estado', 'Anulado')
         .eq('is_deleted', false);
 
-    // Primary USD efectivo account id (fallback when no lineas exist)
-    const primaryUsdId = [...idsUsd][0] ?? null;
-    const primaryArsId = [...idsArs][0] ?? null;
-
     if (movs) {
         movs.forEach((m: {
             tipo_movimiento: string;
-            usd_equivalente_total: number | null;
             caja_admin_movimiento_lineas: MovimientoLinea[];
         }) => {
             const tipo = m.tipo_movimiento;
@@ -1508,26 +1501,12 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
             if (multiplier === 0) return;
 
             const lineas = m.caja_admin_movimiento_lineas;
-
-            if (lineas && lineas.length > 0) {
-                // Normal path: sum by account from the lineas
+            if (lineas) {
                 lineas.forEach((l: MovimientoLinea) => {
                     if (saldosPorCuenta.hasOwnProperty(l.cuenta_id)) {
                         saldosPorCuenta[l.cuenta_id] += Number(l.importe || 0) * multiplier;
                     }
                 });
-            } else {
-                // ⚠️ Defensive fallback: movement has no lineas (data integrity gap).
-                // Use usd_equivalente_total and attribute it to the primary USD efectivo
-                // account so the balance still reflects this movement.
-                const usdAmt = Number(m.usd_equivalente_total || 0);
-                if (usdAmt !== 0 && primaryUsdId && saldosPorCuenta.hasOwnProperty(primaryUsdId)) {
-                    saldosPorCuenta[primaryUsdId] += usdAmt * multiplier;
-                } else if (usdAmt !== 0 && primaryArsId && saldosPorCuenta.hasOwnProperty(primaryArsId)) {
-                    // Last resort: credit ARS account with USD amount (approximate)
-                    saldosPorCuenta[primaryArsId] += usdAmt * multiplier;
-                }
-                console.warn(`[getCurrentBalanceAdmin] Movement has no lineas — using usd_equivalente_total fallback. tipo=${tipo}, usd=${usdAmt}`);
             }
         });
     }

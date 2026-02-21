@@ -155,6 +155,7 @@ export interface Todo {
     priority: TodoPriority;
     created_by: string | null;
     created_by_name: string | null;
+    assigned_to_id: string | null;
     assigned_to_name: string | null;
     due_date: string | null;
     is_pinned: boolean;

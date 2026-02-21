@@ -19,11 +19,18 @@ import {
 import clsx from 'clsx';
 import type { Todo, TodoPriority, TodoStatus } from '@/lib/supabase';
 
+export interface ProfileOption {
+    id: string;
+    full_name: string | null;
+    role: string;
+}
+
 interface NewTodoModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (data: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => Promise<void>;
     initialData?: Todo | null;
+    profiles?: ProfileOption[];
 }
 
 const PRIORITY_CONFIG: Record<TodoPriority, { label: string; color: string; bg: string; icon: React.ComponentType<{ size?: number }> }> = {
@@ -39,12 +46,12 @@ const STATUS_CONFIG: Record<TodoStatus, { label: string; color: string }> = {
     completed:   { label: 'Completada', color: 'text-green-600 dark:text-green-400' },
 };
 
-export default function NewTodoModal({ isOpen, onClose, onSave, initialData }: NewTodoModalProps) {
+export default function NewTodoModal({ isOpen, onClose, onSave, initialData, profiles = [] }: NewTodoModalProps) {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<TodoPriority>('medium');
     const [status, setStatus] = useState<TodoStatus>('pending');
-    const [assignedTo, setAssignedTo] = useState('');
+    const [assignedToId, setAssignedToId] = useState('');
     const [dueDate, setDueDate] = useState('');
     const [isPinned, setIsPinned] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -56,7 +63,7 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData }: N
             setDescription(initialData.description || '');
             setPriority(initialData.priority);
             setStatus(initialData.status);
-            setAssignedTo(initialData.assigned_to_name || '');
+            setAssignedToId(initialData.assigned_to_id || '');
             setDueDate(initialData.due_date || '');
             setIsPinned(initialData.is_pinned);
         } else {
@@ -64,7 +71,7 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData }: N
             setDescription('');
             setPriority('medium');
             setStatus('pending');
-            setAssignedTo('');
+            setAssignedToId('');
             setDueDate('');
             setIsPinned(false);
         }
@@ -77,6 +84,8 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData }: N
         if (!title.trim()) newErrors.title = 'El título es obligatorio';
         if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
+        const selectedProfile = profiles.find(p => p.id === assignedToId);
+
         setSaving(true);
         try {
             await onSave({
@@ -84,7 +93,8 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData }: N
                 description: description.trim() || null,
                 priority,
                 status,
-                assigned_to_name: assignedTo.trim() || null,
+                assigned_to_id: assignedToId || null,
+                assigned_to_name: selectedProfile?.full_name || null,
                 created_by_name: null,
                 due_date: dueDate || null,
                 is_pinned: isPinned,
@@ -249,13 +259,21 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData }: N
                                             <User size={14} />
                                             Asignado a
                                         </label>
-                                        <input
-                                            type="text"
-                                            value={assignedTo}
-                                            onChange={e => setAssignedTo(e.target.value)}
-                                            placeholder="Nombre del responsable"
-                                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all"
-                                        />
+                                        <div className="relative">
+                                            <select
+                                                value={assignedToId}
+                                                onChange={e => setAssignedToId(e.target.value)}
+                                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all appearance-none pr-8"
+                                            >
+                                                <option value="">Sin asignar</option>
+                                                {profiles.map(p => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.full_name || p.role}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">

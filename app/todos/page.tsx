@@ -30,7 +30,7 @@ import { format, isAfter, parseISO, isToday, isTomorrow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Todo, TodoPriority, TodoStatus } from '@/lib/supabase';
-import NewTodoModal from '@/components/todos/NewTodoModal';
+import NewTodoModal, { type ProfileOption } from '@/components/todos/NewTodoModal';
 import TodoKanban from '@/components/todos/TodoKanban';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -262,6 +262,7 @@ type ViewMode = 'list' | 'kanban';
 export default function TodosPage() {
     const { profile, user } = useAuth();
     const [todos, setTodos] = useState<Todo[]>([]);
+    const [profiles, setProfiles] = useState<ProfileOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showModal, setShowModal] = useState(false);
@@ -295,6 +296,39 @@ export default function TodosPage() {
 
     useEffect(() => { loadTodos(); }, [loadTodos]);
 
+    // ── Load team profiles ──
+    useEffect(() => {
+        supabase
+            .from('profiles')
+            .select('id, full_name, role')
+            .eq('is_active', true)
+            .order('full_name')
+            .then(({ data }) => { if (data) setProfiles(data as ProfileOption[]); });
+    }, []);
+
+    // ── Realtime: notify me when a task is assigned to me ──
+    useEffect(() => {
+        if (!user?.id) return;
+        const channel = supabase
+            .channel(`todos-assigned-${user.id}`)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'todos', filter: `assigned_to_id=eq.${user.id}` },
+                (payload) => {
+                    const t = payload.new as Todo;
+                    const by = t.created_by_name ? ` — de ${t.created_by_name}` : '';
+                    toast(`📌 Nueva tarea asignada a vos${by}`, {
+                        description: t.title,
+                        duration: 6000,
+                        action: { label: 'Ver', onClick: () => setFilterStatus('all') },
+                    });
+                    loadTodos(true);
+                }
+            )
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [user?.id]);
+
     // ── CRUD ──
     async function handleSave(data: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'created_by'>) {
         const authorName = profile?.full_name || user?.email?.split('@')[0] || 'Usuario';
@@ -324,6 +358,21 @@ export default function TodosPage() {
                 throw error;
             }
             toast.success('¡Tarea creada!');
+
+            // Send push notification to assigned user (if different from creator)
+            if (data.assigned_to_id && data.assigned_to_id !== user?.id) {
+                fetch('/api/push/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: data.assigned_to_id,
+                        title: '📌 Nueva tarea asignada',
+                        body: data.title,
+                        url: '/todos',
+                        tag: 'am-tarea-nueva',
+                    }),
+                }).catch(console.error);
+            }
         }
         setEditingTodo(null);
         await loadTodos(true);
@@ -633,6 +682,7 @@ export default function TodosPage() {
                 onClose={closeModal}
                 onSave={handleSave}
                 initialData={editingTodo}
+                profiles={profiles}
             />
         </div>
     );
