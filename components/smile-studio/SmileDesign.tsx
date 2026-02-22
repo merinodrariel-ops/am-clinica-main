@@ -472,7 +472,8 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
             setAfterDataUrl(afterDataUrlResult);
 
             // 2. Upload both images to Supabase Storage
-            const ts = new Date().toISOString().split('T')[0].replace(/-/g, '');
+            // Use full timestamp (ms precision) to avoid filename collisions & CDN cache
+            const ts = Date.now();
 
             const beforeBlob = base64ToBlob(beforeBase64, beforeMime);
             const afterBlob = base64ToBlob(enhData.imageBase64, enhData.mimeType);
@@ -482,23 +483,25 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                 supabase.storage
                     .from('patient-portal-files')
                     .upload(`portal/${patientId}/smile_before_${ts}.${beforeMime.includes('png') ? 'png' : 'jpg'}`,
-                        beforeBlob, { upsert: true, contentType: beforeMime }),
+                        beforeBlob, { upsert: false, contentType: beforeMime }),
                 supabase.storage
                     .from('patient-portal-files')
                     .upload(`portal/${patientId}/smile_design_${ts}.${ext}`,
-                        afterBlob, { upsert: true, contentType: enhData.mimeType }),
+                        afterBlob, { upsert: false, contentType: enhData.mimeType }),
             ]);
 
             if (beforeUpload.error) throw beforeUpload.error;
             if (afterUpload.error) throw afterUpload.error;
 
+            // Add cache-busting parameter to prevent CDN serving stale images
+            const cacheBuster = `?t=${ts}`;
             const { data: { publicUrl: bUrl } } = supabase.storage
                 .from('patient-portal-files').getPublicUrl(beforeUpload.data.path);
             const { data: { publicUrl: aUrl } } = supabase.storage
                 .from('patient-portal-files').getPublicUrl(afterUpload.data.path);
 
-            setBeforeStoredUrl(bUrl);
-            setAfterStoredUrl(aUrl);
+            setBeforeStoredUrl(bUrl + cacheBuster);
+            setAfterStoredUrl(aUrl + cacheBuster);
             setSliderPos(50);
             setPhase('result');
         } catch (err) {
