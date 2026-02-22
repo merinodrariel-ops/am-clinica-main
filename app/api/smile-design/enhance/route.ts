@@ -26,22 +26,14 @@ export async function POST(req: NextRequest) {
         }
 
         const level = Math.max(1, Math.min(10, Math.round(intensity ?? 5)));
-        const desc = INTENSITY[level];
+        const whiteningPrompt = level === 1 ? 'a very subtle, natural brightening, just enough to look healthy and clean'
+            : level <= 3 ? 'a natural whitening, similar to the effect of professional cleaning and polishing'
+                : level <= 5 ? 'a noticeable cosmetic whitening, like using whitening strips for a few weeks'
+                    : level <= 7 ? 'a bright, professional cosmetic whitening treatment look'
+                        : level <= 9 ? 'a very bright, brilliant "Hollywood" style white'
+                            : 'an extremely bright, dazzling white, the maximum level of cosmetic whitening';
 
-        const prompt = `You are a professional dental smile design AI used in a dental clinic.
-
-Task: Enhance ONLY the teeth/smile area in this photo.
-Intensity level: ${level}/10 — ${desc}
-
-Rules (strictly follow):
-- Apply photorealistic teeth whitening and alignment matching intensity ${level}/10
-- Preserve ALL facial features: skin tone, eyes, nose, hair, makeup, background
-- The result must look like a real professional dental photo, not a cartoon or illustration
-- Do NOT add teeth that aren't there — only enhance existing teeth
-- Do NOT change head position, lighting, or any non-dental area
-- Return a high-quality image of the same dimensions as the input
-
-Output only the enhanced portrait image.`;
+        const prompt = `Enhance the smile in this photo to a high-resolution, photorealistic quality. Make the teeth perfectly aligned and apply ${whiteningPrompt}. Maintain all other facial features and the original background without any pixelation or compression artifacts.`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.0-flash-exp-image-generation',

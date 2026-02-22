@@ -69,10 +69,10 @@ async function compressImage(
                 reader.onload = () => {
                     const dataUrl = reader.result as string;
                     const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-                    resolve({ base64, mimeType: 'image/webp', dataUrl, width: w, height: h });
+                    resolve({ base64, mimeType: 'image/jpeg', dataUrl, width: w, height: h });
                 };
                 reader.readAsDataURL(blob);
-            }, 'image/webp', quality);
+            }, 'image/jpeg', quality);
         };
         img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load failed')); };
         img.src = url;
@@ -446,67 +446,49 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                 {phase === 'drop' && (
                     <motion.div
                         key="drop"
-                        initial={{ opacity: 0, scale: 0.97 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.97 }}
-                        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                         onDragOver={onDragOver}
                         onDragLeave={onDragLeave}
                         onDrop={onDrop}
                         onClick={() => fileInputRef.current?.click()}
-                        className="relative flex-1 min-h-[480px] rounded-3xl cursor-pointer overflow-hidden group transition-all duration-300"
-                        style={{
-                            background: isDragging
-                                ? 'linear-gradient(135deg,#7c3aed11,#a78bfa18)'
-                                : 'linear-gradient(135deg,#f8f8fc,#f0f0fb)',
-                            border: isDragging ? '2px dashed #7c3aed' : '2px dashed #d1d5db',
-                        }}
+                        className={`relative flex-1 min-h-[500px] rounded-[2rem] cursor-pointer overflow-hidden border-2 transition-all duration-500 group flex flex-col items-center justify-center gap-8 ${isDragging
+                            ? 'border-violet-500 bg-violet-500/10 shadow-[0_0_80px_rgba(124,58,237,0.15)] ring-4 ring-violet-500/10'
+                            : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10'
+                            }`}
                     >
-                        <div className="absolute inset-0 hidden dark:block"
-                            style={{
-                                background: isDragging
-                                    ? 'linear-gradient(135deg,#7c3aed18,#4c1d9530)'
-                                    : 'linear-gradient(135deg,#0f0f18,#14141e)',
-                                border: isDragging ? '2px dashed #7c3aed' : '2px dashed #ffffff0f',
-                            }}
-                        />
-                        <AnimatePresence>
-                            {isDragging && (
-                                <motion.div
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.8, opacity: 0 }}
-                                    className="absolute inset-8 rounded-2xl border-2 border-violet-400/40"
-                                />
-                            )}
-                        </AnimatePresence>
+                        {/* Interactive Grid Background */}
+                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
+                            style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
 
-                        <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8 py-20">
+                        <div className="relative z-10 flex flex-col items-center text-center px-10">
                             <motion.div
-                                animate={isDragging ? { scale: [1, 1.08, 1], transition: { repeat: Infinity, duration: 1.2 } } : { scale: 1 }}
-                                className="relative"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="relative mb-6"
                             >
-                                <div className={`w-32 h-32 rounded-3xl flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-violet-500/20 shadow-[0_0_60px_rgba(124,58,237,0.3)]' : 'bg-gray-100 dark:bg-white/5 group-hover:bg-violet-50 dark:group-hover:bg-violet-900/10'}`}>
-                                    <svg width="64" height="64" viewBox="0 0 64 64" fill="none" className={`transition-colors duration-300 ${isDragging ? 'text-violet-500' : 'text-gray-300 dark:text-white/20 group-hover:text-violet-400'}`}>
-                                        <path d="M22 8c-5 0-11 4-11 14 0 7 2 13 4 18 1 3 2 6 4 8 1 2 3 3 5 3 3 0 4-3 5-6l1-4c0-2 1-3 2-3s2 1 2 3l1 4c1 3 2 6 5 6 2 0 4-1 5-3 2-2 3-5 4-8 2-5 4-11 4-18 0-10-6-14-11-14-3 0-5 1-7 2-2 1-3 2-3 2s-1-1-3-2c-2-1-4-2-7-2z"
-                                            fill="currentColor" stroke="none" />
-                                    </svg>
+                                <div className={`w-32 h-32 rounded-[2.5rem] flex items-center justify-center transition-all duration-500 ${isDragging ? 'bg-violet-500 scale-110' : 'bg-slate-900 border border-white/10 group-hover:border-violet-500/50'
+                                    }`}>
+                                    <Camera size={48} className={`transition-all duration-500 ${isDragging ? 'text-white' : 'text-slate-700 group-hover:text-violet-400'}`} />
                                 </div>
-                                <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} className="absolute -top-2 -right-2">
-                                    <Sparkles size={18} className={`transition-colors ${isDragging ? 'text-violet-400' : 'text-gray-300 dark:text-white/20'}`} />
-                                </motion.div>
+                                <div className="absolute -top-4 -right-4 w-12 h-12 rounded-2xl bg-teal-500/20 backdrop-blur-xl border border-teal-500/30 flex items-center justify-center shadow-lg">
+                                    <Sparkles size={20} className="text-teal-400" />
+                                </div>
                             </motion.div>
 
-                            <div className="text-center space-y-2">
-                                <p className={`text-2xl font-bold tracking-tight transition-colors duration-200 ${isDragging ? 'text-violet-600 dark:text-violet-400' : 'text-gray-400 dark:text-white/30'}`}>
-                                    {isDragging ? 'Suelta la foto aquí' : 'Arrastrá o tocá para subir'}
-                                </p>
-                                <p className="text-sm text-gray-400 dark:text-white/20">
-                                    JPG · PNG · WebP · hasta 50 MB
-                                </p>
-                                <p className="text-xs text-violet-400/60 dark:text-violet-400/40 mt-2">
-                                    ✦ Se auto-alinea con IA antes de procesar
-                                </p>
+                            <h3 className="text-2xl font-bold text-white mb-2 leading-tight">
+                                {isDragging ? '¡Soltala ahora!' : 'Subí una foto de rostro'}
+                            </h3>
+                            <p className="text-slate-500 text-sm max-w-[280px] leading-relaxed">
+                                Arrastrá el archivo o hacé click para seleccionar de tu galería.
+                            </p>
+
+                            <div className="mt-10 flex flex-wrap justify-center gap-3">
+                                <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">JPG</span>
+                                <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">PNG</span>
+                                <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">WEBP</span>
                             </div>
                         </div>
 
@@ -521,23 +503,26 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0 }}
-                        className="flex-1 min-h-[480px] rounded-3xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 flex flex-col items-center justify-center gap-6"
+                        className="flex-1 min-h-[500px] rounded-[2rem] bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center gap-10"
                     >
                         <div className="relative">
-                            <div className="w-20 h-20 rounded-2xl bg-violet-500/10 flex items-center justify-center">
-                                <ScanFace size={36} className="text-violet-400" />
+                            <div className="w-32 h-32 rounded-[2.5rem] bg-violet-500/10 flex items-center justify-center relative overflow-hidden">
+                                <ScanFace size={54} className="text-violet-400" />
+                                <motion.div
+                                    animate={{
+                                        top: ['0%', '100%', '0%'],
+                                    }}
+                                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                    className="absolute left-0 right-0 h-0.5 bg-violet-400/50 shadow-[0_0_15px_rgba(167,139,250,0.5)] z-20"
+                                />
                             </div>
-                            <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                                className="absolute inset-0 rounded-2xl border-2 border-transparent border-t-violet-500"
-                            />
+                            <svg className="absolute -inset-4 w-[calc(100%+32px)] h-[calc(100%+32px)] animate-[spin_8s_linear_infinite]">
+                                <circle cx="50%" cy="50%" r="48%" stroke="rgba(167,139,250,0.15)" strokeWidth="1" fill="none" strokeDasharray="10 10" />
+                            </svg>
                         </div>
-                        <div className="text-center">
-                            <p className="text-lg font-semibold text-gray-800 dark:text-white mb-1">
-                                Detectando línea pupilar…
-                            </p>
-                            <p className="text-sm text-gray-400">Alineando imagen automáticamente con Gemini</p>
+                        <div className="text-center space-y-2">
+                            <h3 className="text-xl font-bold text-white">Escaneando Biometría Facial</h3>
+                            <p className="text-slate-500 text-sm">Alineando los ejes pupilares con Gemini 2.5 Flash</p>
                         </div>
                     </motion.div>
                 )}
@@ -546,114 +531,103 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                 {(phase === 'preview' || phase === 'processing') && beforeDataUrl && (
                     <motion.div
                         key="preview"
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                        className="flex flex-col gap-6"
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                        className="flex flex-col lg:flex-row gap-8 items-start"
                     >
-                        {/* Image preview */}
-                        <div className="relative w-full rounded-3xl overflow-hidden bg-black shadow-2xl" style={{ maxHeight: '55vh' }}>
+                        {/* Left Column: Image */}
+                        <div className="flex-1 w-full rounded-[2rem] overflow-hidden bg-slate-900 border border-white/5 shadow-2xl relative aspect-[3/4] lg:aspect-auto">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={beforeDataUrl}
                                 alt="Original alineada"
-                                className="w-full h-full object-contain block"
-                                style={{ maxHeight: '55vh' }}
+                                className="w-full h-full object-cover lg:max-h-[600px]"
                             />
+
+                            {/* Overlay Info */}
+                            <div className="absolute top-4 left-4 flex gap-2">
+                                <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50">
+                                    Original Alineada
+                                </div>
+                            </div>
+
                             {phase === 'processing' && (
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-5"
+                                    className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl flex flex-col items-center justify-center gap-8"
                                 >
                                     <div className="relative">
-                                        <div className="w-20 h-20 rounded-full bg-violet-500/10 flex items-center justify-center">
-                                            <Wand2 size={32} className="text-violet-400" />
+                                        <div className="w-24 h-24 rounded-[2rem] bg-teal-500/10 flex items-center justify-center">
+                                            <Wand2 size={40} className="text-teal-400" />
                                         </div>
                                         <motion.div
                                             animate={{ rotate: 360 }}
-                                            transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
-                                            className="absolute inset-0 rounded-full border-2 border-transparent border-t-violet-400"
+                                            transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+                                            className="absolute -inset-3 rounded-[2.5rem] border border-transparent border-t-teal-400"
                                         />
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-white font-semibold text-lg">Gemini está diseñando tu sonrisa…</p>
-                                        <p className="text-white/50 text-sm mt-1">Esto puede tomar 10-20 segundos</p>
+                                    <div className="text-center space-y-2 px-10">
+                                        <h3 className="text-xl font-bold text-white">Reconstruyendo Sonrisa</h3>
+                                        <p className="text-slate-500 text-sm max-w-[240px]">Gemini Vision está analizando la estructura dental para una simulación orgánica.</p>
                                     </div>
                                 </motion.div>
                             )}
                         </div>
 
-                        {/* Error */}
-                        {errorMsg && phase === 'preview' && (
-                            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                                className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-2xl">
-                                <AlertCircle size={18} className="text-red-500 shrink-0" />
-                                <p className="text-red-700 dark:text-red-300 text-sm">{errorMsg}</p>
-                            </motion.div>
-                        )}
+                        {/* Right Column: Controls */}
+                        <div className="w-full lg:w-[350px] space-y-6">
+                            <div className="p-8 rounded-[2rem] bg-white/[0.03] border border-white/5 space-y-8 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 blur-[40px] rounded-full -mr-16 -mt-16" />
 
-                        {/* Intensity slider */}
-                        {phase === 'preview' && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.15 }}
-                                className="rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 p-5 space-y-4"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-800 dark:text-white">
-                                            Intensidad de Blanqueamiento
-                                        </p>
-                                        <p className="text-xs text-gray-400 mt-0.5">
-                                            {intensity <= 3 ? 'Resultado natural' : intensity <= 6 ? 'Resultado cosmético' : 'Hollywood smile'}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-3xl font-black text-violet-500 tabular-nums">{intensity}</span>
-                                        <span className="text-gray-400 text-sm">/10</span>
-                                    </div>
-                                </div>
+                                <IntensitySlider
+                                    label="Intensidad de Blanqueamiento"
+                                    value={intensity}
+                                    onChange={setIntensity}
+                                />
 
-                                <div className="relative h-10 flex items-center">
-                                    <div className="absolute inset-y-0 left-0 right-0 flex items-center">
-                                        <div className="w-full h-2 rounded-full overflow-hidden"
-                                            style={{ background: 'linear-gradient(to right,#ede9fe,#7c3aed)' }} />
+                                <div className="space-y-4 pt-4">
+                                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-2">Características</h4>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                                            <div className="w-6 h-6 rounded bg-teal-500/20 flex items-center justify-center">
+                                                <CheckCircle2 size={12} className="text-teal-400" />
+                                            </div>
+                                            <span className="text-xs font-medium text-slate-300">Alineación Dentaria</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                                            <div className="w-6 h-6 rounded bg-teal-500/20 flex items-center justify-center">
+                                                <CheckCircle2 size={12} className="text-teal-400" />
+                                            </div>
+                                            <span className="text-xs font-medium text-slate-300">Textura Esmalte Real</span>
+                                        </div>
                                     </div>
-                                    <input
-                                        type="range" min={1} max={10} step={1}
-                                        value={intensity}
-                                        onChange={e => setIntensity(Number(e.target.value))}
-                                        className="relative w-full h-2 appearance-none bg-transparent cursor-pointer
-                                                   [&::-webkit-slider-thumb]:appearance-none
-                                                   [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7
-                                                   [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white
-                                                   [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-violet-300/50
-                                                   [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-violet-400
-                                                   [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
-                                    />
-                                </div>
-                                <div className="flex justify-between text-[10px] text-gray-400 dark:text-white/25 px-1 -mt-2">
-                                    <span>Natural</span>
-                                    <span>Hollywood</span>
                                 </div>
 
                                 <button
                                     onClick={handleProcess}
-                                    className="w-full mt-2 py-4 rounded-2xl font-bold text-sm text-white transition-all
-                                               bg-gradient-to-r from-violet-600 to-purple-600
-                                               hover:from-violet-500 hover:to-purple-500
-                                               active:scale-[0.98] shadow-lg shadow-violet-500/20"
+                                    disabled={phase === 'processing'}
+                                    className="group w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest text-white transition-all duration-300
+                                               bg-gradient-to-r from-violet-600 to-indigo-600
+                                               hover:from-violet-500 hover:to-indigo-500
+                                               active:scale-[0.98] shadow-xl shadow-violet-500/25 flex items-center justify-center gap-3"
                                 >
-                                    <span className="flex items-center justify-center gap-2">
-                                        <Wand2 size={16} />
-                                        Generar con Gemini AI
-                                    </span>
+                                    <Wand2 size={16} />
+                                    Generar Sonrisa
+                                    <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
                                 </button>
-                            </motion.div>
-                        )}
+                            </div>
+
+                            {errorMsg && (
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                                    className="flex items-start gap-4 p-5 bg-red-500/10 border border-red-200 dark:border-red-800/50 rounded-2xl">
+                                    <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+                                    <p className="text-red-400 text-xs font-medium leading-relaxed">{errorMsg}</p>
+                                </motion.div>
+                            )}
+                        </div>
                     </motion.div>
                 )}
 
@@ -661,82 +635,70 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                 {phase === 'result' && beforeStoredUrl && afterStoredUrl && (
                     <motion.div
                         key="result"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                        className="flex flex-col gap-6"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                        className="flex flex-col gap-10"
                     >
-                        {/* Comparator */}
-                        <div
-                            ref={compareRef}
-                            className="relative w-full rounded-3xl overflow-hidden cursor-ew-resize shadow-2xl bg-black"
-                            style={{ maxHeight: '60vh', minHeight: 300 }}
-                            onMouseDown={e => { draggingCompare.current = true; updateCompare(e.clientX); }}
-                            onMouseMove={e => { if (draggingCompare.current) updateCompare(e.clientX); }}
-                            onMouseUp={() => { draggingCompare.current = false; }}
-                            onMouseLeave={() => { draggingCompare.current = false; }}
-                            onTouchStart={e => { draggingCompare.current = true; updateCompare(e.touches[0].clientX); }}
-                            onTouchMove={e => { if (draggingCompare.current) updateCompare(e.touches[0].clientX); }}
-                            onTouchEnd={() => { draggingCompare.current = false; }}
-                        >
-                            {/* AFTER (full, behind) */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={afterStoredUrl} alt="Después" className="absolute inset-0 w-full h-full object-contain" draggable={false} />
+                        <div className="relative group">
+                            {/* Decorative Glow behind comparator */}
+                            <div className="absolute -inset-4 bg-teal-500/5 blur-3xl rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
 
-                            {/* BEFORE (clipped) */}
-                            <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={beforeStoredUrl} alt="Antes" className="absolute inset-0 h-full object-contain" draggable={false} style={{ width: `${10000 / sliderPos}%` }} />
+                            <ImageComparator
+                                beforeImage={beforeStoredUrl}
+                                afterImage={afterStoredUrl}
+                                orientation="horizontal"
+                            />
+
+                            {/* Corner Labels - Floating */}
+                            <div className="absolute top-6 left-6 pointer-events-none">
+                                <div className="px-5 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Original</span>
+                                </div>
                             </div>
-
-                            {/* Divider */}
-                            <div className="absolute top-0 bottom-0 w-0.5 bg-white/90" style={{ left: `${sliderPos}%` }}>
-                                <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white shadow-2xl flex items-center justify-center">
-                                    <span className="text-gray-600 font-bold text-sm select-none">↔</span>
+                            <div className="absolute top-6 right-6 pointer-events-none">
+                                <div className="px-5 py-2 rounded-2xl bg-teal-500/20 backdrop-blur-xl border border-teal-500/30 shadow-2xl shadow-teal-500/20">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-300">Smile Design AI</span>
                                 </div>
                             </div>
 
-                            {/* Labels */}
-                            <div className="absolute top-4 left-4 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur text-white text-xs font-semibold">ANTES</div>
-                            <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-violet-600/80 backdrop-blur text-white text-xs font-semibold">DESPUÉS</div>
-
-                            {/* Badge */}
-                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-black/50 backdrop-blur border border-white/10 text-white/70 text-xs flex items-center gap-1.5">
-                                <Sparkles size={12} className="text-violet-400" />
-                                Intensidad {intensity}/10 · Generado con Gemini AI
+                            {/* Metadata Badge */}
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/5 text-white/70 text-[10px] font-bold uppercase tracking-widest flex items-center gap-3 shadow-2xl">
+                                <Sparkles size={14} className="text-teal-400" />
+                                Nivel {intensity}/10 · Generado por Gemini
                             </div>
                         </div>
 
-                        {/* Actions */}
-                        <div className="flex gap-3 flex-wrap">
+                        {/* Premium Action Bar */}
+                        <div className="flex flex-col sm:flex-row gap-4">
                             <button
                                 onClick={() => setPhase('preview')}
-                                className="flex-1 py-3.5 rounded-2xl text-sm font-semibold border border-gray-200 dark:border-white/10 text-gray-600 dark:text-white/60 hover:bg-gray-50 dark:hover:bg-white/5 transition-all min-w-[120px]"
+                                className="flex-1 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-400 hover:text-white hover:bg-white/5 transition-all"
                             >
-                                Ajustar nivel
+                                Ajustar Nivel
                             </button>
 
                             <button
                                 onClick={handleDownload}
                                 disabled={isDownloading}
-                                className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-semibold border border-violet-200 dark:border-violet-800/50 text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all disabled:opacity-50"
+                                className="flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-300 hover:bg-white/5 transition-all disabled:opacity-30"
                             >
-                                {isDownloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                                {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                                 Descargar
                             </button>
 
                             <button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white transition-all
-                                           bg-gradient-to-r from-violet-600 to-purple-600
-                                           hover:from-violet-500 hover:to-purple-500
-                                           disabled:opacity-50 disabled:cursor-not-allowed
-                                           active:scale-[0.98] shadow-lg shadow-violet-500/20 min-w-[140px]"
+                                className="flex-[1.5] py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest text-white transition-all duration-500
+                                           bg-gradient-to-r from-teal-600 to-emerald-600
+                                           hover:from-teal-500 hover:to-emerald-500
+                                           disabled:opacity-40 disabled:cursor-not-allowed
+                                           active:scale-[0.98] shadow-2xl shadow-teal-500/20 flex items-center justify-center gap-3"
                             >
-                                {isSaving ? <Loader2 size={16} className="animate-spin inline mr-2" /> : <Save size={16} className="inline mr-2" />}
-                                Guardar en Ficha
+                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                                Finalizar y Guardar
                             </button>
                         </div>
                     </motion.div>
