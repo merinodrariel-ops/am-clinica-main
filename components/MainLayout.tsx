@@ -24,7 +24,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
     }, []);
 
     // If no user or on login page, don't add margin (Sidebar is hidden)
-    const isSidebarVisible = user && pathname !== '/login' && !pathname.startsWith('/portal-profesional') && !pathname.startsWith('/portal');
+    const isSidebarVisible = user && pathname !== '/login' && !pathname.startsWith('/portal-profesional');
 
     return (
         <main className={clsx(

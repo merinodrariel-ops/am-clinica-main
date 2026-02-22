@@ -23,6 +23,7 @@ import {
     SlidersHorizontal,
     CheckSquare,
     Stethoscope,
+    Briefcase,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -91,6 +92,12 @@ const MENU_ITEMS = [
         href: '/admin/staff',
         roles: ['owner', 'admin']
     },
+    {
+        icon: Briefcase,
+        label: 'Mi Portal',
+        href: '/portal/dashboard',
+        roles: ['owner', 'admin', 'odontologo', 'asistente', 'laboratorio']
+    },
 ];
 
 export default function Sidebar() {
@@ -149,10 +156,12 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (isDesktop) setMobileOpen(false); }, [isDesktop]);
 
-    // Hide sidebar on login page or if not authenticated (optional, depends on layout)
-    if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional') || pathname.startsWith('/portal')) return null;
+    // Hide sidebar on login page or if not authenticated
+    if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional')) return null;
 
     const userRole = role || 'partner_viewer';
+    const PORTAL_ONLY_ROLES = ['odontologo', 'asistente', 'laboratorio'];
+    const isPortalRole = PORTAL_ONLY_ROLES.includes(userRole);
 
     function toggleCollapsed() {
         const next = !collapsed;
@@ -236,7 +245,10 @@ export default function Sidebar() {
 
                 {/* Navigation */}
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {MENU_ITEMS.filter(item => item.roles.includes(userRole)).map((item) => {
+                    {(isPortalRole
+                        ? MENU_ITEMS.filter(item => item.href.startsWith('/portal'))
+                        : MENU_ITEMS.filter(item => item.roles.includes(userRole))
+                    ).map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname.startsWith(item.href);
 
