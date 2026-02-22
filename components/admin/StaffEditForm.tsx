@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { WorkerProfile, WorkerRole } from '@/types/worker-portal';
-import { updateWorkerProfileAdmin } from '@/app/actions/worker-portal';
+import { updateWorkerProfileAdmin, getAppUsers } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
-import { Save, X, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck } from 'lucide-react';
+import { Save, X, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2 } from 'lucide-react';
 
 interface StaffEditFormProps {
     worker: WorkerProfile;
@@ -14,6 +14,11 @@ interface StaffEditFormProps {
 
 export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEditFormProps) {
     const [isSaving, setIsSaving] = useState(false);
+    const [appUsers, setAppUsers] = useState<{ id: string, full_name: string, email: string }[]>([]);
+
+    useEffect(() => {
+        getAppUsers().then(setAppUsers).catch(console.error);
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -34,6 +39,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             porcentaje_honorarios: Number(fd.get('porcentaje_honorarios')),
             activo: fd.get('activo') === 'on',
             matricula_provincial: fd.get('matricula_provincial') as string,
+            user_id: fd.get('user_id') as string || undefined,
         };
 
         try {
@@ -50,29 +56,29 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     const ROLES: WorkerRole[] = ['dentist', 'assistant', 'technician', 'cleaning', 'admin', 'reception', 'lab', 'marketing', 'other'];
 
     return (
-        <form onSubmit={handleSubmit} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 space-y-8 animate-in fade-in zoom-in duration-300">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <form onSubmit={handleSubmit} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 md:space-y-8 animate-in fade-in zoom-in duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <User className="text-indigo-400" size={20} />
-                    Editar Perfil: {worker.nombre}
+                    {worker.nombre}
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                        className="flex-1 sm:flex-none px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors border border-slate-800 rounded-xl"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20"
                     >
-                        {isSaving ? 'Guardando...' : (
+                        {isSaving ? '...' : (
                             <>
                                 <Save size={16} />
-                                Guardar Cambios
+                                Guardar
                             </>
                         )}
                     </button>
@@ -195,7 +201,36 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                         <input name="barrio_localidad" defaultValue={worker.barrio_localidad} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-white outline-none transition-all" />
                     </div>
                 </div>
+
+                {/* Account Link Section */}
+                <div className="space-y-4 md:col-span-2">
+                    <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2 border-t border-slate-800 pt-6">
+                        <Link2 size={14} /> Vinculación de Cuenta (Acceso al Portal)
+                    </h3>
+
+                    <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-4 space-y-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Vincular con Usuario de la App</label>
+                            <select
+                                name="user_id"
+                                defaultValue={worker.user_id || ''}
+                                className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-white outline-none transition-all appearance-none"
+                            >
+                                <option value="">No vinculado</option>
+                                {appUsers.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.full_name} ({u.email})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-slate-500 mt-1 italic">
+                                Vincule este perfil de personal con un usuario registrado para que pueda acceder a su portal individual.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
         </form>
     );
 }
