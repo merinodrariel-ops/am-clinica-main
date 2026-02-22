@@ -28,33 +28,24 @@ export async function POST(req: NextRequest) {
         const level = Math.max(1, Math.min(10, Math.round(intensity ?? 5)));
 
         const aestheticPrompt = level <= 2
-            ? 'a conservative clinical polishing. Maintain the original tooth anatomy exactly, only removing external stains while preserving the natural variation in tooth color and minor healthy imperfections.'
+            ? 'slightly whiter, cleaner teeth. Remove visible stains and yellowing. Keep the natural shape and alignment.'
             : level <= 5
-                ? 'a professional aesthetic enhancement. Improve alignment and color to a natural Vita A2/A1 shade. The teeth should look bright and healthy, but still like real human enamel with subtle textures.'
+                ? 'noticeably whiter and straighter teeth. Improve alignment to be more symmetrical. Use a natural bright shade (like Vita A1).'
                 : level <= 8
-                    ? 'a premium ceramic bridge reconstruction. Perfect symmetry based on the Golden Proportion. Use a bright, healthy BL3 shade with realistic surface micro-relief and light-reflecting properties.'
-                    : 'a high-end celebrity smile transformation. Pure white BLB shade, flawless alignment, but with hyper-realistic photographic detail to ensure they look real and integrated, not like a digital overlay.';
+                    ? 'bright, perfectly aligned teeth like professional porcelain veneers. Use a very white shade (like BL3). Straighten and perfect the dental arch.'
+                    : 'ultra-bright, perfectly symmetrical Hollywood-style teeth. Maximum whiteness. Flawless alignment and shape.';
 
-        const prompt = `
-            Task: Hyper-Realistic Photographic Dental Simulation.
-            
-            Instruction:
-            Transform ONLY the teeth area to achieve ${aestheticPrompt}.
-            
-            UNCOMPROMISING REALISM REQUIREMENTS:
-            1. PHOTOGRAPHIC GRIT: Avoid AI-generated smoothness. Teeth MUST have micro-textures, tiny surface variations, and realistic enamel luminosity. 
-            2. SALIVA & REFLECTIONS: Include realistic "wet" highlights and saliva reflections. The teeth must look moist and integrated into the mouth's environment.
-            3. CRISP INTERFACES: The line where the teeth meet the lips and gums must be sharp and physically shadowed. There must be a clear shadow cast by the upper lip onto the teeth. NO blurry transitions.
-            4. COLOR PHYSICS: Use a complex color depth. Teeth are not monolithic; they must vary in opacity and color from the translucent cutting edge (incisal) to the slightly warmer neck (cervical).
-            5. DEPTH & VOLUME: Ensure the "Buccal Corridors" (shadows at the corners of the smile) are preserved to provide facial depth. Teeth must look 3D and set back within the mouth.
-            6. ZERO RADIANCE: Teeth must NOT glow. They must react to the original photo's lighting naturally.
-            
-            STRICT NEGATIVE CONSTRAINTS:
-            - NO "Snap-on Smile" or "Sticker" appearance.
-            - NO flat white or solid-color teeth.
-            - NO blurring of the gums or lips.
-            - NO alteration of the patient's skin, nose, or eyes.
-        `.trim();
+        const prompt = `Edit this photograph. Replace the visible teeth in this person's smile with ${aestheticPrompt}
+
+The new teeth must look photorealistic and match the photo's lighting and shadows. Keep the rest of the face, lips, skin, and background completely unchanged.
+
+Quality guidelines for the teeth:
+- They should look like a real photograph, not CGI or a digital overlay.
+- Match the existing lighting direction and color temperature.
+- Include natural enamel texture and slight surface reflections.
+- The gum line should look natural and sharp.`;
+
+        console.log(`[smile-design/enhance] Processing request: level=${level}, mimeType=${mimeType}, imageSize=${imageBase64.length} chars`);
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.0-flash-exp-image-generation',
@@ -71,9 +62,11 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const parts: any[] = response.candidates?.[0]?.content?.parts ?? [];
         const imagePart = parts.find((p) => p.inlineData?.data);
+        const textPart = parts.find((p) => p.text);
+
+        console.log(`[smile-design/enhance] Response: hasImage=${!!imagePart}, text=${textPart?.text?.slice(0, 200) ?? 'none'}, imageSizeChars=${imagePart?.inlineData?.data?.length ?? 0}`);
 
         if (!imagePart?.inlineData?.data) {
-            const textPart = parts.find((p) => p.text);
             console.error('[smile-design/enhance] No image in response. Text:', textPart?.text);
             return NextResponse.json({ error: 'Gemini did not return an image. Try again or use a different photo.' }, { status: 502 });
         }
