@@ -84,14 +84,14 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    // Redirect prestador roles to /portal instead of admin areas
+    // Bloquear rutas exclusivamente admin para roles prestadores
     const PORTAL_ROLES = ['odontologo', 'asistente', 'laboratorio']
     const userRole = (user?.user_metadata?.role ?? '') as string
     if (user && PORTAL_ROLES.includes(userRole)) {
-        const ADMIN_PATHS = ['/dashboard', '/caja-admin', '/caja-recepcion', '/admin/staff', '/inventario', '/agenda']
-        if (ADMIN_PATHS.some(p => path === p || path.startsWith(p + '/'))) {
+        const ADMIN_ONLY_PATHS = ['/caja-admin', '/caja-recepcion', '/admin/staff', '/admin-users']
+        if (ADMIN_ONLY_PATHS.some(p => path === p || path.startsWith(p + '/'))) {
             const url = request.nextUrl.clone()
-            url.pathname = '/portal/dashboard'
+            url.pathname = '/dashboard'
             return NextResponse.redirect(url)
         }
     }

@@ -160,8 +160,6 @@ export default function Sidebar() {
     if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional')) return null;
 
     const userRole = role || 'partner_viewer';
-    const PORTAL_ONLY_ROLES = ['odontologo', 'asistente', 'laboratorio'];
-    const isPortalRole = PORTAL_ONLY_ROLES.includes(userRole);
 
     function toggleCollapsed() {
         const next = !collapsed;
@@ -245,10 +243,7 @@ export default function Sidebar() {
 
                 {/* Navigation */}
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {(isPortalRole
-                        ? MENU_ITEMS.filter(item => item.href.startsWith('/portal'))
-                        : MENU_ITEMS.filter(item => item.roles.includes(userRole))
-                    ).map((item) => {
+                        {MENU_ITEMS.filter(item => item.roles.includes(userRole)).map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname.startsWith(item.href);
 
