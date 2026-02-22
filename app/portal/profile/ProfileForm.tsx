@@ -106,13 +106,13 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
             {/* Left: Profile Card */}
             <div className="space-y-4">
                 {/* Avatar */}
-                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center relative overflow-hidden">
+                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 md:p-6 text-center relative overflow-hidden">
                     <div className="relative inline-block mb-4">
-                        <div className="w-28 h-28 rounded-full bg-slate-900 flex items-center justify-center border-4 border-slate-800 shadow-2xl overflow-hidden relative group/avatar">
+                        <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-slate-900 flex items-center justify-center border-4 border-slate-800 shadow-2xl overflow-hidden relative group/avatar">
                             {worker.foto_url ? (
                                 <img src={worker.foto_url} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
-                                <span className="text-5xl text-slate-700 font-black">{worker.nombre?.[0]}</span>
+                                <span className="text-4xl md:text-5xl text-slate-700 font-black">{worker.nombre?.[0]}</span>
                             )}
                             {uploading === 'profile_photo' && (
                                 <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
@@ -120,8 +120,8 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                                 </div>
                             )}
                         </div>
-                        <label className="absolute bottom-1 right-1 p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all shadow-lg border-2 border-slate-950 cursor-pointer">
-                            <Camera size={14} />
+                        <label className="absolute bottom-1 right-1 p-1.5 md:p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all shadow-lg border-2 border-slate-950 cursor-pointer">
+                            <Camera size={13} />
                             <input
                                 type="file"
                                 className="hidden"
@@ -131,14 +131,14 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                             />
                         </label>
                     </div>
-                    <h4 className="text-lg font-bold text-white">{worker.nombre} {worker.apellido}</h4>
-                    <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest mt-0.5">{worker.rol}</p>
+                    <h4 className="text-base md:text-lg font-bold text-white leading-tight">{worker.nombre} {worker.apellido}</h4>
+                    <p className="text-indigo-400 font-bold text-[10px] uppercase tracking-widest mt-1">{worker.rol}</p>
                     {worker.especialidad && (
-                        <p className="text-slate-500 text-xs mt-0.5">{worker.especialidad}</p>
+                        <p className="text-slate-500 text-[11px] mt-0.5">{worker.especialidad}</p>
                     )}
 
                     {/* Completeness */}
-                    <div className="mt-5 pt-5 border-t border-slate-800/50 space-y-3">
+                    <div className="mt-4 pt-4 md:mt-5 md:pt-5 border-t border-slate-800/50 space-y-3">
                         <div>
                             <div className="flex justify-between text-[10px] font-bold mb-1">
                                 <span className="text-slate-500 uppercase tracking-wider">Perfil</span>
@@ -161,7 +161,7 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                 </div>
 
                 {/* Section Nav */}
-                <nav className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-2 space-y-0.5">
+                <nav className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-1.5 grid grid-cols-2 lg:flex lg:flex-col gap-1 md:gap-0.5">
                     {SECTIONS.map(sec => {
                         const Icon = sec.icon;
                         return (
@@ -169,13 +169,13 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                                 key={sec.id}
                                 type="button"
                                 onClick={() => setActiveSection(sec.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${activeSection === sec.id
+                                className={`flex items-center gap-2.5 px-3 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-medium transition-all ${activeSection === sec.id
                                     ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
                                     }`}
                             >
-                                <Icon size={15} />
-                                {sec.label}
+                                <Icon size={14} className="flex-shrink-0" />
+                                <span className="truncate">{sec.label}</span>
                             </button>
                         );
                     })}
@@ -343,12 +343,12 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
 
 function FormSection({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
     return (
-        <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700">
+        <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-5 md:p-6 backdrop-blur-xl">
+            <div className="flex items-center gap-3 mb-5 md:mb-6">
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700">
                     {icon}
                 </div>
-                <h3 className="text-base font-bold text-white">{title}</h3>
+                <h3 className="text-sm md:text-base font-bold text-white">{title}</h3>
             </div>
             {children}
         </div>

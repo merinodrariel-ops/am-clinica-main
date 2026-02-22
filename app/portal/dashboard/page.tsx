@@ -82,25 +82,25 @@ export default async function WorkerDashboard() {
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                        <RoleIcon size={28} className="text-indigo-400" />
+                <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                        <RoleIcon size={24} className="md:text-indigo-400" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                        <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
                             Hola, {worker.nombre} 👋
                         </h1>
-                        <p className="text-slate-400 mt-0.5 text-sm font-medium">
-                            {roleConfig.description} · {today.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        <p className="text-slate-400 mt-0.5 text-xs md:text-sm font-medium">
+                            {roleConfig.description} · {today.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <div className="px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-[11px] font-bold text-indigo-400 uppercase tracking-widest">
+                <div className="flex items-center gap-2 self-start md:self-center">
+                    <div className="px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-[10px] md:text-[11px] font-bold text-indigo-400 uppercase tracking-widest">
                         {worker.rol}
                     </div>
-                    <div className={`w-2.5 h-2.5 rounded-full ${worker.activo !== false ? 'bg-emerald-500' : 'bg-slate-600'} shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
+                    <div className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full ${worker.activo !== false ? 'bg-emerald-500' : 'bg-slate-600'} shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
                 </div>
             </div>
 
@@ -309,15 +309,15 @@ function StatCard({ title, value, subtitle, icon, colorClass }: {
     title: string; value: string; subtitle: string; icon: React.ReactNode; colorClass: string;
 }) {
     return (
-        <div className={`bg-slate-900/60 border ${colorClass} p-5 rounded-2xl backdrop-blur-sm hover:bg-slate-900/80 transition-colors group`}>
-            <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-slate-950 rounded-xl group-hover:scale-110 transition-transform duration-300 border border-slate-800/50">
+        <div className={`bg-slate-900/60 border ${colorClass} p-3.5 md:p-5 rounded-2xl backdrop-blur-sm hover:bg-slate-900/80 transition-colors group`}>
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+                <div className="p-1.5 md:p-2 bg-slate-950 rounded-lg md:rounded-xl group-hover:scale-110 transition-transform duration-300 border border-slate-800/50">
                     {icon}
                 </div>
             </div>
-            <div className="text-2xl font-black text-white tracking-tight">{value}</div>
-            <p className="text-slate-500 text-xs font-medium mt-1">{title}</p>
-            <p className="text-slate-600 text-[10px] mt-0.5">{subtitle}</p>
+            <div className="text-xl md:text-2xl font-black text-white tracking-tight">{value}</div>
+            <p className="text-slate-500 text-[10px] md:text-xs font-medium mt-1 uppercase tracking-wider">{title}</p>
+            <p className="text-slate-600 text-[9px] md:text-[10px] mt-0.5">{subtitle}</p>
         </div>
     );
 }

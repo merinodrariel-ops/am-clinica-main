@@ -48,6 +48,20 @@ export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
     return data as WorkerProfile;
 }
 
+export async function getAppUsers(): Promise<{ id: string, full_name: string, email: string }[]> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .order('full_name');
+
+    if (error) {
+        console.error('Error fetching app users:', error);
+        return [];
+    }
+    return data || [];
+}
+
 export async function getAllWorkers(): Promise<WorkerProfile[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -594,21 +608,20 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('No autenticado');
 
-    // Role check
-    const { data: adminProfile } = await supabase
-        .from('personal')
-        .select('rol')
-        .eq('user_id', user.id)
+    // Role check - Check app profiles instead of personal records
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
         .single();
 
-    if (adminProfile?.rol !== 'admin') {
-        throw new Error('Acceso denegado: Se requieren permisos de administrador');
+    if (!profile || !['admin', 'owner'].includes(profile.role || '')) {
+        throw new Error('Acceso denegado: Se requieren permisos de administrador o dueño');
     }
 
-    // Safety: don't allow changing user_id directly through this form
+    // Prepare data for update
     const cleanData = { ...data };
-    delete (cleanData as any).user_id;
-    delete (cleanData as any).full_name;
+    delete (cleanData as any).full_name; // Computed or handled elsewhere
 
     const { error } = await supabase
         .from('personal')
@@ -620,4 +633,5 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
     revalidatePath('/admin/staff');
     revalidatePath(`/admin/staff/${workerId}`);
     revalidatePath('/portal/profile');
+    revalidatePath('/portal/dashboard');
 }

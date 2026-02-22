@@ -53,10 +53,10 @@ export default function StaffDetailView({
             <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-16">
                 <button
                     onClick={() => setIsEditing(false)}
-                    className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors w-fit"
+                    className="flex items-center gap-2 text-slate-400 hover:text-white text-xs md:text-sm font-medium transition-colors w-fit border border-slate-800 px-3 py-1.5 rounded-lg"
                 >
-                    <ChevronLeft size={18} />
-                    Cancelar edición
+                    <ChevronLeft size={16} />
+                    Cancelar
                 </button>
                 <StaffEditForm
                     worker={worker}
@@ -73,66 +73,68 @@ export default function StaffDetailView({
     return (
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-700 pb-16">
             {/* Header / Back */}
-            <div className="flex items-center justify-between">
-                <Link href="/admin/staff" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors w-fit">
-                    <ChevronLeft size={18} />
-                    Volver al personal
+            <div className="flex items-center justify-between gap-2">
+                <Link href="/admin/staff" className="flex items-center gap-2 text-slate-400 hover:text-white text-xs md:text-sm font-medium transition-colors w-fit border border-slate-800 px-3 py-1.5 rounded-lg">
+                    <ChevronLeft size={16} />
+                    <span className="hidden xs:inline">Volver</span>
                 </Link>
                 <button
                     onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-sm font-bold rounded-xl border border-slate-700 transition-all"
+                    className="flex items-center gap-2 px-4 py-1.5 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs md:text-sm font-bold rounded-xl border border-slate-700 transition-all"
                 >
-                    <Edit size={16} />
-                    Editar Perfil
+                    <Edit size={14} />
+                    Editar
                 </button>
             </div>
 
             {/* Hero Card */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-8">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 md:p-8">
                 <div className="flex flex-col md:flex-row md:items-start gap-6">
-                    <StaffPhotoUploader
-                        workerId={worker.id}
-                        initialPhotoUrl={worker.foto_url}
-                        workerName={worker.nombre}
-                        initials={initials}
-                    />
+                    <div className="mx-auto md:mx-0">
+                        <StaffPhotoUploader
+                            workerId={worker.id}
+                            initialPhotoUrl={worker.foto_url}
+                            workerName={worker.nombre}
+                            initials={initials}
+                        />
+                    </div>
 
-                    <div className="flex-1">
+                    <div className="flex-1 text-center md:text-left">
                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                             <div>
-                                <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                                <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
                                     {worker.nombre} {worker.apellido}
                                 </h1>
-                                <p className="text-indigo-400 font-bold text-sm uppercase tracking-widest mt-1">{worker.rol}</p>
+                                <p className="text-indigo-400 font-bold text-xs md:text-sm uppercase tracking-widest mt-1">{worker.rol}</p>
                                 {worker.especialidad && (
-                                    <p className="text-slate-400 text-sm mt-0.5">{worker.especialidad}</p>
+                                    <p className="text-slate-400 text-xs md:text-sm mt-0.5">{worker.especialidad}</p>
                                 )}
                             </div>
-                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold ${worker.activo !== false
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold w-fit mx-auto md:mx-0 ${worker.activo !== false
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                 : 'bg-slate-800 text-slate-500 border border-slate-700'
                                 }`}>
-                                <div className={`w-2 h-2 rounded-full ${worker.activo !== false ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+                                <div className={`w-1.5 h-1.5 rounded-full ${worker.activo !== false ? 'bg-emerald-500' : 'bg-slate-600'}`} />
                                 {worker.activo !== false ? 'Activo' : 'Inactivo'}
                             </div>
                         </div>
 
-                        <div className="mt-5 flex flex-wrap gap-3">
+                        <div className="mt-5 flex flex-col md:flex-row flex-wrap gap-3 md:gap-5 justify-center md:justify-start">
                             {worker.email && (
-                                <div className="flex items-center gap-2 text-sm text-slate-400">
-                                    <Mail size={14} />
-                                    <span>{worker.email}</span>
+                                <div className="flex items-center justify-center md:justify-start gap-2 text-xs md:text-sm text-slate-400">
+                                    <Mail size={14} className="shrink-0" />
+                                    <span className="truncate max-w-[200px]">{worker.email}</span>
                                 </div>
                             )}
                             {worker.whatsapp && (
-                                <div className="flex items-center gap-2 text-sm text-slate-400">
-                                    <Phone size={14} />
+                                <div className="flex items-center justify-center md:justify-start gap-2 text-xs md:text-sm text-slate-400">
+                                    <Phone size={14} className="shrink-0" />
                                     <span>{worker.whatsapp}</span>
                                 </div>
                             )}
                             {worker.documento && (
-                                <div className="flex items-center gap-2 text-sm text-slate-400">
-                                    <User size={14} />
+                                <div className="flex items-center justify-center md:justify-start gap-2 text-xs md:text-sm text-slate-400">
+                                    <User size={14} className="shrink-0" />
                                     <span>DNI: {worker.documento}</span>
                                 </div>
                             )}
@@ -141,22 +143,22 @@ export default function StaffDetailView({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                 {/* Stats */}
-                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 text-center">
-                    <Zap className="mx-auto text-indigo-400 mb-2" size={28} />
-                    <p className="text-2xl font-black text-white">{totalXP.toLocaleString()}</p>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mt-1">XP Total</p>
+                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 md:p-5 text-center">
+                    <Zap className="mx-auto text-indigo-400 mb-2" size={24} />
+                    <p className="text-xl md:text-2xl font-black text-white">{totalXP.toLocaleString()}</p>
+                    <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mt-1">XP Total</p>
                 </div>
-                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 text-center">
-                    <Award className="mx-auto text-amber-400 mb-2" size={28} />
-                    <p className="text-2xl font-black text-white">{safeAchievements.length}</p>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mt-1">Medallas</p>
+                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 md:p-5 text-center">
+                    <Award className="mx-auto text-amber-400 mb-2" size={24} />
+                    <p className="text-xl md:text-2xl font-black text-white">{safeAchievements.length}</p>
+                    <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mt-1">Medallas</p>
                 </div>
-                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 text-center">
-                    <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={28} />
-                    <p className="text-2xl font-black text-white">{completedGoals}</p>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mt-1">Objetivos completos</p>
+                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 md:p-5 text-center xs:col-span-2 md:col-span-1">
+                    <CheckCircle2 className="mx-auto text-emerald-400 mb-2" size={24} />
+                    <p className="text-xl md:text-2xl font-black text-white">{completedGoals}</p>
+                    <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mt-1">Objetivos completos</p>
                 </div>
             </div>
 

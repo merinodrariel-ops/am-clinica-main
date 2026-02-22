@@ -76,40 +76,41 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
             <div className="bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
 
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-800">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-center">
-                            <UserPlus size={20} className="text-indigo-400" />
+                <div className="flex items-center justify-between p-4 md:p-6 border-b border-slate-800">
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="w-9 h-9 md:w-10 md:h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl md:rounded-2xl flex items-center justify-center">
+                            <UserPlus size={18} className="text-indigo-400" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-white">Nuevo Prestador</h2>
-                            <p className="text-xs text-slate-500">Completá los datos de la ficha</p>
+                            <h2 className="text-base md:text-lg font-bold text-white leading-tight">Nuevo Prestador</h2>
+                            <p className="text-[10px] md:text-xs text-slate-500">Completá los datos de la ficha</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+                        className="p-1.5 md:p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
                     >
                         <X size={18} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-5 md:space-y-6">
+                    {/* (all fields content remains the same but with improved parent spacing) */}
+                    {/* ... */}
 
                     {/* Tipo toggle */}
-                    <div className="flex gap-2 p-1 bg-slate-900 border border-slate-800 rounded-2xl">
+                    <div className="flex gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl md:rounded-2xl">
                         {(['prestador', 'profesional'] as const).map(t => (
                             <button
                                 key={t}
                                 type="button"
                                 onClick={() => setTipo(t)}
-                                className={`flex-1 py-2 text-sm font-bold rounded-xl capitalize transition-all ${
-                                    tipo === t
+                                className={`flex-1 py-1.5 md:py-2 text-[13px] md:text-sm font-bold rounded-lg md:rounded-xl capitalize transition-all ${tipo === t
                                         ? 'bg-indigo-600 text-white shadow'
                                         : 'text-slate-500 hover:text-white'
-                                }`}
+                                    }`}
                             >
-                                {t === 'profesional' ? 'Profesional' : 'Prestador / Staff'}
+                                {t === 'profesional' ? 'Profesional' : 'Staff'}
                             </button>
                         ))}
                     </div>
@@ -254,11 +255,10 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                     </div>
 
                     {/* Portal access toggle */}
-                    <div className={`rounded-2xl border p-4 transition-colors ${
-                        giveAccess
+                    <div className={`rounded-2xl border p-4 transition-colors ${giveAccess
                             ? 'bg-indigo-900/20 border-indigo-500/30'
                             : 'bg-slate-900/40 border-slate-800'
-                    }`}>
+                        }`}>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <Send size={18} className={giveAccess ? 'text-indigo-400' : 'text-slate-600'} />
@@ -275,13 +275,11 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                 type="button"
                                 onClick={() => form.email && setGiveAccess(v => !v)}
                                 disabled={!form.email}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                    giveAccess ? 'bg-indigo-600' : 'bg-slate-700'
-                                } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${giveAccess ? 'bg-indigo-600' : 'bg-slate-700'
+                                    } disabled:opacity-40 disabled:cursor-not-allowed`}
                             >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                                    giveAccess ? 'translate-x-6' : 'translate-x-1'
-                                }`} />
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${giveAccess ? 'translate-x-6' : 'translate-x-1'
+                                    }`} />
                             </button>
                         </div>
                         {giveAccess && (
