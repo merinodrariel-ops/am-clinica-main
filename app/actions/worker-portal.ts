@@ -361,6 +361,8 @@ export interface CreateWorkerInput {
 /** Create personal record only — no app access */
 export async function createWorkerNoAccess(data: CreateWorkerInput): Promise<WorkerProfile> {
     const admin = getAdminClient();
+    // DB CHECK constraint only allows 'empleado' | 'profesional'; map 'prestador' → 'empleado'
+    const dbTipo = data.tipo === 'profesional' ? 'profesional' : 'empleado';
     const { data: record, error } = await admin
         .from('personal')
         .insert({
@@ -368,7 +370,7 @@ export async function createWorkerNoAccess(data: CreateWorkerInput): Promise<Wor
             apellido: data.apellido || null,
             rol: data.rol,
             area: data.area || 'general',
-            tipo: data.tipo || 'prestador',
+            tipo: dbTipo,
             email: data.email || null,
             whatsapp: data.whatsapp || null,
             documento: data.documento || null,
@@ -393,8 +395,9 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
 
     const adminSupabase = getAdminClient();
 
-    // Map business tipo → auth role
+    // Map business tipo → auth role and DB tipo
     const authRole = data.tipo === 'profesional' ? 'odontologo' : 'asistente';
+    const dbTipo = data.tipo === 'profesional' ? 'profesional' : 'empleado';
 
     // 1. Generate invite link via Supabase Auth admin
     const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
@@ -433,16 +436,16 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
         invitation_sent_at: new Date().toISOString(),
     });
 
-    // 4. Upsert personal record linked to auth user
+    // 4. Insert personal record linked to auth user (new invite = new user, no conflict expected)
     const { data: record, error: personalError } = await adminSupabase
         .from('personal')
-        .upsert({
+        .insert({
             user_id: userId,
             nombre: data.nombre,
             apellido: data.apellido || null,
             rol: data.rol,
             area: data.area || 'general',
-            tipo: data.tipo || 'prestador',
+            tipo: dbTipo,
             email: data.email,
             whatsapp: data.whatsapp || null,
             documento: data.documento || null,
@@ -452,7 +455,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
             fecha_ingreso: data.fecha_ingreso || new Date().toISOString().split('T')[0],
             especialidad: data.especialidad || null,
             activo: true,
-        }, { onConflict: 'user_id' })
+        })
         .select()
         .single();
 
