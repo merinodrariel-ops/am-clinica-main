@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { WorkerProfile } from '@/types/worker-portal';
 import { Save, Upload, CheckCircle, AlertCircle, Camera, ShieldCheck, FileText, User, Briefcase, MapPin, Lock } from 'lucide-react';
 import { uploadWorkerDocument, updateOwnProfile } from '@/app/actions/worker-portal';
+import { toast } from 'sonner';
 
 // Fields that cannot be changed by the prestador once set (admin-only)
 const LOCKED_ONCE_SET = ['documento', 'foto_url', 'matricula_provincial', 'poliza_url'] as const;
 type LockedField = typeof LOCKED_ONCE_SET[number];
-import { toast } from 'sonner';
 
 interface ProfileFormProps {
     worker: WorkerProfile;
