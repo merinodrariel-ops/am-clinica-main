@@ -7,13 +7,24 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
     const worker = await getWorkerById(id);
     if (!worker) notFound();
 
-    const [achievements, liquidations, totalXP, goals, progressList] = await Promise.all([
-        getWorkerAchievements(worker.id),
-        getWorkerLiquidations(worker.id),
-        getWorkerXP(worker.id),
-        getAllGoals(worker.rol),
-        getGoalProgress(worker.id),
-    ]);
+    let achievements: any[] = [];
+    let liquidations: any[] = [];
+    let totalXP = 0;
+    let goals: any[] = [];
+    let progressList: any[] = [];
+
+    try {
+        [achievements, liquidations, totalXP, goals, progressList] = await Promise.all([
+            getWorkerAchievements(worker.id),
+            getWorkerLiquidations(worker.id),
+            getWorkerXP(worker.id),
+            getAllGoals(worker.rol),
+            getGoalProgress(worker.id),
+        ]);
+    } catch (error) {
+        console.error(`Error loading details for worker ${id}:`, error);
+        // We continue with empty states to allow the page to render basic info
+    }
 
     return (
         <StaffDetailView

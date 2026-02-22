@@ -43,7 +43,10 @@ export default function StaffDetailView({
 
     const initials = `${worker.nombre?.[0] || ''}${worker.apellido?.[0] || ''}`.toUpperCase();
     const docs = (worker.documents as Record<string, any>) || {};
-    const completedGoals = progressList.filter(p => p.completed).length;
+    const safeAchievements = achievements || [];
+    const safeLiquidations = liquidations || [];
+    const safeProgressList = progressList || [];
+    const completedGoals = safeProgressList.filter(p => p?.completed).length;
 
     if (isEditing) {
         return (
@@ -147,7 +150,7 @@ export default function StaffDetailView({
                 </div>
                 <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 text-center">
                     <Award className="mx-auto text-amber-400 mb-2" size={28} />
-                    <p className="text-2xl font-black text-white">{achievements.length}</p>
+                    <p className="text-2xl font-black text-white">{safeAchievements.length}</p>
                     <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mt-1">Medallas</p>
                 </div>
                 <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 text-center">
@@ -183,10 +186,10 @@ export default function StaffDetailView({
                     <div className="mt-5 pt-5 border-t border-slate-800/50">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-300">Liquidaciones</h4>
-                            <span className="text-xs text-slate-500">{liquidations.length} total</span>
+                            <span className="text-xs text-slate-500">{safeLiquidations.length} total</span>
                         </div>
                         <div className="space-y-2">
-                            {liquidations.slice(0, 3).map(liq => (
+                            {safeLiquidations.slice(0, 3).map(liq => (
                                 <div key={liq.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-950/30 border border-slate-800/40">
                                     <div>
                                         <p className="text-sm font-bold text-white">
@@ -199,7 +202,7 @@ export default function StaffDetailView({
                                     </span>
                                 </div>
                             ))}
-                            {liquidations.length === 0 && (
+                            {safeLiquidations.length === 0 && (
                                 <p className="text-center text-slate-600 text-xs py-4">Sin liquidaciones</p>
                             )}
                         </div>
@@ -247,12 +250,12 @@ export default function StaffDetailView({
                     <div className="mt-5 pt-5 border-t border-slate-800/50">
                         <h4 className="text-sm font-bold text-slate-300 mb-3">Medallas ganadas</h4>
                         <div className="flex flex-wrap gap-2">
-                            {achievements.slice(0, 6).map(wa => (
+                            {safeAchievements.slice(0, 6).map(wa => (
                                 <div key={wa.id} className="px-3 py-1.5 bg-amber-500/5 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-400" title={(wa.achievement as any)?.description}>
                                     ✨ {(wa.achievement as any)?.name}
                                 </div>
                             ))}
-                            {achievements.length === 0 && (
+                            {safeAchievements.length === 0 && (
                                 <p className="text-xs text-slate-600">Sin medallas aún</p>
                             )}
                         </div>
