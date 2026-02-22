@@ -62,6 +62,8 @@ export default function StaffListPage() {
         try {
             const data = await getAllWorkers();
             setWorkers(data);
+        } catch (err) {
+            console.error('Error loading workers:', err);
         } finally {
             setLoading(false);
         }

@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-export default async function StaffDetailPage({ params }: { params: { id: string } }) {
-    const worker = await getWorkerById(params.id);
+export default async function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const worker = await getWorkerById(id);
     if (!worker) notFound();
 
     const [achievements, liquidations, totalXP, goals, progressList] = await Promise.all([
