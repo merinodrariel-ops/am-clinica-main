@@ -14,6 +14,7 @@ import {
     Zap,
 } from 'lucide-react';
 import Link from 'next/link';
+import StaffPhotoUploader from '@/components/admin/StaffPhotoUploader';
 
 export default async function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -45,11 +46,12 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
             {/* Hero Card */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-8">
                 <div className="flex flex-col md:flex-row md:items-start gap-6">
-                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-white font-black text-3xl shadow-xl shadow-indigo-500/20 flex-shrink-0 overflow-hidden">
-                        {worker.foto_url ? (
-                            <img src={worker.foto_url} alt={worker.nombre} className="w-full h-full object-cover" />
-                        ) : initials || '?'}
-                    </div>
+                    <StaffPhotoUploader
+                        workerId={worker.id}
+                        initialPhotoUrl={worker.foto_url}
+                        workerName={worker.nombre}
+                        initials={initials}
+                    />
 
                     <div className="flex-1">
                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">

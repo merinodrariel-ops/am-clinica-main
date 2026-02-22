@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { WorkerProfile } from '@/types/worker-portal';
 import { Save, Upload, CheckCircle, AlertCircle, Camera, ShieldCheck, FileText, User, Briefcase, MapPin, Lock } from 'lucide-react';
-import { uploadWorkerDocument, updateOwnProfile } from '@/app/actions/worker-portal';
+import { uploadWorkerDocument, uploadWorkerPhoto, updateOwnProfile } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 
 // Fields that cannot be changed by the prestador once set (admin-only)
-const LOCKED_ONCE_SET = ['documento', 'foto_url', 'matricula_provincial', 'poliza_url'] as const;
+const LOCKED_ONCE_SET = ['documento', 'matricula_provincial', 'poliza_url'] as const;
 type LockedField = typeof LOCKED_ONCE_SET[number];
 
 interface ProfileFormProps {
@@ -35,10 +35,15 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
         if (!file) return;
         setUploading(type);
         try {
-            await uploadWorkerDocument(worker.id, file, type);
-            toast.success(`Documento cargado exitosamente`);
+            if (type === 'profile_photo') {
+                await uploadWorkerPhoto(worker.id, file);
+                toast.success('Foto de perfil actualizada');
+            } else {
+                await uploadWorkerDocument(worker.id, file, type);
+                toast.success(`Documento cargado exitosamente`);
+            }
         } catch {
-            toast.error('Error al cargar el documento');
+            toast.error('Error al cargar el archivo');
         } finally {
             setUploading(null);
         }
@@ -101,16 +106,28 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                 {/* Avatar */}
                 <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center relative overflow-hidden">
                     <div className="relative inline-block mb-4">
-                        <div className="w-28 h-28 rounded-full bg-slate-900 flex items-center justify-center border-4 border-slate-800 shadow-2xl overflow-hidden">
+                        <div className="w-28 h-28 rounded-full bg-slate-900 flex items-center justify-center border-4 border-slate-800 shadow-2xl overflow-hidden relative group/avatar">
                             {worker.foto_url ? (
                                 <img src={worker.foto_url} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
                                 <span className="text-5xl text-slate-700 font-black">{worker.nombre?.[0]}</span>
                             )}
+                            {uploading === 'profile_photo' && (
+                                <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
+                                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
                         </div>
-                        <button type="button" className="absolute bottom-1 right-1 p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all shadow-lg border-2 border-slate-950">
+                        <label className="absolute bottom-1 right-1 p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all shadow-lg border-2 border-slate-950 cursor-pointer">
                             <Camera size={14} />
-                        </button>
+                            <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => handleFileUpload(e, 'profile_photo')}
+                                disabled={!!uploading}
+                            />
+                        </label>
                     </div>
                     <h4 className="text-lg font-bold text-white">{worker.nombre} {worker.apellido}</h4>
                     <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest mt-0.5">{worker.rol}</p>
