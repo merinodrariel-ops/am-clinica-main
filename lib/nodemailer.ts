@@ -36,13 +36,15 @@ export async function sendEmail({
 
         if (error) {
             console.error('Resend error:', error);
-            return { success: false, error };
+            const msg = (error as any)?.message || JSON.stringify(error);
+            return { success: false, error: msg };
         }
 
         console.log('Email sent via Resend:', data?.id);
         return { success: true, messageId: data?.id };
     } catch (error) {
         console.error('Error sending email:', error);
-        return { success: false, error };
+        const msg = error instanceof Error ? error.message : JSON.stringify(error);
+        return { success: false, error: msg };
     }
 }

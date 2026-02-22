@@ -41,7 +41,7 @@ export async function sendWelcomeEmail(data: EmailData): Promise<{ success: bool
     if (response.success) {
       return { success: true };
     } else {
-      return { success: false, error: String(response.error) };
+      return { success: false, error: response.error ?? 'Error desconocido al enviar email' };
     }
   } catch (error) {
     return {
@@ -67,6 +67,6 @@ export async function sendInvitationEmail(data: InvitationData): Promise<{ succe
   if (response.success) {
     return { success: true };
   } else {
-    return { success: false, error: String(response.error) };
+    return { success: false, error: response.error ?? 'Error desconocido al enviar email' };
   }
 }

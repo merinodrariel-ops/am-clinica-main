@@ -417,13 +417,17 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
     const userId = linkData.user?.id;
     const actionLink = linkData.properties?.action_link;
 
-    // 2. Send invitation email
+    // 2. Send invitation email (non-blocking — worker is created even if email fails)
     if (actionLink) {
-        await sendInvitationEmail({
+        const emailResult = await sendInvitationEmail({
             to_name: `${data.nombre} ${data.apellido || ''}`.trim(),
             to_email: data.email,
             action_link: actionLink,
         });
+        if (!emailResult.success) {
+            console.error('Invitation email failed:', emailResult.error);
+            // Don't throw — auth user + personal record are created; admin can resend later
+        }
     }
 
     // 3. Upsert profile (trigger may have already created it)
@@ -495,11 +499,15 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
 
     const actionLink = linkData.properties?.action_link;
     if (actionLink) {
-        await sendInvitationEmail({
+        const emailResult = await sendInvitationEmail({
             to_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
             to_email: worker.email,
             action_link: actionLink,
         });
+        if (!emailResult.success) {
+            // Surface the real Resend error so admin can see it
+            throw new Error(`Invitación creada pero el email falló: ${emailResult.error}`);
+        }
     }
 
     revalidatePath('/admin/staff');
