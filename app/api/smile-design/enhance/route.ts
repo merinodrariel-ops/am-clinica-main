@@ -28,25 +28,32 @@ export async function POST(req: NextRequest) {
         const level = Math.max(1, Math.min(10, Math.round(intensity ?? 5)));
 
         const aestheticPrompt = level <= 2
-            ? 'an extremely subtle, natural touch-up. Maintain the original tooth shapes and textures, only correcting minor discolorations and providing a gentle, healthy polish.'
+            ? 'a conservative clinical touch-up. Maintain 100% of the original anatomy. Only apply a professional prophylaxis effect (cleaning), removing extrinsic stains while preserving the natural variation in tooth color and texture.'
             : level <= 5
-                ? 'a professional dental whitening result. Enhance tooth symmetry slightly while preserving natural enamel texture, subtle incisal translucency, and realistic anatomical variations.'
+                ? 'a professional aesthetic enhancement. Improve alignment and color to a natural Vita A1 shade. Maintain realistic dental anatomy including developmental grooves and subtle incisal translucency.'
                 : level <= 8
-                    ? 'a premium cosmetic dentistry transformation. Create perfect alignment and a bright, healthy color. Ensure teeth have depth, realistic mamelon details, and a natural light-reflecting surface.'
-                    : 'a full Hollywood-standard cosmetic reconstruction. Flawless symmetry, brilliant white shade (BL1 standard), but with high-end photorealistic detail to ensure they look real and integrated.';
+                    ? 'a high-end ceramic veneer simulation. Perfect the "Golden Proportion" in alignment. Use a bright, healthy BL2/BL3 shade with realistic light-reflecting surface micro-relief.'
+                    : 'a premium cosmetic dentistry reconstruction. Achieve maximum brightness (BL1 shade) and flawless symmetry, but ensure every tooth has realistic internal depth, mamelon structures, and translucent edges.';
 
         const prompt = `
-            Task: Professional Dentofacial Aesthetic Simulation.
+            Task: Clinical-Grade Dentofacial Aesthetic Simulation.
             
             Instruction:
             Transform ONLY the teeth and smile area to achieve ${aestheticPrompt}.
             
-            CRITICAL REALISM REQUIREMENTS:
-            1. LIGHTING & TEXTURE: Match the ambient lighting of the original photo exactly. Include realistic specular highlights and subtle reflections. Teeth must NOT look flat or like a sticker. Maintain natural enamel micro-texture.
-            2. ANATOMY: Ensure realistic incisal translucency (edges of teeth should be slightly translucent). Maintain a natural and healthy gingival transition (where teeth meet gums).
-            3. INTEGRATION: Teeth must look physically integrated into the mouth. Apply subtle interdental shadowing to provide depth and 3D volume.
-            4. PRESERVATION: Keep all other facial features, lips, skin texture, and background COMPLETELY UNTOUCHED.
-            5. QUALITY: High-resolution, photorealistic, sharp focus, no pixelation.
+            CRITICAL REALISM & ANATOMICAL REQUIREMENTS:
+            1. LIGHT PHYSICS: Implement Subsurface Scattering. Teeth are not opaque; light must appear to enter and diffuse within the enamel. Ensure specular highlights match the primary light source of the original photo.
+            2. COLOR GRADIENT: Do NOT use a single flat color. Teeth must show a natural gradient: translucent and slightly cooler at the incisal edges, higher saturation (warmer/more yellow) toward the cervical neck (near the gums).
+            3. INTERDENTAL DEPTH: Maintain clear separation between teeth. Use subtle proximal shading and preserve "dark corridors" (buccal corridors) at the corners of the mouth to provide 3D volume.
+            4. GINGIVAL TRANSITION: The transition between teeth and gums must be sharp and anatomically correct. Respect the "Gingival Zenith" of each tooth. Avoid any blurring or "pasted" look at the gum line.
+            5. TEXTURE: Maintain realistic enamel micro-texture (perikymata) and surface reflections. Avoid perfectly smooth surfaces that look like plastic.
+            6. PRESERVATION: Every pixel outside the modified teeth/gum area—including lips, skin, philtrum, and background—must remain 100% identical to the source image.
+            
+            NEGATIVE CONSTRAINTS:
+            - NO flat, uniform white (monochromatic) teeth.
+            - NO "sticker" or "floating" appearance.
+            - NO blurring of the lip-to-tooth interface.
+            - NO modification of facial structure or skin texture.
         `.trim();
 
         const response = await ai.models.generateContent({
