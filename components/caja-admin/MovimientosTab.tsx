@@ -132,7 +132,8 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     gastosTotalesUsd: number;
     giroArs: number;
     giroUsd: number;
-    status: string
+    status: string;
+    lastCloseDate?: string | null;
   } | null>(null);
 
   // Giro Activo form state
@@ -929,72 +930,90 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
       {/* ── Live Balance Strip ── */}
       {balanceVivo && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Efectivo en Caja — ARS + USD unificados */}
-          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Efectivo en Caja</p>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${balanceVivo.status === "Cerrado" ? "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
-                  {balanceVivo.status}
-                </span>
+        <div className={`rounded-xl p-4 shadow-sm border transition-colors ${
+          balanceVivo.status === "Cerrado"
+            ? "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+            : "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
+        }`}>
+          {/* Status header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                balanceVivo.status === "Cerrado" ? "bg-gray-200 dark:bg-gray-700" : "bg-green-100 dark:bg-green-900/40"
+              }`}>
+                <div className={`w-2.5 h-2.5 rounded-full ${
+                  balanceVivo.status === "Cerrado" ? "bg-gray-400" : "bg-green-500 animate-pulse"
+                }`} />
               </div>
-              <p className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                  {balanceVivo.status === "Cerrado" ? "Caja Cerrada" : "Jornada Abierta"}
+                </p>
+                {balanceVivo.lastCloseDate && (
+                  <p className="text-xs text-gray-500">
+                    {balanceVivo.status === "Cerrado"
+                      ? `Último cierre: ${balanceVivo.lastCloseDate}`
+                      : `Desde cierre del ${balanceVivo.lastCloseDate}`}
+                  </p>
+                )}
+              </div>
+            </div>
+            {/* Gastos rápidos */}
+            <div className="hidden sm:flex items-center gap-4 text-right">
+              <div>
+                <p className="text-[10px] text-red-400 uppercase font-semibold tracking-wide">Gastos hoy</p>
+                <p className="text-sm font-bold text-red-500">
+                  {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.gastosTotalesUsd)}`)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">Gastos mes</p>
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                  {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalGastosMesUsd)}`)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Saldos */}
+          <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-2">Saldo Actual Estimado</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Efectivo USD */}
+            <div className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-200 dark:border-blue-800/50">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo USD</span>
+              </div>
+              <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
                 {formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.saldoUsd))}
-              </p>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">
+              </span>
+            </div>
+            {/* Efectivo ARS */}
+            <div className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-200 dark:border-blue-800/50">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo ARS</span>
+              </div>
+              <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
                 {formatPrivacy(new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(balanceVivo.saldoArs))}
-              </p>
+              </span>
             </div>
-            <Wallet className="w-5 h-5 text-indigo-400 shrink-0 ml-2" />
-          </div>
-
-          {/* Giro Activo — independent accumulator, does NOT affect cash balances */}
-          {/* NOTE: immediate UI update is handled via refreshBalance() call in handleSubmit, which emulates SpreadsheetApp.flush() behavior */}
-          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-amber-200 dark:border-amber-800/40 shadow-sm">
-            <div>
-              <p className="text-xs text-amber-600 uppercase font-semibold tracking-wide">Giro Activo (Deuda)</p>
-              {balanceVivo.giroArs > 0 && (
-                <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
-                  {formatPrivacy(new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(balanceVivo.giroArs))}
-                </p>
-              )}
-              {balanceVivo.giroUsd > 0 && (
-                <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
-                  {formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.giroUsd))}
-                </p>
-              )}
-              {balanceVivo.giroArs === 0 && balanceVivo.giroUsd === 0 && (
-                <p className="text-sm text-slate-400 mt-0.5">Sin giros</p>
-              )}
+            {/* Giro Activo */}
+            <div className={`flex justify-between items-center p-3 rounded-xl border ${
+              balanceVivo.giroUsd > 0
+                ? "bg-amber-100/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
+                : "bg-blue-100/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${balanceVivo.giroUsd > 0 ? "bg-amber-500" : "bg-slate-300"}`} />
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Giro Activo</span>
+              </div>
+              <span className={`text-sm font-bold font-mono ${balanceVivo.giroUsd > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
+                {balanceVivo.giroUsd > 0
+                  ? formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.giroUsd))
+                  : "Sin deuda"}
+              </span>
             </div>
-            <ArrowRightLeft className="w-5 h-5 text-amber-500" />
-          </div>
-
-          {/* Gastos Totales del Día (Equiv. USD) */}
-          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-red-200 dark:border-red-900/40 shadow-sm">
-            <div>
-              <p className="text-xs text-red-500 uppercase font-semibold tracking-wide">Gastos Diarios</p>
-              <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-0.5">
-                {formatPrivacy(
-                  `−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.gastosTotalesUsd)}`
-                )}
-              </p>
-            </div>
-            <TrendingDown className="w-5 h-5 text-red-500" />
-          </div>
-
-          {/* Gastos del mes (Histórico acumulado) */}
-          <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm opacity-80">
-            <div>
-              <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Gastos Mes</p>
-              <p className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-0.5">
-                {formatPrivacy(
-                  `−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalGastosMesUsd)}`
-                )}
-              </p>
-            </div>
-            <DollarSign className="w-5 h-5 text-slate-400" />
           </div>
         </div>
       )}
