@@ -1,8 +1,20 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { WorkerProfile, WorkLog, Achievement, WorkerAchievement, ProviderGoal, GoalProgress, Liquidation } from '@/types/worker-portal';
 import { revalidatePath } from 'next/cache';
+import { sendInvitationEmail } from '@/lib/emailjs';
+
+// Service-role client for admin operations that bypass RLS
+function getAdminClient() {
+    return createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+}
+
+const LOCKED_FIELDS = ['documento', 'foto_url', 'matricula_provincial', 'poliza_url'] as const;
 
 const TableNames = {
     Profiles: 'personal',
@@ -324,4 +336,213 @@ export async function getWorkerMonthlyStats(personalId: string, month: number, y
         total_xp: totalXP,
         period: `${year}-${month}`,
     };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKER CREATION (Admin only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CreateWorkerInput {
+    nombre: string;
+    apellido?: string;
+    rol: string;
+    area?: string;
+    tipo?: 'prestador' | 'profesional';
+    email?: string;
+    whatsapp?: string;
+    documento?: string;
+    condicion_afip?: string;
+    valor_hora_ars?: number;
+    porcentaje_honorarios?: number;
+    fecha_ingreso?: string;
+    especialidad?: string;
+}
+
+/** Create personal record only — no app access */
+export async function createWorkerNoAccess(data: CreateWorkerInput): Promise<WorkerProfile> {
+    const admin = getAdminClient();
+    const { data: record, error } = await admin
+        .from('personal')
+        .insert({
+            nombre: data.nombre,
+            apellido: data.apellido || null,
+            rol: data.rol,
+            area: data.area || 'general',
+            tipo: data.tipo || 'prestador',
+            email: data.email || null,
+            whatsapp: data.whatsapp || null,
+            documento: data.documento || null,
+            condicion_afip: data.condicion_afip || null,
+            valor_hora_ars: data.valor_hora_ars || 0,
+            porcentaje_honorarios: data.porcentaje_honorarios || 0,
+            fecha_ingreso: data.fecha_ingreso || new Date().toISOString().split('T')[0],
+            especialidad: data.especialidad || null,
+            activo: true,
+        })
+        .select()
+        .single();
+
+    if (error) throw new Error(error.message);
+    revalidatePath('/admin/staff');
+    return record as WorkerProfile;
+}
+
+/** Create personal record AND send an invite email via Supabase auth */
+export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<WorkerProfile> {
+    if (!data.email) throw new Error('Email requerido para dar acceso al portal');
+
+    const adminSupabase = getAdminClient();
+
+    // Map business tipo → auth role
+    const authRole = data.tipo === 'profesional' ? 'odontologo' : 'asistente';
+
+    // 1. Generate invite link via Supabase Auth admin
+    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+        type: 'invite',
+        email: data.email,
+        options: {
+            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/update-password`,
+            data: {
+                full_name: `${data.nombre} ${data.apellido || ''}`.trim(),
+                role: authRole,
+            },
+        },
+    });
+
+    if (linkError) throw new Error(linkError.message);
+
+    const userId = linkData.user?.id;
+    const actionLink = linkData.properties?.action_link;
+
+    // 2. Send invitation email
+    if (actionLink) {
+        await sendInvitationEmail({
+            to_name: `${data.nombre} ${data.apellido || ''}`.trim(),
+            to_email: data.email,
+            action_link: actionLink,
+        });
+    }
+
+    // 3. Upsert profile (trigger may have already created it)
+    await adminSupabase.from('profiles').upsert({
+        id: userId,
+        email: data.email,
+        full_name: `${data.nombre} ${data.apellido || ''}`.trim(),
+        role: authRole,
+        estado: 'invitado',
+        invitation_sent_at: new Date().toISOString(),
+    });
+
+    // 4. Upsert personal record linked to auth user
+    const { data: record, error: personalError } = await adminSupabase
+        .from('personal')
+        .upsert({
+            user_id: userId,
+            nombre: data.nombre,
+            apellido: data.apellido || null,
+            rol: data.rol,
+            area: data.area || 'general',
+            tipo: data.tipo || 'prestador',
+            email: data.email,
+            whatsapp: data.whatsapp || null,
+            documento: data.documento || null,
+            condicion_afip: data.condicion_afip || null,
+            valor_hora_ars: data.valor_hora_ars || 0,
+            porcentaje_honorarios: data.porcentaje_honorarios || 0,
+            fecha_ingreso: data.fecha_ingreso || new Date().toISOString().split('T')[0],
+            especialidad: data.especialidad || null,
+            activo: true,
+        }, { onConflict: 'user_id' })
+        .select()
+        .single();
+
+    if (personalError) throw new Error(personalError.message);
+    revalidatePath('/admin/staff');
+    return record as WorkerProfile;
+}
+
+/** Send (or resend) portal access invite to an existing personal record */
+export async function sendAccessInvite(workerId: string): Promise<void> {
+    const adminSupabase = getAdminClient();
+
+    const { data: worker, error: fetchError } = await adminSupabase
+        .from('personal')
+        .select('*')
+        .eq('id', workerId)
+        .single();
+
+    if (fetchError || !worker) throw new Error('Prestador no encontrado');
+    if (!worker.email) throw new Error('El prestador no tiene email registrado');
+
+    const authRole = worker.tipo === 'profesional' ? 'odontologo' : 'asistente';
+
+    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+        type: 'invite',
+        email: worker.email,
+        options: {
+            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/update-password`,
+            data: {
+                full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
+                role: authRole,
+            },
+        },
+    });
+
+    if (linkError) throw new Error(linkError.message);
+
+    const actionLink = linkData.properties?.action_link;
+    if (actionLink) {
+        await sendInvitationEmail({
+            to_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
+            to_email: worker.email,
+            action_link: actionLink,
+        });
+    }
+
+    revalidatePath('/admin/staff');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROFILE SELF-UPDATE (Prestador — with field locking)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function updateOwnProfile(data: Partial<WorkerProfile>): Promise<void> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    // Fetch current record to check locked fields
+    const { data: current, error: fetchError } = await supabase
+        .from('personal')
+        .select('documento, foto_url, matricula_provincial, poliza_url')
+        .eq('user_id', user.id)
+        .single();
+
+    if (fetchError || !current) throw new Error('Perfil no encontrado');
+
+    // Enforce locked fields
+    for (const field of LOCKED_FIELDS) {
+        if (data[field as keyof WorkerProfile] !== undefined && current[field]) {
+            throw new Error(
+                `El campo no puede modificarse una vez registrado. Contactá a administración.`
+            );
+        }
+    }
+
+    // Remove admin-only fields (safety net)
+    const safeData = { ...data };
+    delete (safeData as any).user_id;
+    delete (safeData as any).valor_hora_ars;
+    delete (safeData as any).porcentaje_honorarios;
+    delete (safeData as any).pagado_mes_actual;
+    delete (safeData as any).activo;
+
+    const { error } = await supabase
+        .from('personal')
+        .update(safeData)
+        .eq('user_id', user.id);
+
+    if (error) throw new Error(error.message);
+    revalidatePath('/portal/profile');
+    revalidatePath('/portal/dashboard');
 }

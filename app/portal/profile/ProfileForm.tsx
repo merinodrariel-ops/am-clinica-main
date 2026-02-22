@@ -2,8 +2,12 @@
 
 import { useState } from 'react';
 import { WorkerProfile } from '@/types/worker-portal';
-import { Save, Upload, CheckCircle, AlertCircle, Camera, ShieldCheck, FileText, User, Briefcase, MapPin } from 'lucide-react';
-import { uploadWorkerDocument, upsertWorkerProfile } from '@/app/actions/worker-portal';
+import { Save, Upload, CheckCircle, AlertCircle, Camera, ShieldCheck, FileText, User, Briefcase, MapPin, Lock } from 'lucide-react';
+import { uploadWorkerDocument, updateOwnProfile } from '@/app/actions/worker-portal';
+
+// Fields that cannot be changed by the prestador once set (admin-only)
+const LOCKED_ONCE_SET = ['documento', 'foto_url', 'matricula_provincial', 'poliza_url'] as const;
+type LockedField = typeof LOCKED_ONCE_SET[number];
 import { toast } from 'sonner';
 
 interface ProfileFormProps {
@@ -40,29 +44,34 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
         }
     };
 
+    // Check if a field is locked (already set, can't be changed by prestador)
+    function isFieldLocked(field: LockedField): boolean {
+        return !!worker[field as keyof WorkerProfile];
+    }
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsSaving(true);
         const fd = new FormData(e.currentTarget);
 
         try {
-            await upsertWorkerProfile({
-                id: worker.id,
+            await updateOwnProfile({
                 nombre: fd.get('nombre') as string,
                 apellido: fd.get('apellido') as string,
                 especialidad: fd.get('especialidad') as string,
                 whatsapp: fd.get('whatsapp') as string,
                 email: fd.get('email') as string,
-                documento: fd.get('documento') as string,
+                // Only include locked fields in payload if they're not already set
+                ...(!isFieldLocked('documento') && { documento: fd.get('documento') as string }),
+                ...(!isFieldLocked('matricula_provincial') && { matricula_provincial: fd.get('matricula_provincial') as string }),
                 direccion: fd.get('direccion') as string,
                 barrio_localidad: fd.get('barrio_localidad') as string,
                 condicion_afip: fd.get('condicion_afip') as string,
-                matricula_provincial: fd.get('matricula_provincial') as string,
                 descripcion: fd.get('descripcion') as string,
             });
             toast.success('Perfil actualizado correctamente');
-        } catch {
-            toast.error('Error al guardar los cambios');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Error al guardar los cambios');
         } finally {
             setIsSaving(false);
         }
@@ -174,7 +183,13 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                             <FormField label="Nombre" name="nombre" defaultValue={worker.nombre} />
                             <FormField label="Apellido" name="apellido" defaultValue={worker.apellido} />
                             <FormField label="Email" name="email" defaultValue={worker.email} type="email" />
-                            <FormField label="DNI / Documento" name="documento" defaultValue={worker.documento} />
+                            <FormField
+                                label="DNI / Documento"
+                                name="documento"
+                                defaultValue={worker.documento}
+                                locked={isFieldLocked('documento')}
+                                lockedHint="Solo administración puede modificar el DNI una vez registrado"
+                            />
                         </div>
                         <div className="mt-4">
                             <FormField label="Descripción / Bio breve" name="descripcion" defaultValue={worker.descripcion} isTextarea />
@@ -199,7 +214,13 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                     <FormSection title="Datos Profesionales" icon={<Briefcase size={20} className="text-violet-400" />}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField label="Especialidad" name="especialidad" defaultValue={worker.especialidad} />
-                            <FormField label="Matrícula Provincial" name="matricula_provincial" defaultValue={worker.matricula_provincial} />
+                            <FormField
+                                label="Matrícula Provincial"
+                                name="matricula_provincial"
+                                defaultValue={worker.matricula_provincial}
+                                locked={isFieldLocked('matricula_provincial')}
+                                lockedHint="Solo administración puede modificar la matrícula una vez registrada"
+                            />
                         </div>
                         <div className="mt-5 p-4 bg-slate-950/30 rounded-2xl border border-slate-800/50">
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Datos de Pago (sólo lectura)</p>
@@ -315,15 +336,41 @@ function FormSection({ title, icon, children }: { title: string; icon: React.Rea
     );
 }
 
-function FormField({ label, name, defaultValue, type = 'text', placeholder, isTextarea }: {
-    label: string; name: string; defaultValue?: string; type?: string; placeholder?: string; isTextarea?: boolean;
+function FormField({ label, name, defaultValue, type = 'text', placeholder, isTextarea, locked, lockedHint }: {
+    label: string;
+    name: string;
+    defaultValue?: string;
+    type?: string;
+    placeholder?: string;
+    isTextarea?: boolean;
+    locked?: boolean;
+    lockedHint?: string;
 }) {
     const baseClass = "w-full bg-slate-950/50 border border-slate-800/50 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 text-slate-200 rounded-xl px-4 text-sm transition-all outline-none placeholder:text-slate-600";
+    const lockedClass = "w-full bg-slate-900/30 border border-slate-800/30 text-slate-400 rounded-xl px-4 text-sm cursor-not-allowed opacity-70";
 
     return (
         <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</label>
-            {isTextarea ? (
+            <div className="flex items-center gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+                {locked && (
+                    <span title={lockedHint || 'Solo administración puede modificar este campo'}>
+                        <Lock size={10} className="text-amber-500" />
+                    </span>
+                )}
+            </div>
+            {locked ? (
+                <div className="relative">
+                    <input
+                        type={type}
+                        name={name}
+                        value={defaultValue || ''}
+                        readOnly
+                        className={`${lockedClass} h-11 pr-10`}
+                    />
+                    <Lock size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500/60" />
+                </div>
+            ) : isTextarea ? (
                 <textarea
                     name={name}
                     defaultValue={defaultValue || ''}
@@ -339,6 +386,11 @@ function FormField({ label, name, defaultValue, type = 'text', placeholder, isTe
                     placeholder={placeholder}
                     className={`${baseClass} h-11`}
                 />
+            )}
+            {locked && lockedHint && (
+                <p className="text-[10px] text-amber-600/70 flex items-center gap-1">
+                    <Lock size={8} />{lockedHint}
+                </p>
             )}
         </div>
     );

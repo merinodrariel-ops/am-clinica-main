@@ -84,6 +84,18 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
+    // Redirect prestador roles to /portal instead of admin areas
+    const PORTAL_ROLES = ['odontologo', 'asistente', 'laboratorio']
+    const userRole = (user?.user_metadata?.role ?? '') as string
+    if (user && PORTAL_ROLES.includes(userRole)) {
+        const ADMIN_PATHS = ['/dashboard', '/caja-admin', '/caja-recepcion', '/admin/staff', '/inventario', '/agenda']
+        if (ADMIN_PATHS.some(p => path === p || path.startsWith(p + '/'))) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/portal/dashboard'
+            return NextResponse.redirect(url)
+        }
+    }
+
     // IMPORTANT: You *must* return the response object as it is. If you're
     // creating a new Response object with NextResponse.redirect() inside
     // this middleware, you must handle cookies setting there too.
