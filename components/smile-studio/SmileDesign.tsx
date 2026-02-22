@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createBrowserClient } from '@supabase/ssr';
 import { toast } from 'sonner';
 import {
-    Loader2, Save, Sparkles, RotateCcw, Download,
-    ScanFace, Wand2, AlertCircle, Camera, CheckCircle2, ChevronRight, Share2
+    Loader2, Save, Sparkles, RotateCcw, Download, Video, RotateCcw as ResetIcon,
+    ScanFace, Wand2, AlertCircle, Camera, CheckCircle2, ChevronRight, Share2,
+    Play, X, Maximize2
 } from 'lucide-react';
 import { ImageComparator } from '../patients/ImageComparator';
 import { IntensitySlider } from '../patients/IntensitySlider';
@@ -183,6 +184,158 @@ async function downloadComparison(beforeUrl: string, afterUrl: string, intensity
     link.click();
 }
 
+/** Create and download a branded before/after comparison video (swipe animation). Returns the Blob URL for preview. */
+async function downloadComparisonVideo(beforeUrl: string, afterUrl: string, intensity: number): Promise<string> {
+    const [before, after] = await Promise.all([loadImg(beforeUrl), loadImg(afterUrl)]);
+
+    const W = 1080;
+    const HEADER = 100;
+    const FOOTER = 80;
+    const imgW = W;
+    const imgH = Math.round(imgW * (before.naturalHeight / before.naturalWidth));
+    const totalH = HEADER + imgH + FOOTER;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = totalH;
+    const ctx = canvas.getContext('2d', { alpha: false })!;
+
+    // Stream & Recorder
+    const fps = 30;
+    const stream = canvas.captureStream(fps);
+
+    // Try to find a supported mime type
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+
+    const recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 5000000 // 5Mbps for high quality
+    });
+
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = e => {
+        if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    return new Promise<void>((resolve, reject) => {
+        recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+
+            // Auto-download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `smile_design_am_${new Date().toISOString().split('T')[0]}.webm`;
+            link.click();
+
+            resolve(url);
+        };
+
+        recorder.onerror = () => reject(new Error('Video recording failed'));
+
+        recorder.start();
+
+        const duration = 4000; // 4 seconds total
+        const startTime = performance.now();
+
+        function drawFrame(now: number) {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Swipe logic: 
+            // 0-20% (0.8s): Static Before
+            // 20-80% (2.4s): Linear Swipe
+            // 80-100% (0.8s): Static After
+            let swipe = 0;
+            if (progress < 0.2) swipe = 0;
+            else if (progress < 0.8) swipe = (progress - 0.2) / 0.6;
+            else swipe = 1;
+
+            const splitX = W * swipe;
+
+            // 1. Background
+            ctx.fillStyle = '#0f0f18';
+            ctx.fillRect(0, 0, W, totalH);
+
+            // 2. Draw Images
+            // Draw Before (Full width)
+            ctx.drawImage(before, 0, HEADER, imgW, imgH);
+
+            // Draw After (Clipped left part)
+            if (swipe > 0) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(0, HEADER, splitX, imgH);
+                ctx.clip();
+                ctx.drawImage(after, 0, HEADER, imgW, imgH);
+                ctx.restore();
+
+                // Divider Line
+                if (swipe < 1) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = 'rgba(167, 139, 250, 0.8)';
+                    ctx.strokeStyle = '#a78bfa';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(splitX, HEADER);
+                    ctx.lineTo(splitX, HEADER + imgH);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // Handle/Diamond transition
+                    ctx.fillStyle = '#a78bfa';
+                    ctx.beginPath();
+                    ctx.arc(splitX, HEADER + imgH / 2, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+
+            // 3. Branded Overlays
+            // Header
+            ctx.fillStyle = 'rgba(15, 15, 24, 0.8)';
+            ctx.fillRect(0, 0, W, HEADER);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('SMILE DESIGN · AM CLÍNICA', W / 2, 45);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '18px Arial';
+            ctx.fillText('Simulación Digital Progresiva · Puerto Madero', W / 2, 75);
+
+            // Labels
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fillText('ANTES', 30, HEADER + 40);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#a78bfa';
+            ctx.fillText('DESPUÉS (IA)', W - 30, HEADER + 40);
+
+            // Footer
+            ctx.fillStyle = 'rgba(15, 15, 24, 0.9)';
+            ctx.fillRect(0, totalH - FOOTER, W, FOOTER);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('amclinica.com.ar · Este resultado es una simulación visual', W / 2, totalH - 35);
+
+            if (progress < 1) {
+                requestAnimationFrame(drawFrame);
+            } else {
+                // Record a bit of the final state
+                setTimeout(() => recorder.stop(), 500);
+            }
+        }
+
+        requestAnimationFrame(drawFrame);
+    });
+}
+
 /** base64 string → Blob */
 function base64ToBlob(base64: string, mimeType: string): Blob {
     const bytes = atob(base64);
@@ -196,9 +349,12 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
 export default function SmileDesign({ patientId, onSaved }: Props) {
     const [phase, setPhase] = useState<Phase>('drop');
     const [isDragging, setIsDragging] = useState(false);
-    const [intensity, setIntensity] = useState(5);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
+    const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+    const [intensity, setIntensity] = useState(5);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     // Image data
@@ -382,7 +538,6 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
         }
     };
 
-    // ── Download comparison ───────────────────────────────────────────────────
     const handleDownload = async () => {
         if (!beforeStoredUrl || !afterStoredUrl) return;
         setIsDownloading(true);
@@ -392,6 +547,22 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
             toast.error('Error al generar imagen compartible');
         } finally {
             setIsDownloading(false);
+        }
+    };
+
+    const handleDownloadVideo = async () => {
+        if (!beforeStoredUrl || !afterStoredUrl) return;
+        setIsDownloadingVideo(true);
+        toast.info('Generando video de comparación...');
+        try {
+            const url = await downloadComparisonVideo(beforeStoredUrl, afterStoredUrl, intensity);
+            setVideoPreviewUrl(url);
+            toast.success('Video generado correctamente');
+        } catch (err) {
+            console.error(err);
+            toast.error('Error al generar video. Asegurate de estar en un navegador moderno.');
+        } finally {
+            setIsDownloadingVideo(false);
         }
     };
 
@@ -681,11 +852,20 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
 
                             <button
                                 onClick={handleDownload}
-                                disabled={isDownloading}
-                                className="flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-300 hover:bg-white/5 transition-all disabled:opacity-30"
+                                disabled={isDownloading || isDownloadingVideo}
+                                className="flex-1 flex items-center justify-center gap-3 px-6 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-300 hover:bg-white/5 transition-all disabled:opacity-30"
                             >
                                 {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                                Descargar
+                                Imagen
+                            </button>
+
+                            <button
+                                onClick={handleDownloadVideo}
+                                disabled={isDownloading || isDownloadingVideo}
+                                className="flex-1 flex items-center justify-center gap-3 px-6 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-300 hover:bg-white/5 transition-all disabled:opacity-30"
+                            >
+                                {isDownloadingVideo ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />}
+                                Video
                             </button>
 
                             <button
@@ -704,6 +884,85 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                     </motion.div>
                 )}
 
+
+                {/* ── VIDEO PREVIEW MODAL ────────────────────────────────────── */}
+                <AnimatePresence>
+                    {videoPreviewUrl && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                className="relative w-full max-w-4xl bg-slate-900 rounded-[2.5rem] border border-white/10 shadow-3xl overflow-hidden"
+                            >
+                                {/* Header / Controls */}
+                                <div className="absolute top-6 right-6 z-10 flex gap-3">
+                                    <button
+                                        onClick={() => {
+                                            const link = document.createElement('a');
+                                            link.href = videoPreviewUrl;
+                                            link.download = `smile_design_am_${new Date().toISOString().split('T')[0]}.webm`;
+                                            link.click();
+                                        }}
+                                        className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                        title="Descargar de nuevo"
+                                    >
+                                        <Download size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            URL.revokeObjectURL(videoPreviewUrl);
+                                            setVideoPreviewUrl(null);
+                                        }}
+                                        className="p-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 transition-colors"
+                                        title="Cerrar"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                <div className="p-8 pb-4">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                                            <Video className="text-violet-400 w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-white uppercase tracking-tight">Vista Previa del Video</h3>
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Simulación de Transformación</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="aspect-[1080/1260] max-h-[60vh] mx-auto rounded-3xl overflow-hidden bg-black border border-white/5 relative group">
+                                        <video
+                                            src={videoPreviewUrl}
+                                            controls
+                                            autoPlay
+                                            loop
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+
+                                    <div className="mt-8 flex justify-center">
+                                        <button
+                                            onClick={() => {
+                                                URL.revokeObjectURL(videoPreviewUrl);
+                                                setVideoPreviewUrl(null);
+                                            }}
+                                            className="px-10 py-4 rounded-2xl bg-white text-slate-950 text-xs font-black uppercase tracking-[0.2em] hover:bg-slate-200 transition-all active:scale-95"
+                                        >
+                                            Volver al Diseño
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </AnimatePresence>
         </div>
     );

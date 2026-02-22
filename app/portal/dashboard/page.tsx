@@ -1,4 +1,4 @@
-import { getCurrentWorkerProfile, getWorkerMonthlyStats, getWorkerAchievements, getWorkerLogs, getWorkerLiquidations, getAllGoals, getGoalProgress } from "@/app/actions/worker-portal";
+import { getCurrentWorkerProfile, getWorkerMonthlyStats, getWorkerAchievements, getWorkerLogs, getWorkerLiquidations, getAllGoals, getGoalProgress, getUserAppProfile } from "@/app/actions/worker-portal";
 import {
     Users,
     Calendar,
@@ -14,6 +14,7 @@ import {
     Building2,
     FlaskConical,
     Sparkles,
+    Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -43,6 +44,9 @@ export default async function WorkerDashboard() {
     const worker = await getCurrentWorkerProfile();
 
     if (!worker) {
+        const userProfile = await getUserAppProfile();
+        const isAdmin = ['admin', 'owner'].includes(userProfile?.role || '');
+
         return (
             <div className="flex flex-col items-center justify-center p-12 text-center h-[70vh]">
                 <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 border border-slate-700">
@@ -52,6 +56,15 @@ export default async function WorkerDashboard() {
                 <p className="text-slate-400 mt-2 max-w-sm">
                     Tu cuenta no está vinculada a un perfil de personal. Contactá a Administración.
                 </p>
+                {isAdmin && (
+                    <Link
+                        href="/admin/staff"
+                        className="mt-8 flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-sm font-bold transition-all shadow-lg shadow-indigo-500/20"
+                    >
+                        <Settings size={18} />
+                        Gestionar Personal y Vincular
+                    </Link>
+                )}
             </div>
         );
     }

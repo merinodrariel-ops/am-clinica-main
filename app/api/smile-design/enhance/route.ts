@@ -5,16 +5,16 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 // Intensity descriptions (1=natural, 10=Hollywood)
 const INTENSITY: Record<number, string> = {
-    1: 'extremely subtle — just remove minor stains, keep completely natural',
-    2: 'very natural — light cleaning, almost invisible change',
-    3: 'natural — gentle whitening, like professional cleaning',
-    4: 'moderate — noticeable but still natural whitening',
-    5: 'medium — clear whitening, balanced and healthy looking',
-    6: 'enhanced — bright white, like professional whitening treatment',
-    7: 'bright — very white, cosmetic dentistry standard',
-    8: 'very bright — high-end cosmetic result, near Hollywood',
-    9: 'ultra bright — premium Hollywood smile level',
-    10: 'maximum Hollywood — brilliant white, full cosmetic transformation',
+    1: 'Subtle Touch-up — preserve original shapes, clean only',
+    2: 'Natural Cleaning — professional polish, very subtle',
+    3: 'Gentle Whitening — natural appearance, healthy look',
+    4: 'Professional Whitening — noticeable but balanced',
+    5: 'Balanced Aesthetic — healthy, symmetrical and bright',
+    6: 'Enhanced Cosmetic — bright, standard cosmetic dentistry',
+    7: 'High-End Transformation — very bright and perfectly aligned',
+    8: 'Premium Hollywood — brilliant white, major impact',
+    9: 'Ultra-Premium Hollywood — top-tier aesthetic result',
+    10: 'Maximum Transformation — blinding white, flawless symmetry',
 };
 
 export async function POST(req: NextRequest) {
@@ -26,14 +26,28 @@ export async function POST(req: NextRequest) {
         }
 
         const level = Math.max(1, Math.min(10, Math.round(intensity ?? 5)));
-        const whiteningPrompt = level === 1 ? 'a very subtle, natural brightening, just enough to look healthy and clean'
-            : level <= 3 ? 'a natural whitening, similar to the effect of professional cleaning and polishing'
-                : level <= 5 ? 'a noticeable cosmetic whitening, like using whitening strips for a few weeks'
-                    : level <= 7 ? 'a bright, professional cosmetic whitening treatment look'
-                        : level <= 9 ? 'a very bright, brilliant "Hollywood" style white'
-                            : 'an extremely bright, dazzling white, the maximum level of cosmetic whitening';
 
-        const prompt = `Enhance the smile in this photo to a high-resolution, photorealistic quality. Make the teeth perfectly aligned and apply ${whiteningPrompt}. Maintain all other facial features and the original background without any pixelation or compression artifacts.`;
+        const aestheticPrompt = level <= 2
+            ? 'an extremely subtle, natural touch-up. Maintain the original tooth shapes and textures, only correcting minor discolorations and providing a gentle, healthy polish.'
+            : level <= 5
+                ? 'a professional dental whitening result. Enhance tooth symmetry slightly while preserving natural enamel texture, subtle incisal translucency, and realistic anatomical variations.'
+                : level <= 8
+                    ? 'a premium cosmetic dentistry transformation. Create perfect alignment and a bright, healthy color. Ensure teeth have depth, realistic mamelon details, and a natural light-reflecting surface.'
+                    : 'a full Hollywood-standard cosmetic reconstruction. Flawless symmetry, brilliant white shade (BL1 standard), but with high-end photorealistic detail to ensure they look real and integrated.';
+
+        const prompt = `
+            Task: Professional Dentofacial Aesthetic Simulation.
+            
+            Instruction:
+            Transform ONLY the teeth and smile area to achieve ${aestheticPrompt}.
+            
+            CRITICAL REALISM REQUIREMENTS:
+            1. LIGHTING & TEXTURE: Match the ambient lighting of the original photo exactly. Include realistic specular highlights and subtle reflections. Teeth must NOT look flat or like a sticker. Maintain natural enamel micro-texture.
+            2. ANATOMY: Ensure realistic incisal translucency (edges of teeth should be slightly translucent). Maintain a natural and healthy gingival transition (where teeth meet gums).
+            3. INTEGRATION: Teeth must look physically integrated into the mouth. Apply subtle interdental shadowing to provide depth and 3D volume.
+            4. PRESERVATION: Keep all other facial features, lips, skin texture, and background COMPLETELY UNTOUCHED.
+            5. QUALITY: High-resolution, photorealistic, sharp focus, no pixelation.
+        `.trim();
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.0-flash-exp-image-generation',

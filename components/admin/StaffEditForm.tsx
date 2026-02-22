@@ -230,7 +230,6 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                     </div>
                 </div>
             </div>
-        </div>
         </form>
     );
 }

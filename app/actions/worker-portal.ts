@@ -48,6 +48,20 @@ export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
     return data as WorkerProfile;
 }
 
+export async function getUserAppProfile(): Promise<{ role: string | null } | null> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    return profile;
+}
+
 export async function getAppUsers(): Promise<{ id: string, full_name: string, email: string }[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
