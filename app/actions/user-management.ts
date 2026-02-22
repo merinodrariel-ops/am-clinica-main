@@ -223,7 +223,7 @@ export async function updateUser(userId: string, data: UpdateUserData) {
             });
         }
 
-        revalidatePath('/admin/users');
+        revalidatePath('/admin-users');
         return { success: true };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };

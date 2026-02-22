@@ -585,3 +585,39 @@ export async function updateOwnProfile(data: Partial<WorkerProfile>): Promise<vo
     revalidatePath('/portal/profile');
     revalidatePath('/portal/dashboard');
 }
+
+/**
+ * ADMIN ONLY update action that bypasses field locking.
+ */
+export async function updateWorkerProfileAdmin(workerId: string, data: Partial<WorkerProfile>): Promise<void> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    // Role check
+    const { data: adminProfile } = await supabase
+        .from('personal')
+        .select('rol')
+        .eq('user_id', user.id)
+        .single();
+
+    if (adminProfile?.rol !== 'admin') {
+        throw new Error('Acceso denegado: Se requieren permisos de administrador');
+    }
+
+    // Safety: don't allow changing user_id directly through this form
+    const cleanData = { ...data };
+    delete (cleanData as any).user_id;
+    delete (cleanData as any).full_name;
+
+    const { error } = await supabase
+        .from('personal')
+        .update(cleanData)
+        .eq('id', workerId);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath('/admin/staff');
+    revalidatePath(`/admin/staff/${workerId}`);
+    revalidatePath('/portal/profile');
+}

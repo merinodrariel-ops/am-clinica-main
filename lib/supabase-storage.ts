@@ -19,6 +19,7 @@ const BUCKETS = {
     'caja-recepcion': { name: 'caja-recepcion', isPublic: false },
     'pacientes': { name: 'pacientes', isPublic: false },
     'inventory-products': { name: 'inventory-products', isPublic: true },
+    'personal-documents': { name: 'personal-documents', isPublic: true },
 } as const;
 
 type AreaType = keyof typeof BUCKETS;

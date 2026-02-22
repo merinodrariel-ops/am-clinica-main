@@ -5,6 +5,7 @@ import { WorkerProfile } from '@/types/worker-portal';
 import { Save, Upload, CheckCircle, AlertCircle, Camera, ShieldCheck, FileText, User, Briefcase, MapPin, Lock } from 'lucide-react';
 import { uploadWorkerDocument, uploadWorkerPhoto, updateOwnProfile } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/image-utils';
 
 // Fields that cannot be changed by the prestador once set (admin-only)
 const LOCKED_ONCE_SET = ['documento', 'matricula_provincial', 'poliza_url'] as const;
@@ -36,8 +37,9 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
         setUploading(type);
         try {
             if (type === 'profile_photo') {
-                await uploadWorkerPhoto(worker.id, file);
-                toast.success('Foto de perfil actualizada');
+                const compressedFile = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.7 });
+                await uploadWorkerPhoto(worker.id, compressedFile);
+                toast.success('Foto de perfil actualizada (comprimida)');
             } else {
                 await uploadWorkerDocument(worker.id, file, type);
                 toast.success(`Documento cargado exitosamente`);

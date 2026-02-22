@@ -19,13 +19,15 @@ export async function GET() {
         if (result.success) {
             // List files to verify
             const files = await listStorageFiles('caja-admin');
+            const personalFiles = await listStorageFiles('personal-documents');
 
             return NextResponse.json({
                 success: true,
                 message: 'Archivo de prueba subido exitosamente a Supabase Storage',
                 uploadResult: result,
                 bucketsInitialized: initResults,
-                filesInBucket: files.files?.slice(0, 5) || [],
+                filesInCajaAdmin: files.files?.slice(0, 5) || [],
+                filesInPersonalDocs: personalFiles.files?.slice(0, 5) || [],
             });
         } else {
             return NextResponse.json({
