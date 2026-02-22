@@ -57,6 +57,7 @@ import HistorialEdicionesModal from "@/components/caja/HistorialEdicionesModal";
 import { ComprobanteUpload } from "@/components/caja/ComprobanteUpload";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { getLocalISODate } from "@/lib/local-date";
 import { Textarea } from "@/components/ui/Textarea";
 import MoneyInput from "@/components/ui/MoneyInput";
 
@@ -145,7 +146,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     subtipo: "",
     descripcion: "",
     nota: "",
-    fecha_movimiento: new Date().toISOString().split("T")[0],
+    fecha_movimiento: getLocalISODate(),
   });
   const [formLineas, setFormLineas] = useState<MovimientoLinea[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -767,7 +768,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       setSubmitting(false);
       if (error) { setFormError(error.message); return; }
       setShowForm(false);
-      setFormData({ tipo_movimiento: "EGRESO", subtipo: "", descripcion: "", nota: "", fecha_movimiento: new Date().toISOString().split("T")[0] });
+      setFormData({ tipo_movimiento: "EGRESO", subtipo: "", descripcion: "", nota: "", fecha_movimiento: getLocalISODate() });
       setGiroMonto("");
       setGiroMoneda("ARS");
       setGiroRate("");
@@ -857,7 +858,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       subtipo: "",
       descripcion: "",
       nota: "",
-      fecha_movimiento: new Date().toISOString().split("T")[0],
+      fecha_movimiento: getLocalISODate(),
     });
     setFormLineas([]);
     setAdjuntos([]);
