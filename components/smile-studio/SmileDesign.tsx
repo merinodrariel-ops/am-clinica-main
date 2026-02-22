@@ -51,7 +51,7 @@ async function fileToBase64(file: File): Promise<{ base64: string; mimeType: str
 async function compressImage(
     file: File,
     maxW = 2000,
-    quality = 0.75
+    quality = 0.95
 ): Promise<{ base64: string; mimeType: string; dataUrl: string; width: number; height: number }> {
     return new Promise((resolve, reject) => {
         const img = new window.Image();
