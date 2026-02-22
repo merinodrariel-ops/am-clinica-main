@@ -14,7 +14,7 @@ function getAdminClient() {
     );
 }
 
-const LOCKED_FIELDS = ['documento', 'foto_url', 'matricula_provincial', 'poliza_url'] as const;
+const LOCKED_FIELDS = ['documento', 'matricula_provincial', 'poliza_url'] as const;
 
 const TableNames = {
     Profiles: 'personal',
@@ -130,8 +130,36 @@ export async function uploadWorkerDocument(workerId: string, file: File, type: s
     const docCount = Object.keys(docs).length;
     await updateGoalProgressByCode(workerId, 'upload_dni', docCount >= 2 ? 1 : 0);
 
-    revalidatePath('/portal/profile');
     revalidatePath('/portal/dashboard');
+    return { success: true, url: publicUrl };
+}
+
+export async function uploadWorkerPhoto(workerId: string, file: File) {
+    const supabase = await createClient();
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${workerId}/profile_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('personal-documents')
+        .upload(fileName, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+        .from('personal-documents')
+        .getPublicUrl(fileName);
+
+    const { error: updateError } = await supabase
+        .from(TableNames.Profiles)
+        .update({ foto_url: publicUrl })
+        .eq('id', workerId);
+
+    if (updateError) throw updateError;
+
+    revalidatePath('/portal/profile');
+    revalidatePath('/admin/staff');
+    revalidatePath(`/admin/staff/${workerId}`);
     return { success: true, url: publicUrl };
 }
 
@@ -404,7 +432,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
         type: 'invite',
         email: data.email,
         options: {
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/update-password`,
+            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/callback?next=/auth/update-password`,
             data: {
                 full_name: `${data.nombre} ${data.apellido || ''}`.trim(),
                 role: authRole,
@@ -487,7 +515,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
         type: 'invite',
         email: worker.email,
         options: {
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/update-password`,
+            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/callback?next=/auth/update-password`,
             data: {
                 full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
                 role: authRole,

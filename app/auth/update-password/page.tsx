@@ -22,6 +22,7 @@ export default function UpdatePasswordPage() {
             alert(error.message);
             setLoading(false);
         } else {
+            // Middleware will redirect portal roles to /portal/dashboard automatically
             router.replace('/dashboard');
         }
     };
