@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/nodemailer';
+import { generateTreatmentTimelineEmail } from '@/lib/email-templates';
 import type {
     ClinicalWorkflow,
     PatientSearchResult,
@@ -563,13 +564,14 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
     const { data: stageConfig, error: stageError } = await supabase
         .from('clinical_workflow_stages')
         .select(`
-            name, 
-            workflow_id, 
-            notify_on_entry, 
-            notify_emails, 
-            staff_email_template, 
+            name,
+            order_index,
+            workflow_id,
+            notify_on_entry,
+            notify_emails,
+            staff_email_template,
             staff_email_subject,
-            patient_email_template, 
+            patient_email_template,
             patient_email_subject,
             notify_patient_on_entry
         `)
@@ -677,18 +679,36 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
         if (stageConfig.patient_email_template && stageConfig.patient_email_template.trim()) {
             patientHtml = replaceVars(stageConfig.patient_email_template).replace(/\n/g, '<br/>');
         } else {
-            patientHtml = `
-                <div style="font-family: Arial, sans-serif; color: #111827;">
-                    <h2 style="margin: 0 0 8px;">Notificacion de tratamiento</h2>
-                    <p style="margin: 0 0 8px;">Hola ${patientData.nombre || 'Paciente'}, te informamos que tu caso en ${workflowName || 'nuestra clinica'} ha avanzado a la etapa: <strong>${stageConfig.name}</strong>.</p>
-                    <p style="margin: 0 0 8px;">Estaremos en contacto pronto para los siguientes pasos.</p>
-                </div>
-            `;
+            // Fetch all stages to build the timeline email
+            const { data: allStagesData } = await supabase
+                .from('clinical_workflow_stages')
+                .select('name, order_index')
+                .eq('workflow_id', stageConfig.workflow_id)
+                .order('order_index', { ascending: true });
+
+            const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+            const portalUrl = `${appBaseUrl}/mi-clinica`;
+
+            const nextApptFormatted = treatmentData.next_milestone_date
+                ? new Date(treatmentData.next_milestone_date).toLocaleDateString('es-AR', {
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                })
+                : null;
+
+            patientHtml = generateTreatmentTimelineEmail({
+                nombre: patientData.nombre || 'Paciente',
+                workflowName: workflowName || 'Tu tratamiento',
+                currentStageName: stageConfig.name,
+                currentStageOrder: typeof stageConfig.order_index === 'number' ? stageConfig.order_index : 1,
+                allStages: (allStagesData || []).map(s => ({ name: s.name, order_index: s.order_index ?? 0 })),
+                portalUrl,
+                nextAppointmentDate: nextApptFormatted,
+            });
         }
 
         const patientSubject = stageConfig.patient_email_subject
             ? replaceVars(stageConfig.patient_email_subject)
-            : `Actualizacion sobre tu tratamiento: ${stageConfig.name}`;
+            : `Tu tratamiento avanz&#243; &#8212; ${stageConfig.name} | AM Cl&#237;nica`;
 
         const patientEventKey = createNotificationKey(['stage_entry_patient', treatmentId, stageId, patientData.email, new Date().toISOString().slice(0, 10)]);
         const response = await sendEmail({ to: patientData.email, subject: patientSubject, html: patientHtml });

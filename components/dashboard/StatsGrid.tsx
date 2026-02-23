@@ -19,14 +19,14 @@ export default function StatsGrid() {
 
     if (loading) {
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
                 {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 animate-pulse">
+                    <div key={i} className="glass-card rounded-2xl p-6 animate-pulse">
                         <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-xl bg-gray-100 dark:bg-gray-700" />
+                            <div className="h-12 w-12 rounded-xl" style={{ background: 'hsl(230 15% 18%)' }} />
                             <div className="space-y-2">
-                                <div className="h-4 w-20 bg-gray-100 dark:bg-gray-700 rounded" />
-                                <div className="h-6 w-12 bg-gray-100 dark:bg-gray-700 rounded" />
+                                <div className="h-4 w-20 rounded" style={{ background: 'hsl(230 15% 18%)' }} />
+                                <div className="h-6 w-12 rounded" style={{ background: 'hsl(230 15% 18%)' }} />
                             </div>
                         </div>
                     </div>
@@ -35,67 +35,77 @@ export default function StatsGrid() {
         );
     }
 
+    const cards = [
+        {
+            icon: Users,
+            label: 'Pacientes',
+            value: stats?.patientsCount.toLocaleString() || '0',
+            gradient: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(224 76% 48%))',
+            iconBg: 'hsla(217, 91%, 60%, 0.12)',
+            iconColor: 'hsl(217 91% 65%)',
+        },
+        {
+            icon: Banknote,
+            label: 'Ingresos Hoy',
+            value: `$${stats?.todayIncome.toLocaleString() || 0} USD`,
+            gradient: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(160 80% 35%))',
+            iconBg: 'hsla(165, 100%, 42%, 0.12)',
+            iconColor: 'hsl(165 85% 50%)',
+        },
+        {
+            icon: BarChart3,
+            label: 'Ingresos Mes',
+            value: `$${stats?.monthIncome.toLocaleString() || 0} USD`,
+            gradient: 'linear-gradient(135deg, hsl(280 67% 55%), hsl(265 70% 50%))',
+            iconBg: 'hsla(280, 67%, 55%, 0.12)',
+            iconColor: 'hsl(280 67% 65%)',
+        },
+        {
+            icon: Wallet,
+            label: 'Caja Admin (Efectivo)',
+            isDouble: true,
+            valueUsd: `USD ${stats?.adminCash?.usd.toLocaleString() || 0}`,
+            valueArs: `ARS ${stats?.adminCash?.ars.toLocaleString() || 0}`,
+            gradient: 'linear-gradient(135deg, hsl(25 95% 53%), hsl(15 80% 48%))',
+            iconBg: 'hsla(25, 95%, 53%, 0.12)',
+            iconColor: 'hsl(25 95% 60%)',
+        },
+    ];
+
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                        <Users size={24} />
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">Pacientes</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {stats?.patientsCount.toLocaleString() || 0}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
-                        <Banknote size={24} />
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">Ingresos Hoy</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            ${stats?.todayIncome.toLocaleString() || 0} USD
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                        <BarChart3 size={24} />
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">Ingresos Mes</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            ${stats?.monthIncome.toLocaleString() || 0} USD
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-400">
-                        <Wallet size={24} />
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">Caja Admin (Efectivo)</p>
-                        <div className="flex flex-col">
-                            <span className="text-lg font-bold text-gray-900 dark:text-white">
-                                USD {stats?.adminCash?.usd.toLocaleString() || 0}
-                            </span>
-                            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                ARS {stats?.adminCash?.ars.toLocaleString() || 0}
-                            </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
+            {cards.map((card, i) => {
+                const Icon = card.icon;
+                return (
+                    <div key={i} className="glass-card glass-card-hover rounded-2xl p-6">
+                        <div className="flex items-center gap-4">
+                            <div
+                                className="h-12 w-12 rounded-xl flex items-center justify-center"
+                                style={{ background: card.iconBg }}
+                            >
+                                <Icon size={24} style={{ color: card.iconColor }} />
+                            </div>
+                            <div>
+                                <p className="text-sm" style={{ color: 'hsl(230 10% 50%)' }}>{card.label}</p>
+                                {card.isDouble ? (
+                                    <div className="flex flex-col">
+                                        <span className="text-lg font-bold" style={{ color: 'hsl(210 20% 95%)' }}>
+                                            {card.valueUsd}
+                                        </span>
+                                        <span className="text-sm font-medium" style={{ color: 'hsl(230 10% 50%)' }}>
+                                            {card.valueArs}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <p className="text-2xl font-bold" style={{ color: 'hsl(210 20% 95%)' }}>
+                                        {card.value}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                );
+            })}
         </div>
     );
 }

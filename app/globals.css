@@ -2,70 +2,110 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ============================================================
+   AM CLÍNICA — DESIGN SYSTEM (Dark Mode Premium)
+   Inspired by Stitch designs: Navy + Teal + Glassmorphism
+   ============================================================ */
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
+  /* Core palette */
+  --navy-950: 230 25% 8%;
+  --navy-900: 230 20% 11%;
+  --navy-800: 230 18% 15%;
+  --navy-700: 230 15% 22%;
+  --navy-600: 230 12% 32%;
+  --teal-500: 165 100% 42%;
+  --teal-400: 165 85% 50%;
+  --teal-300: 165 70% 60%;
+
+  /* Semantic tokens - Dark mode by default */
+  --background: var(--navy-950);
+  --foreground: 210 20% 95%;
+
+  --card: 230 20% 13%;
+  --card-foreground: 210 20% 95%;
+
+  --popover: 230 20% 13%;
+  --popover-foreground: 210 20% 95%;
+
+  --primary: var(--teal-500);
+  --primary-foreground: 230 25% 8%;
+
+  --secondary: 230 15% 18%;
+  --secondary-foreground: 210 15% 85%;
+
+  --muted: 230 12% 18%;
+  --muted-foreground: 230 10% 55%;
+
+  --accent: var(--teal-500);
+  --accent-foreground: 230 25% 8%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 98%;
+
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 8%;
+
+  --border: 230 15% 18%;
+  --input: 230 15% 18%;
+  --ring: var(--teal-500);
+
+  --radius: 0.75rem;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+  /* Sidebar */
+  --sidebar-bg: 230 22% 10%;
+  --sidebar-border: 230 15% 15%;
+  --sidebar-item-active: var(--teal-500);
+}
+
+/* Light mode override (for users who prefer it) */
+.light {
+  --background: 0 0% 97%;
+  --foreground: 230 25% 10%;
 
   --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
+  --card-foreground: 230 25% 10%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
+  --popover-foreground: 230 25% 10%;
 
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
+  --primary: 165 100% 35%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
+  --secondary: 230 15% 93%;
+  --secondary-foreground: 230 15% 25%;
 
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
+  --muted: 230 10% 93%;
+  --muted-foreground: 230 10% 45%;
 
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
+  --accent: 165 100% 35%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 10% 3.9%;
+  --border: 230 10% 88%;
+  --input: 230 10% 88%;
+  --ring: 165 100% 35%;
 
-  --radius: 0.5rem;
-}
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
 
-.dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  --sidebar-bg: 0 0% 100%;
+  --sidebar-border: 230 10% 90%;
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 
   --color-background: hsl(var(--background));
@@ -101,20 +141,183 @@
   --radius-sm: calc(var(--radius) - 4px);
 }
 
-body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
-}
+/* ============================================================
+   GLOBAL STYLES
+   ============================================================ */
 
 html {
   scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.22);
+  background: hsla(165, 100%, 42%, 0.25);
   color: inherit;
 }
+
+/* ============================================================
+   GLASSMORPHISM UTILITIES
+   ============================================================ */
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+   SIDEBAR STYLES
+   ============================================================ */
+
+.sidebar-glow {
+  position: relative;
+}
+
+.sidebar-glow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: hsl(var(--teal-500));
+  border-radius: 0 4px 4px 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-glow.active::before {
+  opacity: 1;
+}
+
+/* ============================================================
+   CUSTOM SCROLLBAR
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(230 15% 25%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(230 15% 35%);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsla(165, 100%, 42%, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px hsla(165, 100%, 42%, 0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.animate-slide-in {
+  animation: slide-in-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Stagger children animations */
+.stagger-children>* {
+  animation: fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.stagger-children>*:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.stagger-children>*:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.stagger-children>*:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.stagger-children>*:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+.stagger-children>*:nth-child(5) {
+  animation-delay: 0.2s;
+}
+
+.stagger-children>*:nth-child(6) {
+  animation-delay: 0.25s;
+}
+
+/* ============================================================
+   FOCUS STYLES
+   ============================================================ */
 
 button:focus-visible,
 a:focus-visible,
@@ -122,9 +325,13 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid hsl(var(--teal-500));
   outline-offset: 2px;
 }
+
+/* ============================================================
+   ACCESSIBILITY
+   ============================================================ */
 
 @media (prefers-reduced-motion: reduce) {
 
@@ -136,4 +343,44 @@ textarea:focus-visible,
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ============================================================
+   TABLE STYLES (for Caja, Pacientes, etc.)
+   ============================================================ */
+
+.table-row-hover {
+  transition: background-color 0.15s ease;
+}
+
+.table-row-hover:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* ============================================================
+   BADGE VARIANTS
+   ============================================================ */
+
+.badge-teal {
+  background: hsla(165, 100%, 42%, 0.12);
+  color: hsl(165 85% 50%);
+  border: 1px solid hsla(165, 100%, 42%, 0.2);
+}
+
+.badge-success {
+  background: hsla(142, 71%, 45%, 0.12);
+  color: hsl(142 71% 55%);
+  border: 1px solid hsla(142, 71%, 45%, 0.2);
+}
+
+.badge-destructive {
+  background: hsla(0, 72%, 51%, 0.12);
+  color: hsl(0 72% 65%);
+  border: 1px solid hsla(0, 72%, 51%, 0.2);
+}
+
+.badge-warning {
+  background: hsla(38, 92%, 50%, 0.12);
+  color: hsl(38 92% 60%);
+  border: 1px solid hsla(38, 92%, 50%, 0.2);
 }

@@ -120,6 +120,195 @@ export function generatePatientMagicLinkEmail(nombre: string, link: string): str
 </html>`;
 }
 
+export function generateTreatmentTimelineEmail(params: {
+    nombre: string;
+    workflowName: string;
+    currentStageName: string;
+    currentStageOrder: number;
+    allStages: Array<{ name: string; order_index: number }>;
+    portalUrl: string;
+    nextAppointmentDate?: string | null;
+}): string {
+    const { nombre, workflowName, currentStageName, currentStageOrder, allStages, portalUrl, nextAppointmentDate } = params;
+
+    const totalStages = allStages.length || 1;
+    const progressPercent = Math.min(100, Math.round((currentStageOrder / totalStages) * 100));
+
+    const stagesHtml = allStages
+        .sort((a, b) => a.order_index - b.order_index)
+        .map((stage, idx) => {
+            const isDone = stage.order_index < currentStageOrder;
+            const isCurrent = stage.order_index === currentStageOrder;
+            const isLast = idx === allStages.length - 1;
+
+            const dotBg = isDone ? '#C9A96E' : isCurrent ? '#1e1a12' : '#1a1a1a';
+            const dotBorder = isDone || isCurrent ? '#C9A96E' : '#2e2e2e';
+            const dotLabel = isDone ? '&#10003;' : isCurrent ? '&#9679;' : '';
+            const dotColor = isDone ? '#000000' : '#C9A96E';
+            const textColor = isDone ? 'rgba(255,255,255,0.35)' : isCurrent ? '#ffffff' : 'rgba(255,255,255,0.22)';
+            const textDecoration = isDone ? 'line-through' : 'none';
+            const connectorColor = isDone ? 'rgba(201,169,110,0.35)' : 'rgba(255,255,255,0.07)';
+
+            return `
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td valign="top" width="30" style="padding-right:14px;">
+                  <table cellpadding="0" cellspacing="0" border="0" width="28">
+                    <tr>
+                      <td align="center" valign="middle"
+                          style="width:28px;height:28px;background:${dotBg};border:1.5px solid ${dotBorder};border-radius:50%;font-size:13px;font-weight:700;color:${dotColor};text-align:center;line-height:26px;">
+                        ${dotLabel}
+                      </td>
+                    </tr>
+                    ${!isLast ? `<tr><td align="center"><table cellpadding="0" cellspacing="0" border="0"><tr><td style="width:1px;height:18px;background:${connectorColor};margin:2px auto;display:block;">&nbsp;</td></tr></table></td></tr>` : ''}
+                  </table>
+                </td>
+                <td valign="top" style="padding-top:3px;padding-bottom:${isLast ? '0' : '18px'};">
+                  <p style="margin:0;font-size:13px;font-weight:${isCurrent ? '700' : '500'};color:${textColor};text-decoration:${textDecoration};line-height:1.4;">${stage.name}</p>
+                  ${isCurrent ? `<p style="margin:2px 0 0;font-size:9px;color:#C9A96E;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Etapa actual</p>` : ''}
+                </td>
+              </tr>
+            </table>`;
+        })
+        .join('');
+
+    const appointmentRow = nextAppointmentDate ? `
+        <tr>
+          <td style="background:#111111;padding:0 40px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#1a1a1a;border:1px solid rgba(201,169,110,0.2);border-radius:10px;padding:14px 18px;">
+              <tr>
+                <td>
+                  <p style="margin:0 0 3px;color:#C9A96E;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Pr&#243;ximo turno</p>
+                  <p style="margin:0;color:#ffffff;font-size:15px;font-weight:700;">${nextAppointmentDate}</p>
+                </td>
+                <td align="right" valign="middle">
+                  <p style="margin:0;font-size:22px;">&#128197;</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>` : '';
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu tratamiento avanza &#8212; AM Cl&#237;nica</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0d0d0d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0d0d0d;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+        <!-- HEADER -->
+        <tr>
+          <td align="center"
+              style="background:linear-gradient(160deg,#1c1c1c 0%,#111111 60%,#0f0e0a 100%);border-radius:16px 16px 0 0;padding:36px 40px 24px;border-bottom:1px solid rgba(201,169,110,0.18);">
+            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM Cl&#237;nica" height="40"
+                 style="display:block;margin:0 auto 18px;opacity:0.95;">
+            <p style="margin:0 0 6px;color:#C9A96E;font-size:10px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">
+              Tu tratamiento avanza
+            </p>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.4px;">${workflowName}</h1>
+          </td>
+        </tr>
+
+        <!-- GREETING -->
+        <tr>
+          <td style="background:#111111;padding:28px 40px 20px;">
+            <p style="margin:0;color:rgba(255,255,255,0.55);font-size:14px;line-height:1.7;">
+              Hola <strong style="color:#ffffff;">${nombre}</strong>, tu tratamiento acaba de avanzar a una nueva etapa.
+              Aqu&#237; est&#225; el estado completo de tu progreso.
+            </p>
+          </td>
+        </tr>
+
+        <!-- CURRENT STAGE BADGE -->
+        <tr>
+          <td style="background:#111111;padding:0 40px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:linear-gradient(135deg,#1e1a12,#141008);border:1px solid rgba(201,169,110,0.45);border-radius:12px;">
+              <tr>
+                <td style="padding:18px 20px;">
+                  <p style="margin:0 0 4px;color:#C9A96E;font-size:9px;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;">
+                    &#9679;&nbsp; Etapa actual
+                  </p>
+                  <p style="margin:0;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:-0.3px;">${currentStageName}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- PROGRESS BAR -->
+        <tr>
+          <td style="background:#111111;padding:0 40px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:7px;">
+              <tr>
+                <td style="color:rgba(255,255,255,0.35);font-size:11px;letter-spacing:1px;text-transform:uppercase;">Progreso</td>
+                <td align="right" style="color:#C9A96E;font-size:12px;font-weight:700;">${progressPercent}%</td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#1e1e1e;border-radius:100px;height:5px;overflow:hidden;">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:${progressPercent}%;">
+                    <tr>
+                      <td style="background:linear-gradient(90deg,#C9A96E 0%,#e8c98a 100%);height:5px;border-radius:100px;display:block;">&nbsp;</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.25);font-size:11px;">Etapa ${currentStageOrder} de ${totalStages}</p>
+          </td>
+        </tr>
+
+        <!-- TIMELINE -->
+        <tr>
+          <td style="background:#111111;padding:0 40px 28px;">
+            <p style="margin:0 0 16px;color:rgba(255,255,255,0.3);font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:600;">
+              Recorrido completo
+            </p>
+            ${stagesHtml}
+          </td>
+        </tr>
+
+        ${appointmentRow}
+
+        <!-- CTA -->
+        <tr>
+          <td style="background:#111111;padding:0 40px 36px;" align="center">
+            <a href="${portalUrl}"
+               style="display:inline-block;background:linear-gradient(135deg,#C9A96E 0%,#a8853a 100%);color:#000000;text-decoration:none;font-size:14px;font-weight:800;padding:14px 44px;border-radius:10px;letter-spacing:0.4px;">
+              Ver mi portal completo &#8594;
+            </a>
+            <p style="margin:12px 0 0;color:rgba(255,255,255,0.2);font-size:11px;">
+              Acced&#233; a tu historial, estudios y dise&#241;o de sonrisa desde el portal.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td align="center"
+              style="background:#0a0a0a;border-radius:0 0 16px 16px;border-top:1px solid rgba(255,255,255,0.06);padding:24px 40px;">
+            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:11px;line-height:1.8;">
+              AM Cl&#237;nica &middot; Camila O&#39;Gorman 412, Piso 17 &middot; Puerto Madero, CABA<br>
+              Este correo fue enviado autom&#225;ticamente al avanzar tu tratamiento.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 export function generateInvitationMessage(nombre: string, link: string): string {
     return `
     <!DOCTYPE html>

@@ -149,7 +149,7 @@ export default function Sidebar() {
         };
     }, []);
 
-    // Close mobile sidebar on route change – intentional synchronous setState
+    // Close mobile sidebar on route change
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { setMobileOpen(false); }, [pathname]);
 
@@ -173,10 +173,12 @@ export default function Sidebar() {
         <>
             <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
+            {/* Mobile toggle button */}
             {!isDesktop && !mobileOpen && (
                 <button
                     onClick={() => setMobileOpen(true)}
-                    className="fixed left-4 bottom-4 z-[60] inline-flex items-center gap-2 rounded-full bg-blue-600 text-white px-4 py-2.5 shadow-xl shadow-blue-200 dark:shadow-none"
+                    className="fixed left-4 bottom-4 z-[60] inline-flex items-center gap-2 rounded-full px-4 py-2.5 shadow-xl text-white"
+                    style={{ background: 'hsl(165 100% 42%)' }}
                     title="Abrir menú"
                     aria-label="Abrir menú lateral"
                 >
@@ -185,34 +187,55 @@ export default function Sidebar() {
                 </button>
             )}
 
+            {/* Mobile overlay */}
             {!isDesktop && mobileOpen && (
                 <button
                     onClick={() => setMobileOpen(false)}
                     aria-label="Cerrar menú lateral"
-                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
                 />
             )}
 
+            {/* Sidebar */}
             <aside className={clsx(
-                'fixed left-0 top-0 h-screen bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 z-50 flex flex-col transform transition-all duration-200',
+                'fixed left-0 top-0 h-screen z-50 flex flex-col transform transition-all duration-300',
                 isDesktop
                     ? (compactMode ? 'w-20 translate-x-0' : 'w-64 translate-x-0')
                     : (mobileOpen ? 'w-[84vw] max-w-80 translate-x-0 shadow-2xl' : 'w-[84vw] max-w-80 -translate-x-full pointer-events-none')
-            )}>
+            )}
+                style={{
+                    background: 'hsl(var(--sidebar-bg))',
+                    borderRight: '1px solid hsl(var(--sidebar-border))',
+                }}
+            >
                 {/* Logo area */}
-                <div className={clsx('border-b border-gray-200 dark:border-gray-800', compactMode ? 'p-3' : 'p-6')}>
+                <div
+                    className={clsx(compactMode ? 'p-3' : 'p-5')}
+                    style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}
+                >
                     <div className={clsx('flex items-center', compactMode ? 'justify-center' : 'justify-between')}>
                         <div className={clsx(compactMode && 'text-center')}>
-                            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                            <h1 className="text-xl font-bold" style={{
+                                background: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(165 85% 60%))',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                            }}>
                                 {compactMode ? 'AM' : 'AM Clínica'}
                             </h1>
-                            {!compactMode && <p className="text-xs text-gray-500 mt-1">Operativa 360</p>}
+                            {!compactMode && (
+                                <p className="text-xs mt-0.5" style={{ color: 'hsl(230 10% 45%)' }}>
+                                    Operativa 360
+                                </p>
+                            )}
                         </div>
 
                         {isDesktop && !compactMode && (
                             <button
                                 onClick={toggleCollapsed}
-                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                                className="p-2 rounded-lg transition-colors"
+                                style={{ color: 'hsl(230 10% 45%)' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'hsl(230 15% 18%)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                 title="Contraer menú lateral"
                             >
                                 <ChevronLeft size={16} />
@@ -222,7 +245,8 @@ export default function Sidebar() {
                         {!isDesktop && (
                             <button
                                 onClick={() => setMobileOpen(false)}
-                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                                className="p-2 rounded-lg transition-colors"
+                                style={{ color: 'hsl(230 10% 45%)' }}
                                 title="Cerrar menú"
                             >
                                 <X size={16} />
@@ -233,7 +257,10 @@ export default function Sidebar() {
                     {isDesktop && compactMode && (
                         <button
                             onClick={toggleCollapsed}
-                            className="mt-2 w-full flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                            className="mt-2 w-full flex items-center justify-center p-2 rounded-lg transition-colors"
+                            style={{ color: 'hsl(230 10% 45%)' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'hsl(230 15% 18%)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                             title="Expandir menú lateral"
                         >
                             <ChevronRight size={16} />
@@ -242,8 +269,8 @@ export default function Sidebar() {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                        {MENU_ITEMS.filter(item => item.roles.includes(userRole)).map((item) => {
+                <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+                    {MENU_ITEMS.filter(item => item.roles.includes(userRole)).map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname.startsWith(item.href);
 
@@ -252,12 +279,28 @@ export default function Sidebar() {
                                 key={item.href}
                                 href={item.href}
                                 className={clsx(
-                                    'flex items-center rounded-xl text-sm font-medium transition-all duration-200',
-                                    compactMode ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3',
-                                    isActive
-                                        ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                    'sidebar-glow flex items-center rounded-xl text-sm font-medium transition-all duration-200 relative',
+                                    compactMode ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-2.5',
+                                    isActive && 'active'
                                 )}
+                                style={isActive ? {
+                                    background: 'hsla(165, 100%, 42%, 0.1)',
+                                    color: 'hsl(165 85% 50%)',
+                                } : {
+                                    color: 'hsl(230 10% 55%)',
+                                }}
+                                onMouseEnter={e => {
+                                    if (!isActive) {
+                                        e.currentTarget.style.background = 'hsl(230 15% 16%)';
+                                        e.currentTarget.style.color = 'hsl(210 20% 90%)';
+                                    }
+                                }}
+                                onMouseLeave={e => {
+                                    if (!isActive) {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.color = 'hsl(230 10% 55%)';
+                                    }
+                                }}
                                 onClick={() => {
                                     if (!isDesktop) setMobileOpen(false);
                                 }}
@@ -271,35 +314,41 @@ export default function Sidebar() {
                 </nav>
 
                 {/* User Profile & Actions */}
-                <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+                <div className="p-3 space-y-1" style={{ borderTop: '1px solid hsl(var(--sidebar-border))' }}>
 
-                    {/* ALWAYS VISIBLE SETTINGS BUTTON */}
+                    {/* Settings button */}
                     <button
                         onClick={() => setShowSettings(true)}
                         className={clsx(
-                            'block w-full flex items-center rounded-lg text-sm font-medium transition-colors',
-                            compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2',
-                            showSettings
-                                ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
-                                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            'w-full flex items-center rounded-xl text-sm font-medium transition-all duration-200',
+                            compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5'
                         )}
+                        style={{
+                            color: showSettings ? 'hsl(210 20% 90%)' : 'hsl(230 10% 55%)',
+                            background: showSettings ? 'hsl(230 15% 16%)' : 'transparent',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'hsl(230 15% 16%)'; e.currentTarget.style.color = 'hsl(210 20% 90%)'; }}
+                        onMouseLeave={e => { if (!showSettings) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'hsl(230 10% 55%)'; } }}
                         title={compactMode ? 'Configuración' : undefined}
                     >
                         <SlidersHorizontal size={18} />
                         {!compactMode && <span>Configuración</span>}
                     </button>
 
-                    {/* Always Show Admin Link for Real Owner or Active Admin */}
+                    {/* Admin users link */}
                     {(isRealOwner || userRole === 'owner' || userRole === 'admin') && (
                         <Link
                             href="/admin-users"
                             className={clsx(
-                                'flex items-center rounded-lg text-sm font-medium transition-colors',
-                                compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2',
-                                pathname.startsWith('/admin-users')
-                                    ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
-                                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                'flex items-center rounded-xl text-sm font-medium transition-all duration-200',
+                                compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5'
                             )}
+                            style={{
+                                color: pathname.startsWith('/admin-users') ? 'hsl(210 20% 90%)' : 'hsl(230 10% 55%)',
+                                background: pathname.startsWith('/admin-users') ? 'hsl(230 15% 16%)' : 'transparent',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'hsl(230 15% 16%)'; e.currentTarget.style.color = 'hsl(210 20% 90%)'; }}
+                            onMouseLeave={e => { if (!pathname.startsWith('/admin-users')) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'hsl(230 10% 55%)'; } }}
                             title={compactMode ? 'Gestión de Usuarios' : undefined}
                         >
                             <Settings size={18} />
@@ -312,9 +361,14 @@ export default function Sidebar() {
                         <button
                             onClick={() => setImpersonatedRole(null)}
                             className={clsx(
-                                'w-full flex items-center rounded-lg text-sm font-medium transition-colors bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
-                                compactMode ? 'justify-center px-2 py-2' : 'gap-3 px-4 py-2'
+                                'w-full flex items-center rounded-xl text-sm font-medium transition-colors',
+                                compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5'
                             )}
+                            style={{
+                                background: 'hsla(38, 92%, 50%, 0.1)',
+                                color: 'hsl(38 92% 60%)',
+                                border: '1px solid hsla(38, 92%, 50%, 0.2)',
+                            }}
                             title={compactMode ? 'Dejar de Imitar' : undefined}
                         >
                             <EyeOff size={18} />
@@ -322,18 +376,26 @@ export default function Sidebar() {
                         </button>
                     )}
 
+                    {/* User info */}
                     <div className={clsx('flex items-center py-3', compactMode ? 'justify-center px-2' : 'gap-3 px-4')}>
-                        <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-                            <UserCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                        <div
+                            className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{
+                                background: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(200 80% 50%))',
+                            }}
+                        >
+                            <span className="text-xs font-bold text-white">
+                                {(profile?.full_name || user.email || 'U').charAt(0).toUpperCase()}
+                            </span>
                         </div>
                         {!compactMode && (
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                <p className="text-sm font-medium truncate" style={{ color: 'hsl(210 20% 90%)' }}>
                                     {profile?.full_name || user.email?.split('@')[0]}
                                 </p>
-                                <p className="text-xs text-gray-500 capitalize truncate">
+                                <p className="text-xs capitalize truncate" style={{ color: 'hsl(230 10% 45%)' }}>
                                     {userRole.replace('_', ' ')}
-                                    {impersonatedRole && <span className="ml-1 text-amber-600">(Imitando)</span>}
+                                    {impersonatedRole && <span className="ml-1" style={{ color: 'hsl(38 92% 60%)' }}>(Imitando)</span>}
                                 </p>
                             </div>
                         )}
@@ -346,9 +408,12 @@ export default function Sidebar() {
                                 window.location.href = '/login';
                             }}
                             className={clsx(
-                                'flex items-center text-gray-500 hover:text-red-600 transition-colors text-sm font-medium',
+                                'flex items-center transition-colors text-sm font-medium',
                                 compactMode ? 'justify-center p-1.5' : 'gap-2'
                             )}
+                            style={{ color: 'hsl(230 10% 45%)' }}
+                            onMouseEnter={e => e.currentTarget.style.color = 'hsl(0 72% 60%)'}
+                            onMouseLeave={e => e.currentTarget.style.color = 'hsl(230 10% 45%)'}
                             title="Cerrar Sesión"
                         >
                             <LogOut size={18} />

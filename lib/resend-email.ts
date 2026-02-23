@@ -8,14 +8,14 @@ interface SendResendEmailInput {
 
 export async function sendResendEmail(input: SendResendEmailInput) {
     const apiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL;
+    const fromEmail = process.env.RESEND_FROM_EMAIL ?? process.env.RESEND_FROM;
 
     if (!apiKey) {
         return { success: false, error: 'RESEND_API_KEY no configurada' };
     }
 
     if (!fromEmail) {
-        return { success: false, error: 'RESEND_FROM_EMAIL no configurado' };
+        return { success: false, error: 'RESEND_FROM / RESEND_FROM_EMAIL no configurado' };
     }
 
     try {
