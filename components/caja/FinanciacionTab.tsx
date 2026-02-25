@@ -376,7 +376,7 @@ export default function FinanciacionTab() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <KpiMini
                     icon={CreditCard}
-                    label="Planes Activos"
+                    label="Financiaciones Activas"
                     value={`${stats.planesActivos}`}
                     gradient="linear-gradient(135deg, hsl(270 67% 55%), hsl(285 65% 50%))"
                     iconBg="hsla(270, 67%, 55%, 0.15)"
@@ -419,7 +419,7 @@ export default function FinanciacionTab() {
                     style={{ color: 'hsl(210 20% 85%)' }}
                 >
                     <CreditCard size={16} style={{ color: 'hsl(270 67% 65%)' }} />
-                    Planes en curso ({activos.length})
+                    Financiaciones en curso ({activos.length})
                 </h3>
                 <div className="space-y-3">
                     {activos.map(plan => (
@@ -433,7 +433,7 @@ export default function FinanciacionTab() {
                     ))}
                     {activos.length === 0 && (
                         <p className="text-center py-8 text-sm" style={{ color: 'hsl(230 10% 40%)' }}>
-                            No hay planes de financiación activos
+                            No hay financiaciones activas
                         </p>
                     )}
                 </div>
