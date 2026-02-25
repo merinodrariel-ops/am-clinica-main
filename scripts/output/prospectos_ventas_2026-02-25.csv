@@ -1,0 +1,507 @@
+Prioridad,Nombre,Email,Teléfono,Tiene Email,Tiene Teléfono,Interés,Fecha Consulta,Días desde consulta,Etapa actual,Intentos de contacto
+🔴 URGENTE (< 1 mes),Guadalupe Gatti,gattilupe@hotmail.com,1130542071,✓,✓,Sin definir,2026-02-23,2 días,Consulta Realizada,0
+🔴 URGENTE (< 1 mes),Molina Eugenia,,,✗,✗,Sin definir,2026-02-18,7 días,Consulta Realizada,0
+🔴 URGENTE (< 1 mes),nicolás andalaft,nico.andalaft@gmail.com,1170138785,✓,✓,Sin definir,2026-02-11,14 días,Consulta Realizada,0
+🔴 URGENTE (< 1 mes),Mercedes Otero,otero.mercedesk@gmail.com,1155765845,✓,✓,Sin definir,2026-02-02,23 días,Consulta Realizada,0
+🔴 URGENTE (< 1 mes),Facundo Gonzalez,facundojulian73@gmail.com,1153085429,✓,✓,Sin definir,2026-01-26,30 días,Consulta Realizada,0
+🔴 URGENTE (< 1 mes),Lucas Gil,lucasgil.1798@gmail.com,11665576092,✓,✓,Sin definir,2026-01-26,30 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Pedro Adamovic,pedroadamovic@gnail.com,1145281772,✓,✓,Sin definir,2026-01-23,33 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Nicolás Leon,nicolasmakeup@icloud.com,1123805535,✓,✓,Sin definir,2026-01-23,33 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Dario Pablo Godoy,dpgodoy@gmail.com,1163003733,✓,✓,Sin definir,2026-01-21,35 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Natali Davila,nati.davila@hotmail.com,1158203035,✓,✓,Sin definir,2025-12-26,61 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Hernan Acosta,,,✗,✗,Sin definir,2025-12-19,68 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Camila Fernández,camilafer1984@gmail.com,1155801828,✓,✓,Sin definir,2025-12-17,70 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Patricio Sanchez,patols953@gmail.com,61420809252,✓,✓,Sin definir,2025-12-15,72 días,Consulta Realizada,0
+🟠 ALTA (1-3 meses),Mateo Schreiterer,schreiterermateo@gmail.com,+545491148892300,✓,✓,Sin definir,2025-12-15,72 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Pietro Ezio Zucchet,ezio_z@hotmail.com,3704919912,✓,✓,Sin definir,2025-11-24,93 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Diego andrades,diego.andrades@iff.com,+545491126626012,✓,✓,Sin definir,2025-11-21,96 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),María de los Milagros Rodriguez,mariadelosmilagrosr33@gmail.com,2243434745,✓,✓,Sin definir,2025-11-19,98 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Damian minckas,damianmusic@gmail.com,1157631984,✓,✓,Sin definir,2025-11-14,103 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Alejandro Migliorisi,alemigliorisi@gmail.com,+541163977530,✓,✓,Sin definir,2025-11-06,111 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Enrique Souza Rey,souza.rey.enrique@gmail.com,1155028591,✓,✓,Sin definir,2025-10-30,118 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Eduardo Néstor Fernandez,suarezlilianae@gmail.com,1163989524,✓,✓,Sin definir,2025-10-22,126 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Liliana Esther Suarez,suarezlilianae@gmail.com,1138630958,✓,✓,Sin definir,2025-10-22,126 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Fernandez Suarez Evelyn,fsevelyn@hotmail.com,+545491140706481,✓,✓,Sin definir,2025-10-20,128 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Maria Ines Bezus,mariainesbezus@gmail.com,+545493624808255,✓,✓,Sin definir,2025-10-16,132 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Norma Noemi Miceli,,,✗,✗,Sin definir,2025-10-14,134 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Yamila Solange González,gyamila766@gmail.com,+545492932546155,✓,✓,Sin definir,2025-10-06,142 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Rocio Poli,sesinjoaquin@gmail.com,+545493782441605,✓,✓,Sin definir,2025-10-01,147 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),florencia tosi,flor_vcf3@hotmail.com,+545491167245694,✓,✓,Sin definir,2025-10-01,147 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Franco Carnemolla,cotidekleva@gmail.com,1144751667,✓,✓,Sin definir,2025-09-26,152 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Sofia Correa,correa_sofia@hotmail.com,+545491135697710,✓,✓,Sin definir,2025-09-26,152 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Marianela Alberich,marianelaalberich@gmail.com,+545491169469947,✓,✓,Sin definir,2025-09-26,152 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Gonzalo Acevedo,gonzaloacevedo09@gmail.com,+545491151818158,✓,✓,Sin definir,2025-09-25,153 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Roumec juan ignacio,juaniroumec@gmail.com,+545492914636400,✓,✓,Sin definir,2025-09-22,156 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Graciela Doretti,gdoretti@gmail.com,1151825968,✓,✓,Sin definir,2025-09-17,161 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Federico González pondal,fedejpondal@hotmail.com,+545492664486540,✓,✓,Sin definir,2025-09-17,161 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Belen Carranza,beluc96@icloud.com,+545491134561655,✓,✓,Ortodoncia,2025-09-17,161 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Nadia debora melian,nadiamelian1627@gmail.com,1135368099,✓,✓,Sin definir,2025-09-15,163 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Anibal Coceres Pedro,corban_a.c@hotmail.com,+545491123027996,✓,✓,Carillas / Diseño de Sonrisa,2025-09-11,167 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Laura Aimar,aimar_barreta@yahoo.com.ar,+545492302604600,✓,✓,Carillas / Diseño de Sonrisa,2025-09-05,173 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Mariano Páez,marianopaez88@gmail.com,1162489801,✓,✓,Sin definir,2025-09-03,175 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Martin Jofre,omila10@hotmail.com,+54 11 5450-7797,✓,✓,Sin definir,2025-09-03,175 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Lara Gomez,laracgomez@hotmail.com,+545491138612700,✓,✓,Carillas / Diseño de Sonrisa,2025-09-01,177 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Magali Silva,magali.as@hotmail.com,+545491140413638,✓,✓,Sin definir,2025-09-01,177 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Melina Fernandez Suarez,mm.fs@hotmail.com,+545491140706511,✓,✓,Sin definir,2025-08-29,180 días,Consulta Realizada,0
+🟡 MEDIA (3-6 meses),Ivan Bahl,bahlivan@gmail.com,+545491126448481,✓,✓,Carillas / Diseño de Sonrisa,2025-08-29,180 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Natalia Vaca,natalia.vaca@hotmail.com,+545491138252260,✓,✓,Carillas / Diseño de Sonrisa,2025-08-27,182 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Máximo Medina,maximo.medina@tenbroking.com,+54 9 11 4945-5304,✓,✓,Sin definir,2025-08-25,184 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Santiago Fierro,santiagofierro139@gmail.com,+545492996554450,✓,✓,Carillas / Diseño de Sonrisa,2025-08-25,184 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Diego Alcantara,diego.martin.alcantara@hotmail.com,+545491168567684,✓,✓,Carillas / Diseño de Sonrisa,2025-08-22,187 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Ian Colman Lerner Novaro,icolmanlerner@gmail.com,+54 11 6420-9381,✓,✓,Sin definir,2025-08-20,189 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Lourdes Mendez,,+545491176287749,✗,✓,Sin definir,2025-08-14,195 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Nicolas Goitea,goiteanicolas1106@icloud.com,+593 98 716 0500,✓,✓,Carillas / Diseño de Sonrisa,2025-08-13,196 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Sofia Mendonca,sofiamendonca96@gmail.com,+545491164350148,✓,✓,Sin definir,2025-08-06,203 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),María Suarez Ana,anasuarez2001@hotmail.com,+545492995071433,✓,✓,Sin definir,2025-08-01,208 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Silvina Corona Malena,Malenacorona@outlook.com,+545493624567131,✓,✓,Sin definir,2025-07-25,215 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Carolina Isabel Garrido,Carolina.garrido95g@hotmail.com,+545491153252526,✓,✓,Sin definir,2025-07-23,217 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Tanquia Jail,jailabdultanquia@gmail.com,+545491130380753,✓,✓,Sin definir,2025-07-23,217 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Polo Dora,dorispolo790@gmail.com,+545491151543390,✓,✓,Sin definir,2025-07-23,217 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Santiago Anibal Gomez,santucho1870@yahoo.com.ar,,✓,✗,Sin definir,2025-07-22,218 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Zapata Tamara,zapatatamara02@gmail.com,+545491128778156,✓,✓,Sin definir,2025-07-14,226 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),German Chirino Leandro,leandrogchirino@gmail.com,+5454922729410,✓,✓,Sin definir,2025-07-11,229 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Sosa Virginia,virginia.noelia.sosa@gmail.com,+545491156325000,✓,✓,Carillas / Diseño de Sonrisa,2025-07-11,229 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Millahuel Ariel,arielmillahuel@hotmail.com.ar,+545491124500969,✓,✓,Ortodoncia,2025-07-09,231 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Analia Oberman,anaoberman@gmail.com,+54 11 4158-9134,✓,✓,Sin definir,2025-07-03,237 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Bruno Baraba,barbaranoeliabruno@gmail.com,+545491126382983,✓,✓,Sin definir,2025-07-02,238 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Medina Juliana,medina.m.juliana@gmail.com,+545491133090686,✓,✓,Sin definir,2025-06-27,243 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Rodriguez Elizabet,Ma.eli.ro@hotmail.com,+545491157166360,✓,✓,Sin definir,2025-06-25,245 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Gozzerino Marcello,marcellogozzerino@hotmail.com,+545491125564400,✓,✓,Sin definir,2025-06-18,252 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Morales Bárbara,bmorales.perfil@gmail.com,+54 11 7021-9298,✓,✓,Sin definir,2025-06-05,265 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Belen Agudiez,belenagudiez@gmail.com,+545491157727291,✓,✓,Sin definir,2025-06-04,266 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Gaston Adrian Salguero,gastonsalguero@gmail.com,+545491137785742,✓,✓,Sin definir,2025-05-27,274 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Cuman Leticia,leticiacuman.perfil@gmail.com,+54 9 11 3380-1614,✓,✓,Sin definir,2025-05-27,274 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Cristian Camacho,sabryjjjj@gmail.com,+545491127333512,✓,✓,Carillas / Diseño de Sonrisa,2025-05-23,278 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Emiliano Baccarini,emibacc@hotmail.com,+545491165593248,✓,✓,Carillas / Diseño de Sonrisa,2025-05-19,282 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Rojas Brenda,brendarojas122@icloud.com,+545491156963494,✓,✓,Carillas / Diseño de Sonrisa,2025-05-16,285 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Facundo Ramirez,facundonr17@gmail.com,+545491125218242,✓,✓,Carillas / Diseño de Sonrisa,2025-05-16,285 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Santiago Ferraro,ferraro.san@gmail.com,+54 11 5885-5172,✓,✓,Carillas / Diseño de Sonrisa,2025-05-16,285 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Sanchez Gisel,gisellemicaelasanchez@live.com,,✓,✗,Sin definir,2025-05-09,292 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Romina Silva Chusho Flavia,s.flaviarominac@gmail.com,+545491166813051,✓,✓,Sin definir,2025-04-28,303 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Irala Elizabeth,sarairala32@gmail.com,+545491135112062,✓,✓,Sin definir,2025-04-28,303 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Utkina Oksana,oksanautkinaceramics@gmail.com,+545491158934257,✓,✓,Sin definir,2025-04-23,308 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Pedro Taddeo Germán,gtaddeo@remax.com.ar,,✓,✗,Sin definir,2025-04-17,314 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Ramos Victoria,victoriaramos443@gmail.com,+545491157101458,✓,✓,Implantes,2025-04-16,315 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Daniela Rocca,danielarocca89@gmail.com,+545491141993622,✓,✓,Sin definir,2025-04-15,316 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Begzadeh Ana,ani.begzadeh@gmail.com,+545493885878572,✓,✓,Carillas / Diseño de Sonrisa,2025-04-14,317 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Andreucci Sara,sarandreucci@gmail.com,+545491152215514,✓,✓,Sin definir,2025-04-11,320 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Molina Celina,celuwp@gmail.com,+5454922384646,✓,✓,Sin definir,2025-04-11,320 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Celeste Scaringi,patriciamattica@gmail.com,,✓,✗,Sin definir,2025-04-10,321 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Hernández Claudia,claudiahernandezb21@gmail.com,+54 11 2884-0002,✓,✓,Sin definir,2025-04-10,321 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Maria Jose Mendoza,majomendoza5@gmail.com,+54 11 2328-1527,✓,✓,Sin definir,2025-04-10,321 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Castro Cynthia,info@cyncastro.com,+545492974248105,✓,✓,Sin definir,2025-04-07,324 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Jose Álvarez,choboalvarezv21@gmail.com,+545491157251450,✓,✓,Sin definir,2025-04-01,330 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Fernando Rey,reyfernando2112@hotmail.com,+545491136379213,✓,✓,Sin definir,2025-03-28,334 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Cynthia Chicco Adriana,cynchicco@gmail.com,+5454912397473183,✓,✓,Sin definir,2025-03-28,334 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Emilio Frugoni,efrugoni.fca@gmail.com,,✓,✗,Sin definir,2025-03-27,335 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Lucas Melgarejo,melgarejo.luc@igmail.com,+545491162292508,✓,✓,Carillas / Diseño de Sonrisa,2025-03-26,336 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Andrea Arias,andrea.arias11@gmail.com,+54 11 3020-7406,✓,✓,Sin definir,2025-03-25,337 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Martina Espinosa,martulas1234@gmail.com,+54 11 3062-2777,✓,✓,Carillas / Diseño de Sonrisa,2025-03-17,345 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Alejandra Ferrari,ale.crochet61@gmail.com,+545491168443142,✓,✓,Sin definir,2025-03-14,348 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Guastalegname Cinthia,cinthiaguastalegname@yahoo.com.ar,+545491165800449,✓,✓,Sin definir,2025-03-12,350 días,Consulta Realizada,0
+🟢 BAJA (6-12 meses),Lucero Viviana,vivilucero_81@hotmail.com,+545491136367211,✓,✓,Sin definir,2025-03-10,352 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Belen Arteaga Ana,,,✗,✗,Sin definir,2025-02-12,378 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Milo Stankiewicz,susanazotta@me.com,,✓,✗,Sin definir,2025-02-11,379 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Santiago Barrientos,santiago_barrientos@hotmail.com,+545492964415295,✓,✓,Sin definir,2025-02-10,380 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Belén Arteaga Boyadjian,arteaga.bel@gmail.com,+545492964576742,✓,✓,Sin definir,2025-02-07,383 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cristian Gaston Cuello,cristian.g.cuello@gmail.com,+545491122399700,✓,✓,Sin definir,2025-02-03,387 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gabriela Distefano,gabriela.distefano@live.com,+545491164716114,✓,✓,Sin definir,2025-01-24,397 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Haines Hernan,hernan.haines@gmail.com,,✓,✗,Sin definir,2025-01-21,400 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Juan Cruz Testa,juancruztesta@hotmail.com,,✓,✗,Sin definir,2025-01-14,407 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Felipe Santos Rafael,rafaeldsantt@gmail.com,+545491157973243,✓,✓,Carillas / Diseño de Sonrisa,2025-01-14,407 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Mauro Simonet,maurosimonet2@gmail.com,+545492392445570,✓,✓,Sin definir,2024-05-29,637 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ana Rottjer,,,✗,✗,Sin definir,2024-05-22,644 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bruno Stratico,,+545491154654609,✗,✓,Sin definir,2024-05-20,646 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Carolina Garces,carito10992@gmail.com,+5454922760140,✓,✓,Sin definir,2023-09-04,905 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agustin Marcos Rebottaro,amrebottaro@gmail.com,+545491148700865,✓,✓,Sin definir,2023-08-30,910 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Florencia Geminiani,florenciageminiani1996@hotmail.com,+545493435241750,✓,✓,Sin definir,2023-08-23,917 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diaz Vitiana,vitina1978@gmail.com,+545491133101427,✓,✓,Carillas / Diseño de Sonrisa,2023-08-18,922 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Noelia Macarena Rodriguez,noelia.rodriguez012@gmail.com,+545491159575435,✓,✓,Implantes,2023-08-11,929 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Sabrina Sanchez Blanco,sabrisanchezblanco@yahoo.com,+545491134394031,✓,✓,Sin definir,2023-08-09,931 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),María Jose Meyer Saenz Valiente,majomeyersv@hotmail.com,,✓,✗,Sin definir,2023-08-08,932 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernandez Monica,consultorafm@gmail.com,+545491158534313,✓,✓,Ortodoncia,2023-08-07,933 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Angela Rivas,rivasangela87@gmail.com,+54 3489 55-2762,✓,✓,Implantes,2023-07-31,940 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vallejos Mauricio,mlvallejos1987@gmail.com,+545493487363787,✓,✓,Sin definir,2023-07-28,943 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Nicolas Ezequiel Martinez Almiron,nicolas.emec@gmail.com,+545491163627547,✓,✓,Sin definir,2023-07-26,945 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fichman Matias,fichmanmatias@hotmail.com,+545491134222928,✓,✓,Sin definir,2023-07-26,945 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),David Aghetone,david@frutasrosali.com.ar,+545491156205968,✓,✓,Sin definir,2023-07-24,947 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego Alejandro Vieiro,dvieiro@live.com.ar,+545491167047068,✓,✓,Carillas / Diseño de Sonrisa,2023-07-21,950 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cerceda Eugenia,mecerceda@hotmaul.com,+545491124763000,✓,✓,Sin definir,2023-07-17,954 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sebastian Muzzalupo,sebastian.muzzalupo@gmsil.com,+545491141939052,✓,✓,Blanqueamiento,2023-07-14,957 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Juan Francidco,ventas@indulong.com.ar,,✓,✗,Sin definir,2023-07-12,959 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Francisco Cardozo,francar133.fc@gmail.com,+545493874093922,✓,✓,Sin definir,2023-07-10,961 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Griselda Sixto,sixtogri@hotmail.com,+545491150221993,✓,✓,Sin definir,2023-07-10,961 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cuenca Natalia,ncuenca1@abc.gob.ar,+545493329335936,✓,✓,Sin definir,2023-07-07,964 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Belén Medina,belenmedian@gmail.com,+545491127323841,✓,✓,Sin definir,2023-07-05,966 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Alcarraz Maximiliano,3x.xander@gmail.com,+545491161915044,✓,✓,Sin definir,2023-07-03,968 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Constanza Dekleva,cotidekleva@gmail.com,+545491144751667,✓,✓,Sin definir,2023-06-29,972 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martina Velazquez,velazquezmartina7@hotmail.com,+545491153133033,✓,✓,Sin definir,2023-06-27,974 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Villalba Julia,julitavillalba@gmail.com,,✓,✗,Sin definir,2023-06-23,978 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Francisco Juan,franciscojuan37@icloud.com,+545491130911635,✓,✓,Sin definir,2023-06-21,980 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Genoud Lucrecia,genoudlucrecia7@gmail.com,+545491159101411,✓,✓,Sin definir,2023-06-21,980 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Caponera Claudio,ccaponera@hotmail.com,+5454922014678,✓,✓,Sin definir,2023-06-19,982 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bernardo Nazarena,nazarenabernardo@gmail.com,+545491141412820,✓,✓,Sin definir,2023-06-16,985 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Meilich Ariel,arimeilich@gmail.com,+598 97 221 410,✓,✓,Sin definir,2023-06-15,986 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Locatelli Nunzia,mzapiola@pan-energy.com,+545491162089058,✓,✓,Sin definir,2023-06-14,987 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Laura Fernandez,lfgalvani@yahoo.com.ar,+545491135011175,✓,✓,Sin definir,2023-06-12,989 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Paleari Silvana,silpaleari@hotmail.com,+545491131004916,✓,✓,Carillas / Diseño de Sonrisa,2023-06-07,994 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maidana Claudia,maidana.claudia@gmail.com,+545491166951820,✓,✓,Sin definir,2023-06-07,994 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Alegre Ariel,arielacoflex@hotmail.com,+545491154021869,✓,✓,Carillas / Diseño de Sonrisa,2023-06-02,999 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Leandro Gomez,Leandrodjv@hotmail.com,+545491158027773,✓,✓,Blanqueamiento,2023-06-02,999 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Monica Matitti,monimatitti@yahoo.com.ar,+545492923652670,✓,✓,Sin definir,2023-05-29,1003 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Julieta Steinmann,justeinmann@gmail.com,+545491124377475,✓,✓,Ortodoncia,2023-05-24,1008 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Posse Gustavo,cquiroga@sanisidro.gov.ar,+545491131638166,✓,✓,Sin definir,2023-05-24,1008 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego de Guinea,diego@mexx.com.ar,+545491152474854,✓,✓,Sin definir,2023-05-16,1016 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lambois Sabrina,dralambois@gmail.com,+54 11 6513-2323,✓,✓,Sin definir,2023-05-15,1017 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Jacqueline Posse,jackieposse@hotmail.com,+545491138724153,✓,✓,Sin definir,2023-05-15,1017 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Guttenberg Heidi,heidi.guttenberg@gmail.com,+545491145377644,✓,✓,Blanqueamiento,2023-05-08,1024 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Nicolas Ingrassia,nicoingrassia05@gmail.com,+545491126308316,✓,✓,Sin definir,2023-04-26,1036 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Micaela Papa,micaelapapa22@gmail.com,+54 11 3558-3754,✓,✓,Sin definir,2023-04-25,1037 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Luis Coronado,angeluis757@hotmail.com,,✓,✗,Sin definir,2023-04-25,1037 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Facundo Palmon,facundogualtiere7@gmail.com,+545492236252256,✓,✓,Carillas / Diseño de Sonrisa,2023-04-24,1038 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Puerto O´connor Erika del,kikidelpuerto@icloud.com,+54 11 6454-1010,✓,✓,Sin definir,2023-04-24,1038 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego Salemne,jazzdiego@yahoo.com.ar,,✓,✗,Sin definir,2023-04-19,1043 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sebastian Borojovich,boro_844@hotmail.com,+545491165559007,✓,✓,Blanqueamiento,2023-04-19,1043 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Espindola Silvana,jazminboro@hotmail.com,+545491135946944,✓,✓,Sin definir,2023-04-19,1043 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Guzman Sergio,sergioguzman71@hotmail.com,+545491136667400,✓,✓,Sin definir,2023-04-17,1045 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Lucia Gill,luciagill155@gmail.com,+545493535696300,✓,✓,Sin definir,2023-04-07,1055 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Llauró Abril Ezcurra,soyabrilezcurra@gmail.com,+545491131299000,✓,✓,Sin definir,2023-04-07,1055 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Hernández Susana,susanab-hernandez@hotmail.com,+545491153058777,✓,✓,Sin definir,2023-04-05,1057 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Emiliano Torres,emitorres732@gmail.com,+545492964529756,✓,✓,Sin definir,2023-04-05,1057 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Jorge Angel Serrudo Pinto,jorgeangel.se@gmail.com,+545492216043316,✓,✓,Sin definir,2023-03-31,1062 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Camila Gorosito,camila_goro@hotmail.com,+545491138947445,✓,✓,Sin definir,2023-03-29,1064 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sabrina Mansilla,sabrina.mansilla@live.com,+54549,✓,✓,Sin definir,2023-03-27,1066 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rapetti Antonella,rapeti@hotmail.com,+545491140311126,✓,✓,Ortodoncia,2023-03-27,1066 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Calizaya Rosmery,sherymajo2013@gmail.com,+545491157440245,✓,✓,Carillas / Diseño de Sonrisa,2023-03-24,1069 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Mariana Garcia,dra.marianacgarcia@gmail.com,+545491158714640,✓,✓,Sin definir,2023-03-24,1069 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bertolotti Soledad,oliviaguapa22@hotmail.com,+545491171472528,✓,✓,Sin definir,2023-03-22,1071 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Pava Soledad,sol.2821@icloud.com,+545491136521522,✓,✓,Carillas / Diseño de Sonrisa,2023-03-20,1073 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Soto Nahir,yinsuuu@gmail.com,+545491135860831,✓,✓,Blanqueamiento,2023-03-20,1073 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lourdes Tamara Godoy Leiva,lourdestamaragodoyleiva@gmail.com,+545491126657823,✓,✓,Sin definir,2023-03-17,1076 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Alegre Fabrizio,fabri.alegre@icloud.com,+545491150165295,✓,✓,Sin definir,2023-03-15,1078 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Nicolas Palermo,gap.nicolas@gmail.com,+545491155662600,✓,✓,Sin definir,2023-03-15,1078 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),John Mariel,marieljohn1@gmail.com,+545492226484100,✓,✓,Blanqueamiento,2023-03-13,1080 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Liendro Ona,onaliendro@gmail.com,+545491151607719,✓,✓,Sin definir,2023-03-10,1083 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Eduardo Ayala,ayalasixtoeduardo@gmail.com,+545491161292653,✓,✓,Sin definir,2023-03-10,1083 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Andres Dodero,andrew@avalith.net,+545491151317074,✓,✓,Sin definir,2023-03-08,1085 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),María Cecilia Baroni,ceciliaabaroni@gmail.com,+545491133761419,✓,✓,Sin definir,2023-03-08,1085 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Balboa Nicole,nicoleebalboa@gmail.com,+545491136394082,✓,✓,Ortodoncia,2023-03-06,1087 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Diaz,marylu.md94@gmail.com,+545491138272885,✓,✓,Sin definir,2023-03-03,1090 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),María Josefina Caruezo,caruezo.josefina@gmail.com,+545492396613215,✓,✓,Sin definir,2023-03-03,1090 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martin Eliana,elianamartinn@gmail.com,+54 11 2450-2064,✓,✓,Sin definir,2023-02-20,1101 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sofia Ailen Carnovale,sofiacarnovale@gmail.com,+545491135781578,✓,✓,Sin definir,2023-02-20,1101 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lucas Alen,alenlucas@hotmail.com,,✓,✗,Sin definir,2023-02-08,1113 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Carreras Pedro,pedrocarreras@gmail.com,+545491153777644,✓,✓,Carillas / Diseño de Sonrisa,2023-02-03,1118 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Schaab Couat Ernestina,ernestinaschaab@hotmail.com,+545492914377966,✓,✓,Carillas / Diseño de Sonrisa,2023-02-01,1120 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Soledad Orellana Marisa,mso02092003@yahoo.com.ar,+545491161399077,✓,✓,Carillas / Diseño de Sonrisa,2023-01-30,1122 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Civiello Mariela,marielaciv@hotmail.com,+545491160068392,✓,✓,Sin definir,2023-01-30,1122 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Florencia Granton,florengranton@hotmail.com,+545493513902934,✓,✓,Sin definir,2023-01-27,1125 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Canciani Michelle,mvd.canciani@gmail.com,+545491137658585,✓,✓,Sin definir,2023-01-23,1129 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Sol Sesin,solsesin@hotmail.com,+545491132644701,✓,✓,Sin definir,2023-01-20,1132 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego Villalba,nosomosnada_06@hotmail.com,+545491153777403,✓,✓,Ortodoncia,2023-01-20,1132 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Olivera Sandra,sos_olivera22@hotmail.com,+545493364008046,✓,✓,Sin definir,2023-01-16,1136 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Romina Fernandez,romina_fernandezmano@hotmail.com,+545491130305900,✓,✓,Carillas / Diseño de Sonrisa,2023-01-16,1136 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gutierrez Marilu,marilunow@hotmail.com,+545491154977115,✓,✓,Carillas / Diseño de Sonrisa,2023-01-13,1139 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lucas Sarmiento,sarmiento.lucas93@gmail.com,+545491165971760,✓,✓,Carillas / Diseño de Sonrisa,2023-01-11,1141 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Campos Alicia,aliciabenignacampos@gmail.com,+545491130018300,✓,✓,Sin definir,2023-01-04,1148 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Leonardo Pozzo,leopozzojl@gmail.com,+545491126628655,✓,✓,Carillas / Diseño de Sonrisa,2022-12-28,1155 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Favretto Matias,matiasfavretto@hotmail.com,+545491165239459,✓,✓,Sin definir,2022-12-28,1155 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Valentina Cid,felinaargentina@hotmail.es,+54 11 5416-5682,✓,✓,Sin definir,2022-12-19,1164 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agustina Mancini,aguss.mancini@hotmail.com,+545491150969526,✓,✓,Sin definir,2022-12-19,1164 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martinez Meliza,melizamartinez1018@gmail.com,+545491166751745,✓,✓,Implantes,2022-12-14,1169 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Seijas Ibañez Barbara,seijasibanez@hotmail.com,+545491135223251,✓,✓,Carillas / Diseño de Sonrisa,2022-12-12,1171 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernandez Sergio,dreykodream@gmail.com,+545491166651037,✓,✓,Sin definir,2022-12-12,1171 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lionel Roa Llabrés Dylan,dylanlionelllabres98@live.com.ar,+545491155241287,✓,✓,Sin definir,2022-12-07,1176 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Dominguez,federicoadominguez@gmail.com,+545491131209993,✓,✓,Sin definir,2022-12-05,1178 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Hurtado Rodrigo,rodrigo.hurtado@supervielle.com.ar,+545493516433573,✓,✓,Sin definir,2022-12-02,1181 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Atilio Bodini,atilionicolasbodini@gmail.com,+545491166878140,✓,✓,Sin definir,2022-12-02,1181 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Laura Nuñez,m.lauranuniez@gmail.com,+545491164704674,✓,✓,Ortodoncia,2022-11-28,1185 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sosa Yamila,yamiesosa@gmail.com,+545491137777028,✓,✓,Sin definir,2022-11-25,1188 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Silvia Andrea Molinas,inspmolinas@gmail.com,+545491150613514,✓,✓,Carillas / Diseño de Sonrisa,2022-11-25,1188 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agustin Ilariuzzi,agustinilariuzzi@gmail.com,+545491170029302,✓,✓,Blanqueamiento,2022-11-23,1190 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Melania Gisondi,Gisondimelania@gmail.com,+545491161319426,✓,✓,Sin definir,2022-11-22,1191 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Perretta Brenda,brenperretta@gmail.com,+545492477569084,✓,✓,Sin definir,2022-11-18,1195 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agostina Mauricio,agostina@acuarela.com.ar,+545491149379788,✓,✓,Sin definir,2022-11-17,1196 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Andres Dodero,andrew@avalith.net,+545491151317074,✓,✓,Sin definir,2022-11-16,1197 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Facundo Marin Meyer,facumarin_07@hotmail.com,+545492944705107,✓,✓,Carillas / Diseño de Sonrisa,2022-11-14,1199 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Andres Hirsch,andy-ht@hotmail.com,+545491155845547,✓,✓,Sin definir,2022-11-09,1204 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Russo Leonel,leonelfernandorusso@hotmail.com,+545491138544631,✓,✓,Sin definir,2022-11-09,1204 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Quiroz Mendez Jhamarin,jhami0562@gmail.com,+545491165563706,✓,✓,Sin definir,2022-11-07,1206 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Halfon Sol,solhalfon84@hotmail.com,+545491162826877,✓,✓,Carillas / Diseño de Sonrisa,2022-11-07,1206 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Freire Juliana,julianaefreire@gmail.com,+545491149376426,✓,✓,Sin definir,2022-11-04,1209 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agostina Mauricio,agostina@acuarela.com.ar,+545491149379788,✓,✓,Sin definir,2022-11-03,1210 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Carolina Lazcano,jlazcanosoliz@gmail.com,+545491158030085,✓,✓,Sin definir,2022-11-02,1211 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Romina Jimena,rominaj75@hotmail.com,+545491144274667,✓,✓,Sin definir,2022-11-02,1211 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lautaro Ricci,lautaro_ricci@yahoo.com.ar,+54 9 11 3270-1392,✓,✓,Carillas / Diseño de Sonrisa,2022-11-02,1211 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Nelly Velázquez Galeano Carmen,nelly-velazquez@hotmail.com,+545491135743636,✓,✓,Carillas / Diseño de Sonrisa,2022-10-31,1213 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Julieta Frangioli,julietafrangioli@gmail.com,+545491139193353,✓,✓,Ortodoncia,2022-10-31,1213 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),González Daniela,dege1981@hotmail.com,+545491165160574,✓,✓,Blanqueamiento,2022-10-24,1220 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ezequiel Ferreyra,ezequiel@coverline.com.ar,+545491158181574,✓,✓,Sin definir,2022-10-24,1220 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Haissiner Daniela,danielahaissiner@gmail.com,+545491144118717,✓,✓,Carillas / Diseño de Sonrisa,2022-10-21,1223 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cruz Paola,pala14658@gmail.com,+545491127430203,✓,✓,Sin definir,2022-10-21,1223 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agostina Mauricio,agostina@acuarela.com.ar,+545491149379788,✓,✓,Carillas / Diseño de Sonrisa,2022-10-21,1223 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Estefania Alozen,estefialozen@gmail.com,+545491138686322,✓,✓,Implantes,2022-10-19,1225 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ruben Aranda,rdaranda@hotmail.com.ar,+545492966447786,✓,✓,Sin definir,2022-10-19,1225 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Juan Pablo Carrizo Torrontegui,juancarrizogestion@hotmail.com,+545492664402768,✓,✓,Sin definir,2022-10-19,1225 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Camila Duarte,camiladuarte.jefatura@gmail.com,+545491161223614,✓,✓,Sin definir,2022-10-18,1226 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Viviana Killing Clarisa,drakilling@gmail.com,+545491161597918,✓,✓,Carillas / Diseño de Sonrisa,2022-10-17,1227 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Matias Ravagnan,matiasravagnan@gmail.com,+541167484516,✓,✓,Sin definir,2022-10-17,1227 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bernstein Victoria,victoriabernstein@outlook.com,,✓,✗,Sin definir,2022-10-17,1227 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bellagamba Mariela,marielab843@gmail.com,+54 11 3913-9810,✓,✓,Sin definir,2022-10-11,1233 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vera Figueredo Elisandra,elisandravera897@gmail.com,+545491133682458,✓,✓,Sin definir,2022-10-07,1237 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Alarcon Sayuri,sayuri.alarcon99@email.com,+545491155248839,✓,✓,Sin definir,2022-10-07,1237 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Beatriz Aguirre,yany_b5@hotmail.com,+545491156230495,✓,✓,Sin definir,2022-10-07,1237 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rivera Dani,riveradaniela@live.comn.ar,,✓,✗,Sin definir,2022-10-06,1238 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Landoni Gustavo,gustavo@dollfins.com.ar,,✓,✗,Sin definir,2022-10-05,1239 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Camila Duarte,camiladuarte.jefatura@gmail.com,+545491161223614,✓,✓,Carillas / Diseño de Sonrisa,2022-10-05,1239 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gabriela Díaz Cuvalo,gdiazcuvalo@gmail.com,+545492616510344,✓,✓,Sin definir,2022-09-30,1244 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernando Furlan,ffurlan23@gmail.com,+545493487475558,✓,✓,Sin definir,2022-09-28,1246 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Silvina Meso,full_365@hotmail.com,+5454922905825,✓,✓,Sin definir,2022-09-26,1248 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Laura Medina,laury.medina@hotmail.com,+545491141623763,✓,✓,Sin definir,2022-09-23,1251 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Aguero Alicia,psicoholo@gmail.com,+5454935378118,✓,✓,Sin definir,2022-09-23,1251 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Marquez Carmen,caralur@hotmail.com,+54549,✓,✓,Sin definir,2022-09-21,1253 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Romina Souse,somirouse@gmail.com,+545491139096759,✓,✓,Sin definir,2022-09-19,1255 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),María Salinas,marielalan@yahoo.com.ar,+545491158183863,✓,✓,Sin definir,2022-09-19,1255 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martin Mena,tincho33s4@gmail.com,+54549,✓,✓,Sin definir,2022-09-16,1258 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Villalba Braian,braian.villalba97@hotmail.com,+545491156268913,✓,✓,Sin definir,2022-09-16,1258 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ezequiel Cerisola,mayorista.silvernow@gmail.com,+545491159730324,✓,✓,Sin definir,2022-09-14,1260 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Grimbeg Richard,marianadelacuesta@gmail.com,+545491132655554,✓,✓,Sin definir,2022-09-12,1262 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Nestor Britez,britez.ng@gmail.com,+545491168194338,✓,✓,Carillas / Diseño de Sonrisa,2022-09-09,1265 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rocio Miguel,valugaspar32@gmail.com,+545491162377322,✓,✓,Sin definir,2022-09-09,1265 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Franco Magali,magali.francorivero@gmail.com,+545491173634763,✓,✓,Sin definir,2022-09-07,1267 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vilchez Rodrigo,rodrigovilchez@hotmail.com,+545491166111422,✓,✓,Blanqueamiento,2022-09-05,1269 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rivera Daniela,riveradaniela@live.com.ar,+54 11 4928-3298,✓,✓,Sin definir,2022-08-31,1274 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Petragnani Victoria,victoria.petragnani@gmail.com,+54549393317390717,✓,✓,Sin definir,2022-08-26,1279 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Mariana di Meglio,marianadimeglio@hotmail.com,+545491132574752,✓,✓,Sin definir,2022-08-26,1279 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Paula Pieres,carolinapieres@gmail.com,+541132322764,✓,✓,Sin definir,2022-08-26,1279 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Francisco Juan,franciscojuan37@icloud.com,+545491130911635,✓,✓,Sin definir,2022-08-24,1281 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fluhr Tamara,tamarafluhr@gmail.com,+545491132653188,✓,✓,Sin definir,2022-08-22,1283 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martina Lescano,maridemiqueli@yahoo.com.ar,+54549261248760,✓,✓,Ortodoncia,2022-08-19,1286 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Juan Carlos Barros,barros.juancarlos@gmail.com,+545491137038670,✓,✓,Sin definir,2022-08-19,1286 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agustina Plá,agustinapla88@gmail.com,+54 11 4403-5963,✓,✓,Sin definir,2022-08-18,1287 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Garcia,cuchu12@hotmail.com,+545491135054883,✓,✓,Sin definir,2022-08-17,1288 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Natalia Giménez,gimeneznatalia790@gmail.com,+545491133759689,✓,✓,Carillas / Diseño de Sonrisa,2022-08-17,1288 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Morchon Gustavo,gustavomorchon@hotmail.com,+545492214772178,✓,✓,Sin definir,2022-08-17,1288 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cristian Valentino,chichosmile@gmail.com,+545491141407184,✓,✓,Sin definir,2022-08-15,1290 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rocio Jimena,rociobelenjimena@gmail.com,+545491138574635,✓,✓,Sin definir,2022-08-15,1290 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Belén Ramírez,m.belenramirez@hotmail.com,+545491125758697,✓,✓,Sin definir,2022-08-15,1290 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Camila Fernanda Pajón Fretes,camilapajonfretes@gmail.com,+545491168732058,✓,✓,Sin definir,2022-08-15,1290 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Szewczuk Marcela,marcela.szewczuk@gmail.com,+545491135714035,✓,✓,Sin definir,2022-08-12,1293 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernando Cairo,fernandocairo.diet@gmail.com,+545491131214709,✓,✓,Sin definir,2022-08-12,1293 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Nicolas Andres Areco,nareco70@gmail.com,+545491155966922,✓,✓,Carillas / Diseño de Sonrisa,2022-08-10,1295 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Galeano Vanesa,vanuchi29@gmail.com,+545491161913873,✓,✓,Sin definir,2022-08-10,1295 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Pablo Fernandez,pablofernandezmarzullo@gmail.com,+545491132199694,✓,✓,Sin definir,2022-08-10,1295 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Marie Piñeyro,arqmarielapineyro@gmail.com,+545493247090259,✓,✓,Carillas / Diseño de Sonrisa,2022-08-08,1297 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Calderon Jexumar,jexumarca@gmail.com,+54549,✓,✓,Sin definir,2022-08-08,1297 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Mariana Duarte Julia,mariduarte7@hotmail.com,+545491131307320,✓,✓,Sin definir,2022-08-08,1297 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Juan Marinelli,jmarinelli49@gmail.com,+545491154624483,✓,✓,Sin definir,2022-08-05,1300 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Juan Manuel Beltran,juanmanuel@beltran.com,+545491153298778,✓,✓,Carillas / Diseño de Sonrisa,2022-08-05,1300 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Alejandro Torres,alejandrotorres@fibertel.com.ar,+545491162873830,✓,✓,Carillas / Diseño de Sonrisa,2022-08-03,1302 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernandez Mauricio,mauri_17690@hotmail.com,+545491132262986,✓,✓,Implantes,2022-08-03,1302 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Costilla Vanesa,costillavanesa@gmail.com,+545491149286471,✓,✓,Sin definir,2022-08-03,1302 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Buddemeyer Leandro,lea@advtea.com,,✓,✗,Sin definir,2022-08-02,1303 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lorena Ramírez,ladyloreley@hotmail.com,+545491157640692,✓,✓,Sin definir,2022-08-01,1304 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lagostena Paola,paolagostena@gmail.com,+545491168213274,✓,✓,Carillas / Diseño de Sonrisa,2022-08-01,1304 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Olazagasti Mariel,marielolazagasti@gmail.com,+545491138120223,✓,✓,Sin definir,2022-07-29,1307 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gabriela Musse,gabrielamusse@yahoo.com.ar,+545491159241476,✓,✓,Sin definir,2022-07-27,1309 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Luciano Spadetto,fespa95@hotmail.com,+545491130282042,✓,✓,Ortodoncia,2022-07-27,1309 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ledesma Ayelen,aledesmafer@gmail.com,+545491153781907,✓,✓,Sin definir,2022-07-25,1311 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Galliano,fechugalliano@live.com,+545491130198952,✓,✓,Sin definir,2022-07-22,1314 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martin Mena,tincho33s4@gmail.com,+54549,✓,✓,Implantes,2022-07-22,1314 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bergen Sven von,svenvbo93@gmail.com,+545491126981319,✓,✓,Sin definir,2022-07-22,1314 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cabrera Nelson,neljaca@gmail.com,+545491166821870,✓,✓,Sin definir,2022-07-19,1317 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Risco Agostina del,agostinadelrisco@gmail.com,+545491123477524,✓,✓,Sin definir,2022-07-18,1318 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Beco Aldana di,aldana.dibeco@gmail.com,+545492317402410,✓,✓,Sin definir,2022-07-15,1321 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Salimbeni,fede.salimbeni@gmail.com,+545491141701977,✓,✓,Sin definir,2022-07-15,1321 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Analia Canciani,Acnanis5@gmail.com,+545491137659009,✓,✓,Sin definir,2022-07-11,1325 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Micaela Pajaro,mic11p@hotmail.com,+545491130022166,✓,✓,Sin definir,2022-07-08,1328 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernando Andres Ibarra,fernandoaibarra77@gmail.com,+545492975932557,✓,✓,Sin definir,2022-07-06,1330 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ranieri Regina,ranieriregina@hotmail.com,,✓,✗,Sin definir,2022-07-01,1335 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Emiliano Maineri,emilianomaineri@gmail.com,+545492644552811,✓,✓,Carillas / Diseño de Sonrisa,2022-07-01,1335 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Castagno Iara,aguselve@gmail.com,+545493512223568,✓,✓,Sin definir,2022-06-22,1344 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maribel Chambi,maribelchambi812@gmail.com,+54 11 2330-4645,✓,✓,Sin definir,2022-06-22,1344 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Zampini Carina,carinaliliana32@hotmail.com.ar,+545491150266507,✓,✓,Blanqueamiento,2022-06-17,1349 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vilte Franco,fjvilte63@gmail.com,+545491134125963,✓,✓,Sin definir,2022-06-17,1349 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Micaela Campos,campos.mica@hotmail.com,+545491166491558,✓,✓,Carillas / Diseño de Sonrisa,2022-06-15,1351 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cristina Rodriguez Aravena Claudia,mariaagustina.alonso@outlook.com,+545491144054483,✓,✓,Carillas / Diseño de Sonrisa,2022-06-15,1351 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Pereira Jissela,jiselaeper@gmail.com,+545491154755212,✓,✓,Carillas / Diseño de Sonrisa,2022-06-13,1353 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Laura Laves,inglauralaves@ymail.com,+545491128929359,✓,✓,Ortodoncia,2022-06-13,1353 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sanchez Fernanda,sanchezfernanda@live.com.ar,+545491138560058,✓,✓,Sin definir,2022-06-10,1356 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Valentina Gonzalez,vale6w@gmail.com,+545493543600815,✓,✓,Blanqueamiento,2022-06-10,1356 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),María Arce Ojeda Ana,ana.ojeda89@hotmail.com,+545491168032326,✓,✓,Carillas / Diseño de Sonrisa,2022-06-10,1356 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Buyatti Daniela,danielabuyatti@gmail.com,+545492964553770,✓,✓,Carillas / Diseño de Sonrisa,2022-06-08,1358 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Regunega Ines,mariaines.rgng@gmail.com,+54 11 3472-2608,✓,✓,Sin definir,2022-06-06,1360 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lucas Varas,lucasanvaras@gmail.com,+545491166732105,✓,✓,Carillas / Diseño de Sonrisa,2022-06-06,1360 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lucia Montorfano,lulimontorfano@gmail.com,+54 11 3449-1395,✓,✓,Sin definir,2022-05-25,1372 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martina Velazquez,velazquezmartina7@hotmail.com,+545491153133033,✓,✓,Sin definir,2022-05-25,1372 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Arnolfi Marilina,mariarnolfi@hotmail.com,+545491155133204,✓,✓,Sin definir,2022-05-23,1374 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Simon Adrian,adrianfsimon@hotmail.com,+545492214112856,✓,✓,Sin definir,2022-05-23,1374 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Yanina Chirinos Valdez Ana,yasvina@hotmail.com,+545491126630655,✓,✓,Sin definir,2022-05-20,1377 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Patricia Hayes,patohayes62@gmail.com,,✓,✗,Sin definir,2022-05-20,1377 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Llauró Abril Ezcurra,soyabrilezcurra@gmail.com,+545491131299000,✓,✓,Carillas / Diseño de Sonrisa,2022-05-16,1381 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cayo Rebeca,rebecaanaliacayo@gmail.com,+545491123422453,✓,✓,Blanqueamiento,2022-05-13,1384 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Muñoz Monica,monicarosasmu@gmail.com,+545491130629299,✓,✓,Sin definir,2022-05-13,1384 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Aldana Garnero,aldanagarnero@hotmail.com,+545493406562172,✓,✓,Blanqueamiento,2022-05-13,1384 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Carolina Wainberg,carolwainberg@hotmail.com,+545491131743082,✓,✓,Sin definir,2022-05-13,1384 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Delfina Jaacks,Delfijaacks@gmail.com,+54 11 5825-0757,✓,✓,Sin definir,2022-05-09,1388 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Belen Fernandez,mbelenfernandez91@hotmail.com,+541155057132,✓,✓,Sin definir,2022-05-09,1388 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gabriel Ouviña,gabrielouv@gmail.com,+545491131956345,✓,✓,Sin definir,2022-05-06,1391 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Andrade Malena,male_yo2@hotmail.com,+545491168181842,✓,✓,Carillas / Diseño de Sonrisa,2022-05-06,1391 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Alessandrini Sonia,sonialola2710@gmail.com,+545491122934999,✓,✓,Carillas / Diseño de Sonrisa,2022-05-04,1393 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Wiszniewski Aurora,auro.deco@hotmail.com,+545491133120949,✓,✓,Sin definir,2022-05-04,1393 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Kolker Gaston,gkolker@hotmail.com,+545491150294311,✓,✓,Carillas / Diseño de Sonrisa,2022-05-02,1395 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Mazzeo Solange,mazzeosolange@hotmail.com,+545491140229941,✓,✓,Sin definir,2022-04-27,1400 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bruno Santillan,bruno.santillan0912@gmail.com,+545491173638267,✓,✓,Carillas / Diseño de Sonrisa,2022-04-25,1402 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ale Benjamin y,ale.veracxbmf@gmail.com,+44 7944 136953,✓,✓,Sin definir,2022-04-18,1409 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Micaela Ponzl,micasideral@gmail.com,+545491140374555,✓,✓,Carillas / Diseño de Sonrisa,2022-04-15,1412 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Chavarria Rosana,roxychava01@gmail.com,+545491166909659,✓,✓,Carillas / Diseño de Sonrisa,2022-04-15,1412 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Montes Luna,lumontess2002@gmail.com,+545491131627585,✓,✓,Blanqueamiento,2022-04-11,1416 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),German Ventriglia,german.ventriglia@gmail.com,+545491132707514,✓,✓,Sin definir,2022-04-08,1419 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rendon Giselle,rendongl@hotmail.com,+5454919176039129,✓,✓,Sin definir,2022-04-06,1421 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Balbuena Joel,yoelbalbuena2245@gmail.com,+545491122451380,✓,✓,Sin definir,2022-04-06,1421 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Zavaleta Zuely,zu18@hotmail.com,+545491138146524,✓,✓,Sin definir,2022-04-04,1423 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Landoni Paz,pazlandoni@gmail.com,+545491132568930,✓,✓,Carillas / Diseño de Sonrisa,2022-04-04,1423 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Viera Hermes,hermesvieraamado@gmail.com,+545491167145653,✓,✓,Carillas / Diseño de Sonrisa,2022-04-04,1423 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cestac Mariano,marianoccm@hotmail.com,+545492954337070,✓,✓,Sin definir,2022-03-28,1430 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Giunta Jonathan di,jonathandigiunta@hotmail.com,+545491163045038,✓,✓,Sin definir,2022-03-28,1430 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fulop Karen,karenfulop@outlook.com,+545491155756596,✓,✓,Sin definir,2022-03-28,1430 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Pablo Moreira,pes.moreira@gmail.com,+545491159915010,✓,✓,Sin definir,2022-03-25,1433 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Amadeo Daira,dairaamadeo@hotmail.com,+545491156592006,✓,✓,Sin definir,2022-03-25,1433 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Müller Esteban,estebanmuller@live.com.ar,+545491140230332,✓,✓,Blanqueamiento,2022-03-23,1435 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ivana Denisse Skibicki,ivana_22_28@hotmail.com,+545491121825504,✓,✓,Sin definir,2022-03-21,1437 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rojas Naira,ribbasami@gmail.com,+545491162553459,✓,✓,Carillas / Diseño de Sonrisa,2022-03-21,1437 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Simone Ariel,arielsimone19@hotmail.com,+545491161924191,✓,✓,Sin definir,2022-03-18,1440 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Casco Tabhata,casco.tabhata@gmail.com,+545491131370595,✓,✓,Carillas / Diseño de Sonrisa,2022-03-18,1440 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ginzalez Navarro Viviana,gonzaleznavarrov@gmail.com,+545491156960164,✓,✓,Sin definir,2022-03-14,1444 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Jose Caro,joccaro87@gmail.com,+545493855990292,✓,✓,Carillas / Diseño de Sonrisa,2022-03-11,1447 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Julieta Cabrera,jual_85@outlook.com,+545492364262949,✓,✓,Carillas / Diseño de Sonrisa,2022-03-11,1447 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bocanegra Bertilda,belenbocanegra@yahoo.com.ar,+545491151161506,✓,✓,Sin definir,2022-03-09,1449 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cucchietti Viviana,esrher_a10@hotmail.com,+545493518074225,✓,✓,Carillas / Diseño de Sonrisa,2022-03-09,1449 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Vozza,federico.vozza@yahoo.com,+545491164228135,✓,✓,Carillas / Diseño de Sonrisa,2022-03-02,1456 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gallo Natalia,nataliagallo87@gmail.com,+545491124553151,✓,✓,Sin definir,2022-02-28,1458 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Analia Medina,mimatheoymel@gmail.com,+545491138120452,✓,✓,Sin definir,2022-02-28,1458 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Aniceto Norma,naniceto9@gmail.com,+545491141899595,✓,✓,Carillas / Diseño de Sonrisa,2022-02-25,1461 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Casupa Paola,paola.casupa@hotmail.com,+545491164557774,✓,✓,Sin definir,2022-02-23,1463 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Etlis Gisela,giselaetlis@gmail.com,+545491158307432,✓,✓,Sin definir,2022-02-23,1463 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Romina Guglielminotti,guglielminottir@gmail.com,+545491150554110,✓,✓,Ortodoncia,2022-02-21,1465 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Anabella Diple,Anabelladiple@icloud.com,+545493425311930,✓,✓,Sin definir,2022-02-18,1468 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Paula Llauro,paulallauronougues@gmail.com,+54 11 4178-5000,✓,✓,Sin definir,2022-02-16,1470 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Virginia Gallardo,virgigallardo@gmail.com,+545491136092814,✓,✓,Carillas / Diseño de Sonrisa,2022-02-16,1470 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ola Matias,ola.juanmatias@gmail.com,+545491149365208,✓,✓,Carillas / Diseño de Sonrisa,2022-02-16,1470 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Romina Souse,somirouse@gmail.com,+545491139096759,✓,✓,Sin definir,2022-02-11,1475 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Valentino Rios diament,rios_santiago@hotmail.com,+54 11 3030-5900,✓,✓,Carillas / Diseño de Sonrisa,2022-02-09,1477 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martinez Lahitou Ines,inesmartinezl94@gmail.com,+545491140749826,✓,✓,Ortodoncia,2022-02-07,1479 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernando Sibilla,sibillafernando@gmail.com,+545491130815116,✓,✓,Implantes,2022-02-07,1479 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Piazza Claudio,cnpiazza@gmail.com,+545491166208800,✓,✓,Sin definir,2022-02-04,1482 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diana Diaz,diazdiana.secretariat@gmail.com,,✓,✗,Sin definir,2022-01-31,1486 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bago Stella,stebago@hotmail.com,+545491158319606,✓,✓,Sin definir,2022-01-28,1489 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Paula Pieres,carolinapieres@gmail.com,+541132322764,✓,✓,Carillas / Diseño de Sonrisa,2022-01-28,1489 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Dalla Pria Marcela,marceladp13@gmail.com,+545491158479090,✓,✓,Sin definir,2022-01-26,1491 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rocio Miguel,valugaspar32@gmail.com,+545491162377322,✓,✓,Carillas / Diseño de Sonrisa,2022-01-19,1498 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Larin Viviana,viviana_larin@hotmail.com,+545491167911147,✓,✓,Carillas / Diseño de Sonrisa,2022-01-17,1500 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Pereira Simália,simatakafashi@gmail.com,+545493412710469,✓,✓,Sin definir,2022-01-17,1500 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Jose Luis Gonzalez,gonzajoseluis708@gmail.com,+545491160595586,✓,✓,Carillas / Diseño de Sonrisa,2022-01-12,1505 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Christiansen,christiansenf@gmail.com,+545491131805843,✓,✓,Sin definir,2022-01-10,1507 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diaz Diana,diazdiana.secretariat@gmail.con,+545491167827554,✓,✓,Sin definir,2022-01-07,1510 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Federico Laufgang,federicolaufgang@gmail.com,+545491126536433,✓,✓,Sin definir,2022-01-07,1510 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agustin Marenna,agustinmarenna@outlook.com,+545491133693471,✓,✓,Sin definir,2022-01-05,1512 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Marcilese Barbara,barbara.marcilese@gmail.com,+545491141963806,✓,✓,Sin definir,2022-01-05,1512 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Julieta Ferrer,julietaferrerotheguy@gmail.com,+545491134525746,✓,✓,Sin definir,2022-01-05,1512 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Soto Melisa,merisareal@gmail.com,+545491123144109,✓,✓,Sin definir,2021-12-29,1519 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Giancristofaro Ornella,ornella.giancristofaro@hotmail.com,+545491127955662,✓,✓,Sin definir,2021-12-29,1519 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vanesa Wasinger,vanesapaow@gmail.com,+545491134351991,✓,✓,Carillas / Diseño de Sonrisa,2021-12-29,1519 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Andrea Konecny Comolli,andreakonecnycomolli@gmail.com,+545493865392138,✓,✓,Sin definir,2021-12-27,1521 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bautista Yhoselin,yhos18bauqui@gmail.com,+545491138497859,✓,✓,Implantes,2021-12-24,1524 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Emilio Laurens,emiliolaurens@hotmail.com,+54 2325 65-7200,✓,✓,Sin definir,2021-12-22,1526 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),María Soledad Feijóo,msoledadfeijoo@yahoo.com.ar,+545491122502473,✓,✓,Carillas / Diseño de Sonrisa,2021-12-20,1528 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Prieto Siomara,siomara.prieto@gmail.com,+545491124994563,✓,✓,Carillas / Diseño de Sonrisa,2021-12-20,1528 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Paula Arakaki,plarakaki@gmail.com,+54541140419068,✓,✓,Carillas / Diseño de Sonrisa,2021-12-13,1535 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gonzalez Aldana,aldy94_@hotmail.com,+545491128476633,✓,✓,Sin definir,2021-12-10,1538 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Briceño Antonieta,antobri@gmail.com,+545491134043833,✓,✓,Sin definir,2021-12-10,1538 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Silvia Lalin,laliniglesiassilvia@gmail.com,+545491149926844,✓,✓,Sin definir,2021-12-08,1540 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maylin Milagros,maylin.milagros@gmail.com,+545491136059555,✓,✓,Blanqueamiento,2021-12-06,1542 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Christiansen Gustavo,christiansen2007@gmail.com,+545491151657923,✓,✓,Implantes,2021-12-06,1542 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Victoria Christiansen,christiansen.vi@gmail.com,+545491166241894,✓,✓,Ortodoncia,2021-12-06,1542 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Victoria Saporiti,visaporiti@hotmail.com,+545491140762988,✓,✓,Sin definir,2021-12-03,1545 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Paulina Maschio,bonavita.carlos@gmail.com,+545491136429294,✓,✓,Sin definir,2021-12-03,1545 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Analia de Rosa,avderosa@hotmail.com,+545491150096311,✓,✓,Carillas / Diseño de Sonrisa,2021-11-29,1549 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sanchez Alejandra,celes-gab@hotmail.com,+545491150533637,✓,✓,Sin definir,2021-11-29,1549 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Facundo Buda Almenta,facundobuda@gmail.com,+545491134556163,✓,✓,Carillas / Diseño de Sonrisa,2021-11-26,1552 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Salerno Tamara,tamara_disalerno@hotmail.com,+545491127183322,✓,✓,Carillas / Diseño de Sonrisa,2021-11-26,1552 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ezequiel Luna,ezequielmluna@gmail.com,+545491164270646,✓,✓,Sin definir,2021-11-24,1554 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gomez Jenifer,jenigomez870@gmail.com,+545491133084668,✓,✓,Sin definir,2021-11-22,1556 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ivana Denisse Skibicki,ivana_22_28@hotmail.com,+545491121825504,✓,✓,Sin definir,2021-11-19,1559 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Boucau Dólares,loliboucau.stylist@gmail.com,+34 622 10 62 94,✓,✓,Sin definir,2021-11-19,1559 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gramajo Estefania,fanyegramajo@gmail.com,+545491161191961,✓,✓,Sin definir,2021-11-17,1561 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ravelli Sabrina,sabrinaravelli87@gmail.com,+545491136378887,✓,✓,Carillas / Diseño de Sonrisa,2021-11-17,1561 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Steiner Mauro,maro_steiner@hotmail.com,+545492974007789,✓,✓,Sin definir,2021-11-15,1563 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rueda Rafael,rafaelrueda.cr@gmail.com,+545491166161440,✓,✓,Carillas / Diseño de Sonrisa,2021-11-12,1566 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Belen Fernandez,mbelenfernandez91@hotmail.com,+541155057132,✓,✓,Sin definir,2021-11-10,1568 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Julieta Vela,julietafvela@gmail.com,+545491151236275,✓,✓,Blanqueamiento,2021-10-29,1580 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Buonvicino Ariadna,ariadnabuonvicino@gmail.com,+545491169720102,✓,✓,Sin definir,2021-10-29,1580 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Zuccari Lisandro,lisandrozuccari@gmail.com,+54 11 7172-2784,✓,✓,Sin definir,2021-10-28,1581 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bernal Estevania,estefibernal@icloud.com,+545491139523674,✓,✓,Sin definir,2021-10-27,1582 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sebastian Franceschini,sebasfranceschini22@gmail.com,+54541165345967,✓,✓,Carillas / Diseño de Sonrisa,2021-10-27,1582 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agustina Bolla,agustinabbolla@gmail.com,+545491158431992,✓,✓,Sin definir,2021-10-27,1582 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Franco Javier,jfmagia@gmail.com,+545491164479167,✓,✓,Sin definir,2021-10-25,1584 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vicario Natalia,naty22vic.nv@gmail.com,+545491145282963,✓,✓,Sin definir,2021-10-25,1584 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Andres Vitar,hysandres@hotmail.com,+545493464697176,✓,✓,Sin definir,2021-10-22,1587 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Patricia Rodríguez,ppatty_8@hotmail.com,+545491151513167,✓,✓,Sin definir,2021-10-22,1587 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cruz Nahuel Gomez,nahuel_54@hotmail.com,+545491164485755,✓,✓,Carillas / Diseño de Sonrisa,2021-10-20,1589 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Matias Salvucci,mreddel82@hotmail.com,+54 9 221 317-7101,✓,✓,Sin definir,2021-10-18,1591 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lucas Junco,juncolucasnicolas@gmail.com,+545491158258244,✓,✓,Sin definir,2021-10-18,1591 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rocio Guazzaroni,rocioesclavo@gmail.com,+545491133417808,✓,✓,Sin definir,2021-10-18,1591 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Agustin Bernasconi,agustinbernasconiok@hotmail.com,+545493546488277,✓,✓,Sin definir,2021-10-15,1594 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Manuel Matias Barrionuevo,matii952009@gmail.com,+545491167898043,✓,✓,Sin definir,2021-10-15,1594 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Santiago Pinczinger,jpincz@gmail.com,+545492494497320,✓,✓,Carillas / Diseño de Sonrisa,2021-10-15,1594 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Silvia Magallanes,sikviamagallanes_07@hotmail.com,+545491136432958,✓,✓,Sin definir,2021-10-13,1596 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Raffo Erika,eriraffo@gmail.com,+545491164864060,✓,✓,Sin definir,2021-10-08,1601 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Almada Guillermo,guillermoe.almada@gmail.com,+545491125113645,✓,✓,Sin definir,2021-10-06,1603 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Puerto Daniela del,danieladelpuerto@hotmail.com,+545491131163789,✓,✓,Carillas / Diseño de Sonrisa,2021-10-01,1608 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Nahuel Gisondi,gisondinahuel@gmail.com,+545491157254266,✓,✓,Sin definir,2021-09-29,1610 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Juan Manuel Gonzalez,gonzalezjuanmanuel51@gmail.com,+545491127011536,✓,✓,Carillas / Diseño de Sonrisa,2021-09-29,1610 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ferron Lautaeo,lautaro.ferron@aerolineas.com.ar,+545491166926000,✓,✓,Sin definir,2021-09-27,1612 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Villalba Basilide,batledrums@gmail.com,+545491126977108,✓,✓,Sin definir,2021-09-27,1612 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Peralta Silvina,sil3peralta@hotmail.com,+545491161281658,✓,✓,Carillas / Diseño de Sonrisa,2021-09-27,1612 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vladimiro Triep,vladi@hotmail.com.ar,+54 9 261 360-2381,✓,✓,Carillas / Diseño de Sonrisa,2021-09-24,1615 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Belen Fernandez,mbelenfernandez91@hotmail.com,+541155057132,✓,✓,Carillas / Diseño de Sonrisa,2021-09-23,1616 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Vinay Samanta,samantavinay@live.com.ar,+545492227442440,✓,✓,Sin definir,2021-09-22,1617 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bordon Roxana,bordonroxana@hotmail.com,+545491162057368,✓,✓,Sin definir,2021-09-22,1617 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Mayra Lezcano,mayravlescano@gmail.com,+545491140246961,✓,✓,Implantes,2021-09-22,1617 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego de Guinea,diego@mexx.com.ar,+545491152474854,✓,✓,Sin definir,2021-09-21,1618 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Garcé Gustavo,gustavogarce@yahoo.com.ar,+545492216027912,✓,✓,Carillas / Diseño de Sonrisa,2021-09-20,1619 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Buondini Mariela,mariela_161@hotmail.com,+545492396423672,✓,✓,Carillas / Diseño de Sonrisa,2021-09-15,1624 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Silvia Chediek,silvia1060@hotmail.com,+545491144484315,✓,✓,Blanqueamiento,2021-09-15,1624 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego de Guinea,diego@mexx.com.ar,+545491152474854,✓,✓,Sin definir,2021-09-14,1625 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gentile Victoria,mvgentile.gamond@gmail.com,+545491155082222,✓,✓,Carillas / Diseño de Sonrisa,2021-09-13,1626 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Luis Trejo,luchotrejodg@gmail.com,+545491154871558,✓,✓,Sin definir,2021-09-13,1626 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Triep Vladimiro,vladimirtriep@hotmail.com,+54 9 261 360-2381,✓,✓,Sin definir,2021-09-13,1626 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Walter Ocampo,wjjocampo@gmail.com,+545491130710867,✓,✓,Sin definir,2021-09-10,1629 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Cespedes Mauricio,mauricio.cespedes87@gmail.com,+54 11 6469-5566,✓,✓,Sin definir,2021-09-09,1630 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Reddel Leandro,reddel.leandro@hotmail.com,+54 221 316-7121,✓,✓,Sin definir,2021-09-09,1630 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Martin Sosa,mjs_94@live.com,+545491156349627,✓,✓,Carillas / Diseño de Sonrisa,2021-09-08,1631 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ramos Hercilia,hercilia_rs@icloud.com,+545491166127212,✓,✓,Carillas / Diseño de Sonrisa,2021-09-08,1631 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Lech Bibiana,bibianavl@yahoo.com.ar,+545491160995968,✓,✓,Carillas / Diseño de Sonrisa,2021-09-06,1633 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego Riveira,diegoriveira@gmail.com,+545491149453415,✓,✓,Sin definir,2021-09-03,1636 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Paredes Daiana,dai.p.escurra.94@gmail.com,+545491161524701,✓,✓,Sin definir,2021-09-03,1636 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Adriana Buccafusca,adribucca@gmail.com,+5454951077777,✓,✓,Sin definir,2021-09-03,1636 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Campoy Virginia,vircampoy@gmail.com,+545492214365622,✓,✓,Sin definir,2021-09-03,1636 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Hirschfeld Marcelo,marceloohigh@hotmail.com,+545491130213783,✓,✓,Implantes,2021-09-01,1638 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Zarate Marcelo,contactolapreviaok@gmail.com,+545491137759394,✓,✓,Carillas / Diseño de Sonrisa,2021-09-01,1638 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Maria Belen Fernandez,mbelenfernandez91@hotmail.com,+541155057132,✓,✓,Sin definir,2021-08-31,1639 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Bogado Silvina,solcito.silvina@gmail.com,+545492241463764,✓,✓,Carillas / Diseño de Sonrisa,2021-08-30,1640 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Mabel Alvarez Adriana,alpropiedades.seguros@gmail.com,+545491136982126,✓,✓,Carillas / Diseño de Sonrisa,2021-08-30,1640 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Diego Riveira,diegoriveira@gmail.com,+545491149453415,✓,✓,Implantes,2021-08-30,1640 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Romina Antonelli,rominaantonelli@gmail.com,+545491130462202,✓,✓,Sin definir,2021-08-27,1643 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Ferron Luz,luzferron@gmail.com,+545491131913100,✓,✓,Sin definir,2021-08-25,1645 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Garcia Bernaus Fernanda,fernandagarciabernaus@gmail.com,+545492478466690,✓,✓,Carillas / Diseño de Sonrisa,2021-08-25,1645 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Sánchez Macarena,maca.sanchez@me.com,+545491139010956,✓,✓,Carillas / Diseño de Sonrisa,2021-08-23,1647 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Manuel Morales,doc.morales.manuel@gmail.com,+545491157989252,✓,✓,Sin definir,2021-08-23,1647 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Fernandez Marcelo,marceclaromeco@yahoo.com.ar,+545492983656546,✓,✓,Carillas / Diseño de Sonrisa,2021-08-23,1647 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Rocio Regueiro,rochi.regueiro@gmail.com,+545491130177753,✓,✓,Sin definir,2021-08-20,1650 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Andrea Civiello,andre_nell@hotmail.com,,✓,✗,Sin definir,2021-08-19,1651 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Florencia Bruno,florencia.bruno.v@gmail.com,+54 11 5622-5149,✓,✓,Sin definir,2021-08-19,1651 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Camila Castro,castro.camila.m@gmail.com,+545493489688338,✓,✓,Sin definir,2021-08-13,1657 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Gonzalez Jonatha,jooniitoh.detelmoooh@gmail.com,+545491154056118,✓,✓,Sin definir,2021-08-06,1664 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),Miguel Leandro,leandromiguel86@yahoo.com.ar,+545491140454232,✓,✓,Carillas / Diseño de Sonrisa,2021-08-04,1666 días,Consulta Realizada,0
+⚪ HISTÓRICO (> 1 año),María del Mar Riestra,riestra.mar@hotmail.com,+545491160225468,✓,✓,Ortodoncia,2021-08-02,1668 días,Consulta Realizada,0
