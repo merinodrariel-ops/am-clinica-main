@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useTransition, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import {
     Bell, Clock, CalendarDays, Phone, MessageCircle,
     CheckCircle2, PauseCircle, XCircle, Search, Filter,
     TrendingUp, AlertTriangle, ChevronDown, Plus, User,
-    ArrowRight, RefreshCw, Calendar, Timer, Zap
+    ArrowRight, RefreshCw, Calendar, Timer, Zap, ExternalLink
 } from 'lucide-react';
 import {
     getRecallWorklist,
@@ -259,9 +260,20 @@ function RecallCard({ rule, onAction }: {
                         </div>
                         <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                                {patient ? `${patient.nombre} ${patient.apellido}` : 'Paciente desconocido'}
-                            </h4>
+                            {patient ? (
+                                <Link
+                                    href={`/patients/${patient.id_paciente}`}
+                                    className="group/link flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white
+                                        hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate"
+                                >
+                                    {patient.nombre} {patient.apellido}
+                                    <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 flex-shrink-0 transition-opacity" />
+                                </Link>
+                            ) : (
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                    Paciente desconocido
+                                </h4>
+                            )}
                         </div>
                         <div className="flex items-center gap-4 mt-1">
                             <span className={`flex items-center gap-1 text-xs font-medium ${countdownColor}`}>
