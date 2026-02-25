@@ -506,7 +506,6 @@ export default function OwnerDashboard() {
                                 ? 'hsl(165, 85%, 50%)'
                                 : 'hsl(230, 10%, 60%)',
                             border: `1px solid ${isEditing ? 'hsla(165, 100%, 42%, 0.3)' : 'hsla(230, 15%, 30%, 0.5)'}`,
-                            ringColor: isEditing ? 'hsla(165, 100%, 42%, 0.3)' : undefined,
                         }}
                     >
                         <Settings2 size={12} />

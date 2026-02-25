@@ -219,7 +219,7 @@ async function downloadComparisonVideo(beforeUrl: string, afterUrl: string, inte
         if (e.data.size > 0) chunks.push(e.data);
     };
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
         recorder.onstop = () => {
             const blob = new Blob(chunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);

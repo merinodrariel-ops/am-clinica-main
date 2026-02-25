@@ -380,12 +380,12 @@ export default function CajaRecepcionPage() {
 
             const pendientes = (movs || []).filter((m) => m.estado === 'pendiente');
 
-            const { data: countData } = await supabase
+            const { count: totalCount } = await supabase
                 .from('pacientes')
                 .select('id_paciente', { count: 'exact', head: true })
                 .eq('is_deleted', false);
 
-            const { data: newCountData } = await supabase
+            const { count: newCount } = await supabase
                 .from('pacientes')
                 .select('id_paciente', { count: 'exact', head: true })
                 .gte('fecha_alta', `${mesActual}-01`)
@@ -398,8 +398,8 @@ export default function CajaRecepcionPage() {
                 porCategoria: {},
                 movimientosHoy: pagadosHoy.length,
                 pendientes: pendientes.length,
-                totalPacientes: countData || 0,
-                nuevosPacientes: newCountData || 0,
+                totalPacientes: totalCount || 0,
+                nuevosPacientes: newCount || 0,
             });
         } catch (error) {
             console.error('Error loading data:', error);
