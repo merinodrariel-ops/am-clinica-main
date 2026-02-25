@@ -27,6 +27,10 @@ const ExecutiveCommandCenter = dynamic(() => import('@/components/dashboard/Exec
     ssr: false,
     loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />
 });
+const OwnerDashboard = dynamic(() => import('@/components/dashboard/OwnerDashboard'), {
+    ssr: false,
+    loading: () => <Skeleton className="h-[400px] w-full rounded-xl" />
+});
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -60,6 +64,9 @@ export default function DashboardPage() {
                 </h1>
                 <p className="mt-1" style={{ color: 'hsl(230 10% 50%)' }}>AM Clínica – Operativa 360</p>
             </div>
+
+            {/* Owner-only Dashboard */}
+            {role === 'owner' && <OwnerDashboard />}
 
             <UserAlerts />
             <CajaAlerts />
