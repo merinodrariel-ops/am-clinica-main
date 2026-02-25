@@ -113,6 +113,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     lines: MovimientoLinea[];
     adjuntos: string[];
     totalUsd: number;
+    nota?: string;
   }>({
     fecha: "",
     descripcion: "",
@@ -120,6 +121,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     lines: [],
     adjuntos: [],
     totalUsd: 0,
+    nota: "",
   });
 
   const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
@@ -683,10 +685,22 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
         );
       }
 
+      if (editData.nota !== (editingMov.nota || "")) {
+        await logMovimientoEdit(
+          editingMov.id,
+          "caja_admin_movimientos",
+          "nota",
+          editingMov.nota || "",
+          editData.nota || "",
+          editData.motivo,
+        );
+      }
+
       const { success, error } = await updateCajaAdminMovimientoSecure({
         movimientoId: editingMov.id,
         fecha_movimiento: editData.fecha,
         descripcion: editData.descripcion,
+        nota: editData.nota,
         registro_editado: true,
         lines: normalizedLinesToSave,
         usdTotalOverride: editData.totalUsd,
@@ -930,20 +944,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
       {/* ── Live Balance Strip ── */}
       {balanceVivo && (
-        <div className={`rounded-xl p-4 shadow-sm border transition-colors ${
-          balanceVivo.status === "Cerrado"
-            ? "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
-            : "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
-        }`}>
+        <div className={`rounded-xl p-4 shadow-sm border transition-colors ${balanceVivo.status === "Cerrado"
+          ? "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+          : "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
+          }`}>
           {/* Status header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                balanceVivo.status === "Cerrado" ? "bg-gray-200 dark:bg-gray-700" : "bg-green-100 dark:bg-green-900/40"
-              }`}>
-                <div className={`w-2.5 h-2.5 rounded-full ${
-                  balanceVivo.status === "Cerrado" ? "bg-gray-400" : "bg-green-500 animate-pulse"
-                }`} />
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${balanceVivo.status === "Cerrado" ? "bg-gray-200 dark:bg-gray-700" : "bg-green-100 dark:bg-green-900/40"
+                }`}>
+                <div className={`w-2.5 h-2.5 rounded-full ${balanceVivo.status === "Cerrado" ? "bg-gray-400" : "bg-green-500 animate-pulse"
+                  }`} />
               </div>
               <div>
                 <p className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -999,11 +1010,10 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
               </span>
             </div>
             {/* Giro Activo */}
-            <div className={`flex justify-between items-center p-3 rounded-xl border ${
-              balanceVivo.giroUsd > 0
-                ? "bg-amber-100/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
-                : "bg-blue-100/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
-            }`}>
+            <div className={`flex justify-between items-center p-3 rounded-xl border ${balanceVivo.giroUsd > 0
+              ? "bg-amber-100/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
+              : "bg-blue-100/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
+              }`}>
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${balanceVivo.giroUsd > 0 ? "bg-amber-500" : "bg-slate-300"}`} />
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Giro Activo</span>
@@ -1250,6 +1260,20 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                 }
                 placeholder="Ej. Pago de servicios, compra insumos..."
                 className="w-full px-4 py-2.5 text-sm font-bold rounded-2xl border-none ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-950 h-11 focus:ring-2 ring-indigo-500 transition-all shadow-sm"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">
+                Notas / Observaciones (Opcional)
+              </label>
+              <Textarea
+                value={formData.nota}
+                onChange={(e) =>
+                  setFormData({ ...formData, nota: e.target.value })
+                }
+                placeholder="Detalle adicional del pago, transferencia o gasto..."
+                className="w-full px-4 py-2.5 text-sm font-bold rounded-2xl border-none ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-950 min-h-[80px] focus:ring-2 ring-indigo-500 transition-all shadow-sm"
               />
             </div>
           </div>
@@ -1775,7 +1799,12 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium">
-                      {mov.descripcion}
+                      <div>{mov.descripcion}</div>
+                      {mov.nota && (
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 font-normal line-clamp-1 italic" title={mov.nota}>
+                          {mov.nota}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">
                       {mov.subtipo || "-"}
@@ -1895,6 +1924,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                                     ? [movConComprobante.url_comprobante]
                                     : []),
                                 totalUsd: Number(mov.usd_equivalente_total || 0),
+                                nota: mov.nota || "",
                               });
                             }}
                             className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -2120,6 +2150,20 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                     setEditData({ ...editData, descripcion: e.target.value })
                   }
                   className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Notas / Observaciones (Opcional)
+                </label>
+                <Textarea
+                  value={editData.nota}
+                  onChange={(e) =>
+                    setEditData({ ...editData, nota: e.target.value })
+                  }
+                  placeholder="Detalle adicional..."
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white min-h-[80px]"
                 />
               </div>
 

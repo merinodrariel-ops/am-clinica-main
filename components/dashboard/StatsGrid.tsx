@@ -97,9 +97,18 @@ export default function StatsGrid() {
                                         </span>
                                     </div>
                                 ) : (
-                                    <p className="text-2xl font-bold" style={{ color: 'hsl(210 20% 95%)' }}>
-                                        {card.value}
-                                    </p>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-baseline gap-2">
+                                            <p className="text-2xl font-bold" style={{ color: 'hsl(210 20% 95%)' }}>
+                                                {card.value}
+                                            </p>
+                                            {card.label === 'Pacientes' && (
+                                                <span className="text-xs px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-medium border border-teal-500/20">
+                                                    +{stats?.newPatientsCount || 0} mes
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </div>

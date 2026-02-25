@@ -1,0 +1,285 @@
+{
+  "generatedAt": "2026-02-25T09:46:55.088Z",
+  "mode": "enroll",
+  "stats": {
+    "enrolled": 58,
+    "errors": 0,
+    "skipped": 43,
+    "no_match": 39
+  },
+  "enrolled_patients": [
+    {
+      "name": "Bruno Stratico",
+      "date": "2024-05-20"
+    },
+    {
+      "name": "Ana Rottjer",
+      "date": "2024-05-22"
+    },
+    {
+      "name": "Mauro Simonet",
+      "date": "2024-05-29"
+    },
+    {
+      "name": "Gabriela Distefano",
+      "date": "2025-01-24"
+    },
+    {
+      "name": "Cristian Gaston Cuello",
+      "date": "2025-02-03"
+    },
+    {
+      "name": "Santiago Barrientos",
+      "date": "2025-02-10"
+    },
+    {
+      "name": "Belen Arteaga Ana",
+      "date": "2025-02-12"
+    },
+    {
+      "name": "Alejandra Ferrari",
+      "date": "2025-03-14"
+    },
+    {
+      "name": "Castro Cynthia",
+      "date": "2025-04-07"
+    },
+    {
+      "name": "Romina Silva Chusho Flavia",
+      "date": "2025-04-28"
+    },
+    {
+      "name": "Sanchez Gisel",
+      "date": "2025-05-09"
+    },
+    {
+      "name": "Gozzerino Marcello",
+      "date": "2025-06-18"
+    },
+    {
+      "name": "Rodriguez Elizabet",
+      "date": "2025-06-25"
+    },
+    {
+      "name": "Medina Juliana",
+      "date": "2025-06-27"
+    },
+    {
+      "name": "German Chirino Leandro",
+      "date": "2025-07-11"
+    },
+    {
+      "name": "Zapata Tamara",
+      "date": "2025-07-14"
+    },
+    {
+      "name": "Santiago Anibal Gomez",
+      "date": "2025-07-22"
+    },
+    {
+      "name": "Carolina Isabel Garrido",
+      "date": "2025-07-23"
+    },
+    {
+      "name": "Tanquia Jail",
+      "date": "2025-07-23"
+    },
+    {
+      "name": "María Suarez Ana",
+      "date": "2025-08-01"
+    },
+    {
+      "name": "Lourdes Mendez",
+      "date": "2025-08-14"
+    },
+    {
+      "name": "Mariano Páez",
+      "date": "2025-09-03"
+    },
+    {
+      "name": "Nadia debora melian",
+      "date": "2025-09-15"
+    },
+    {
+      "name": "Federico González pondal",
+      "date": "2025-09-17"
+    },
+    {
+      "name": "Graciela Doretti",
+      "date": "2025-09-17"
+    },
+    {
+      "name": "Roumec juan ignacio",
+      "date": "2025-09-22"
+    },
+    {
+      "name": "Gonzalo Acevedo",
+      "date": "2025-09-25"
+    },
+    {
+      "name": "Sofia Correa",
+      "date": "2025-09-26"
+    },
+    {
+      "name": "Marianela Alberich",
+      "date": "2025-09-26"
+    },
+    {
+      "name": "Franco Carnemolla",
+      "date": "2025-09-26"
+    },
+    {
+      "name": "Rocio Poli",
+      "date": "2025-10-01"
+    },
+    {
+      "name": "florencia tosi",
+      "date": "2025-10-01"
+    },
+    {
+      "name": "Yamila Solange González",
+      "date": "2025-10-06"
+    },
+    {
+      "name": "Norma Noemi Miceli",
+      "date": "2025-10-14"
+    },
+    {
+      "name": "Maria Ines Bezus",
+      "date": "2025-10-16"
+    },
+    {
+      "name": "Fernandez Suarez Evelyn",
+      "date": "2025-10-20"
+    },
+    {
+      "name": "Eduardo Néstor Fernandez",
+      "date": "2025-10-22"
+    },
+    {
+      "name": "Liliana Esther Suarez",
+      "date": "2025-10-22"
+    },
+    {
+      "name": "Enrique Souza Rey",
+      "date": "2025-10-30"
+    },
+    {
+      "name": "Alejandro Migliorisi",
+      "date": "2025-11-06"
+    },
+    {
+      "name": "Damian minckas",
+      "date": "2025-11-14"
+    },
+    {
+      "name": "María de los Milagros Rodriguez",
+      "date": "2025-11-19"
+    },
+    {
+      "name": "Diego andrades",
+      "date": "2025-11-21"
+    },
+    {
+      "name": "Pietro Ezio Zucchet",
+      "date": "2025-11-24"
+    },
+    {
+      "name": "Patricio Sanchez",
+      "date": "2025-12-15"
+    },
+    {
+      "name": "Mateo Schreiterer",
+      "date": "2025-12-15"
+    },
+    {
+      "name": "Camila Fernández",
+      "date": "2025-12-17"
+    },
+    {
+      "name": "Hernan Acosta",
+      "date": "2025-12-19"
+    },
+    {
+      "name": "Natali Davila",
+      "date": "2025-12-26"
+    },
+    {
+      "name": "Dario Pablo Godoy",
+      "date": "2026-01-21"
+    },
+    {
+      "name": "Pedro Adamovic",
+      "date": "2026-01-23"
+    },
+    {
+      "name": "Nicolás Leon",
+      "date": "2026-01-23"
+    },
+    {
+      "name": "Facundo Gonzalez",
+      "date": "2026-01-26"
+    },
+    {
+      "name": "Lucas Gil",
+      "date": "2026-01-26"
+    },
+    {
+      "name": "Mercedes Otero",
+      "date": "2026-02-02"
+    },
+    {
+      "name": "nicolás andalaft",
+      "date": "2026-02-11"
+    },
+    {
+      "name": "Molina Eugenia",
+      "date": "2026-02-18"
+    },
+    {
+      "name": "Guadalupe Gatti",
+      "date": "2026-02-23"
+    }
+  ],
+  "no_match": [
+    "Nicolas Grimberg",
+    "Luciana Perrone",
+    "Agustina Mochi",
+    "Ingrid",
+    "Guillermo Posse",
+    "Fabian Frick",
+    "Maximiliano Miranda",
+    "Sabina Ferreyra",
+    "Franco Sunsundegui",
+    "Gisele Politi",
+    "Daniela Ramos",
+    "Carolina Malvicino",
+    "Florencia Roumec",
+    "Valentina Vallejos",
+    "Carla Gehrke",
+    "Ariel Rodriguez",
+    "Gonzalo Lucero",
+    "Romina Crespo",
+    "Adriana Cacciacane",
+    "Claudia Acchiardi",
+    "Gabriela Castillo",
+    "Ana Ferrari",
+    "Santiago Lopez",
+    "Matias Collazo",
+    "Martina Albornoz",
+    "Diego Mendez",
+    "Micaela Suarez",
+    "Ileana Duarte",
+    "Natalia Barros",
+    "Lucas Fernandez",
+    "Vanesa Gutierrez",
+    "Paula Trujillo",
+    "Roberto Britos",
+    "Silvana Cano",
+    "Hernan Blanco",
+    "Tamara Solis",
+    "Eduardo Paz",
+    "Lorena Gimenez",
+    "Alberto Gomez"
+  ]
+}

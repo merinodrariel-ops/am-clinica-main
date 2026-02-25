@@ -1,0 +1,2676 @@
+{
+  "generatedAt": "2026-02-25T08:43:55.544Z",
+  "mode": "import",
+  "stats": {
+    "matched": 293,
+    "unmatched": 125,
+    "imported": 291,
+    "skipped_duplicate": 2,
+    "error": 0
+  },
+  "imported": [
+    {
+      "date": "2026-02-23",
+      "patient": "Melisa Engstfeld",
+      "title": "Melisa Engstfeld- Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-23",
+      "patient": "Abril Mugetti",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Abril Mugetti)",
+      "type": "consulta",
+      "status": "cancelled"
+    },
+    {
+      "date": "2026-02-23",
+      "patient": "Guadalupe Gatti",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Guadalupe Gatti)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-20",
+      "patient": "Carreras Pedro",
+      "title": "Pedro carreras",
+      "type": "otro",
+      "status": "cancelled"
+    },
+    {
+      "date": "2026-02-20",
+      "patient": "Maria Eugenia Gariador",
+      "title": "Eugenía Gariador- Reparación carilla resina inf",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-20",
+      "patient": "Camila Gorosito",
+      "title": "$$$Camila gorosito limpieza",
+      "type": "tratamiento",
+      "status": "cancelled"
+    },
+    {
+      "date": "2026-02-20",
+      "patient": "Rocio Pardiñas",
+      "title": "Rocio Pardiñas- Carilla Resina (nueva)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-18",
+      "patient": "Molina Eugenia",
+      "title": "Eugenia Molina- Consulta (continuación del tratamiento)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-18",
+      "patient": "Magali Mazzuca",
+      "title": "Mazzuca Magali- Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-18",
+      "patient": "Patricio Sanchez",
+      "title": "Patricio Sanchez - retoque",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-11",
+      "patient": "Carolina Garrido",
+      "title": "Carolina Garrido - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-11",
+      "patient": "nicolás andalaft",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Nicolas Andalaft)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-09",
+      "patient": "Diego Chaure",
+      "title": "CHAURE, Diego 1ra vez",
+      "type": "otro",
+      "status": "cancelled"
+    },
+    {
+      "date": "2026-02-06",
+      "patient": "Melisa Engstfeld",
+      "title": "Engstfeld Melisa- Carillas Resina",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-06",
+      "patient": "Santiago Debus",
+      "title": "Debus Santiago- 1era Vez + Limpieza láser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-05",
+      "patient": "Ana Lia Kobal",
+      "title": "Analia Kobal consulta virtual con",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-04",
+      "patient": "Miguel Leandro",
+      "title": "Leandro Miguel - Recementado de carilla",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-03",
+      "patient": "ARIEL MERINO",
+      "title": "Ariel merino and Valentino Granata",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-03",
+      "patient": "Melisa Engstfeld",
+      "title": "Melisa Engstfeld - Blanquemiento",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2026-02-02",
+      "patient": "Mercedes Otero",
+      "title": "Mercedes Otero - Consulta",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-29",
+      "patient": "Molina Eugenia",
+      "title": "Eugenia Molina - Clau",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-26",
+      "patient": "Lucas Gil",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Lucas Gil)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-26",
+      "patient": "Facundo Gonzalez",
+      "title": "Facundo González - Primera Vez consulta",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-23",
+      "patient": "Nicolás Leon",
+      "title": "Nicolas León - Consulta Dr.",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-23",
+      "patient": "Vanesa Wasinger",
+      "title": "Vanesa Wasinger - Cementado",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-23",
+      "patient": "Pedro Adamovic",
+      "title": "Pedro Adamovic - Consulta Dr. Ariel Merino",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-21",
+      "patient": "Vanesa Wasinger",
+      "title": "Vanesa Wasinger - Cementado de carilla",
+      "type": "tratamiento",
+      "status": "cancelled"
+    },
+    {
+      "date": "2026-01-21",
+      "patient": "Magali Mazzuca",
+      "title": "Magali mazzuca - control con",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-21",
+      "patient": "Camila Gorosito",
+      "title": "Camila Gorosito - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-21",
+      "patient": "Dario Pablo Godoy",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Dario Godoy)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-19",
+      "patient": "Vanesa Wasinger",
+      "title": "$ Vanesa Wasinger - Tallado para ceramica",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-19",
+      "patient": "Carolina Garrido",
+      "title": "Carolina Garrido - CONTROL",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-19",
+      "patient": "Jacqueline Posse",
+      "title": "$ Posse Jacqueline - Limpieza Tradicional",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-16",
+      "patient": "María Suarez Ana",
+      "title": "Liliana ester Suarez - tallado",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-16",
+      "patient": "Paula Llauro",
+      "title": "Paula LLauro - definitivo",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-16",
+      "patient": "German Chirino Leandro",
+      "title": "Chirino Leandro - Limpieza con laser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-16",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola Maria Elena - Escaneo y control por pd 46",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2026-01-07",
+      "patient": "Karina Heitman",
+      "title": "Recaptación Karina Heitman - Martu",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-26",
+      "patient": "Natali Davila",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Natalí Dávila)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-23",
+      "patient": "Vanesa Wasinger",
+      "title": "Vanesa Wasinger limpieza tradicional",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-23",
+      "patient": "Sofi Ferracuti",
+      "title": "sofia ferracuti retoque de resinas",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-22",
+      "patient": "Milo Stankiewicz",
+      "title": "Milo stankiewicz inferior resinas",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-19",
+      "patient": "Hernan Acosta",
+      "title": "Hernan Acosta - Consulta con Ari (es amigo)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-19",
+      "patient": "Ezequiel Luna",
+      "title": "Ezequiel Luna - Limpieza con laser + pulido",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-18",
+      "patient": "Carla Del Vecchio",
+      "title": "Carla del Vecchio - Pulido de carillas + 4 resinas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-17",
+      "patient": "Carolina Garrido",
+      "title": "Garrido Carolina - Control encias",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-17",
+      "patient": "Martin Jofre",
+      "title": "Martin Jofre - Cementado de corona 16",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-17",
+      "patient": "Camila Fernández",
+      "title": "Camila Fernández - consulta",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-15",
+      "patient": "Bernardo Nazarena",
+      "title": "Nazarena bernardo - retiro de carillas + tallado y provis",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-15",
+      "patient": "Mateo Schreiterer",
+      "title": "Mateo Schreiterer - segunda consulta",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-15",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola Maria Elena - Escaneo y control por pd 46",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-15",
+      "patient": "Patricio Sanchez",
+      "title": "Patricio Sanchez consulta 1ra vez virtual",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-13",
+      "patient": "María Suarez Ana",
+      "title": "Ana María Suarez - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-12",
+      "patient": "Paula Llauro",
+      "title": "Paula Llauro - intento de sacar el tornillito maldito",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-11",
+      "patient": "Angeles Lijo",
+      "title": "Ángeles Lijo - Gingi ambos maxilares",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-11",
+      "patient": "Sofi Ferracuti",
+      "title": "Sofia Ferracuti - Resinas superiores",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-04",
+      "patient": "Maria mercedes roca",
+      "title": "1ra vez Mercedes Roca",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-04",
+      "patient": "Angeles Lijo",
+      "title": "Ángeles Lijo (Hija magali mazzuca) Consulta",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-04",
+      "patient": "Magali Mazzuca",
+      "title": "Magalí Mazzuca - control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-04",
+      "patient": "Sofi Ferracuti",
+      "title": "Sofia Ferracuti - Resinas x8 superiores",
+      "type": "tratamiento",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-12-03",
+      "patient": "Melina Fernandez Suarez",
+      "title": "Melina Fernandez Suarez - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-03",
+      "patient": "Martin Jofre",
+      "title": "Martin Jofre - Microdiseño Resinas + tallado de la 16",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-12-01",
+      "patient": "Mariana Basulto",
+      "title": "Basulto Mariana - Control + limpieza",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-28",
+      "patient": "Paula Llauro",
+      "title": "Cementado Coronas Paula LLauro",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-28",
+      "patient": "Carla Del Vecchio",
+      "title": "Carla del Vecchio - Consulta",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-28",
+      "patient": "Gaston Salguero",
+      "title": "Control de Gaston salguero",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-27",
+      "patient": "Eduardo Néstor Fernandez",
+      "title": "Cementado max inferior Eduardo Fernandez (TITO)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-25",
+      "patient": "Milo Stankiewicz",
+      "title": "Milo stankiewicz - segunda parte del tratamiento",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-24",
+      "patient": "Paula Llauro",
+      "title": "Llauró Paula para retoque de tallado de coronas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-24",
+      "patient": "Pietro Ezio Zucchet",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Pietro Ezio Zucchet)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-21",
+      "patient": "Vanda Ryliskis",
+      "title": "Vanda Ryliskis - Cementado infreior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-21",
+      "patient": "Romina Jimena",
+      "title": "Romina Jimena - control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-21",
+      "patient": "Diego andrades",
+      "title": "Consulta 1ra vez Diego Andrades",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-19",
+      "patient": "Gaston Salguero",
+      "title": "Gaston Salguero - Cementado de 4 coronas s/implante",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-19",
+      "patient": "María de los Milagros Rodriguez",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Milagros Rodriguez)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-19",
+      "patient": "Lourdes Mendez",
+      "title": "Lourdes Mendez- problemas en las encias",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-17",
+      "patient": "Liliana Esther Suarez",
+      "title": "Liliana Esther Suarez - Resinas + tallado de corona",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-17",
+      "patient": "Paula Llauro",
+      "title": "Paula llauró - despegue de puente y abono de tratamiento",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-17",
+      "patient": "Antonella Mascioli",
+      "title": "Mascioli antonella - Realizar rx control y limpieza carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-17",
+      "patient": "Carolina Garrido",
+      "title": "Carolina Garrido - control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-14",
+      "patient": "Vanda Ryliskis",
+      "title": "Vanda Ryliskis - tallado",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-14",
+      "patient": "Paula Llauro",
+      "title": "Llauró Paula - Control y charla por corona y puente - Dr.",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-14",
+      "patient": "Damian minckas",
+      "title": "Damian minckas-Consulta 1ra vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-14",
+      "patient": "Alejandra Ferrari",
+      "title": "Alejandra Ferrari - Control de coronas sobre implante",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-06",
+      "patient": "Alejandro Migliorisi",
+      "title": "Consultas - Primera vez - Staff (Alejandro Migliorisi)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-11-06",
+      "patient": "Silvio Pomar",
+      "title": "Pomar Silvio - se le despegó sector posterior",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-30",
+      "patient": "Enrique Souza Rey",
+      "title": "Consultas - Primera vez - Staff (Enrique Souza Rey)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-22",
+      "patient": "Gaston Salguero",
+      "title": "Gaston Salguero - Prueba de puente en resina",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-22",
+      "patient": "Alejandra Ferrari",
+      "title": "Alejandra Ferrari - Cementado de 2 coronas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-22",
+      "patient": "Liliana Esther Suarez",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Liliana Esther Suarez)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-22",
+      "patient": "Eduardo Néstor Fernandez",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Eduardo Nestor Fernandez)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-22",
+      "patient": "Gaston Pereira Mauro",
+      "title": "Mauro Gaston Pereira - Cementado carilla caida",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-21",
+      "patient": "Santiago Ferraro",
+      "title": "Santiago Ferraro - FOTOS",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-20",
+      "patient": "Carolina Garrido",
+      "title": "Garrido Carolina - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-20",
+      "patient": "Maria Florencia Granton",
+      "title": "Florencia Granton - Control Carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-20",
+      "patient": "Rossini Luz",
+      "title": "Luz Rossini - control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-20",
+      "patient": "Fernandez Suarez Evelyn",
+      "title": "Evelyn Fernandez Suarez - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-17",
+      "patient": "Lourdes Mendez",
+      "title": "Lourdes mendez - Resinas x 10 superiores",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-16",
+      "patient": "Maria Ines Bezus",
+      "title": "Consultas - Primera vez - Staff (Ines Bezus)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-16",
+      "patient": "Maria Belen Fernandez",
+      "title": "Belen Fernandez - Arreglo \"salido\" control - Dr . Ariel Merino",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-15",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola Maria Elena - Control",
+      "type": "control",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-10-15",
+      "patient": "Natalia Vaca",
+      "title": "Natalia Vaca - Retoques resina",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-14",
+      "patient": "Norma Noemi Miceli",
+      "title": "Norma Noemí Miceli - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-13",
+      "patient": "Camila Lopez",
+      "title": "CONSENTIMIENTO Y $ Camila Lopez - Alineadores - Entregar algunos NO todos - Dra. Luz Ferrón",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-13",
+      "patient": "Natalia Vaca",
+      "title": "Natalia Vaca - Resinas x10 superiores",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-13",
+      "patient": "Marcelo Torassa",
+      "title": "Torassa Marcelo - implante flojo",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-10",
+      "patient": "Nicolas Andres Areco",
+      "title": "$ Nicolas Areco cementado de carilla + limpieza con laser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-10",
+      "patient": "Alejandra Ferrari",
+      "title": "Alejandra Ferrari - Destape de implantes",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-08",
+      "patient": "Franco Carnemolla",
+      "title": "Franco Carnemolla - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-06",
+      "patient": "Yamila Solange González",
+      "title": "Yamila González - consulta virtual",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-06",
+      "patient": "Sofia Correa",
+      "title": "Sofia Correa - Martina",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-01",
+      "patient": "florencia tosi",
+      "title": "Florencia Tosi - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-10-01",
+      "patient": "Rocio Poli",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Rocio Poli)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-29",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola Maria Elena - Cementado de coronas superiores",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-29",
+      "patient": "Luis Coronado",
+      "title": "Luis coronado - Se le salio un arreglo",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-29",
+      "patient": "Jacqueline Posse",
+      "title": "Posse Jacqueline - Limpieza Tradicional",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-26",
+      "patient": "Dario Ruben Baldassa",
+      "title": "Darío Baldassa - movimiento de sector posterior",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-26",
+      "patient": "Franco Carnemolla",
+      "title": "Franco Carnemolla - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-26",
+      "patient": "Marianela Alberich",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (MARIANELA ALBERICH)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-26",
+      "patient": "Sofia Correa",
+      "title": "Sofia Correa - Consulta 1ra vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-25",
+      "patient": "Gonzalo Acevedo",
+      "title": "Consultas - Primera vez - Staff (Gonzalo Acevedo)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-24",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola Maria Elena - Control + escaneo implantes para sector posterior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-23",
+      "patient": "Paula Magliarella",
+      "title": "Paula magliarella - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-09-22",
+      "patient": "Camila Castro",
+      "title": "Camila Castro - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-22",
+      "patient": "Alejandra Ferrari",
+      "title": "Alejandra Ferrari - Turno de limpieza",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-22",
+      "patient": "Roumec juan ignacio",
+      "title": "Consultas virtual - Primera vez - Dr. Ariel Merino (Juan Ignacio Roumec)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-17",
+      "patient": "Graciela Doretti",
+      "title": "Consultas - Primera vez - Dr. Ariel Merino (Graciela Amanda doretti)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-17",
+      "patient": "Federico González pondal",
+      "title": "Federico José Pondal - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-15",
+      "patient": "Nadia debora melian",
+      "title": "Nadia Debora Melian - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-10",
+      "patient": "Gaston Pereira Mauro",
+      "title": "Mauro Gastón Pereira - Cementado carilla ceramica premo",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-04",
+      "patient": "Lara Gomez",
+      "title": "Lara Gómez - Fotos y Gingivectomia",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-03",
+      "patient": "Alan Rueco",
+      "title": "Alan Rueco - Cementado",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-03",
+      "patient": "Mariano Páez",
+      "title": "Mariano Páez -Consultas primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-09-02",
+      "patient": "Carolina Garrido",
+      "title": "Carolina Garrido - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-31",
+      "patient": "María Suarez Ana",
+      "title": "Ana Maria Suarez - cementado",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-30",
+      "patient": "Felipe Santos Rafael",
+      "title": "Rafael Dos Santos",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-29",
+      "patient": "Tanquia Jail",
+      "title": "Jail Tanquia - Control - Dr.",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-29",
+      "patient": "María Suarez Ana",
+      "title": "Ana Maria Suarez",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-27",
+      "patient": "Alan Rueco",
+      "title": "Alan Rueco - Tallado",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-25",
+      "patient": "Carolina Garrido",
+      "title": "Carolina Garrido - Prueba diseño nuevo",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-22",
+      "patient": "Diego Diaz",
+      "title": "Diego Diaz - Se le mueve una corona - Dr.",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-22",
+      "patient": "Nicolas Andres Areco",
+      "title": "Nicolas Areco se le rompió una carilla 3.3 - Tallado",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-21",
+      "patient": "Carolina Garrido",
+      "title": "Carolina Garrido",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-20",
+      "patient": "Carolina Garrido",
+      "title": "Garrido Carolina - Tallado",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-20",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola Maria Elena - Cementado de provis + Escaneo corona sobre implante",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-19",
+      "patient": "Tanquia Jail",
+      "title": "Jail Tanquia - Revision del cementado, le molesta al morder",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-18",
+      "patient": "Anahi Yanez",
+      "title": "Anahi Yañez - Cementado pd 24",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-18",
+      "patient": "Tanquia Jail",
+      "title": "Jail Abdul Tanquia - Cementado",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-14",
+      "patient": "Lourdes Mendez",
+      "title": "Lourdes Marina mendez - Consulta Primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-14",
+      "patient": "Tanquia Jail",
+      "title": "Jail Abdul Tanquia - se le despegó el provisorio",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-13",
+      "patient": "Rodriguez Elizabet",
+      "title": "Elizabeth Rodriguez - Arreglos en resina en inferior",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-13",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola Maria Elena - Cementado de provis + Escaneo corona sobre implante",
+      "type": "tratamiento",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-08-12",
+      "patient": "Vanesa Rey",
+      "title": "Rey Vanesa - Cementado de corona 1.2",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-12",
+      "patient": "Tanquia Jail",
+      "title": "Jail Abdul Tanquia - Reever diseño de carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-11",
+      "patient": "Carolina Garrido",
+      "title": "Garrido Carolina - gingivectomia",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-11",
+      "patient": "Santiago Ferraro",
+      "title": "Santiago Ferraro - Limpieza con laser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-08",
+      "patient": "Anahi Yanez",
+      "title": "$ anahi yañez - Cementado superior - Dr. Ariel Merino ?",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-08",
+      "patient": "Constanza Dekleva",
+      "title": "Dekleva Constanza - Protesis, instalación",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-08",
+      "patient": "Romina Caparotta",
+      "title": "Romina Caparotta control por dolor",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-08",
+      "patient": "Vanesa Rey",
+      "title": "Vanesa Rey - Escaneo para corona sobre implante del 1.2 + provi",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-07",
+      "patient": "Gaston Salguero",
+      "title": "Gastón Salguero - Puente en resina",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-05",
+      "patient": "Lola Stankiewicz",
+      "title": "Stankiewicz, Lola - Control Alineadores -",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-04",
+      "patient": "Rodriguez Elizabet",
+      "title": "Elizabeth rodriguez - Arreglos, resina",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-01",
+      "patient": "Corona Malena",
+      "title": "Malena corona - Cementado inferior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-01",
+      "patient": "Garcia Fausto",
+      "title": "Fausto Garcia - Control Carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-01",
+      "patient": "María Suarez Ana",
+      "title": "Suárez Ana María - Consulta 1era Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-08-01",
+      "patient": "German Chirino Leandro",
+      "title": "Leandro Chirino - Control carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-30",
+      "patient": "Mauro Pereira",
+      "title": "Mauro Pereira - Cementado de carilla",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-28",
+      "patient": "Corona Malena",
+      "title": "Malena Corona - Tallado inferior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-28",
+      "patient": "Anahi Yanez",
+      "title": "Anahí Yañez - Control, carilla floja",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-28",
+      "patient": "David Aghetone",
+      "title": "David Aghetone - Control - Dra. Ariel Merino",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-28",
+      "patient": "Camila Lopez",
+      "title": "Camila Lopez - Control de blanqueamiento, color",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-26",
+      "patient": "Corona Malena",
+      "title": "Malena Corona - Tallado ambos maxilares",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-26",
+      "patient": "Constanza Dekleva",
+      "title": "Dekleva Constanza - Atornillar tapa de implante",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-25",
+      "patient": "German Chirino Leandro",
+      "title": "Leandro Chirino - Cementado inferior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-25",
+      "patient": "Gaston Salguero",
+      "title": "Gaston salguero - Se le aflojó el puente",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-24",
+      "patient": "Buyatti Daniela",
+      "title": "Buyatti, Daniela - Tallado sup e inf",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-23",
+      "patient": "German Chirino Leandro",
+      "title": "Leandro Chirino - Cementado de maxilar superior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-23",
+      "patient": "Santiago Ferraro",
+      "title": "Santiago Ferraro - Retoques",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-23",
+      "patient": "Garcia Fausto",
+      "title": "CANCELADO Garcia Fausto - Control Carillas",
+      "type": "tratamiento",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-07-23",
+      "patient": "Tanquia Jail",
+      "title": "Jail Abdul Tanquia -Consulta 1ra vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-23",
+      "patient": "Carolina Isabel Garrido",
+      "title": "Carolina Isabel Garrido - Consulta primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-22",
+      "patient": "Santiago Anibal Gomez",
+      "title": "Santiago Anibal Gomez - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-21",
+      "patient": "Llauró Abril Ezcurra",
+      "title": "Abril ezcurra",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-21",
+      "patient": "Analia Canciani",
+      "title": "Analía Canciani - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-21",
+      "patient": "German Chirino Leandro",
+      "title": "Leandro Chirino - retoques DSD",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-21",
+      "patient": "Débora Sol Molina",
+      "title": "Sol Debora Molina - control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-21",
+      "patient": "María Elena Mazzola",
+      "title": "Maria Elena Mazzola - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-18",
+      "patient": "Juan Pablo Martinez",
+      "title": "ABONAR Juan Pablo Martinez - Alineadores - Dr. Ariel Merino (entrega 10 y 11)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-18",
+      "patient": "Francisco Juan",
+      "title": "Francisco, Juan - Reparación de arreglo",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-18",
+      "patient": "Llauró Abril Ezcurra",
+      "title": "ABONAR Ezcurra, Abriln - Reparación x1 en resina",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-18",
+      "patient": "German Chirino Leandro",
+      "title": "Leandro chirino - retoques DSD",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-16",
+      "patient": "German Chirino Leandro",
+      "title": "Leandro German Chirino - Tallado",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-16",
+      "patient": "Carolina Antoliche",
+      "title": "Carolina antoliche - Gingivectomía láser + pulido cuellos limpieza",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-14",
+      "patient": "Romina von Zastrow",
+      "title": "Romina Von Zastrow - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-14",
+      "patient": "Gozzerino Marcello",
+      "title": "Marcello Gozzerino - control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-14",
+      "patient": "Zapata Tamara",
+      "title": "Tamara Zapata - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-14",
+      "patient": "Landoni Gustavo",
+      "title": "Landoni, Gustavo - Limpieza inferior tradicional",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-11",
+      "patient": "German Chirino Leandro",
+      "title": "Leandro german chirino - Consulta primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-09",
+      "patient": "Sergio Pd 36 Favaretto",
+      "title": "Favaretto Sergio - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-07",
+      "patient": "Gozzerino Marcello",
+      "title": "Marcello Gozzerino - Cementado",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-07",
+      "patient": "María Elena Mazzola",
+      "title": "Mazzola, Maria Elena - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-07",
+      "patient": "Agostina Mauricio",
+      "title": "Agostina Mauricio - URGENCIA se le cae la pd 45 (creo)",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-04",
+      "patient": "Romina Caparotta",
+      "title": "Caparotta, Romina - Cuellos en resina + Blanqueamiento + Placa mio",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-04",
+      "patient": "Diego Diaz",
+      "title": "Diego Diaz - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-02",
+      "patient": "Juan Pablo Tomeo",
+      "title": "Tomeo Juan Pablo - Incrustación",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-02",
+      "patient": "Santiago Ferraro",
+      "title": "Santiago Ferraro - Control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-02",
+      "patient": "Ivana Denisse Skibicki",
+      "title": "Skibicki, Ivana - Control Carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-07-02",
+      "patient": "Carolina Antoliche",
+      "title": "Carolina antoliche - Control general + encía",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-30",
+      "patient": "Jacqueline Posse",
+      "title": "Posse Jacqueline - Limpieza Tradicional",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-27",
+      "patient": "Santiago Ferraro",
+      "title": "Ferraro, Santiago - Cementado de Carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-27",
+      "patient": "Romina Paik",
+      "title": "Paik, Romina - 2 arreglos en Resina por rotura",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-27",
+      "patient": "Camila Lopez",
+      "title": "Camila lopez - Limpieza + blanqueamiento",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-27",
+      "patient": "Antonella Mascioli",
+      "title": "Mascioli antonella - Limpieza con láser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-27",
+      "patient": "Medina Juliana",
+      "title": "Juliana Medina - Consulta Primera Vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-25",
+      "patient": "Sergio Pd 36 Favaretto",
+      "title": "Favaretto Sergio - cementado x2",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-25",
+      "patient": "Gozzerino Marcello",
+      "title": "Gozzerino, Marcello - Tallado + Resina",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-25",
+      "patient": "Rodriguez Elizabet",
+      "title": "María Elizabeth Rodriguez - Consulta primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-20",
+      "patient": "Gozzerino Marcello",
+      "title": "Marcello gozzerino - Gingivectomía Láser, blanqueamiento y limpieza",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-20",
+      "patient": "Santiago Ferraro",
+      "title": "Santiago Ferraro - Poste 1.1 ; Dr Ariel Merino",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-20",
+      "patient": "Antonella Mascioli",
+      "title": "ABONAR 300 mascioli antonella limpieza",
+      "type": "tratamiento",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-06-18",
+      "patient": "Carolina Antoliche",
+      "title": "SEÑA + ABONAR antoliche carolina 11 - 21- 32",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-18",
+      "patient": "Lola Stankiewicz",
+      "title": "ABONAR TOTAL (3000) Lola Stankiewicz Alineadores - Le quedan muy sueltos",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-18",
+      "patient": "Gozzerino Marcello",
+      "title": "Marcello Gozzerino - Consulta Primera vez Dr. Ariel Merino",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-18",
+      "patient": "Camila Lopez",
+      "title": "Camila Lopez - Consulta Primera vez Dr. Ariel Merino",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-17",
+      "patient": "Constanza Dekleva",
+      "title": "Abonar 50% Constanza Dekleva HACER ENCERADO PARA TALLADO INFERIOR",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-16",
+      "patient": "Francisco Juan",
+      "title": "Francisco juan arreglo carilla",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-13",
+      "patient": "Francisco Juan",
+      "title": "Francisco, Juan rotura carilla (resina) pd 12",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-11",
+      "patient": "Sergio Pd 36 Favaretto",
+      "title": "Favaretto Sergio, Scan body PD 14 (se le hace un provi sobre implante pra proximo corona sobre implante)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-11",
+      "patient": "Lomele Antonio",
+      "title": "Antonio Lomele, no le entra el alineador 1 superior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-11",
+      "patient": "Alejandra Ferrari",
+      "title": "Alejandra Ferrari - Molestia zona inferior",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-11",
+      "patient": "Romina Caparotta",
+      "title": "Romina Caparotta - Escaneo para placa mio relajante y placa de blanqueamiento Y CONTROL CON ARIEL POR MOLESTIAS (ella tiene las jeringas ya)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-09",
+      "patient": "Sabrina Mansilla",
+      "title": "Sabrina Mansilla - Control Carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-04",
+      "patient": "Salvucci Matias",
+      "title": "ABONAR Matias Salvucci Adaptar placa mio",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-06-03",
+      "patient": "Belen Agudiez",
+      "title": "ABONAR 500 Belen agudiez",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-28",
+      "patient": "Analia Canciani",
+      "title": "Analia Canciani control CANCELADO",
+      "type": "control",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-05-28",
+      "patient": "Sanchez Gisel",
+      "title": "Giselle sanchez primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-26",
+      "patient": "Alejandra Ferrari",
+      "title": "Alejandra Ferrari - Control Carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-24",
+      "patient": "Nestor Britez",
+      "title": "Nestor Britez, control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-15",
+      "patient": "Santiago Puy",
+      "title": "abonar puy santiago adaptacion placa",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-14",
+      "patient": "Carolina Antoliche",
+      "title": "Abonar 50% Carolina antoliche cambio perno y corona",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-12",
+      "patient": "Delfina Jaacks",
+      "title": "Delfina Jaacks control c/",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-12",
+      "patient": "Romina Silva Chusho Flavia",
+      "title": "Consent. Flavia Chusho Control de resinas",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-09",
+      "patient": "Sanchez Gisel",
+      "title": "Giselle Sanchez consulta primera vez (era de emi, ahora ari)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-09",
+      "patient": "Magali Mazzuca",
+      "title": "ABONAR Magalí Mazzuca control + limpieza con laser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-09",
+      "patient": "Gaston Pereira Mauro",
+      "title": "Mauro Gaston CONTROL carillas (+testimonio)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-05-05",
+      "patient": "Juan Pablo Tomeo",
+      "title": "ABONAR Juan pablo tomeo limpieza de carillas con laser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-04-28",
+      "patient": "Lola Stankiewicz",
+      "title": "Lola Stankiewicz alineadores stripping c/",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-04-28",
+      "patient": "Romina Silva Chusho Flavia",
+      "title": "Flavia Romina Silva Chusho 1ra vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-04-23",
+      "patient": "Belen Arteaga Ana",
+      "title": "ABONAR 200 ana belen arteaga control + limpieza con laser",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-04-07",
+      "patient": "Castro Cynthia",
+      "title": "cynthia castro primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-04-07",
+      "patient": "Alegre Ariel",
+      "title": "ABONAR Ariel Alegre control y limpieza",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-04-02",
+      "patient": "Bernardo Nazarena",
+      "title": "NAZARENA bernardo habla con Ariel para ver como seguir + limpieza (ya paga)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-04-02",
+      "patient": "Montoya Ott Ana",
+      "title": "ABONAR resina ana montoya con ariel, arreglo. Posiblemente mas de 1",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-03-21",
+      "patient": "Gaston Adrian Salguero",
+      "title": "Gaston adrian salguero 1ra vez",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-03-17",
+      "patient": "María Elena Mazzola",
+      "title": "mazzola maria tallado inferior PASAR PRESUPUESTO CON",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-03-14",
+      "patient": "Alejandra Ferrari",
+      "title": "Alejandra Ferrari primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-03-12",
+      "patient": "Antonella Mascioli",
+      "title": "ABONAR Antonella Mascioli control +limpieza",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-03-10",
+      "patient": "Agostina Mauricio",
+      "title": "agostina mauricio corona floja urgencia (Escaneo para corona sobre implante)",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-03-05",
+      "patient": "Longo Gina",
+      "title": "Gina Longo 1ra vez",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-03-05",
+      "patient": "Antonella Cusano",
+      "title": "Antonella Cusano control",
+      "type": "control",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-02-28",
+      "patient": "Gabriela Distefano",
+      "title": "gabriela distefano resinas x2",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-02-28",
+      "patient": "Vanesa Wasinger",
+      "title": "Vanesa wasinger limpieza",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-02-28",
+      "patient": "Carolina Antoliche",
+      "title": "carolina antoliche control",
+      "type": "control",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-02-24",
+      "patient": "Rossini Luz",
+      "title": "luz rossini control con",
+      "type": "control",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-02-17",
+      "patient": "Gabriela Distefano",
+      "title": "Gabriela Distefano resinas x2",
+      "type": "otro",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-02-17",
+      "patient": "Mariano Ríos",
+      "title": "rios mariano primera vez",
+      "type": "consulta",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-02-14",
+      "patient": "Matias Ravagnan",
+      "title": "ABONAR matias ravagnan control Y BLANQUEAMIENTO",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-02-14",
+      "patient": "Agustin Bernasconi",
+      "title": "Agustin Bernasconi control",
+      "type": "control",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-02-12",
+      "patient": "Belen Arteaga Ana",
+      "title": "ana belen arteaga boyadjian primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-02-10",
+      "patient": "Santiago Barrientos",
+      "title": "santiago barrientos primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-02-03",
+      "patient": "Cristian Gaston Cuello",
+      "title": "Gaston Cuello primera vez ari",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-01-31",
+      "patient": "Sebastian Franceschini",
+      "title": "ABONAR sebastian franceschini tallado inf x10",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2025-01-31",
+      "patient": "Maria Virginia Gallardo",
+      "title": "Virginia Gallardo control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2025-01-24",
+      "patient": "Gabriela Distefano",
+      "title": "Gabriela Distefano primera vez ari",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2025-01-17",
+      "patient": "Dario Ruben Baldassa",
+      "title": "Dario Baldassa, cementar corona sobre implante",
+      "type": "tratamiento",
+      "status": "cancelled"
+    },
+    {
+      "date": "2025-01-17",
+      "patient": "Martin Blanco",
+      "title": "Martin blanco control por pigmentacion de carillas Y POSIBLE LIMPIEZA",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2025-01-13",
+      "patient": "Ivana Denisse Skibicki",
+      "title": "Skibicki Ivana control carillas",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2024-12-20",
+      "patient": "Alessandrini Sonia",
+      "title": "Sonia Alejandra Alessandrini control",
+      "type": "control",
+      "status": "cancelled"
+    },
+    {
+      "date": "2024-12-04",
+      "patient": "Dario Ruben Baldassa",
+      "title": "Dario Baldassa corona sobre implante",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-29",
+      "patient": "Mauro Simonet",
+      "title": "Mauro Simonet primera vez",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-24",
+      "patient": "Anahi Yanez",
+      "title": "Anahi Yañez - cementado",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-24",
+      "patient": "Nestor Britez",
+      "title": "Nestor Britez, control",
+      "type": "control",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-22",
+      "patient": "Juan Pablo Martinez",
+      "title": "Juan Pablo Martinez- tallado",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-22",
+      "patient": "Ana Rottjer",
+      "title": "Ana Röttjer (primera vez)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-22",
+      "patient": "Santini Rojas",
+      "title": "Karina Santini Rojas 1ra vez",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-20",
+      "patient": "Javier Grinblat",
+      "title": "Javier Grinblat- tallado max superior",
+      "type": "tratamiento",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-20",
+      "patient": "Bruno Stratico",
+      "title": "Bruno Stratico (primera vez)",
+      "type": "consulta",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-15",
+      "patient": "Roberto Vojvoditch Matias",
+      "title": "Matias Roberto Vojvoditch 1ra vez",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-10",
+      "patient": "Anahi Yanez",
+      "title": "Anahi Yañez - Tallado",
+      "type": "otro",
+      "status": "completed"
+    },
+    {
+      "date": "2024-05-10",
+      "patient": "Maria Belen Fernandez",
+      "title": "Belen Fernandez- Consulta ariel CANCELO",
+      "type": "consulta",
+      "status": "cancelled"
+    }
+  ],
+  "unmatched": [
+    {
+      "date": "2026-02-24T06:30:00-03:00",
+      "summary": "Recordatorio cambio de Alineador Lijo ",
+      "extractedName": "Recordatorio cambio de"
+    },
+    {
+      "date": "2026-02-23T12:00:00-03:00",
+      "summary": "Escribirle a diego ortiz por implante en 17",
+      "extractedName": "Escribirle diego ortiz"
+    },
+    {
+      "date": "2026-02-20T20:30:00-03:00",
+      "summary": "botox Cande que ari se lo lleve"
+    },
+    {
+      "date": "2026-02-20T12:15:00-03:00",
+      "summary": "+54 9 3424 86-4186",
+      "extractedName": "+54 9 3424 86"
+    },
+    {
+      "date": "2026-02-16T16:20:00-03:00",
+      "summary": "CANCELADO Ana Valenti - Control + Limpieza - Dr. Ariel Merino",
+      "extractedName": "Ana Valenti Control"
+    },
+    {
+      "date": "2026-02-13T16:30:00-03:00",
+      "summary": "UY-Nadia Vigniolis",
+      "extractedName": "UY"
+    },
+    {
+      "date": "2026-02-06T15:15:00-03:00",
+      "summary": "+54 9 11 3213-0028",
+      "extractedName": "+54 9 11 3213"
+    },
+    {
+      "date": "2026-02-05T19:15:00-03:00",
+      "summary": "Cuota 1 - Melina Fernandez ",
+      "extractedName": "Cuota 1"
+    },
+    {
+      "date": "2026-02-05T19:00:00-03:00",
+      "summary": "Valentino- IA",
+      "extractedName": "Valentino"
+    },
+    {
+      "date": "2026-02-05T11:30:00-03:00",
+      "summary": "Bertozzi- seña",
+      "extractedName": "Bertozzi"
+    },
+    {
+      "date": "2026-02-02T15:15:00-03:00",
+      "summary": "Meli Engliesfield - Consulta",
+      "extractedName": "Meli Engliesfield"
+    },
+    {
+      "date": "2026-01-29T20:00:00-03:00",
+      "summary": "+54 9 11 6822-0338",
+      "extractedName": "+54 9 11 6822"
+    },
+    {
+      "date": "2026-01-27T08:00:00-03:00",
+      "summary": "MARTU - ENVIAR CASO ANTES Y DESP RECAPTACIÓN PABLO GODOY",
+      "extractedName": "MARTU"
+    },
+    {
+      "date": "2026-01-26T18:00:00-03:00",
+      "summary": "Estefania bernal - consulta ",
+      "extractedName": "Estefania bernal"
+    },
+    {
+      "date": "2026-01-26T16:30:00-03:00",
+      "summary": "Diego Ortiz - Cementado de corona",
+      "extractedName": "Diego Ortiz"
+    },
+    {
+      "date": "2026-01-26T16:30:00-03:00",
+      "summary": "CANCELADO Meli Engliesfield - Consulta",
+      "extractedName": "Meli Engliesfield Consulta"
+    },
+    {
+      "date": "2026-01-23T20:30:00-03:00",
+      "summary": "+54 9 11 6252-8350",
+      "extractedName": "+54 9 11 6252"
+    },
+    {
+      "date": "2026-01-23T19:30:00-03:00",
+      "summary": "+54 9 11 5425-9554",
+      "extractedName": "+54 9 11 5425"
+    },
+    {
+      "date": "2026-01-21T15:20:00-03:00",
+      "summary": "German Ventrigilia - Control + Limpieza",
+      "extractedName": "German Ventrigilia"
+    },
+    {
+      "date": "2026-01-19T10:30:00-03:00",
+      "summary": "+54 9 11 2380-5535",
+      "extractedName": "+54 9 11 2380"
+    },
+    {
+      "date": "2026-01-15T12:00:00-03:00",
+      "summary": "Jackie Posse - Hablarle",
+      "extractedName": "Jackie Posse"
+    },
+    {
+      "date": "2026-01-15T11:30:00-03:00",
+      "summary": "+54 9 11 6751-4306",
+      "extractedName": "+54 9 11 6751"
+    },
+    {
+      "date": "2026-01-03T11:00:00-03:00",
+      "summary": "Cuota 1 - Melina Fernandez ",
+      "extractedName": "Cuota 1"
+    },
+    {
+      "date": "2026-01-02T10:00:00-03:00",
+      "summary": "No viene Martu",
+      "extractedName": "Martu"
+    },
+    {
+      "date": "2026-01-02T09:00:00-03:00",
+      "summary": "NO VIENE CLAU",
+      "extractedName": "CLAU"
+    },
+    {
+      "date": "2025-12-26T15:30:00-03:00",
+      "summary": "CANCELADO magali con ari",
+      "extractedName": "magali con ari"
+    },
+    {
+      "date": "2025-12-20T13:00:00-03:00",
+      "summary": " Nazarena Bernado - Cementado definitivo superior - Dr. Ariel Merino",
+      "extractedName": "Nazarena Bernado"
+    },
+    {
+      "date": "2025-12-19T16:30:00-03:00",
+      "summary": "Ro Regueiro - Control - Dr. Ariel Merino",
+      "extractedName": "Ro Regueiro"
+    },
+    {
+      "date": "2025-12-19T13:00:00-03:00",
+      "summary": " Tito control - Dr. Ariel Merino",
+      "extractedName": "Tito control"
+    },
+    {
+      "date": "2025-12-19T10:30:00-03:00",
+      "summary": "pendiente alineador de sofia oro",
+      "extractedName": "pendiente"
+    },
+    {
+      "date": "2025-12-19T05:30:00-03:00",
+      "summary": "pasarle presu a vecchio blanqueamiento 400usd",
+      "extractedName": "pasarle presu vecchio"
+    },
+    {
+      "date": "2025-12-17T10:00:00-03:00",
+      "summary": "Cementado coronas de Vanda Ryliskys - Dr. Ariel Merino",
+      "extractedName": "Cementado coronas de Vanda Ryliskys"
+    },
+    {
+      "date": "2025-12-13T15:00:00-03:00",
+      "summary": "Tallado superior Diego Andrada - Dr. Ariel Merino",
+      "extractedName": "Tallado superior Diego Andrada"
+    },
+    {
+      "date": "2025-12-12T14:00:00-03:00",
+      "summary": "Vanda Ryliskys - Tallado de coronas ",
+      "extractedName": "Vanda Ryliskys"
+    },
+    {
+      "date": "2025-12-10T10:30:00-03:00",
+      "summary": "+54 9 11 2495-0504",
+      "extractedName": "+54 9 11 2495"
+    },
+    {
+      "date": "2025-12-08T10:30:00-03:00",
+      "summary": "seña belen arteaga botox",
+      "extractedName": "seña belen arteaga"
+    },
+    {
+      "date": "2025-12-04T19:00:00-03:00",
+      "summary": "Evento Ariel ",
+      "extractedName": "Evento"
+    },
+    {
+      "date": "2025-12-03T08:00:00-03:00",
+      "summary": "Cuota 1 - Melina Fernandez ",
+      "extractedName": "Cuota 1"
+    },
+    {
+      "date": "2025-12-03T07:00:00-03:00",
+      "summary": "AGENDAR TRANQUI A ARIEL",
+      "extractedName": "AGENDAR TRANQUI"
+    },
+    {
+      "date": "2025-12-01T18:00:00-03:00",
+      "summary": "Vanda Relysikis Control - Dr. Ariel Merino",
+      "extractedName": "Vanda Relysikis Control"
+    },
+    {
+      "date": "2025-11-27T18:00:00-03:00",
+      "summary": "+54 9 11 2631-6538",
+      "extractedName": "+54 9 11 2631"
+    },
+    {
+      "date": "2025-11-25T18:00:00-03:00",
+      "summary": "Rafael y ariel",
+      "extractedName": "Rafael"
+    },
+    {
+      "date": "2025-11-25T16:30:00-03:00",
+      "summary": "Latirgue maxi - restauración pd 15 - Dr. Ariel Merino",
+      "extractedName": "Latirgue maxi"
+    },
+    {
+      "date": "2025-11-24T15:10:00-03:00",
+      "summary": "Consultas - Primera vez - Dr. Ariel Merino   (silvia Ardiz)",
+      "extractedName": "Consultas"
+    },
+    {
+      "date": "2025-11-20T16:45:00-03:00",
+      "summary": "Google // Dr. Ariel Merino Odontologia Estetica : Google Ads Consultation",
+      "extractedName": "Google // Dr."
+    },
+    {
+      "date": "2025-11-20T10:00:00-03:00",
+      "summary": "Tito Gonzalez - Cementado superior",
+      "extractedName": "Tito Gonzalez"
+    },
+    {
+      "date": "2025-11-19T16:00:00-03:00",
+      "summary": "Consulta - Maribel Alvarado Dr. Ariel Merino",
+      "extractedName": "Consulta"
+    },
+    {
+      "date": "2025-11-17T14:00:00-03:00",
+      "summary": "Luz Rosini - Limpieza con láser + control - Dr. Ariel Merino",
+      "extractedName": "Luz Rosini"
+    },
+    {
+      "date": "2025-11-14T09:00:00-03:00",
+      "summary": "Consulta Analia con Dr. Ariel",
+      "extractedName": "Consulta Analia con"
+    },
+    {
+      "date": "2025-11-07T08:00:00-03:00",
+      "summary": "NO viene Agos",
+      "extractedName": "Agos"
+    },
+    {
+      "date": "2025-11-04T08:00:00-03:00",
+      "summary": "no viene luz",
+      "extractedName": "luz"
+    },
+    {
+      "date": "2025-11-03T11:00:00-03:00",
+      "summary": "Cuota 2 - Melina Fernandez ",
+      "extractedName": "Cuota 2"
+    },
+    {
+      "date": "2025-10-22T13:30:00-03:00",
+      "summary": "Maxi latirgue - Control - Dr. Ariel Merino",
+      "extractedName": "Maxi latirgue"
+    },
+    {
+      "date": "2025-10-22T11:00:00-03:00",
+      "summary": "Grabar contenido valen M y ariel",
+      "extractedName": "Grabar contenido valen"
+    },
+    {
+      "date": "2025-10-20T11:00:00-03:00",
+      "summary": "Firma y directorio - La plata - Ariel",
+      "extractedName": "Firma y directorio"
+    },
+    {
+      "date": "2025-10-17T16:20:00-03:00",
+      "summary": "Paula Maglairella - Consulta primera vez - Dr. Ariel Merino",
+      "extractedName": "Paula Maglairella"
+    },
+    {
+      "date": "2025-10-16T11:30:00-03:00",
+      "summary": "Resonancia Ariel",
+      "extractedName": "Resonancia"
+    },
+    {
+      "date": "2025-10-15T16:30:00-03:00",
+      "summary": "Maximiliano Latirgue - Cementado Inferior - Dr. Ariel Merino",
+      "extractedName": "Maximiliano Latirgue"
+    },
+    {
+      "date": "2025-10-13T11:45:00-03:00",
+      "summary": "No viene romi",
+      "extractedName": "romi"
+    },
+    {
+      "date": "2025-10-11T13:00:00-03:00",
+      "summary": "Latirgue maxi - Cementado Superior - Dr. Ariel Merino",
+      "extractedName": "Latirgue maxi"
+    },
+    {
+      "date": "2025-10-09T16:00:00-03:00",
+      "summary": "Cancelado Latirgue maxi - Cementado Superior - Dr. Ariel Merino",
+      "extractedName": "Latirgue maxi Cementado"
+    },
+    {
+      "date": "2025-10-07T16:00:00-03:00",
+      "summary": "Cancelado Latirgue Maximiliano cementado superior",
+      "extractedName": "Latirgue Maximiliano cementado"
+    },
+    {
+      "date": "2025-10-07T08:15:00-03:00",
+      "summary": "+54 9 11 3569-9054",
+      "extractedName": "+54 9 11 3569"
+    },
+    {
+      "date": "2025-10-02T17:00:00-03:00",
+      "summary": "Maximiliano Latirgue - TB - Dr. Ariel Merino ",
+      "extractedName": "Maximiliano Latirgue"
+    },
+    {
+      "date": "2025-10-02T09:00:00-03:00",
+      "summary": "Cuota  - Melina Fernandez ",
+      "extractedName": "Cuota"
+    },
+    {
+      "date": "2025-09-30T14:00:00-03:00",
+      "summary": "Andres endondoncista - Presencial ",
+      "extractedName": "Andres endondoncista"
+    },
+    {
+      "date": "2025-09-29T08:15:00-03:00",
+      "summary": "Hablar con Areco Nicolas por la carilla a cementar",
+      "extractedName": "Hablar con Areco"
+    },
+    {
+      "date": "2025-09-17T16:15:00-03:00",
+      "summary": "Control - Rueco Alan - Dr. Ariel Merino",
+      "extractedName": "Control"
+    },
+    {
+      "date": "2025-09-15T18:00:00-03:00",
+      "summary": "Consulta Pirmera Vez - Gustavo Ariel Viana - Dr. Ariel Merino",
+      "extractedName": "Consulta Pirmera Vez"
+    },
+    {
+      "date": "2025-09-09T12:00:00-03:00",
+      "summary": "CANCELADO Romina - Franquicias Crecen - Dr. Ariel Merino VIRTUAL",
+      "extractedName": "Romina Franquicias Crecen"
+    },
+    {
+      "date": "2025-08-31T16:00:00-03:00",
+      "summary": "Control de carillas - ",
+      "extractedName": "Control de carillas"
+    },
+    {
+      "date": "2025-08-31T12:00:00-03:00",
+      "summary": "[PLANTILLA] Control de carillas",
+      "extractedName": "[PLANTILLA] Control de"
+    },
+    {
+      "date": "2025-08-31T10:15:00-03:00",
+      "summary": "[PLANTILLA] Turno de limpieza tradicional",
+      "extractedName": "[PLANTILLA] Turno de"
+    },
+    {
+      "date": "2025-08-29T13:00:00-03:00",
+      "summary": "Videollamada - Dr. Ariel Merino ",
+      "extractedName": "Videollamada"
+    },
+    {
+      "date": "2025-08-12T18:00:00-03:00",
+      "summary": "Sofía Allora - Consulta primera vez - Dr. Ariel Merino",
+      "extractedName": "Sofía Allora"
+    },
+    {
+      "date": "2025-08-11T16:30:00-03:00",
+      "summary": "Luz Rosini - Cementado de corona - Dr. Ariel Merino",
+      "extractedName": "Luz Rosini"
+    },
+    {
+      "date": "2025-08-11T15:10:00-03:00",
+      "summary": " CANCELADO Maximiliano acosta - Consulta Primera Vez - Dr. Ariel Merino",
+      "extractedName": "Maximiliano acosta Consulta"
+    },
+    {
+      "date": "2025-08-06T16:30:00-03:00",
+      "summary": "Tallado  superior - Jail Abdul Tanquia - Dr Ariel Merino",
+      "extractedName": "Tallado  superior"
+    },
+    {
+      "date": "2025-08-06T15:15:00-03:00",
+      "summary": "Luz Rosini - Retallado + escaneado - Dr. Ariel Merino",
+      "extractedName": "Luz Rosini"
+    },
+    {
+      "date": "2025-08-05T19:00:00-03:00",
+      "summary": "Bárbara Bruno - Cementado corona - Dr. Ariel Merino",
+      "extractedName": "Bárbara Bruno"
+    },
+    {
+      "date": "2025-08-01T14:00:00-03:00",
+      "summary": "Cementar provi - Barbara Bruno - Dr Ariel Merino",
+      "extractedName": "Cementar provi"
+    },
+    {
+      "date": "2025-07-29T17:30:00-03:00",
+      "summary": "Bárbara Bruno - Poste- Dr. Ariel Merino",
+      "extractedName": "Bárbara Bruno"
+    },
+    {
+      "date": "2025-07-25T16:10:00-03:00",
+      "summary": "Analia Elizabeth Avellaneda - Consulta primera vez - Dr. Ariel Merino",
+      "extractedName": "Analia Elizabeth Avellaneda"
+    },
+    {
+      "date": "2025-07-25T15:00:00-03:00",
+      "summary": "Vladimir Triep - Control - Dr. Ariel Merino",
+      "extractedName": "Vladimir Triep"
+    },
+    {
+      "date": "2025-07-22T15:30:00-03:00",
+      "summary": "Lucia Menucar y Ariel",
+      "extractedName": "Lucia Menucar"
+    },
+    {
+      "date": "2025-07-18T19:30:00-03:00",
+      "summary": "Barbara bruno - Resina + tallado - Dr. Ariel Merino",
+      "extractedName": "Barbara bruno"
+    },
+    {
+      "date": "2025-07-11T18:45:00-03:00",
+      "summary": "Deckleva Constanza - Escaneado - Dr. Ariel Merino",
+      "extractedName": "Deckleva Constanza"
+    },
+    {
+      "date": "2025-07-07T14:00:00-03:00",
+      "summary": "Agostina Cataldo - Consulta Primera Vez - Dr. Ariel Merino",
+      "extractedName": "Agostina Cataldo"
+    },
+    {
+      "date": "2025-06-30T16:00:00-03:00",
+      "summary": "Deckleva, Constanza - Cementado maxilar inferior - Dr. Ariel Merino",
+      "extractedName": "Deckleva, Constanza"
+    },
+    {
+      "date": "2025-06-29T15:30:00-03:00",
+      "summary": "Jesus Ochoa - Podcast",
+      "extractedName": "Jesus Ochoa"
+    },
+    {
+      "date": "2025-06-26T15:30:00-03:00",
+      "summary": "Curso Finanzas - Ariel (esperar que pasen link)",
+      "extractedName": "Curso Finanzas"
+    },
+    {
+      "date": "2025-06-26T14:00:00-03:00",
+      "summary": "Valen Merino - Grabar Contenido",
+      "extractedName": "Valen Merino"
+    },
+    {
+      "date": "2025-06-23T16:00:00-03:00",
+      "summary": "Luz Rosini - Provisorio de pd 12 y retallado + Limpieza con laser",
+      "extractedName": "Luz Rosini"
+    },
+    {
+      "date": "2025-06-18T15:00:00-03:00",
+      "summary": "ABONAR 50% Caparotta control por molestias + escaneo placa mio y blanqueamiento ",
+      "extractedName": "50% Caparotta control"
+    },
+    {
+      "date": "2025-06-16T15:00:00-03:00",
+      "summary": " Myriam Florentin - control ariel",
+      "extractedName": "Myriam Florentin"
+    },
+    {
+      "date": "2025-06-13T17:00:00-03:00",
+      "summary": "CONSENTIMIENTO X2   -  Abonar 50% Santiago Ferraro Tallado + resinas (?) HACER ENCERADO",
+      "extractedName": "CONSENTIMIENTO X2"
+    },
+    {
+      "date": "2025-06-02T15:10:00-03:00",
+      "summary": "CANCELADO (se olvido de venir) Analia canciani control por perno y corona floja",
+      "extractedName": "(se olvido de"
+    },
+    {
+      "date": "2025-05-30T17:00:00-03:00",
+      "summary": "Abonar 600 (sin blanq) Sebastian Muzzalupo gingivectomia",
+      "extractedName": "600 (sin blanq)"
+    },
+    {
+      "date": "2025-05-27T18:00:00-03:00",
+      "summary": "ABONAR Provisorio en resina Santiago Di Francesco ",
+      "extractedName": "Provisorio en resina"
+    },
+    {
+      "date": "2025-05-21T17:00:00-03:00",
+      "summary": "abonarrr adaptacion placa mascioli",
+      "extractedName": "abonarrr adaptacion placa"
+    },
+    {
+      "date": "2025-05-09T14:00:00-03:00",
+      "summary": "CANCELADO myriam florentin Control ariel",
+      "extractedName": "myriam florentin Control"
+    },
+    {
+      "date": "2025-05-08T18:30:00-03:00",
+      "summary": "Agustin Mele consulta 1era vez ariel",
+      "extractedName": "Agustin Mele consulta"
+    },
+    {
+      "date": "2025-05-08T17:00:00-03:00",
+      "summary": "Sergio Cavallero 1ra vez",
+      "extractedName": "Sergio Cavallero"
+    },
+    {
+      "date": "2025-04-07T15:15:00-03:00",
+      "summary": "ABONAR Karina Santini control y limpieza",
+      "extractedName": "Karina Santini control"
+    },
+    {
+      "date": "2025-04-04T16:20:00-03:00",
+      "summary": "Wasinger Vanessa reduccion de carillas existentes",
+      "extractedName": "Wasinger Vanessa reduccion"
+    },
+    {
+      "date": "2025-03-26T14:00:00-03:00",
+      "summary": "cancelado control belen arteaga ESCANEAR PARA ALINEADORESSS",
+      "extractedName": "control belen arteaga"
+    },
+    {
+      "date": "2025-03-12T19:00:00-03:00",
+      "summary": "CANCELADO ABONAR TOTAL bernasconi RESINAS (no encerado) (paciente pide esa hora porque no llega y quiere ESE dia)",
+      "extractedName": "TOTAL bernasconi RESINAS"
+    },
+    {
+      "date": "2025-03-10T15:15:00-03:00",
+      "summary": "luz rosini control ariel ",
+      "extractedName": "luz rosini control"
+    },
+    {
+      "date": "2025-02-24T16:30:00-03:00",
+      "summary": "ABONAR resinas sup x 2 Agustina Zacariaz y posible gingi",
+      "extractedName": "resinas sup Agustina"
+    },
+    {
+      "date": "2025-02-21T14:00:00-03:00",
+      "summary": "cande cruz, resinas ariel",
+      "extractedName": "cande cruz, resinas"
+    },
+    {
+      "date": "2025-02-20T16:00:00-03:00",
+      "summary": "belen arteaga gingi y tallado ARIEL",
+      "extractedName": "belen arteaga gingi"
+    },
+    {
+      "date": "2025-02-18T18:30:00-03:00",
+      "summary": " ariel con Fausto Garcia MIRAR DESCRIPCION",
+      "extractedName": "ariel con Fausto"
+    },
+    {
+      "date": "2025-02-14T16:40:00-03:00",
+      "summary": "atilio bondini control ariel",
+      "extractedName": "atilio bondini control"
+    },
+    {
+      "date": "2025-01-29T18:00:00-03:00",
+      "summary": "ABONAR 300 estefania bernal, arreglo resina + blanqueamiento",
+      "extractedName": "300 estefania bernal,"
+    },
+    {
+      "date": "2025-01-23T18:00:00-03:00",
+      "summary": "ABONARRR Cementado Matias Salvucci (3)",
+      "extractedName": "ABONARRR Cementado Matias"
+    },
+    {
+      "date": "2025-01-17T20:00:00-03:00",
+      "summary": "cande carillas ari",
+      "extractedName": "cande"
+    },
+    {
+      "date": "2024-12-27T18:00:00-03:00",
+      "summary": "Control carillas Lisandro Zuccari",
+      "extractedName": "Control"
+    },
+    {
+      "date": "2024-12-20T16:40:00-03:00",
+      "summary": "Maria Bonzi control CARILLAS",
+      "extractedName": "Maria Bonzi control"
+    },
+    {
+      "date": "2024-12-18T18:00:00-03:00",
+      "summary": "control carillas Nazarena Bernardo",
+      "extractedName": "control"
+    },
+    {
+      "date": "2024-12-11T11:00:00-03:00",
+      "summary": "CLARI NO VIENE🥲",
+      "extractedName": "CLARI 🥲"
+    },
+    {
+      "date": "2024-12-04T14:00:00-03:00",
+      "summary": "Nidia Concepcion Gonzalez primera vez",
+      "extractedName": "Nidia Concepcion Gonzalez"
+    },
+    {
+      "date": "2024-10-22T16:00:00-03:00",
+      "summary": "Consulta control anual - Juan",
+      "extractedName": "Consulta control anual"
+    },
+    {
+      "date": "2024-06-17T15:00:00-03:00",
+      "summary": "Consulta con Dr. Ariel - Bot Hobaweb",
+      "extractedName": "Consulta con Dr. Ariel"
+    },
+    {
+      "date": "2024-05-27T16:40:00-03:00",
+      "summary": "CONF Agustina Alonso- control de resinas ",
+      "extractedName": "CONF Agustina Alonso"
+    },
+    {
+      "date": "2024-05-24T17:00:00-03:00",
+      "summary": "CONF Belen Amigo control ",
+      "extractedName": "CONF Belen Amigo"
+    }
+  ]
+}

@@ -1,0 +1,3422 @@
+{
+  "generatedAt": "2026-02-25T08:12:16.831Z",
+  "mode": "import",
+  "stats": {
+    "matched": 265,
+    "unmatched": 89,
+    "imported": 42,
+    "skipped_duplicate": 223,
+    "skipped_future": 0,
+    "error": 0
+  },
+  "matched": [
+    {
+      "date": "2026-02-23",
+      "recall_type": "otro",
+      "extractedName": "Melisa Engstfeld",
+      "patientName": "Melisa Engstfeld",
+      "patientId": "b95954af-e8cf-447c-aca8-ac9eee36e574",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-23T00:00:00+00:00)",
+      "originalSummary": "Melisa Engstfeld- Control"
+    },
+    {
+      "date": "2026-02-23",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Guadalupe Gatti",
+      "patientId": "68d5d6b5-24f5-4a08-8912-1ed1567306f5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-23T00:00:00+00:00)",
+      "originalSummary": " Consultas - Primera vez - Dr. Ariel Merino   (Guadalupe Gatti)"
+    },
+    {
+      "date": "2026-02-20",
+      "recall_type": "control_carillas",
+      "extractedName": "Eugenía Gariador",
+      "patientName": "Maria Eugenia Gariador",
+      "patientId": "de3a53c7-2df5-4ac7-991c-907b84b7acf5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-20T00:00:00+00:00)",
+      "originalSummary": "Eugenía Gariador- Reparación carilla resina inf"
+    },
+    {
+      "date": "2026-02-20",
+      "recall_type": "control_carillas",
+      "extractedName": "Rocio Pardiñas",
+      "patientName": "Rocio Pardiñas",
+      "patientId": "6104203f-13e6-4653-82a9-c8d10917f5e5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-20T00:00:00+00:00)",
+      "originalSummary": "Rocio Pardiñas- Carilla Resina (nueva)"
+    },
+    {
+      "date": "2026-02-18",
+      "recall_type": "otro",
+      "extractedName": "Eugenia Molina",
+      "patientName": "Molina Eugenia",
+      "patientId": "bf7f203c-cc08-4b43-878f-1f73711c22c2",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-18T00:00:00+00:00)",
+      "originalSummary": "Eugenia Molina- Consulta (continuación del tratamiento)"
+    },
+    {
+      "date": "2026-02-18",
+      "recall_type": "otro",
+      "extractedName": "Mazzuca Magali",
+      "patientName": "Magali Mazzuca",
+      "patientId": "b80f1ef1-c30e-4f4d-ac90-be7e8797bba5",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Mazzuca Magali- Control"
+    },
+    {
+      "date": "2026-02-18",
+      "recall_type": "otro",
+      "extractedName": "Patricio Sanchez",
+      "patientName": "Patricio Sanchez",
+      "patientId": "6a8e9d1d-fa72-4a06-b216-f78ecb91514c",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-18T00:00:00+00:00)",
+      "originalSummary": "Patricio Sanchez - retoque"
+    },
+    {
+      "date": "2026-02-11",
+      "recall_type": "otro",
+      "extractedName": "Carolina Garrido",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "Carolina Garrido - Control"
+    },
+    {
+      "date": "2026-02-11",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "nicolás andalaft",
+      "patientId": "ffa7b92d-dd98-49d4-8052-22a88a54a8f4",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Nicolas Andalaft)"
+    },
+    {
+      "date": "2026-02-06",
+      "recall_type": "control_carillas",
+      "extractedName": "Engstfeld Melisa",
+      "patientName": "Melisa Engstfeld",
+      "patientId": "b95954af-e8cf-447c-aca8-ac9eee36e574",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-06T00:00:00+00:00)",
+      "originalSummary": " Engstfeld Melisa- Carillas Resina "
+    },
+    {
+      "date": "2026-02-06",
+      "recall_type": "limpieza",
+      "extractedName": "Debus Santiago",
+      "patientName": "Santiago Debus",
+      "patientId": "f5c2b144-92a4-4c54-9f73-14e1aa47a9b0",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-06T00:00:00+00:00)",
+      "originalSummary": " Debus Santiago- 1era Vez + Limpieza láser"
+    },
+    {
+      "date": "2026-02-05",
+      "recall_type": "otro",
+      "extractedName": "Analia Kobal consulta",
+      "patientName": "Ana Lia Kobal",
+      "patientId": "3453ef3c-0f7b-405c-a025-70178404d91f",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-05T00:00:00+00:00)",
+      "originalSummary": "Analia Kobal consulta virtual con Ariel"
+    },
+    {
+      "date": "2026-02-04",
+      "recall_type": "control_carillas",
+      "extractedName": "Leandro Miguel",
+      "patientName": "Miguel Leandro",
+      "patientId": "bbcbab3a-7f83-4063-baa0-346f465b0df1",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-04T00:00:00+00:00)",
+      "originalSummary": "Leandro Miguel - Recementado de carilla"
+    },
+    {
+      "date": "2026-02-03",
+      "recall_type": "otro",
+      "extractedName": "Ariel merino and",
+      "patientName": "ARIEL MERINO",
+      "patientId": "135a0e97-0b32-448d-af94-188b9c930c7a",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-03T00:00:00+00:00)",
+      "originalSummary": "Ariel merino and Valentino Granata"
+    },
+    {
+      "date": "2026-02-03",
+      "recall_type": "otro",
+      "extractedName": "Melisa Engstfeld",
+      "patientName": "Melisa Engstfeld",
+      "patientId": "b95954af-e8cf-447c-aca8-ac9eee36e574",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-23T00:00:00+00:00)",
+      "originalSummary": "Melisa Engstfeld - Blanquemiento"
+    },
+    {
+      "date": "2026-02-02",
+      "recall_type": "otro",
+      "extractedName": "Mercedes Otero",
+      "patientName": "Mercedes Otero",
+      "patientId": "7f072259-374b-4749-8675-80f3344777a9",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-02T00:00:00+00:00)",
+      "originalSummary": "Mercedes Otero - Consulta "
+    },
+    {
+      "date": "2026-01-29",
+      "recall_type": "otro",
+      "extractedName": "Eugenia Molina",
+      "patientName": "Molina Eugenia",
+      "patientId": "bf7f203c-cc08-4b43-878f-1f73711c22c2",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-18T00:00:00+00:00)",
+      "originalSummary": "Eugenia Molina - Clau"
+    },
+    {
+      "date": "2026-01-26",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Lucas Gil",
+      "patientId": "715c969a-76b0-4192-8670-aa3fadadfe65",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-26T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Lucas Gil)"
+    },
+    {
+      "date": "2026-01-26",
+      "recall_type": "otro",
+      "extractedName": "Facundo González",
+      "patientName": "Facundo Gonzalez",
+      "patientId": "aa7263f9-996b-43ae-89e2-263bafec57cc",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-26T00:00:00+00:00)",
+      "originalSummary": "Facundo González - Primera Vez consulta Ariel"
+    },
+    {
+      "date": "2026-01-23",
+      "recall_type": "otro",
+      "extractedName": "Nicolas León",
+      "patientName": "Nicolás Leon",
+      "patientId": "4a133ab5-68fe-4200-86f3-0a0887696726",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-23T00:00:00+00:00)",
+      "originalSummary": "Nicolas León - Consulta Dr. Ariel"
+    },
+    {
+      "date": "2026-01-23",
+      "recall_type": "otro",
+      "extractedName": "Vanesa Wasinger",
+      "patientName": "Vanesa Wasinger",
+      "patientId": "21555414-4719-4f6b-9b8c-d19f69b91fb7",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Vanesa Wasinger - Cementado "
+    },
+    {
+      "date": "2026-01-23",
+      "recall_type": "otro",
+      "extractedName": "Pedro Adamovic",
+      "patientName": "Pedro Adamovic",
+      "patientId": "cef2506e-e974-4d65-8517-1cd06f239794",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-23T00:00:00+00:00)",
+      "originalSummary": "Pedro Adamovic - Consulta Dr. Ariel Merino"
+    },
+    {
+      "date": "2026-01-21",
+      "recall_type": "otro",
+      "extractedName": "Magali mazzuca",
+      "patientName": "Magali Mazzuca",
+      "patientId": "b80f1ef1-c30e-4f4d-ac90-be7e8797bba5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-18T00:00:00+00:00)",
+      "originalSummary": "Magali mazzuca - control con Ariel"
+    },
+    {
+      "date": "2026-01-21",
+      "recall_type": "otro",
+      "extractedName": "Camila Gorosito",
+      "patientName": "Camila Gorosito",
+      "patientId": "71d02155-664c-4e47-a5d7-27c2447fb7e6",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-21T00:00:00+00:00)",
+      "originalSummary": "Camila Gorosito - Control "
+    },
+    {
+      "date": "2026-01-21",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Dario Pablo Godoy",
+      "patientId": "b691aad8-8f91-44fe-aaca-982eb63da588",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-21T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Dario Godoy)"
+    },
+    {
+      "date": "2026-01-19",
+      "recall_type": "otro",
+      "extractedName": "$ Vanesa Wasinger",
+      "patientName": "Vanesa Wasinger",
+      "patientId": "21555414-4719-4f6b-9b8c-d19f69b91fb7",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-23T00:00:00+00:00)",
+      "originalSummary": "$ Vanesa Wasinger - Tallado para ceramica"
+    },
+    {
+      "date": "2026-01-19",
+      "recall_type": "otro",
+      "extractedName": "Carolina Garrido",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Carolina Garrido - CONTROL "
+    },
+    {
+      "date": "2026-01-19",
+      "recall_type": "limpieza",
+      "extractedName": "$ Posse Jacqueline",
+      "patientName": "Jacqueline Posse",
+      "patientId": "d4c9b5d5-8297-4dc3-81d5-7fc5fd44ca02",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": " $ Posse Jacqueline - Limpieza Tradicional - Dr. Ariel Merino"
+    },
+    {
+      "date": "2026-01-16",
+      "recall_type": "otro",
+      "extractedName": "Liliana ester Suarez",
+      "patientName": "María Suarez Ana",
+      "patientId": "6c4ee090-dbd5-49f1-a0f7-eb95644081ce",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "Liliana ester Suarez - tallado"
+    },
+    {
+      "date": "2026-01-16",
+      "recall_type": "otro",
+      "extractedName": "Paula LLauro",
+      "patientName": "Paula Llauro",
+      "patientId": "00b56056-54f4-4bf7-9efc-6719a268788b",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Paula LLauro - definitivo"
+    },
+    {
+      "date": "2026-01-16",
+      "recall_type": "limpieza",
+      "extractedName": "Chirino Leandro",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Chirino Leandro - Limpieza con laser"
+    },
+    {
+      "date": "2026-01-16",
+      "recall_type": "otro",
+      "extractedName": "Mazzola Maria Elena",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": " Mazzola Maria Elena - Escaneo y control por pd 46 - Dr. Ariel Merino"
+    },
+    {
+      "date": "2026-01-07",
+      "recall_type": "otro",
+      "extractedName": "Recaptación Karina Heitman",
+      "patientName": "Karina Heitman",
+      "patientId": "f4b87b7b-09b1-4eec-8f0d-03597d01cb6a",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-07T00:00:00+00:00)",
+      "originalSummary": "Recaptación Karina Heitman - Martu"
+    },
+    {
+      "date": "2025-12-26",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Natali Davila",
+      "patientId": "cb263ee3-4723-4c6f-b2a8-484612b501d2",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-26T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Natalí Dávila)"
+    },
+    {
+      "date": "2025-12-23",
+      "recall_type": "limpieza",
+      "extractedName": "Vanesa Wasinger",
+      "patientName": "Vanesa Wasinger",
+      "patientId": "21555414-4719-4f6b-9b8c-d19f69b91fb7",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Vanesa Wasinger limpieza tradicional"
+    },
+    {
+      "date": "2025-12-23",
+      "recall_type": "otro",
+      "extractedName": "sofia ferracuti retoque de resinas",
+      "patientName": "Sofi Ferracuti",
+      "patientId": "e95ceca7-53f3-4e57-95b2-60338ac61568",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "sofia ferracuti retoque de resinas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-22",
+      "recall_type": "otro",
+      "extractedName": "Milo stankiewicz inferior resinas",
+      "patientName": "Milo Stankiewicz",
+      "patientId": "e24cad0f-7d07-4387-896f-5acdd2125dce",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Milo stankiewicz inferior resinas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-19",
+      "recall_type": "otro",
+      "extractedName": "Hernan Acosta",
+      "patientName": "Hernan Acosta",
+      "patientId": "a79d5bd7-cb14-4e3f-800b-dac43ce5926e",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-19T00:00:00+00:00)",
+      "originalSummary": " Hernan Acosta - Consulta con Ari (es amigo)"
+    },
+    {
+      "date": "2025-12-19",
+      "recall_type": "limpieza",
+      "extractedName": "Ezequiel Luna",
+      "patientName": "Ezequiel Luna",
+      "patientId": "283842c0-4a66-4b9a-8529-427f41c5cb92",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-19T00:00:00+00:00)",
+      "originalSummary": "Ezequiel Luna - Limpieza con laser + pulido - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-18",
+      "recall_type": "control_carillas",
+      "extractedName": "Carla del Vecchio",
+      "patientName": "Carla Del Vecchio",
+      "patientId": "069d82e1-a448-41f8-8a87-844f570a1316",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-18T00:00:00+00:00)",
+      "originalSummary": "Carla del Vecchio - Pulido de carillas + 4 resinas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-17",
+      "recall_type": "otro",
+      "extractedName": "Garrido Carolina",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": " Garrido Carolina - Control encias - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-17",
+      "recall_type": "otro",
+      "extractedName": "Martin Jofre",
+      "patientName": "Martin Jofre",
+      "patientId": "bcd006e6-4554-44f9-8ce5-e3161773b801",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": " Martin Jofre - Cementado de corona 16 - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-17",
+      "recall_type": "otro",
+      "extractedName": "Camila Fernández",
+      "patientName": "Camila Fernández",
+      "patientId": "23880595-4386-4cd2-b3c5-7f107c8116f6",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-17T00:00:00+00:00)",
+      "originalSummary": "Camila Fernández - consulta - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-15",
+      "recall_type": "control_carillas",
+      "extractedName": "Nazarena bernardo",
+      "patientName": "Bernardo Nazarena",
+      "patientId": "91a598d6-eed7-4e9a-8598-230142c23762",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-15T00:00:00+00:00)",
+      "originalSummary": "Nazarena bernardo - retiro de carillas + tallado y provis - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-15",
+      "recall_type": "otro",
+      "extractedName": "Mateo Schreiterer",
+      "patientName": "Mateo Schreiterer",
+      "patientId": "6caf8502-5eb0-4e07-92d4-beb586da2ae4",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-15T00:00:00+00:00)",
+      "originalSummary": "Mateo Schreiterer - segunda consulta - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-15",
+      "recall_type": "otro",
+      "extractedName": "Mazzola Maria Elena",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": " Mazzola Maria Elena - Escaneo y control por pd 46 - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-15",
+      "recall_type": "otro",
+      "extractedName": "Patricio Sanchez consulta",
+      "patientName": "Patricio Sanchez",
+      "patientId": "6a8e9d1d-fa72-4a06-b216-f78ecb91514c",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-18T00:00:00+00:00)",
+      "originalSummary": "Patricio Sanchez consulta 1ra vez virtual"
+    },
+    {
+      "date": "2025-12-13",
+      "recall_type": "otro",
+      "extractedName": "Ana María Suarez",
+      "patientName": "María Suarez Ana",
+      "patientId": "6c4ee090-dbd5-49f1-a0f7-eb95644081ce",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Ana María Suarez - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-12",
+      "recall_type": "otro",
+      "extractedName": "Paula Llauro",
+      "patientName": "Paula Llauro",
+      "patientId": "00b56056-54f4-4bf7-9efc-6719a268788b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Paula Llauro - intento de sacar el tornillito maldito"
+    },
+    {
+      "date": "2025-12-11",
+      "recall_type": "otro",
+      "extractedName": "Ángeles Lijo",
+      "patientName": "Angeles Lijo",
+      "patientId": "40840568-c557-4bf0-9720-6671344d43c6",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Ángeles Lijo - Gingi ambos maxilares "
+    },
+    {
+      "date": "2025-12-11",
+      "recall_type": "otro",
+      "extractedName": "CONFIRMADO Sofia Ferracuti",
+      "patientName": "Sofi Ferracuti",
+      "patientId": "e95ceca7-53f3-4e57-95b2-60338ac61568",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-23T00:00:00+00:00)",
+      "originalSummary": "CONFIRMADO Sofia Ferracuti - Resinas superiores - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-04",
+      "recall_type": "otro",
+      "extractedName": "Mercedes Roca",
+      "patientName": "Maria mercedes roca",
+      "patientId": "f7b0afaa-0094-415e-8e8f-6c47e6850e48",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-04T00:00:00+00:00)",
+      "originalSummary": "1ra vez Mercedes Roca"
+    },
+    {
+      "date": "2025-12-04",
+      "recall_type": "otro",
+      "extractedName": "Ángeles Lijo   Consulta",
+      "patientName": "Angeles Lijo",
+      "patientId": "40840568-c557-4bf0-9720-6671344d43c6",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-11T00:00:00+00:00)",
+      "originalSummary": "Ángeles Lijo  (Hija magali mazzuca) Consulta - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-04",
+      "recall_type": "otro",
+      "extractedName": "Magalí Mazzuca",
+      "patientName": "Magali Mazzuca",
+      "patientId": "b80f1ef1-c30e-4f4d-ac90-be7e8797bba5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-18T00:00:00+00:00)",
+      "originalSummary": "Magalí Mazzuca - control ariel"
+    },
+    {
+      "date": "2025-12-03",
+      "recall_type": "otro",
+      "extractedName": "Melina Fernandez Suarez",
+      "patientName": "Melina Fernandez Suarez",
+      "patientId": "49607950-8216-4f0b-950b-f858875c7903",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-03T00:00:00+00:00)",
+      "originalSummary": "Melina Fernandez Suarez - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-03",
+      "recall_type": "otro",
+      "extractedName": "Martin Jofre",
+      "patientName": "Martin Jofre",
+      "patientId": "bcd006e6-4554-44f9-8ce5-e3161773b801",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-17T00:00:00+00:00)",
+      "originalSummary": "Martin Jofre - Microdiseño Resinas + tallado de la 16 - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-12-01",
+      "recall_type": "limpieza",
+      "extractedName": "Basulto Mariana",
+      "patientName": "Mariana Basulto",
+      "patientId": "07a83c9f-8d7a-489e-8b7e-235e23f26f68",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-01T00:00:00+00:00)",
+      "originalSummary": " Basulto Mariana - Control + limpieza - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-28",
+      "recall_type": "otro",
+      "extractedName": "Cementado Coronas Paula LLauro",
+      "patientName": "Paula Llauro",
+      "patientId": "00b56056-54f4-4bf7-9efc-6719a268788b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Cementado Coronas Paula LLauro - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-28",
+      "recall_type": "otro",
+      "extractedName": "Carla del Vecchio",
+      "patientName": "Carla Del Vecchio",
+      "patientId": "069d82e1-a448-41f8-8a87-844f570a1316",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-28T00:00:00+00:00)",
+      "originalSummary": "Carla del Vecchio - Consulta - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-28",
+      "recall_type": "otro",
+      "extractedName": "Control de Gaston salguero",
+      "patientName": "Gaston Salguero",
+      "patientId": "83f1b6cb-d275-4f13-b65b-016ad1cfe374",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "Control de Gaston salguero - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-27",
+      "recall_type": "otro",
+      "extractedName": "Cementado max inferior Eduardo Fernandez",
+      "patientName": "Eduardo Néstor Fernandez",
+      "patientId": "94bbf334-e82b-4f88-b795-2ef1d950e282",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Cementado max inferior Eduardo Fernandez (TITO) - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-25",
+      "recall_type": "otro",
+      "extractedName": "Milo stankiewicz",
+      "patientName": "Milo Stankiewicz",
+      "patientId": "e24cad0f-7d07-4387-896f-5acdd2125dce",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-22T00:00:00+00:00)",
+      "originalSummary": "Milo stankiewicz  - segunda parte del tratamiento - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-24",
+      "recall_type": "otro",
+      "extractedName": "Llauró Paula para retoque de tallado de coronas",
+      "patientName": "Paula Llauro",
+      "patientId": "00b56056-54f4-4bf7-9efc-6719a268788b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Llauró Paula para retoque de tallado de coronas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-24",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Pietro Ezio Zucchet",
+      "patientId": "ee3a7504-067d-4bdd-8c60-6c87406771b9",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-24T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Pietro Ezio Zucchet)"
+    },
+    {
+      "date": "2025-11-21",
+      "recall_type": "otro",
+      "extractedName": "Vanda Ryliskis",
+      "patientName": "Vanda Ryliskis",
+      "patientId": "d480e120-9f41-47e5-878d-6c2cbb59c3de",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": " Vanda Ryliskis - Cementado infreior "
+    },
+    {
+      "date": "2025-11-21",
+      "recall_type": "otro",
+      "extractedName": "Romina Jimena",
+      "patientName": "Romina Jimena",
+      "patientId": "b6cf7181-f234-44c1-a15e-6d30949b782c",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-21T00:00:00+00:00)",
+      "originalSummary": "Romina Jimena - control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-21",
+      "recall_type": "otro",
+      "extractedName": "Consulta Diego Andrades",
+      "patientName": "Diego andrades",
+      "patientId": "fa11c72a-4ba6-4354-8a2b-7d30625ab95a",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-21T00:00:00+00:00)",
+      "originalSummary": " Consulta 1ra vez Diego Andrades"
+    },
+    {
+      "date": "2025-11-19",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Gaston Salguero",
+      "patientName": "Gaston Salguero",
+      "patientId": "83f1b6cb-d275-4f13-b65b-016ad1cfe374",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-19T00:00:00+00:00)",
+      "originalSummary": "Gaston Salguero - Cementado de 4 coronas s/implante - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-19",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "María de los Milagros Rodriguez",
+      "patientId": "4a16c4fe-8618-4ac0-bbce-e18a2b0faeb9",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-19T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Milagros Rodriguez)"
+    },
+    {
+      "date": "2025-11-19",
+      "recall_type": "otro",
+      "extractedName": "Lourdes Mendez",
+      "patientName": "Lourdes Mendez",
+      "patientId": "9f5131a2-b22f-4b7f-9eb0-5d859b95afcf",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Lourdes Mendez- problemas en las encias"
+    },
+    {
+      "date": "2025-11-17",
+      "recall_type": "otro",
+      "extractedName": "Liliana Esther Suarez",
+      "patientName": "Liliana Esther Suarez",
+      "patientId": "daf86dee-424d-4436-ad7f-b95d56f0e1bf",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "Liliana Esther Suarez - Resinas + tallado de corona - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-17",
+      "recall_type": "otro",
+      "extractedName": "Paula llauró",
+      "patientName": "Paula Llauro",
+      "patientId": "00b56056-54f4-4bf7-9efc-6719a268788b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Paula llauró - despegue de puente y abono de tratamiento"
+    },
+    {
+      "date": "2025-11-17",
+      "recall_type": "limpieza",
+      "extractedName": "Mascioli antonella",
+      "patientName": "Antonella Mascioli",
+      "patientId": "26a33f28-7816-4d20-9762-53f76ef82221",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Mascioli antonella - Realizar rx control y limpieza carillas"
+    },
+    {
+      "date": "2025-11-17",
+      "recall_type": "otro",
+      "extractedName": "Carolina Garrido",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": " Carolina Garrido - control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-14",
+      "recall_type": "otro",
+      "extractedName": "Vanda Ryliskis",
+      "patientName": "Vanda Ryliskis",
+      "patientId": "d480e120-9f41-47e5-878d-6c2cbb59c3de",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-21T00:00:00+00:00)",
+      "originalSummary": "Vanda Ryliskis - tallado - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-14",
+      "recall_type": "otro",
+      "extractedName": "Llauró Paula",
+      "patientName": "Paula Llauro",
+      "patientId": "00b56056-54f4-4bf7-9efc-6719a268788b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Llauró Paula - Control y charla por corona y puente - Dr. Ariel  "
+    },
+    {
+      "date": "2025-11-14",
+      "recall_type": "otro",
+      "extractedName": "Damian minckas",
+      "patientName": "Damian minckas",
+      "patientId": "59b92dab-6ac3-4fc6-bdd1-f7b6c0629bb8",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-14T00:00:00+00:00)",
+      "originalSummary": "Damian minckas-Consulta 1ra vez"
+    },
+    {
+      "date": "2025-11-14",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Alejandra Ferrari",
+      "patientName": "Alejandra Ferrari",
+      "patientId": "757b143b-bcc7-4042-91a1-a0013dbf49e8",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Alejandra Ferrari - Control de coronas sobre implante - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-11-06",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Alejandro Migliorisi",
+      "patientId": "b9cb6863-1054-431a-a946-d55165780833",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-06T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Staff (Alejandro Migliorisi)"
+    },
+    {
+      "date": "2025-11-06",
+      "recall_type": "otro",
+      "extractedName": "Pomar Silvio",
+      "patientName": "Silvio Pomar",
+      "patientId": "4180282c-42b7-46eb-94f2-398243bc9c85",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-06T00:00:00+00:00)",
+      "originalSummary": "Pomar Silvio - se le despegó sector posterior "
+    },
+    {
+      "date": "2025-10-30",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Enrique Souza Rey",
+      "patientId": "bc8796cc-b1fb-4f92-9cc1-86984d761edd",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-30T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Staff (Enrique Souza Rey)"
+    },
+    {
+      "date": "2025-10-22",
+      "recall_type": "otro",
+      "extractedName": "Gaston Salguero",
+      "patientName": "Gaston Salguero",
+      "patientId": "83f1b6cb-d275-4f13-b65b-016ad1cfe374",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-28T00:00:00+00:00)",
+      "originalSummary": "Gaston Salguero - Prueba de puente en resina - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-22",
+      "recall_type": "otro",
+      "extractedName": "Alejandra Ferrari",
+      "patientName": "Alejandra Ferrari",
+      "patientId": "757b143b-bcc7-4042-91a1-a0013dbf49e8",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Alejandra Ferrari - Cementado de 2 coronas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-22",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Liliana Esther Suarez",
+      "patientId": "daf86dee-424d-4436-ad7f-b95d56f0e1bf",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-17T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Liliana Esther Suarez)"
+    },
+    {
+      "date": "2025-10-22",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Eduardo Néstor Fernandez",
+      "patientId": "94bbf334-e82b-4f88-b795-2ef1d950e282",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-27T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Eduardo Nestor Fernandez)"
+    },
+    {
+      "date": "2025-10-22",
+      "recall_type": "control_carillas",
+      "extractedName": "Mauro Gaston Pereira",
+      "patientName": "Gaston Pereira Mauro",
+      "patientId": "71b3a801-cbe6-455b-9660-f551969ba3df",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "Mauro Gaston Pereira - Cementado carilla caida - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-21",
+      "recall_type": "otro",
+      "extractedName": "Santiago Ferraro",
+      "patientName": "Santiago Ferraro",
+      "patientId": "2033104e-d13b-4800-a7bc-5c668b15a9ef",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Santiago Ferraro - FOTOS"
+    },
+    {
+      "date": "2025-10-20",
+      "recall_type": "otro",
+      "extractedName": "Garrido Carolina",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Garrido Carolina - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-20",
+      "recall_type": "control_carillas",
+      "extractedName": "Florencia Granton",
+      "patientName": "Maria Florencia Granton",
+      "patientId": "ca3cb6ae-04cb-40e9-a306-6ffee668e0f6",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-20T00:00:00+00:00)",
+      "originalSummary": "Florencia Granton - Control Carillas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-20",
+      "recall_type": "otro",
+      "extractedName": "Luz Rossini",
+      "patientName": "Rossini Luz",
+      "patientId": "12cc81e4-0c33-4551-ae4a-d28a2f21b8f4",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-20T00:00:00+00:00)",
+      "originalSummary": "Luz Rossini - control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-20",
+      "recall_type": "otro",
+      "extractedName": "Evelyn Fernandez Suarez",
+      "patientName": "Fernandez Suarez Evelyn",
+      "patientId": "384b9ee3-f234-4fe3-8544-fc8ca63129f5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-20T00:00:00+00:00)",
+      "originalSummary": "Evelyn Fernandez Suarez - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-17",
+      "recall_type": "otro",
+      "extractedName": "Lourdes mendez",
+      "patientName": "Lourdes Mendez",
+      "patientId": "9f5131a2-b22f-4b7f-9eb0-5d859b95afcf",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-19T00:00:00+00:00)",
+      "originalSummary": " Lourdes mendez - Resinas x 10 superiores - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-16",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Maria Ines Bezus",
+      "patientId": "15b56df3-dbbd-422f-a031-8db8f1bc8d83",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-16T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Staff (Ines Bezus)"
+    },
+    {
+      "date": "2025-10-16",
+      "recall_type": "otro",
+      "extractedName": "Belen Fernandez",
+      "patientName": "Maria Belen Fernandez",
+      "patientId": "c32c8212-9395-4ff0-9e40-812f588323eb",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-16T00:00:00+00:00)",
+      "originalSummary": "Belen Fernandez - Arreglo \"salido\" control - Dr . Ariel Merino"
+    },
+    {
+      "date": "2025-10-15",
+      "recall_type": "otro",
+      "extractedName": "Natalia Vaca",
+      "patientName": "Natalia Vaca",
+      "patientId": "0c0526a6-6022-4f3f-865b-7d020ab8d121",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Natalia Vaca - Retoques resina - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-14",
+      "recall_type": "otro",
+      "extractedName": "Norma Noemí Miceli",
+      "patientName": "Norma Noemi Miceli",
+      "patientId": "acbfe0e2-1f87-4a05-9ca0-092428f67e8e",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-14T00:00:00+00:00)",
+      "originalSummary": "Norma Noemí Miceli  - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-13",
+      "recall_type": "otro",
+      "extractedName": "CONSENTIMIENTO Y $ Camila Lopez",
+      "patientName": "Camila Lopez",
+      "patientId": "e8caf9dd-57eb-4c21-b688-af232a86e194",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "CONSENTIMIENTO Y $ Camila Lopez - Alineadores - Entregar algunos NO todos - Dra. Luz Ferrón"
+    },
+    {
+      "date": "2025-10-13",
+      "recall_type": "otro",
+      "extractedName": "Natalia Vaca",
+      "patientName": "Natalia Vaca",
+      "patientId": "0c0526a6-6022-4f3f-865b-7d020ab8d121",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-15T00:00:00+00:00)",
+      "originalSummary": " Natalia Vaca - Resinas x10 superiores - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-13",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Torassa Marcelo",
+      "patientName": "Marcelo Torassa",
+      "patientId": "fd6f9c7f-26aa-4247-81e5-e3a927ecbea5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-13T00:00:00+00:00)",
+      "originalSummary": "Torassa Marcelo - implante flojo - Dr Ariel Merino"
+    },
+    {
+      "date": "2025-10-10",
+      "recall_type": "limpieza",
+      "extractedName": "Nicolas Areco cementado",
+      "patientName": "Nicolas Andres Areco",
+      "patientId": "b5541b3e-6fc9-406b-bdaa-6f0556b206d1",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-10T00:00:00+00:00)",
+      "originalSummary": "$ Nicolas Areco cementado de carilla + limpieza con laser"
+    },
+    {
+      "date": "2025-10-10",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Alejandra Ferrari",
+      "patientName": "Alejandra Ferrari",
+      "patientId": "757b143b-bcc7-4042-91a1-a0013dbf49e8",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-14T00:00:00+00:00)",
+      "originalSummary": "Alejandra Ferrari - Destape de implantes - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-08",
+      "recall_type": "otro",
+      "extractedName": "Franco Carnemolla",
+      "patientName": "Franco Carnemolla",
+      "patientId": "93b51042-7b8d-4ca6-892a-95824ee1d728",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "Franco Carnemolla - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-06",
+      "recall_type": "otro",
+      "extractedName": "Yamila González",
+      "patientName": "Yamila Solange González",
+      "patientId": "7d580f6b-a48f-461f-b5f3-0e98e0571f15",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-06T00:00:00+00:00)",
+      "originalSummary": "Yamila González - consulta virtual - Dr Ariel Merino"
+    },
+    {
+      "date": "2025-10-06",
+      "recall_type": "otro",
+      "extractedName": "Sofia Correa",
+      "patientName": "Sofia Correa",
+      "patientId": "d8548b76-c443-40c2-adb1-6412f622aa47",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Sofia Correa - Martina"
+    },
+    {
+      "date": "2025-10-01",
+      "recall_type": "otro",
+      "extractedName": "Florencia Tosi",
+      "patientName": "florencia tosi",
+      "patientId": "4d6ac01f-6bee-431b-88d0-e04dda455603",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-01T00:00:00+00:00)",
+      "originalSummary": "Florencia Tosi - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-10-01",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Rocio Poli",
+      "patientId": "cf3066ba-a3ac-4118-83bd-cc6be52e6118",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-01T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Rocio  Poli)"
+    },
+    {
+      "date": "2025-09-29",
+      "recall_type": "otro",
+      "extractedName": "Mazzola Maria Elena",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Mazzola Maria Elena - Cementado de coronas superiores - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-29",
+      "recall_type": "otro",
+      "extractedName": "Luis coronado",
+      "patientName": "Luis Coronado",
+      "patientId": "15c8621b-a6d3-489d-8941-092c14b29d4e",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-29T00:00:00+00:00)",
+      "originalSummary": "Luis coronado - Se le salio un arreglo - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-29",
+      "recall_type": "limpieza",
+      "extractedName": "Posse Jacqueline",
+      "patientName": "Jacqueline Posse",
+      "patientId": "d4c9b5d5-8297-4dc3-81d5-7fc5fd44ca02",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-19T00:00:00+00:00)",
+      "originalSummary": "Posse Jacqueline - Limpieza Tradicional - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-26",
+      "recall_type": "otro",
+      "extractedName": "Darío Baldassa",
+      "patientName": "Dario Ruben Baldassa",
+      "patientId": "0225b49e-7f6a-4580-b20b-2f23c96cb3e4",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-26T00:00:00+00:00)",
+      "originalSummary": "Darío Baldassa - movimiento de sector posterior - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-26",
+      "recall_type": "otro",
+      "extractedName": "Franco Carnemolla",
+      "patientName": "Franco Carnemolla",
+      "patientId": "93b51042-7b8d-4ca6-892a-95824ee1d728",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-08T00:00:00+00:00)",
+      "originalSummary": "Franco Carnemolla - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-26",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Marianela Alberich",
+      "patientId": "5ee2f0fd-caf7-4b35-9fec-14070618df4a",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-26T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (MARIANELA ALBERICH)"
+    },
+    {
+      "date": "2025-09-26",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Marianela Alberich",
+      "patientId": "5ee2f0fd-caf7-4b35-9fec-14070618df4a",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-26T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (MARIANELA ALBERICH)"
+    },
+    {
+      "date": "2025-09-26",
+      "recall_type": "otro",
+      "extractedName": "Sofia Correa",
+      "patientName": "Sofia Correa",
+      "patientId": "d8548b76-c443-40c2-adb1-6412f622aa47",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-06T00:00:00+00:00)",
+      "originalSummary": "Sofia Correa - Consulta 1ra vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-25",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Gonzalo Acevedo",
+      "patientId": "dc9b8c01-8714-4967-aba5-fd526d5ef9be",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-25T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Staff (Gonzalo Acevedo)"
+    },
+    {
+      "date": "2025-09-24",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Mazzola Maria Elena",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Mazzola Maria Elena - Control + escaneo implantes para sector posterior-  Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-22",
+      "recall_type": "otro",
+      "extractedName": "Camila Castro",
+      "patientName": "Camila Castro",
+      "patientId": "b9854978-47e1-4fc3-80f0-b31dcc6e167e",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-22T00:00:00+00:00)",
+      "originalSummary": "Camila Castro - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-22",
+      "recall_type": "limpieza",
+      "extractedName": "Alejandra Ferrari",
+      "patientName": "Alejandra Ferrari",
+      "patientId": "757b143b-bcc7-4042-91a1-a0013dbf49e8",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Alejandra Ferrari - Turno de limpieza "
+    },
+    {
+      "date": "2025-09-22",
+      "recall_type": "otro",
+      "extractedName": "Consultas virtual",
+      "patientName": "Roumec juan ignacio",
+      "patientId": "e426f8b5-b0d5-411f-b55a-70f388f16179",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-22T00:00:00+00:00)",
+      "originalSummary": "Consultas virtual - Primera vez - Dr. Ariel Merino   (Juan Ignacio Roumec)"
+    },
+    {
+      "date": "2025-09-17",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Graciela Doretti",
+      "patientId": "05b3fc1f-f329-450e-ad3a-5dde94c73d18",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-17T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Graciela Amanda doretti)"
+    },
+    {
+      "date": "2025-09-17",
+      "recall_type": "otro",
+      "extractedName": "Consultas",
+      "patientName": "Graciela Doretti",
+      "patientId": "05b3fc1f-f329-450e-ad3a-5dde94c73d18",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-17T00:00:00+00:00)",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (Graciela Amanda doretti)"
+    },
+    {
+      "date": "2025-09-17",
+      "recall_type": "otro",
+      "extractedName": "Federico José Pondal",
+      "patientName": "Federico González pondal",
+      "patientId": "550e2cbf-21ac-4a63-a2b8-42d033a1d772",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-17T00:00:00+00:00)",
+      "originalSummary": "Federico José Pondal - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-15",
+      "recall_type": "otro",
+      "extractedName": "Nadia Debora Melian",
+      "patientName": "Nadia debora melian",
+      "patientId": "49c89aca-f569-4a90-837c-17a7e9964947",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-15T00:00:00+00:00)",
+      "originalSummary": "Nadia Debora Melian - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-10",
+      "recall_type": "control_carillas",
+      "extractedName": "Mauro Gastón Pereira",
+      "patientName": "Gaston Pereira Mauro",
+      "patientId": "71b3a801-cbe6-455b-9660-f551969ba3df",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-22T00:00:00+00:00)",
+      "originalSummary": "Mauro Gastón Pereira - Cementado carilla ceramica premo - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-04",
+      "recall_type": "otro",
+      "extractedName": "Lara Gómez",
+      "patientName": "Lara Gomez",
+      "patientId": "5d2f58bb-0f97-48af-af17-0b03c6def7ed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-04T00:00:00+00:00)",
+      "originalSummary": "Lara Gómez - Fotos y Gingivectomia - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-09-03",
+      "recall_type": "otro",
+      "extractedName": "Alan Rueco",
+      "patientName": "Alan Rueco",
+      "patientId": "70f6afb0-ded5-46a9-94d4-c4bd8c0d2d29",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Alan Rueco - Cementado - Dr. Ariel Merino "
+    },
+    {
+      "date": "2025-09-03",
+      "recall_type": "otro",
+      "extractedName": "Mariano Páez",
+      "patientName": "Mariano Páez",
+      "patientId": "7002b40f-8b2b-4532-a1f7-5e0f52136d6d",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-03T00:00:00+00:00)",
+      "originalSummary": "Mariano Páez -Consultas primera vez - Dr. Ariel Merino  "
+    },
+    {
+      "date": "2025-09-02",
+      "recall_type": "otro",
+      "extractedName": "Carolina Garrido",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Carolina Garrido - Control - Dr. Ariel Merino "
+    },
+    {
+      "date": "2025-08-31",
+      "recall_type": "otro",
+      "extractedName": "Ana Maria Suarez",
+      "patientName": "María Suarez Ana",
+      "patientId": "6c4ee090-dbd5-49f1-a0f7-eb95644081ce",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Ana Maria Suarez - cementado"
+    },
+    {
+      "date": "2025-08-30",
+      "recall_type": "otro",
+      "extractedName": "Rafael Dos Santos",
+      "patientName": "Felipe Santos Rafael",
+      "patientId": "d1633228-5b9d-4499-9343-fd8814097ac1",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-30T00:00:00+00:00)",
+      "originalSummary": "Rafael Dos Santos - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-29",
+      "recall_type": "otro",
+      "extractedName": "Jail Tanquia",
+      "patientName": "Tanquia Jail",
+      "patientId": "d82698b3-08bd-4c57-a1ac-fe923c8d41ec",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-29T00:00:00+00:00)",
+      "originalSummary": "Jail Tanquia - Control - Dr. Ariel"
+    },
+    {
+      "date": "2025-08-29",
+      "recall_type": "otro",
+      "extractedName": "Ana Maria Suarez",
+      "patientName": "María Suarez Ana",
+      "patientId": "6c4ee090-dbd5-49f1-a0f7-eb95644081ce",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Ana Maria Suarez - Dr Ariel Merino"
+    },
+    {
+      "date": "2025-08-27",
+      "recall_type": "otro",
+      "extractedName": "Alan Rueco",
+      "patientName": "Alan Rueco",
+      "patientId": "70f6afb0-ded5-46a9-94d4-c4bd8c0d2d29",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-03T00:00:00+00:00)",
+      "originalSummary": "Alan Rueco - Tallado - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-25",
+      "recall_type": "otro",
+      "extractedName": "Carolina Garrido",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Carolina Garrido - Prueba diseño nuevo"
+    },
+    {
+      "date": "2025-08-22",
+      "recall_type": "otro",
+      "extractedName": "Diego Diaz",
+      "patientName": "Diego Diaz",
+      "patientId": "70764764-07e9-4be2-87ca-2158ec52b22e",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-22T00:00:00+00:00)",
+      "originalSummary": "Diego Diaz - Se le mueve una corona - Dr. Ariel "
+    },
+    {
+      "date": "2025-08-22",
+      "recall_type": "control_carillas",
+      "extractedName": "Nicolas Areco se le rompió una carilla 3.3",
+      "patientName": "Nicolas Andres Areco",
+      "patientId": "b5541b3e-6fc9-406b-bdaa-6f0556b206d1",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-22T00:00:00+00:00)",
+      "originalSummary": "Nicolas Areco se le rompió una carilla 3.3 - Tallado"
+    },
+    {
+      "date": "2025-08-21",
+      "recall_type": "otro",
+      "extractedName": "Carolina Garrido",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Carolina Garrido - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-20",
+      "recall_type": "otro",
+      "extractedName": "Garrido Carolina",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Garrido Carolina - Tallado - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-20",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Mazzola Maria Elena",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-24T00:00:00+00:00)",
+      "originalSummary": "Mazzola Maria Elena - Cementado de provis + Escaneo corona sobre implante - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-19",
+      "recall_type": "otro",
+      "extractedName": "Jail Tanquia",
+      "patientName": "Tanquia Jail",
+      "patientId": "d82698b3-08bd-4c57-a1ac-fe923c8d41ec",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-29T00:00:00+00:00)",
+      "originalSummary": "Jail Tanquia - Revision del cementado, le molesta al morder"
+    },
+    {
+      "date": "2025-08-18",
+      "recall_type": "otro",
+      "extractedName": "Anahi Yañez",
+      "patientName": "Anahi Yanez",
+      "patientId": "2ae94bd0-a512-4ebf-b191-161c378202ed",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Anahi Yañez - Cementado pd 24 - Dr. Ariel merino"
+    },
+    {
+      "date": "2025-08-18",
+      "recall_type": "otro",
+      "extractedName": "Jail Abdul Tanquia",
+      "patientName": "Tanquia Jail",
+      "patientId": "d82698b3-08bd-4c57-a1ac-fe923c8d41ec",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-29T00:00:00+00:00)",
+      "originalSummary": "Jail Abdul Tanquia - Cementado - Dr Ariel Merino"
+    },
+    {
+      "date": "2025-08-14",
+      "recall_type": "otro",
+      "extractedName": "Lourdes Marina mendez",
+      "patientName": "Lourdes Mendez",
+      "patientId": "9f5131a2-b22f-4b7f-9eb0-5d859b95afcf",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-19T00:00:00+00:00)",
+      "originalSummary": "Lourdes Marina mendez - Consulta Primera vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-14",
+      "recall_type": "otro",
+      "extractedName": "Jail Abdul Tanquia",
+      "patientName": "Tanquia Jail",
+      "patientId": "d82698b3-08bd-4c57-a1ac-fe923c8d41ec",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-29T00:00:00+00:00)",
+      "originalSummary": "Jail Abdul Tanquia - se le despegó el provisorio - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-13",
+      "recall_type": "otro",
+      "extractedName": "Elizabeth Rodriguez",
+      "patientName": "Rodriguez Elizabet",
+      "patientId": "efbece0d-ae0b-4e0b-8c89-885821ed06f4",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Elizabeth Rodriguez - Arreglos en resina en inferior"
+    },
+    {
+      "date": "2025-08-12",
+      "recall_type": "otro",
+      "extractedName": "Rey Vanesa",
+      "patientName": "Vanesa Rey",
+      "patientId": "f7b975f7-1ff6-44d6-b91c-020cf95d2bea",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-12T00:00:00+00:00)",
+      "originalSummary": "Rey Vanesa - Cementado de corona 1.2 - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-12",
+      "recall_type": "control_carillas",
+      "extractedName": "Jail Abdul Tanquia",
+      "patientName": "Tanquia Jail",
+      "patientId": "d82698b3-08bd-4c57-a1ac-fe923c8d41ec",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-12T00:00:00+00:00)",
+      "originalSummary": "Jail Abdul Tanquia - Reever diseño de carillas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-11",
+      "recall_type": "otro",
+      "extractedName": "Garrido Carolina",
+      "patientName": "Carolina Garrido",
+      "patientId": "c99bdc76-ab0f-44b8-9c8a-5d96742c1bcc",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-02-11T00:00:00+00:00)",
+      "originalSummary": "Garrido Carolina - gingivectomia - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-11",
+      "recall_type": "limpieza",
+      "extractedName": "Santiago Ferraro",
+      "patientName": "Santiago Ferraro",
+      "patientId": "2033104e-d13b-4800-a7bc-5c668b15a9ef",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-11T00:00:00+00:00)",
+      "originalSummary": "Santiago Ferraro - Limpieza con laser - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-08",
+      "recall_type": "otro",
+      "extractedName": "$ anahi yañez",
+      "patientName": "Anahi Yanez",
+      "patientId": "2ae94bd0-a512-4ebf-b191-161c378202ed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-18T00:00:00+00:00)",
+      "originalSummary": "$ anahi yañez - Cementado superior - Dr. Ariel Merino ?"
+    },
+    {
+      "date": "2025-08-08",
+      "recall_type": "otro",
+      "extractedName": "Dekleva Constanza",
+      "patientName": "Constanza Dekleva",
+      "patientId": "7d1f8367-b009-40b6-a1eb-1864a1b8588a",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-08T00:00:00+00:00)",
+      "originalSummary": "Dekleva Constanza - Protesis, instalación - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-08",
+      "recall_type": "otro",
+      "extractedName": "Romina Caparotta control por dolor",
+      "patientName": "Romina Caparotta",
+      "patientId": "e6023ca3-5b85-4107-8ae1-5b220fbab786",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-08T00:00:00+00:00)",
+      "originalSummary": "Romina Caparotta control por dolor - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-08",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Vanesa Rey",
+      "patientName": "Vanesa Rey",
+      "patientId": "f7b975f7-1ff6-44d6-b91c-020cf95d2bea",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-08T00:00:00+00:00)",
+      "originalSummary": "Vanesa Rey - Escaneo para corona sobre implante del 1.2 + provi - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-07",
+      "recall_type": "otro",
+      "extractedName": "Gastón Salguero",
+      "patientName": "Gaston Salguero",
+      "patientId": "83f1b6cb-d275-4f13-b65b-016ad1cfe374",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-28T00:00:00+00:00)",
+      "originalSummary": "Gastón Salguero - Puente en resina - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-05",
+      "recall_type": "otro",
+      "extractedName": "Stankiewicz, Lola",
+      "patientName": "Lola Stankiewicz",
+      "patientId": "f1e41344-e917-49e2-b11f-031cc2e01e3f",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-05T00:00:00+00:00)",
+      "originalSummary": "Stankiewicz, Lola - Control Alineadores - ARIEL"
+    },
+    {
+      "date": "2025-08-04",
+      "recall_type": "otro",
+      "extractedName": "Elizabeth rodriguez",
+      "patientName": "Rodriguez Elizabet",
+      "patientId": "efbece0d-ae0b-4e0b-8c89-885821ed06f4",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-13T00:00:00+00:00)",
+      "originalSummary": "Elizabeth rodriguez - Arreglos, resina - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-01",
+      "recall_type": "otro",
+      "extractedName": "Malena corona",
+      "patientName": "Corona Malena",
+      "patientId": "5232dd68-4dd2-45a9-ba4f-1f6c4eaafe20",
+      "confidence": "medium",
+      "imported": true,
+      "originalSummary": "Malena corona - Cementado inferior - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-01",
+      "recall_type": "control_carillas",
+      "extractedName": "Fausto Garcia",
+      "patientName": "Garcia Fausto",
+      "patientId": "2c71f253-605d-4a61-bae6-539e82e3f9b8",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-01T00:00:00+00:00)",
+      "originalSummary": "Fausto Garcia - Control Carillas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-01",
+      "recall_type": "otro",
+      "extractedName": "Suárez Ana María",
+      "patientName": "María Suarez Ana",
+      "patientId": "6c4ee090-dbd5-49f1-a0f7-eb95644081ce",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Suárez Ana María - Consulta 1era Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-08-01",
+      "recall_type": "control_carillas",
+      "extractedName": "Leandro Chirino",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-01T00:00:00+00:00)",
+      "originalSummary": "Leandro Chirino - Control carillas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-30",
+      "recall_type": "control_carillas",
+      "extractedName": "Mauro Pereira",
+      "patientName": "Mauro Pereira",
+      "patientId": "d99b59e3-3da6-4207-8944-cd80d4af18ce",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-30T00:00:00+00:00)",
+      "originalSummary": "Mauro Pereira - Cementado de carilla - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-28",
+      "recall_type": "otro",
+      "extractedName": "Malena Corona",
+      "patientName": "Corona Malena",
+      "patientId": "5232dd68-4dd2-45a9-ba4f-1f6c4eaafe20",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-01T00:00:00+00:00)",
+      "originalSummary": "Malena Corona - Tallado inferior - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-28",
+      "recall_type": "control_carillas",
+      "extractedName": "Anahí Yañez",
+      "patientName": "Anahi Yanez",
+      "patientId": "2ae94bd0-a512-4ebf-b191-161c378202ed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-28T00:00:00+00:00)",
+      "originalSummary": "Anahí Yañez - Control, carilla floja - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-28",
+      "recall_type": "otro",
+      "extractedName": "David Aghetone",
+      "patientName": "David Aghetone",
+      "patientId": "b3a88ac4-7ef1-44f9-b0c5-03386d423582",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-28T00:00:00+00:00)",
+      "originalSummary": "David Aghetone - Control - Dra. Ariel Merino"
+    },
+    {
+      "date": "2025-07-28",
+      "recall_type": "blanqueamiento",
+      "extractedName": "Camila Lopez",
+      "patientName": "Camila Lopez",
+      "patientId": "e8caf9dd-57eb-4c21-b688-af232a86e194",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-28T00:00:00+00:00)",
+      "originalSummary": "Camila Lopez - Control de blanqueamiento, color -Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-26",
+      "recall_type": "otro",
+      "extractedName": "Malena Corona",
+      "patientName": "Corona Malena",
+      "patientId": "5232dd68-4dd2-45a9-ba4f-1f6c4eaafe20",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-01T00:00:00+00:00)",
+      "originalSummary": "Malena Corona - Tallado ambos maxilares - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-26",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Dekleva Constanza",
+      "patientName": "Constanza Dekleva",
+      "patientId": "7d1f8367-b009-40b6-a1eb-1864a1b8588a",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-26T00:00:00+00:00)",
+      "originalSummary": "Dekleva Constanza - Atornillar tapa de implante - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-25",
+      "recall_type": "otro",
+      "extractedName": "Leandro Chirino",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Leandro Chirino - Cementado inferior - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-25",
+      "recall_type": "otro",
+      "extractedName": "Gaston salguero",
+      "patientName": "Gaston Salguero",
+      "patientId": "83f1b6cb-d275-4f13-b65b-016ad1cfe374",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-28T00:00:00+00:00)",
+      "originalSummary": "Gaston salguero - Se le aflojó el puente - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-24",
+      "recall_type": "otro",
+      "extractedName": "Buyatti, Daniela",
+      "patientName": "Buyatti Daniela",
+      "patientId": "7e55a1fd-2ce8-4f11-aab5-3dd07be7548c",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-24T00:00:00+00:00)",
+      "originalSummary": "Buyatti, Daniela - Tallado sup e inf - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-23",
+      "recall_type": "otro",
+      "extractedName": "Leandro Chirino",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-25T00:00:00+00:00)",
+      "originalSummary": "Leandro Chirino - Cementado de maxilar superior - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-23",
+      "recall_type": "otro",
+      "extractedName": "Santiago Ferraro",
+      "patientName": "Santiago Ferraro",
+      "patientId": "2033104e-d13b-4800-a7bc-5c668b15a9ef",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-21T00:00:00+00:00)",
+      "originalSummary": "Santiago Ferraro - Retoques - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-23",
+      "recall_type": "otro",
+      "extractedName": "Jail Abdul Tanquia",
+      "patientName": "Tanquia Jail",
+      "patientId": "d82698b3-08bd-4c57-a1ac-fe923c8d41ec",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-29T00:00:00+00:00)",
+      "originalSummary": "Jail Abdul Tanquia -Consulta 1ra vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-23",
+      "recall_type": "otro",
+      "extractedName": "Carolina Isabel Garrido",
+      "patientName": "Carolina Isabel Garrido",
+      "patientId": "96ff4e18-3f02-4ee6-a258-48c1e62053a9",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-23T00:00:00+00:00)",
+      "originalSummary": "Carolina Isabel Garrido - Consulta primera vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-22",
+      "recall_type": "otro",
+      "extractedName": "Santiago Anibal Gomez",
+      "patientName": "Santiago Anibal Gomez",
+      "patientId": "a2920741-f177-4e49-9982-72bb050ce273",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-22T00:00:00+00:00)",
+      "originalSummary": "Santiago Anibal Gomez - Consulta Primera Vez - Dr Ariel Merino"
+    },
+    {
+      "date": "2025-07-21",
+      "recall_type": "otro",
+      "extractedName": "Abril ezcurra",
+      "patientName": "Llauró Abril Ezcurra",
+      "patientId": "89ca88f5-b21f-4536-ada1-3d18c76c4226",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Abril ezcurra - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-21",
+      "recall_type": "otro",
+      "extractedName": "Analía Canciani",
+      "patientName": "Analia Canciani",
+      "patientId": "69677423-bf02-4172-af68-a1540532d3e7",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-21T00:00:00+00:00)",
+      "originalSummary": "Analía Canciani - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-21",
+      "recall_type": "otro",
+      "extractedName": "Leandro Chirino",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-25T00:00:00+00:00)",
+      "originalSummary": "Leandro Chirino - retoques DSD - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-21",
+      "recall_type": "otro",
+      "extractedName": "Sol Debora Molina",
+      "patientName": "Débora Sol Molina",
+      "patientId": "0b6d7e36-94f0-4306-b9ea-af5e27073807",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-21T00:00:00+00:00)",
+      "originalSummary": "Sol Debora Molina - control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-21",
+      "recall_type": "otro",
+      "extractedName": "Maria Elena Mazzola",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Maria Elena Mazzola - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-18",
+      "recall_type": "otro",
+      "extractedName": "ABONAR Juan Pablo Martinez",
+      "patientName": "Juan Pablo Martinez",
+      "patientId": "d2e1cd69-c7cb-4949-a944-586ac7ac8262",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-18T00:00:00+00:00)",
+      "originalSummary": "ABONAR Juan Pablo Martinez - Alineadores - Dr. Ariel Merino (entrega 10 y 11)"
+    },
+    {
+      "date": "2025-07-18",
+      "recall_type": "otro",
+      "extractedName": "Francisco, Juan",
+      "patientName": "Francisco Juan",
+      "patientId": "cf3e523d-1908-4aa3-8cc6-2b3451959601",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-18T00:00:00+00:00)",
+      "originalSummary": "Francisco, Juan - Reparación de arreglo - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-18",
+      "recall_type": "otro",
+      "extractedName": "ABONAR Ezcurra, Abriln",
+      "patientName": "Llauró Abril Ezcurra",
+      "patientId": "89ca88f5-b21f-4536-ada1-3d18c76c4226",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-21T00:00:00+00:00)",
+      "originalSummary": "ABONAR Ezcurra, Abriln - Reparación x1 en resina - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-18",
+      "recall_type": "otro",
+      "extractedName": "Leandro chirino",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-25T00:00:00+00:00)",
+      "originalSummary": "Leandro chirino - retoques DSD - Dr Ariel Merino"
+    },
+    {
+      "date": "2025-07-16",
+      "recall_type": "otro",
+      "extractedName": "Leandro German Chirino",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-25T00:00:00+00:00)",
+      "originalSummary": "Leandro German Chirino - Tallado - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-16",
+      "recall_type": "limpieza",
+      "extractedName": "Carolina antoliche",
+      "patientName": "Carolina Antoliche",
+      "patientId": "0c39a411-b4b1-49ba-a58f-003e57bc3523",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-16T00:00:00+00:00)",
+      "originalSummary": "Carolina antoliche - Gingivectomía láser + pulido cuellos limpieza  - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-14",
+      "recall_type": "otro",
+      "extractedName": "Romina Von Zastrow",
+      "patientName": "Romina von Zastrow",
+      "patientId": "58cd9175-d61c-482a-b908-5dc9a378c030",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-14T00:00:00+00:00)",
+      "originalSummary": " Romina Von Zastrow - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-14",
+      "recall_type": "otro",
+      "extractedName": "Marcello Gozzerino",
+      "patientName": "Gozzerino Marcello",
+      "patientId": "daaee7ac-1809-4122-8793-63b8c085bafd",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Marcello Gozzerino - control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-14",
+      "recall_type": "otro",
+      "extractedName": "Tamara Zapata",
+      "patientName": "Zapata Tamara",
+      "patientId": "4721eb5f-ecf8-472b-82e8-c4798659f9c5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-14T00:00:00+00:00)",
+      "originalSummary": "Tamara Zapata - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-14",
+      "recall_type": "limpieza",
+      "extractedName": "Landoni, Gustavo",
+      "patientName": "Landoni Gustavo",
+      "patientId": "c33c3469-5a52-4dc1-89ca-b4a7bf29d461",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-14T00:00:00+00:00)",
+      "originalSummary": " Landoni, Gustavo - Limpieza inferior tradicional - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-11",
+      "recall_type": "otro",
+      "extractedName": "Leandro german chirino",
+      "patientName": "German Chirino Leandro",
+      "patientId": "4ed88273-27c2-490b-bce8-37cc1cd11eed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-25T00:00:00+00:00)",
+      "originalSummary": "Leandro german chirino - Consulta primera vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-09",
+      "recall_type": "otro",
+      "extractedName": "Favaretto Sergio",
+      "patientName": "Sergio Pd 36 Favaretto",
+      "patientId": "d784ccf4-94aa-4352-9f27-062bf9f91167",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Favaretto Sergio - Control Ariel - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-07",
+      "recall_type": "otro",
+      "extractedName": "Marcello Gozzerino",
+      "patientName": "Gozzerino Marcello",
+      "patientId": "daaee7ac-1809-4122-8793-63b8c085bafd",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-14T00:00:00+00:00)",
+      "originalSummary": "Marcello Gozzerino - Cementado - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-07",
+      "recall_type": "otro",
+      "extractedName": "Mazzola, Maria Elena",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "Mazzola, Maria Elena - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-07",
+      "recall_type": "otro",
+      "extractedName": "Agostina Mauricio",
+      "patientName": "Agostina Mauricio",
+      "patientId": "15610f2c-e993-46e1-9300-1d94a8dd2692",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-07T00:00:00+00:00)",
+      "originalSummary": "Agostina Mauricio - URGENCIA se le cae la pd 45 (creo)"
+    },
+    {
+      "date": "2025-07-04",
+      "recall_type": "blanqueamiento",
+      "extractedName": "Caparotta, Romina",
+      "patientName": "Romina Caparotta",
+      "patientId": "e6023ca3-5b85-4107-8ae1-5b220fbab786",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Caparotta, Romina - Cuellos en resina + Blanqueamiento + Placa mio - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-04",
+      "recall_type": "otro",
+      "extractedName": "Diego Diaz",
+      "patientName": "Diego Diaz",
+      "patientId": "70764764-07e9-4be2-87ca-2158ec52b22e",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-22T00:00:00+00:00)",
+      "originalSummary": "Diego Diaz - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-02",
+      "recall_type": "otro",
+      "extractedName": "Tomeo Juan Pablo",
+      "patientName": "Juan Pablo Tomeo",
+      "patientId": "30a4478d-3f56-4fc3-b8ca-86d6a32c3d17",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-02T00:00:00+00:00)",
+      "originalSummary": "Tomeo Juan Pablo - Incrustación - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-02",
+      "recall_type": "otro",
+      "extractedName": "Santiago Ferraro",
+      "patientName": "Santiago Ferraro",
+      "patientId": "2033104e-d13b-4800-a7bc-5c668b15a9ef",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-21T00:00:00+00:00)",
+      "originalSummary": "Santiago Ferraro - Control - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-02",
+      "recall_type": "control_carillas",
+      "extractedName": "Skibicki, Ivana",
+      "patientName": "Ivana Denisse Skibicki",
+      "patientId": "1c948eb2-2df4-4afa-abb2-95279aebd5f7",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-02T00:00:00+00:00)",
+      "originalSummary": " Skibicki, Ivana - Control Carillas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-07-02",
+      "recall_type": "otro",
+      "extractedName": "Carolina antoliche",
+      "patientName": "Carolina Antoliche",
+      "patientId": "0c39a411-b4b1-49ba-a58f-003e57bc3523",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Carolina antoliche - Control general + encía - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-30",
+      "recall_type": "limpieza",
+      "extractedName": "Posse Jacqueline",
+      "patientName": "Jacqueline Posse",
+      "patientId": "d4c9b5d5-8297-4dc3-81d5-7fc5fd44ca02",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-19T00:00:00+00:00)",
+      "originalSummary": "Posse Jacqueline - Limpieza Tradicional - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-27",
+      "recall_type": "control_carillas",
+      "extractedName": "Ferraro, Santiago",
+      "patientName": "Santiago Ferraro",
+      "patientId": "2033104e-d13b-4800-a7bc-5c668b15a9ef",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-27T00:00:00+00:00)",
+      "originalSummary": "Ferraro, Santiago - Cementado de Carillas - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-27",
+      "recall_type": "otro",
+      "extractedName": "Paik, Romina",
+      "patientName": "Romina Paik",
+      "patientId": "90d322f5-43ce-49e2-87b3-700872732d6b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-27T00:00:00+00:00)",
+      "originalSummary": "Paik, Romina - 2 arreglos en Resina por rotura - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-27",
+      "recall_type": "limpieza",
+      "extractedName": "Camila lopez",
+      "patientName": "Camila Lopez",
+      "patientId": "e8caf9dd-57eb-4c21-b688-af232a86e194",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-27T00:00:00+00:00)",
+      "originalSummary": "Camila lopez - Limpieza + blanqueamiento - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-27",
+      "recall_type": "limpieza",
+      "extractedName": "Mascioli antonella",
+      "patientName": "Antonella Mascioli",
+      "patientId": "26a33f28-7816-4d20-9762-53f76ef82221",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-17T00:00:00+00:00)",
+      "originalSummary": "Mascioli antonella - Limpieza con láser - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-27",
+      "recall_type": "otro",
+      "extractedName": "Juliana Medina",
+      "patientName": "Medina Juliana",
+      "patientId": "d9315f34-c4b1-4812-bb62-e1d4d529be2f",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-27T00:00:00+00:00)",
+      "originalSummary": "Juliana Medina - Consulta Primera Vez - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-25",
+      "recall_type": "otro",
+      "extractedName": "Favaretto Sergio",
+      "patientName": "Sergio Pd 36 Favaretto",
+      "patientId": "d784ccf4-94aa-4352-9f27-062bf9f91167",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-09T00:00:00+00:00)",
+      "originalSummary": "Favaretto Sergio - cementado x2 - Dr.Ariel Merino"
+    },
+    {
+      "date": "2025-06-25",
+      "recall_type": "otro",
+      "extractedName": "Gozzerino,  Marcello",
+      "patientName": "Gozzerino Marcello",
+      "patientId": "daaee7ac-1809-4122-8793-63b8c085bafd",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-14T00:00:00+00:00)",
+      "originalSummary": "Gozzerino,  Marcello - Tallado + Resina - Dr. Ariel Merino "
+    },
+    {
+      "date": "2025-06-25",
+      "recall_type": "otro",
+      "extractedName": "María Elizabeth Rodriguez",
+      "patientName": "Rodriguez Elizabet",
+      "patientId": "efbece0d-ae0b-4e0b-8c89-885821ed06f4",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-13T00:00:00+00:00)",
+      "originalSummary": "María Elizabeth Rodriguez - Consulta primera vez- Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-20",
+      "recall_type": "limpieza",
+      "extractedName": "Marcello gozzerino",
+      "patientName": "Gozzerino Marcello",
+      "patientId": "daaee7ac-1809-4122-8793-63b8c085bafd",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-20T00:00:00+00:00)",
+      "originalSummary": "Marcello gozzerino  - Gingivectomía Láser, blanqueamiento y limpieza - Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-20",
+      "recall_type": "otro",
+      "extractedName": "Santiago Ferraro",
+      "patientName": "Santiago Ferraro",
+      "patientId": "2033104e-d13b-4800-a7bc-5c668b15a9ef",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-21T00:00:00+00:00)",
+      "originalSummary": "Santiago Ferraro - Poste 1.1 ; Dr Ariel Merino"
+    },
+    {
+      "date": "2025-06-18",
+      "recall_type": "otro",
+      "extractedName": "SEÑA + ABONAR antoliche carolina 11",
+      "patientName": "Carolina Antoliche",
+      "patientId": "0c39a411-b4b1-49ba-a58f-003e57bc3523",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-02T00:00:00+00:00)",
+      "originalSummary": " SEÑA + ABONAR antoliche carolina 11 - 21- 32"
+    },
+    {
+      "date": "2025-06-18",
+      "recall_type": "otro",
+      "extractedName": "ABONAR TOTAL  Lola Stankiewicz Alineadores",
+      "patientName": "Lola Stankiewicz",
+      "patientId": "f1e41344-e917-49e2-b11f-031cc2e01e3f",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-05T00:00:00+00:00)",
+      "originalSummary": "ABONAR TOTAL (3000) Lola Stankiewicz Alineadores - Le quedan muy sueltos"
+    },
+    {
+      "date": "2025-06-18",
+      "recall_type": "otro",
+      "extractedName": "Marcello Gozzerino",
+      "patientName": "Gozzerino Marcello",
+      "patientId": "daaee7ac-1809-4122-8793-63b8c085bafd",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-14T00:00:00+00:00)",
+      "originalSummary": "Marcello Gozzerino - Consulta Primera vez Dr. Ariel Merino "
+    },
+    {
+      "date": "2025-06-18",
+      "recall_type": "otro",
+      "extractedName": "Camila Lopez",
+      "patientName": "Camila Lopez",
+      "patientId": "e8caf9dd-57eb-4c21-b688-af232a86e194",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-13T00:00:00+00:00)",
+      "originalSummary": "Camila Lopez - Consulta Primera vez Dr. Ariel Merino"
+    },
+    {
+      "date": "2025-06-16",
+      "recall_type": "control_carillas",
+      "extractedName": "Francisco juan arreglo",
+      "patientName": "Francisco Juan",
+      "patientId": "cf3e523d-1908-4aa3-8cc6-2b3451959601",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Francisco juan arreglo carilla"
+    },
+    {
+      "date": "2025-06-13",
+      "recall_type": "control_carillas",
+      "extractedName": "Francisco, Juan rotura",
+      "patientName": "Francisco Juan",
+      "patientId": "cf3e523d-1908-4aa3-8cc6-2b3451959601",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-16T00:00:00+00:00)",
+      "originalSummary": "Francisco, Juan rotura carilla (resina) pd 12"
+    },
+    {
+      "date": "2025-06-11",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Favaretto Sergio, Scan",
+      "patientName": "Sergio Pd 36 Favaretto",
+      "patientId": "d784ccf4-94aa-4352-9f27-062bf9f91167",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-11T00:00:00+00:00)",
+      "originalSummary": "Favaretto Sergio, Scan body PD 14 (se le hace un provi sobre implante pra proximo corona sobre implante)"
+    },
+    {
+      "date": "2025-06-11",
+      "recall_type": "control_ortodoncia",
+      "extractedName": "Antonio Lomele, no",
+      "patientName": "Lomele Antonio",
+      "patientId": "0bf37ed7-1571-45b8-a8e2-f0e219d14fa4",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-11T00:00:00+00:00)",
+      "originalSummary": "Antonio Lomele, no le entra el alineador 1 superior"
+    },
+    {
+      "date": "2025-06-11",
+      "recall_type": "otro",
+      "extractedName": "Alejandra Ferrari",
+      "patientName": "Alejandra Ferrari",
+      "patientId": "757b143b-bcc7-4042-91a1-a0013dbf49e8",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-22T00:00:00+00:00)",
+      "originalSummary": "Alejandra Ferrari - Molestia zona inferior "
+    },
+    {
+      "date": "2025-06-11",
+      "recall_type": "blanqueamiento",
+      "extractedName": "Romina Caparotta",
+      "patientName": "Romina Caparotta",
+      "patientId": "e6023ca3-5b85-4107-8ae1-5b220fbab786",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-04T00:00:00+00:00)",
+      "originalSummary": "Romina Caparotta - Escaneo para placa mio relajante y placa de blanqueamiento Y CONTROL CON ARIEL POR MOLESTIAS (ella tiene las jeringas ya)"
+    },
+    {
+      "date": "2025-06-09",
+      "recall_type": "limpieza",
+      "extractedName": "Sabrina Mansilla",
+      "patientName": "Sabrina Mansilla",
+      "patientId": "a2fb6ae9-607a-4d8c-a65e-9f6ccd316f88",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-06-09T00:00:00+00:00)",
+      "originalSummary": "Sabrina Mansilla - Control Carillas "
+    },
+    {
+      "date": "2025-05-28",
+      "recall_type": "otro",
+      "extractedName": "Giselle sanchez",
+      "patientName": "Sanchez Gisel",
+      "patientId": "f61ef565-119c-4fca-9a52-8ecd617ce86b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-05-28T00:00:00+00:00)",
+      "originalSummary": "Giselle sanchez primera vez ariel"
+    },
+    {
+      "date": "2025-05-26",
+      "recall_type": "limpieza",
+      "extractedName": "Alejandra Ferrari",
+      "patientName": "Alejandra Ferrari",
+      "patientId": "757b143b-bcc7-4042-91a1-a0013dbf49e8",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-09-22T00:00:00+00:00)",
+      "originalSummary": "Alejandra Ferrari - Control Carillas"
+    },
+    {
+      "date": "2025-05-24",
+      "recall_type": "otro",
+      "extractedName": "CONF Nestor Britez,",
+      "patientName": "Nestor Britez",
+      "patientId": "b38566d4-ec69-4ed9-817a-2dd87fde68db",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "CONF Nestor Britez, control"
+    },
+    {
+      "date": "2025-05-12",
+      "recall_type": "otro",
+      "extractedName": "Delfina Jaacks control",
+      "patientName": "Delfina Jaacks",
+      "patientId": "c13fcd7d-f62d-48ec-9d3f-82861567e5bb",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-05-12T00:00:00+00:00)",
+      "originalSummary": "Delfina Jaacks control c/Ariel"
+    },
+    {
+      "date": "2025-05-12",
+      "recall_type": "otro",
+      "extractedName": "Consent. Flavia Chusho",
+      "patientName": "Romina Silva Chusho Flavia",
+      "patientId": "e42a0408-232f-402c-9c36-d59f09083208",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "Consent. Flavia Chusho Control de resinas ariel"
+    },
+    {
+      "date": "2025-05-09",
+      "recall_type": "otro",
+      "extractedName": "Giselle Sanchez consulta",
+      "patientName": "Sanchez Gisel",
+      "patientId": "f61ef565-119c-4fca-9a52-8ecd617ce86b",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-05-28T00:00:00+00:00)",
+      "originalSummary": "Giselle Sanchez consulta primera vez (era de emi, ahora ari)"
+    },
+    {
+      "date": "2025-05-09",
+      "recall_type": "limpieza",
+      "extractedName": "Magalí Mazzuca control",
+      "patientName": "Magali Mazzuca",
+      "patientId": "b80f1ef1-c30e-4f4d-ac90-be7e8797bba5",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-05-09T00:00:00+00:00)",
+      "originalSummary": "ABONAR Magalí Mazzuca control + limpieza con laser"
+    },
+    {
+      "date": "2025-05-09",
+      "recall_type": "control_carillas",
+      "extractedName": "Mauro Gaston CONTROL",
+      "patientName": "Gaston Pereira Mauro",
+      "patientId": "71b3a801-cbe6-455b-9660-f551969ba3df",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-22T00:00:00+00:00)",
+      "originalSummary": "Mauro Gaston CONTROL carillas (+testimonio)"
+    },
+    {
+      "date": "2025-05-05",
+      "recall_type": "limpieza",
+      "extractedName": "Juan pablo tomeo",
+      "patientName": "Juan Pablo Tomeo",
+      "patientId": "30a4478d-3f56-4fc3-b8ca-86d6a32c3d17",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-05-05T00:00:00+00:00)",
+      "originalSummary": "ABONAR Juan pablo tomeo limpieza de carillas con laser"
+    },
+    {
+      "date": "2025-04-28",
+      "recall_type": "otro",
+      "extractedName": "Lola Stankiewicz alineadores",
+      "patientName": "Lola Stankiewicz",
+      "patientId": "f1e41344-e917-49e2-b11f-031cc2e01e3f",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-05T00:00:00+00:00)",
+      "originalSummary": "Lola Stankiewicz alineadores stripping c/ariel"
+    },
+    {
+      "date": "2025-04-28",
+      "recall_type": "otro",
+      "extractedName": "Flavia Romina Silva",
+      "patientName": "Romina Silva Chusho Flavia",
+      "patientId": "e42a0408-232f-402c-9c36-d59f09083208",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-05-12T00:00:00+00:00)",
+      "originalSummary": "Flavia Romina Silva Chusho 1ra vez"
+    },
+    {
+      "date": "2025-04-23",
+      "recall_type": "limpieza",
+      "extractedName": "200 ana belen",
+      "patientName": "Belen Arteaga Ana",
+      "patientId": "348a9bcf-d3e9-49d6-afb3-e228bf540323",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-04-23T00:00:00+00:00)",
+      "originalSummary": "ABONAR 200 ana belen arteaga control + limpieza con laser"
+    },
+    {
+      "date": "2025-04-07",
+      "recall_type": "otro",
+      "extractedName": "cynthia castro",
+      "patientName": "Castro Cynthia",
+      "patientId": "9fb2ead1-bbda-4ecd-9867-1c65c66ec933",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-04-07T00:00:00+00:00)",
+      "originalSummary": "cynthia castro primera vez ariel"
+    },
+    {
+      "date": "2025-04-07",
+      "recall_type": "limpieza",
+      "extractedName": "Ariel Alegre control",
+      "patientName": "Alegre Ariel",
+      "patientId": "15d1ea4e-de73-43ba-bb51-cf9ba59c1e7f",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-04-07T00:00:00+00:00)",
+      "originalSummary": "ABONAR  Ariel Alegre control y limpieza"
+    },
+    {
+      "date": "2025-04-02",
+      "recall_type": "limpieza",
+      "extractedName": "NAZARENA bernardo habla",
+      "patientName": "Bernardo Nazarena",
+      "patientId": "91a598d6-eed7-4e9a-8598-230142c23762",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-04-02T00:00:00+00:00)",
+      "originalSummary": "NAZARENA bernardo habla con Ariel para ver como seguir + limpieza (ya paga) "
+    },
+    {
+      "date": "2025-03-21",
+      "recall_type": "otro",
+      "extractedName": "Gaston adrian salguero",
+      "patientName": "Gaston Adrian Salguero",
+      "patientId": "abc858ee-3625-44f6-9607-f3d11949d57f",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-03-21T00:00:00+00:00)",
+      "originalSummary": "Gaston adrian salguero 1ra vez"
+    },
+    {
+      "date": "2025-03-17",
+      "recall_type": "otro",
+      "extractedName": "mazzola maria tallado",
+      "patientName": "María Elena Mazzola",
+      "patientId": "0e439d49-bc33-4803-90d4-28f9e19cd449",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2026-01-16T00:00:00+00:00)",
+      "originalSummary": "mazzola maria tallado inferior PASAR PRESUPUESTO CON ARIEL"
+    },
+    {
+      "date": "2025-03-14",
+      "recall_type": "otro",
+      "extractedName": "Alejandra Ferrari",
+      "patientName": "Alejandra Ferrari",
+      "patientId": "757b143b-bcc7-4042-91a1-a0013dbf49e8",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-10-22T00:00:00+00:00)",
+      "originalSummary": "Alejandra Ferrari primera vez ariel"
+    },
+    {
+      "date": "2025-03-12",
+      "recall_type": "limpieza",
+      "extractedName": "Antonella Mascioli control",
+      "patientName": "Antonella Mascioli",
+      "patientId": "26a33f28-7816-4d20-9762-53f76ef82221",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-11-17T00:00:00+00:00)",
+      "originalSummary": "ABONAR Antonella Mascioli control +limpieza "
+    },
+    {
+      "date": "2025-03-10",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "agostina mauricio corona",
+      "patientName": "Agostina Mauricio",
+      "patientId": "15610f2c-e993-46e1-9300-1d94a8dd2692",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-03-10T00:00:00+00:00)",
+      "originalSummary": "agostina mauricio corona floja urgencia (Escaneo para corona sobre implante)"
+    },
+    {
+      "date": "2025-03-05",
+      "recall_type": "otro",
+      "extractedName": "Gina Longo",
+      "patientName": "Longo Gina",
+      "patientId": "8ef1b92a-3182-4695-bcbc-759d751f0d99",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-03-05T00:00:00+00:00)",
+      "originalSummary": "Gina Longo 1ra vez"
+    },
+    {
+      "date": "2025-02-28",
+      "recall_type": "otro",
+      "extractedName": "gabriela distefano resinas",
+      "patientName": "Gabriela Distefano",
+      "patientId": "2db2fd0c-2ca9-4e45-8403-58af73996d62",
+      "confidence": "high",
+      "imported": true,
+      "originalSummary": "gabriela distefano resinas x2 ariel"
+    },
+    {
+      "date": "2025-02-28",
+      "recall_type": "limpieza",
+      "extractedName": "Vanesa wasinger",
+      "patientName": "Vanesa Wasinger",
+      "patientId": "21555414-4719-4f6b-9b8c-d19f69b91fb7",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-12-23T00:00:00+00:00)",
+      "originalSummary": "Vanesa wasinger limpieza ariel"
+    },
+    {
+      "date": "2025-02-14",
+      "recall_type": "blanqueamiento",
+      "extractedName": "matias ravagnan control",
+      "patientName": "Matias Ravagnan",
+      "patientId": "a6623f3c-bef5-48dd-8d4d-66e282d82e98",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-02-14T00:00:00+00:00)",
+      "originalSummary": "ABONAR matias ravagnan control Y BLANQUEAMIENTO"
+    },
+    {
+      "date": "2025-02-12",
+      "recall_type": "otro",
+      "extractedName": "ana belen arteaga",
+      "patientName": "Belen Arteaga Ana",
+      "patientId": "348a9bcf-d3e9-49d6-afb3-e228bf540323",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-02-12T00:00:00+00:00)",
+      "originalSummary": "ana belen arteaga boyadjian primera vez ariel"
+    },
+    {
+      "date": "2025-02-10",
+      "recall_type": "otro",
+      "extractedName": "santiago barrientos",
+      "patientName": "Santiago Barrientos",
+      "patientId": "0332ae3e-f492-40d5-8ce8-20c5ff1ae032",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-02-10T00:00:00+00:00)",
+      "originalSummary": "santiago barrientos primera vez "
+    },
+    {
+      "date": "2025-02-03",
+      "recall_type": "otro",
+      "extractedName": "Gaston Cuello ari",
+      "patientName": "Cristian Gaston Cuello",
+      "patientId": "516953e7-6bfa-49ae-a5ff-fc73a3d28491",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-02-03T00:00:00+00:00)",
+      "originalSummary": "Gaston Cuello primera vez ari"
+    },
+    {
+      "date": "2025-01-31",
+      "recall_type": "otro",
+      "extractedName": "Virginia Gallardo control",
+      "patientName": "Maria Virginia Gallardo",
+      "patientId": "4403e587-7566-4b4f-9440-fb2048e551bc",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-01-31T00:00:00+00:00)",
+      "originalSummary": "Virginia Gallardo control ariel"
+    },
+    {
+      "date": "2025-01-24",
+      "recall_type": "otro",
+      "extractedName": "Gabriela Distefano ari",
+      "patientName": "Gabriela Distefano",
+      "patientId": "2db2fd0c-2ca9-4e45-8403-58af73996d62",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-02-28T00:00:00+00:00)",
+      "originalSummary": "Gabriela Distefano primera vez ari"
+    },
+    {
+      "date": "2025-01-17",
+      "recall_type": "limpieza",
+      "extractedName": "Martin blanco control",
+      "patientName": "Martin Blanco",
+      "patientId": "6e49ae53-cae7-43bf-ac71-1de2a120adc2",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-01-17T00:00:00+00:00)",
+      "originalSummary": "Martin blanco control por pigmentacion de carillas Y POSIBLE LIMPIEZA"
+    },
+    {
+      "date": "2025-01-13",
+      "recall_type": "control_carillas",
+      "extractedName": "Skibicki Ivana control",
+      "patientName": "Ivana Denisse Skibicki",
+      "patientId": "1c948eb2-2df4-4afa-abb2-95279aebd5f7",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-02T00:00:00+00:00)",
+      "originalSummary": "Skibicki Ivana control carillas"
+    },
+    {
+      "date": "2024-12-04",
+      "recall_type": "mantenimiento_implantes",
+      "extractedName": "Dario Baldassa corona",
+      "patientName": "Dario Ruben Baldassa",
+      "patientId": "0225b49e-7f6a-4580-b20b-2f23c96cb3e4",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2024-12-04T00:00:00+00:00)",
+      "originalSummary": "Dario Baldassa corona sobre implante"
+    },
+    {
+      "date": "2024-05-29",
+      "recall_type": "otro",
+      "extractedName": "Mauro Simonet",
+      "patientName": "Mauro Simonet",
+      "patientId": "6a9afd93-f0ce-4270-a5fa-90574aa67368",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2024-05-29T00:00:00+00:00)",
+      "originalSummary": "Mauro Simonet primera vez "
+    },
+    {
+      "date": "2024-05-24",
+      "recall_type": "otro",
+      "extractedName": "CONF Anahi Yañez",
+      "patientName": "Anahi Yanez",
+      "patientId": "2ae94bd0-a512-4ebf-b191-161c378202ed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-18T00:00:00+00:00)",
+      "originalSummary": "CONF Anahi Yañez - cementado "
+    },
+    {
+      "date": "2024-05-24",
+      "recall_type": "otro",
+      "extractedName": "CONF Nestor Britez,",
+      "patientName": "Nestor Britez",
+      "patientId": "b38566d4-ec69-4ed9-817a-2dd87fde68db",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-05-24T00:00:00+00:00)",
+      "originalSummary": "CONF Nestor Britez, control"
+    },
+    {
+      "date": "2024-05-22",
+      "recall_type": "otro",
+      "extractedName": "Juan Pablo Martinez",
+      "patientName": "Juan Pablo Martinez",
+      "patientId": "d2e1cd69-c7cb-4949-a944-586ac7ac8262",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-07-18T00:00:00+00:00)",
+      "originalSummary": "Juan Pablo Martinez- tallado "
+    },
+    {
+      "date": "2024-05-22",
+      "recall_type": "otro",
+      "extractedName": "Ana Röttjer ()",
+      "patientName": "Ana Rottjer",
+      "patientId": "562c176d-2b73-45d0-b2ab-c4768486af72",
+      "confidence": "medium",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2024-05-22T00:00:00+00:00)",
+      "originalSummary": "Ana Röttjer (primera vez)"
+    },
+    {
+      "date": "2024-05-22",
+      "recall_type": "otro",
+      "extractedName": "Karina Santini Rojas",
+      "patientName": "Santini Rojas",
+      "patientId": "3477eede-a58f-4784-ac95-7e77a932a94a",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2024-05-22T00:00:00+00:00)",
+      "originalSummary": "Karina Santini Rojas 1ra vez"
+    },
+    {
+      "date": "2024-05-20",
+      "recall_type": "otro",
+      "extractedName": "Javier Grinblat",
+      "patientName": "Javier Grinblat",
+      "patientId": "fb28338b-2c38-4789-bcf0-5a2959f2af90",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2024-05-20T00:00:00+00:00)",
+      "originalSummary": "Javier Grinblat- tallado max superior "
+    },
+    {
+      "date": "2024-05-20",
+      "recall_type": "otro",
+      "extractedName": "Bruno Stratico ()",
+      "patientName": "Bruno Stratico",
+      "patientId": "bec338dd-ee4b-4e87-94e3-66ec418781bb",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2024-05-20T00:00:00+00:00)",
+      "originalSummary": "Bruno Stratico (primera vez)"
+    },
+    {
+      "date": "2024-05-15",
+      "recall_type": "otro",
+      "extractedName": "Matias Roberto Vojvoditch",
+      "patientName": "Roberto Vojvoditch Matias",
+      "patientId": "8cf593f8-2303-44ef-a8a8-9475a69422f2",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2024-05-15T00:00:00+00:00)",
+      "originalSummary": "Matias Roberto Vojvoditch 1ra vez CONFIRMO "
+    },
+    {
+      "date": "2024-05-10",
+      "recall_type": "otro",
+      "extractedName": "Anahi Yañez",
+      "patientName": "Anahi Yanez",
+      "patientId": "2ae94bd0-a512-4ebf-b191-161c378202ed",
+      "confidence": "high",
+      "imported": false,
+      "skipped_reason": "Recall exists with same/newer date (2025-08-18T00:00:00+00:00)",
+      "originalSummary": "Anahi Yañez - Tallado CONFIRMO "
+    }
+  ],
+  "unmatched": [
+    {
+      "date": "2026-02-24",
+      "extractedName": "Recordatorio cambio de",
+      "originalSummary": "Recordatorio cambio de Alineador Lijo ",
+      "score": 40
+    },
+    {
+      "date": "2026-02-23",
+      "extractedName": "Escribirle diego ortiz",
+      "originalSummary": "Escribirle a diego ortiz por implante en 17",
+      "score": 40
+    },
+    {
+      "date": "2026-02-20",
+      "originalSummary": "botox Cande que ari se lo lleve",
+      "score": 40
+    },
+    {
+      "date": "2026-02-13",
+      "extractedName": "UY",
+      "originalSummary": "UY-Nadia Vigniolis",
+      "score": 40
+    },
+    {
+      "date": "2026-02-05",
+      "extractedName": "Cuota 1",
+      "originalSummary": "Cuota 1 - Melina Fernandez ",
+      "score": 40
+    },
+    {
+      "date": "2026-02-05",
+      "extractedName": "Valentino",
+      "originalSummary": "Valentino- IA",
+      "score": 40
+    },
+    {
+      "date": "2026-02-05",
+      "extractedName": "Bertozzi",
+      "originalSummary": "Bertozzi- seña",
+      "score": 40
+    },
+    {
+      "date": "2026-02-02",
+      "extractedName": "Meli Engliesfield",
+      "originalSummary": "Meli Engliesfield - Consulta",
+      "score": 50
+    },
+    {
+      "date": "2026-01-27",
+      "extractedName": "MARTU",
+      "originalSummary": "MARTU - ENVIAR CASO ANTES Y DESP RECAPTACIÓN PABLO GODOY",
+      "score": 40
+    },
+    {
+      "date": "2026-01-26",
+      "extractedName": "Estefania bernal",
+      "originalSummary": "Estefania bernal - consulta ",
+      "score": 50
+    },
+    {
+      "date": "2026-01-26",
+      "extractedName": "Diego Ortiz",
+      "originalSummary": "Diego Ortiz - Cementado de corona",
+      "score": 50
+    },
+    {
+      "date": "2026-01-21",
+      "extractedName": "German Ventrigilia",
+      "originalSummary": "German Ventrigilia - Control + Limpieza",
+      "score": 70
+    },
+    {
+      "date": "2026-01-15",
+      "extractedName": "Jackie Posse",
+      "originalSummary": "Jackie Posse - Hablarle",
+      "score": 50
+    },
+    {
+      "date": "2026-01-03",
+      "extractedName": "Cuota 1",
+      "originalSummary": "Cuota 1 - Melina Fernandez ",
+      "score": 40
+    },
+    {
+      "date": "2025-12-20",
+      "extractedName": "Nazarena Bernado",
+      "originalSummary": " Nazarena Bernado - Cementado definitivo superior - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-12-19",
+      "extractedName": "Ro Regueiro",
+      "originalSummary": "Ro Regueiro - Control - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-12-19",
+      "extractedName": "Tito control",
+      "originalSummary": " Tito control - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-12-19",
+      "extractedName": "pendiente",
+      "originalSummary": "pendiente alineador de sofia oro",
+      "score": 40
+    },
+    {
+      "date": "2025-12-19",
+      "extractedName": "pasarle presu vecchio",
+      "originalSummary": "pasarle presu a vecchio blanqueamiento 400usd",
+      "score": 40
+    },
+    {
+      "date": "2025-12-17",
+      "extractedName": "Cementado coronas de Vanda Ryliskys",
+      "originalSummary": "Cementado coronas de Vanda Ryliskys - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-12-13",
+      "extractedName": "Tallado superior Diego Andrada",
+      "originalSummary": "Tallado superior Diego Andrada - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-12-12",
+      "extractedName": "Vanda Ryliskys",
+      "originalSummary": "Vanda Ryliskys - Tallado de coronas ",
+      "score": 50
+    },
+    {
+      "date": "2025-12-08",
+      "extractedName": "seña belen arteaga",
+      "originalSummary": "seña belen arteaga botox",
+      "score": 40
+    },
+    {
+      "date": "2025-12-03",
+      "extractedName": "Cuota 1",
+      "originalSummary": "Cuota 1 - Melina Fernandez ",
+      "score": 40
+    },
+    {
+      "date": "2025-12-03",
+      "extractedName": "AGENDAR TRANQUI",
+      "originalSummary": "AGENDAR TRANQUI A ARIEL",
+      "score": 40
+    },
+    {
+      "date": "2025-12-01",
+      "extractedName": "Vanda Relysikis Control",
+      "originalSummary": "Vanda Relysikis Control - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-11-25",
+      "extractedName": "Latirgue maxi",
+      "originalSummary": "Latirgue maxi - restauración pd 15 - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-11-24",
+      "extractedName": "Consultas",
+      "originalSummary": "Consultas - Primera vez - Dr. Ariel Merino   (silvia Ardiz)",
+      "score": 80
+    },
+    {
+      "date": "2025-11-20",
+      "extractedName": "Google // Dr.",
+      "originalSummary": "Google // Dr. Ariel Merino Odontologia Estetica : Google Ads Consultation",
+      "score": 45
+    },
+    {
+      "date": "2025-11-20",
+      "extractedName": "Tito Gonzalez",
+      "originalSummary": "Tito Gonzalez - Cementado superior",
+      "score": 50
+    },
+    {
+      "date": "2025-11-19",
+      "extractedName": "Consulta",
+      "originalSummary": "Consulta - Maribel Alvarado Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-11-17",
+      "extractedName": "Luz Rosini",
+      "originalSummary": "Luz Rosini - Limpieza con láser + control - Dr. Ariel Merino",
+      "score": 70
+    },
+    {
+      "date": "2025-11-14",
+      "extractedName": "Consulta Analia con",
+      "originalSummary": "Consulta Analia con Dr. Ariel",
+      "score": 40
+    },
+    {
+      "date": "2025-11-03",
+      "extractedName": "Cuota 2",
+      "originalSummary": "Cuota 2 - Melina Fernandez ",
+      "score": 40
+    },
+    {
+      "date": "2025-10-22",
+      "extractedName": "Maxi latirgue",
+      "originalSummary": "Maxi latirgue - Control - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-10-22",
+      "extractedName": "Grabar contenido valen",
+      "originalSummary": "Grabar contenido valen M y ariel",
+      "score": 40
+    },
+    {
+      "date": "2025-10-20",
+      "extractedName": "Firma y directorio",
+      "originalSummary": "Firma y directorio - La plata - Ariel",
+      "score": 70
+    },
+    {
+      "date": "2025-10-17",
+      "extractedName": "Paula Maglairella",
+      "originalSummary": "Paula Maglairella - Consulta primera vez - Dr. Ariel Merino",
+      "score": 65
+    },
+    {
+      "date": "2025-10-15",
+      "extractedName": "Maximiliano Latirgue",
+      "originalSummary": "Maximiliano Latirgue - Cementado Inferior - Dr. Ariel Merino",
+      "score": 40
+    },
+    {
+      "date": "2025-10-11",
+      "extractedName": "Latirgue maxi",
+      "originalSummary": "Latirgue maxi - Cementado Superior - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-10-02",
+      "extractedName": "Maximiliano Latirgue",
+      "originalSummary": "Maximiliano Latirgue - TB - Dr. Ariel Merino ",
+      "score": 50
+    },
+    {
+      "date": "2025-10-02",
+      "extractedName": "Cuota",
+      "originalSummary": "Cuota  - Melina Fernandez ",
+      "score": 40
+    },
+    {
+      "date": "2025-09-30",
+      "extractedName": "Andres endondoncista",
+      "originalSummary": "Andres endondoncista - Presencial ",
+      "score": 50
+    },
+    {
+      "date": "2025-09-29",
+      "extractedName": "Hablar con Areco",
+      "originalSummary": "Hablar con Areco Nicolas por la carilla a cementar",
+      "score": 40
+    },
+    {
+      "date": "2025-09-17",
+      "extractedName": "Control",
+      "originalSummary": "Control - Rueco Alan - Dr. Ariel Merino",
+      "score": 40
+    },
+    {
+      "date": "2025-09-15",
+      "extractedName": "Consulta Pirmera Vez",
+      "originalSummary": "Consulta Pirmera Vez - Gustavo Ariel Viana - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-08-31",
+      "extractedName": "Control de carillas",
+      "originalSummary": "Control de carillas - ",
+      "score": 80
+    },
+    {
+      "date": "2025-08-31",
+      "extractedName": "[PLANTILLA] Control de",
+      "originalSummary": "[PLANTILLA] Control de carillas",
+      "score": 50
+    },
+    {
+      "date": "2025-08-31",
+      "extractedName": "[PLANTILLA] Turno de",
+      "originalSummary": "[PLANTILLA] Turno de limpieza tradicional",
+      "score": 50
+    },
+    {
+      "date": "2025-08-29",
+      "extractedName": "Videollamada",
+      "originalSummary": "Videollamada - Dr. Ariel Merino ",
+      "score": 40
+    },
+    {
+      "date": "2025-08-12",
+      "extractedName": "Sofía Allora",
+      "originalSummary": "Sofía Allora - Consulta primera vez - Dr. Ariel Merino",
+      "score": 65
+    },
+    {
+      "date": "2025-08-11",
+      "extractedName": "Luz Rosini",
+      "originalSummary": "Luz Rosini - Cementado de corona - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-08-06",
+      "extractedName": "Tallado  superior",
+      "originalSummary": "Tallado  superior - Jail Abdul Tanquia - Dr Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-08-06",
+      "extractedName": "Luz Rosini",
+      "originalSummary": "Luz Rosini - Retallado + escaneado - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-08-05",
+      "extractedName": "Bárbara Bruno",
+      "originalSummary": "Bárbara Bruno - Cementado corona - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-08-01",
+      "extractedName": "Cementar provi",
+      "originalSummary": "Cementar provi - Barbara Bruno - Dr Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-07-29",
+      "extractedName": "Bárbara Bruno",
+      "originalSummary": "Bárbara Bruno - Poste- Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-07-25",
+      "extractedName": "Analia Elizabeth Avellaneda",
+      "originalSummary": "Analia Elizabeth Avellaneda - Consulta primera vez - Dr. Ariel Merino",
+      "score": 65
+    },
+    {
+      "date": "2025-07-25",
+      "extractedName": "Vladimir Triep",
+      "originalSummary": "Vladimir Triep - Control - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-07-22",
+      "extractedName": "Lucia Menucar",
+      "originalSummary": "Lucia Menucar y Ariel",
+      "score": 40
+    },
+    {
+      "date": "2025-07-18",
+      "extractedName": "Barbara bruno",
+      "originalSummary": "Barbara bruno - Resina + tallado - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-07-11",
+      "extractedName": "Deckleva Constanza",
+      "originalSummary": "Deckleva Constanza - Escaneado - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-07-07",
+      "extractedName": "Agostina Cataldo",
+      "originalSummary": "Agostina Cataldo - Consulta Primera Vez - Dr. Ariel Merino",
+      "score": 65
+    },
+    {
+      "date": "2025-06-30",
+      "extractedName": "Deckleva, Constanza",
+      "originalSummary": "Deckleva, Constanza - Cementado maxilar inferior - Dr. Ariel Merino",
+      "score": 50
+    },
+    {
+      "date": "2025-06-29",
+      "extractedName": "Jesus Ochoa",
+      "originalSummary": "Jesus Ochoa - Podcast",
+      "score": 50
+    },
+    {
+      "date": "2025-06-26",
+      "extractedName": "Curso Finanzas",
+      "originalSummary": "Curso Finanzas - Ariel (esperar que pasen link)",
+      "score": 60
+    },
+    {
+      "date": "2025-06-26",
+      "extractedName": "Valen Merino",
+      "originalSummary": "Valen Merino - Grabar Contenido",
+      "score": 50
+    },
+    {
+      "date": "2025-06-23",
+      "extractedName": "Luz Rosini",
+      "originalSummary": "Luz Rosini - Provisorio de pd 12 y retallado + Limpieza con laser",
+      "score": 70
+    },
+    {
+      "date": "2025-06-18",
+      "extractedName": "50% Caparotta control",
+      "originalSummary": "ABONAR 50% Caparotta control por molestias + escaneo placa mio y blanqueamiento ",
+      "score": 45
+    },
+    {
+      "date": "2025-06-16",
+      "extractedName": "Myriam Florentin",
+      "originalSummary": " Myriam Florentin - control ariel",
+      "score": 70
+    },
+    {
+      "date": "2025-06-13",
+      "extractedName": "CONSENTIMIENTO X2",
+      "originalSummary": "CONSENTIMIENTO X2   -  Abonar 50% Santiago Ferraro Tallado + resinas (?) HACER ENCERADO",
+      "score": 50
+    },
+    {
+      "date": "2025-05-08",
+      "extractedName": "Agustin Mele consulta",
+      "originalSummary": "Agustin Mele consulta 1era vez ariel",
+      "score": 40
+    },
+    {
+      "date": "2025-05-08",
+      "extractedName": "Sergio Cavallero",
+      "originalSummary": "Sergio Cavallero 1ra vez",
+      "score": 35
+    },
+    {
+      "date": "2025-04-07",
+      "extractedName": "Karina Santini control",
+      "originalSummary": "ABONAR Karina Santini control y limpieza",
+      "score": 45
+    },
+    {
+      "date": "2025-04-04",
+      "extractedName": "Wasinger Vanessa reduccion",
+      "originalSummary": "Wasinger Vanessa reduccion de carillas existentes",
+      "score": 40
+    },
+    {
+      "date": "2025-03-10",
+      "extractedName": "luz rosini control",
+      "originalSummary": "luz rosini control ariel ",
+      "score": 40
+    },
+    {
+      "date": "2025-02-21",
+      "extractedName": "cande cruz, resinas",
+      "originalSummary": "cande cruz, resinas ariel",
+      "score": 40
+    },
+    {
+      "date": "2025-02-20",
+      "extractedName": "belen arteaga gingi",
+      "originalSummary": "belen arteaga gingi y tallado ARIEL",
+      "score": 40
+    },
+    {
+      "date": "2025-02-14",
+      "extractedName": "atilio bondini control",
+      "originalSummary": "atilio bondini control ariel",
+      "score": 40
+    },
+    {
+      "date": "2025-01-29",
+      "extractedName": "300 estefania bernal,",
+      "originalSummary": "ABONAR 300 estefania bernal, arreglo resina + blanqueamiento",
+      "score": 45
+    },
+    {
+      "date": "2025-01-17",
+      "extractedName": "cande",
+      "originalSummary": "cande carillas ari",
+      "score": 40
+    },
+    {
+      "date": "2024-12-27",
+      "extractedName": "Control",
+      "originalSummary": "Control carillas Lisandro Zuccari",
+      "score": 55
+    },
+    {
+      "date": "2024-12-20",
+      "extractedName": "Maria Bonzi control",
+      "originalSummary": "Maria Bonzi control CARILLAS",
+      "score": 40
+    },
+    {
+      "date": "2024-12-18",
+      "extractedName": "control",
+      "originalSummary": "control carillas Nazarena Bernardo",
+      "score": 40
+    },
+    {
+      "date": "2024-12-04",
+      "extractedName": "Nidia Concepcion Gonzalez",
+      "originalSummary": "Nidia Concepcion Gonzalez primera vez",
+      "score": 35
+    },
+    {
+      "date": "2024-10-22",
+      "extractedName": "Consulta control anual",
+      "originalSummary": "Consulta control anual - Juan",
+      "score": 50
+    },
+    {
+      "date": "2024-06-17",
+      "extractedName": "Consulta con Dr. Ariel",
+      "originalSummary": "Consulta con Dr. Ariel - Bot Hobaweb",
+      "score": 50
+    },
+    {
+      "date": "2024-05-27",
+      "extractedName": "CONF Agustina Alonso",
+      "originalSummary": "CONF Agustina Alonso- control de resinas ",
+      "score": 65
+    },
+    {
+      "date": "2024-05-24",
+      "extractedName": "CONF Belen Amigo",
+      "originalSummary": "CONF Belen Amigo control ",
+      "score": 35
+    }
+  ]
+}
