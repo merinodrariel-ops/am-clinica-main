@@ -6,6 +6,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { readSidebarCollapsed, SIDEBAR_COLLAPSED_EVENT } from '@/lib/sidebar-preferences';
+import CommandPalette from './ui/CommandPalette';
 
 export default function MainLayout({ children }: { children: ReactNode }) {
     const pathname = usePathname();
@@ -27,11 +28,13 @@ export default function MainLayout({ children }: { children: ReactNode }) {
     const isSidebarVisible = user && pathname !== '/login' && !pathname.startsWith('/portal-profesional');
 
     return (
-        <main className={clsx(
-            'min-h-screen transition-all duration-200',
-            isSidebarVisible ? (sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64') : ''
-        )}>
-            {children}
-        </main>
+        <CommandPalette>
+            <main className={clsx(
+                'min-h-screen transition-all duration-200',
+                isSidebarVisible ? (sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64') : ''
+            )}>
+                {children}
+            </main>
+        </CommandPalette>
     );
 }

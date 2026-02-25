@@ -35,6 +35,7 @@ import {
     Loader2,
 } from 'lucide-react';
 import { getOwnerDashboardStats, type OwnerDashboardStats } from '@/lib/dashboard';
+import PredictiveInsights from './PredictiveInsights';
 
 const STORAGE_KEY = 'owner-dashboard-layout';
 
@@ -527,6 +528,8 @@ export default function OwnerDashboard() {
                     Arrastrá las tarjetas para reordenar • Usá el ojo 👁️ para ocultar/mostrar
                 </div>
             )}
+
+            <PredictiveInsights />
 
             {/* Cards Grid */}
             <DndContext
