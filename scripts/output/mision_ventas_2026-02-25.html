@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Misión Ventas — AM Estética Dental — 2026-02-25</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: #1a1a2e;
+    background: #fff;
+    padding: 20px 24px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid #0f3460;
+  }
+  .brand { font-size: 18px; font-weight: 800; color: #0f3460; letter-spacing: -0.5px; }
+  .brand span { color: #e94560; }
+  .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .meta { text-align: right; font-size: 10px; color: #888; }
+  .meta strong { display: block; font-size: 13px; color: #0f3460; font-weight: 700; }
+
+  /* ── Briefing box ── */
+  .briefing {
+    background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+  .briefing-title { font-size: 14px; font-weight: 800; letter-spacing: -0.3px; }
+  .briefing-sub { font-size: 10px; opacity: 0.75; margin-top: 2px; }
+  .kpis { display: flex; gap: 20px; margin-left: auto; }
+  .kpi { text-align: center; }
+  .kpi-val { font-size: 22px; font-weight: 800; line-height: 1; }
+  .kpi-label { font-size: 9px; opacity: 0.7; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi.red .kpi-val { color: #ff6b6b; }
+  .kpi.orange .kpi-val { color: #ffa94d; }
+  .kpi.yellow .kpi-val { color: #ffe066; }
+
+  /* ── Section headers ── */
+  .section {
+    margin-bottom: 22px;
+    page-break-inside: avoid;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border-radius: 7px;
+    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .section-header.red    { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
+  .section-header.orange { background: #fff8f0; color: #d35400; border-left: 4px solid #f39c12; }
+  .section-header.yellow { background: #fffbf0; color: #b7770d; border-left: 4px solid #f1c40f; }
+  .section-header .count {
+    margin-left: auto;
+    font-size: 10px;
+    background: rgba(0,0,0,0.1);
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+  }
+  th {
+    background: #f1f3f8;
+    padding: 5px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: #555;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+  }
+  tr.even td { background: #fafafa; }
+  tr:last-child td { border-bottom: none; }
+
+  .num { color: #aaa; font-size: 9.5px; width: 22px; }
+  .name { font-weight: 600; color: #1a1a2e; }
+  .contact { color: #0f3460; font-family: monospace; font-size: 10px; }
+  .missing { color: #ccc; font-style: italic; }
+  .center { text-align: center; }
+  .dias { font-weight: 700; }
+  .check { width: 30px; text-align: center; }
+  .checkbox {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 1.5px solid #bbb;
+    border-radius: 3px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: #e8f4fd;
+    color: #2980b9;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .tag { width: 90px; }
+
+  /* ── Instructions ── */
+  .instructions {
+    margin-top: 20px;
+    padding: 12px 16px;
+    background: #f8f9fc;
+    border-radius: 8px;
+    border: 1px solid #e8ecf4;
+    page-break-inside: avoid;
+  }
+  .instructions h3 { font-size: 11px; font-weight: 700; color: #0f3460; margin-bottom: 8px; }
+  .instructions ol { padding-left: 16px; }
+  .instructions li { margin-bottom: 4px; line-height: 1.5; color: #444; }
+  .instructions li strong { color: #1a1a2e; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 16px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #bbb;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 12px 16px; font-size: 10.5px; }
+    .section { page-break-inside: avoid; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="brand">AM <span>Estética</span> Dental</div>
+    <div class="subtitle">Hoja de Misión — Equipo de Ventas</div>
+  </div>
+  <div class="meta">
+    <strong>Fecha: 25/02/2026</strong>
+    Generado automáticamente desde el sistema
+  </div>
+</div>
+
+<!-- Briefing -->
+<div class="briefing">
+  <div>
+    <div class="briefing-title">🎯 Misión: Recontactar prospectos prioritarios</div>
+    <div class="briefing-sub">Pacientes que consultaron y no iniciaron tratamiento. Foco en los más recientes.</div>
+  </div>
+  <div class="kpis">
+    <div class="kpi red">
+      <div class="kpi-val">6</div>
+      <div class="kpi-label">🔴 Urgentes</div>
+    </div>
+    <div class="kpi orange">
+      <div class="kpi-val">8</div>
+      <div class="kpi-label">🟠 Alta prio.</div>
+    </div>
+    <div class="kpi yellow">
+      <div class="kpi-val">31</div>
+      <div class="kpi-label">🟡 Media</div>
+    </div>
+  </div>
+</div>
+
+<!-- URGENTE -->
+<div class="section">
+  <div class="section-header red">
+    🔴 URGENTE — Consultaron hace menos de 1 mes
+    <span class="count">6 pacientes · cerrar esta semana</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Nombre</th>
+        <th>Email</th>
+        <th>Teléfono</th>
+        <th>Interés</th>
+        <th class="center">Consulta</th>
+        <th class="center">Hace</th>
+        <th class="center">✓</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+            <tr class="even">
+                <td class="num">1</td>
+                <td class="name">Guadalupe Gatti</td>
+                <td><span class="contact">gattilupe@hotmail.com</span></td>
+                <td><span class="contact">1130542071</span></td>
+                <td class="tag"></td>
+                <td class="center">23/02/2026</td>
+                <td class="center dias">2d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">2</td>
+                <td class="name">Molina Eugenia</td>
+                <td><span class="missing">sin email</span></td>
+                <td><span class="missing">sin tel.</span></td>
+                <td class="tag"></td>
+                <td class="center">18/02/2026</td>
+                <td class="center dias">7d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">3</td>
+                <td class="name">nicolás andalaft</td>
+                <td><span class="contact">nico.andalaft@gmail.com</span></td>
+                <td><span class="contact">1170138785</span></td>
+                <td class="tag"></td>
+                <td class="center">11/02/2026</td>
+                <td class="center dias">14d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">4</td>
+                <td class="name">Mercedes Otero</td>
+                <td><span class="contact">otero.mercedesk@gmail.com</span></td>
+                <td><span class="contact">1155765845</span></td>
+                <td class="tag"></td>
+                <td class="center">02/02/2026</td>
+                <td class="center dias">23d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">5</td>
+                <td class="name">Facundo Gonzalez</td>
+                <td><span class="contact">facundojulian73@gmail.com</span></td>
+                <td><span class="contact">1153085429</span></td>
+                <td class="tag"></td>
+                <td class="center">26/01/2026</td>
+                <td class="center dias">30d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">6</td>
+                <td class="name">Lucas Gil</td>
+                <td><span class="contact">lucasgil.1798@gmail.com</span></td>
+                <td><span class="contact">11665576092</span></td>
+                <td class="tag"></td>
+                <td class="center">26/01/2026</td>
+                <td class="center dias">30d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ALTA -->
+<div class="section">
+  <div class="section-header orange">
+    🟠 ALTA PRIORIDAD — Consultaron hace 1 a 3 meses
+    <span class="count">8 pacientes · esta semana / próxima</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Nombre</th>
+        <th>Email</th>
+        <th>Teléfono</th>
+        <th>Interés</th>
+        <th class="center">Consulta</th>
+        <th class="center">Hace</th>
+        <th class="center">✓</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+            <tr class="even">
+                <td class="num">1</td>
+                <td class="name">Pedro Adamovic</td>
+                <td><span class="contact">pedroadamovic@gnail.com</span></td>
+                <td><span class="contact">1145281772</span></td>
+                <td class="tag"></td>
+                <td class="center">23/01/2026</td>
+                <td class="center dias">33d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">2</td>
+                <td class="name">Nicolás Leon</td>
+                <td><span class="contact">nicolasmakeup@icloud.com</span></td>
+                <td><span class="contact">1123805535</span></td>
+                <td class="tag"></td>
+                <td class="center">23/01/2026</td>
+                <td class="center dias">33d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">3</td>
+                <td class="name">Dario Pablo Godoy</td>
+                <td><span class="contact">dpgodoy@gmail.com</span></td>
+                <td><span class="contact">1163003733</span></td>
+                <td class="tag"></td>
+                <td class="center">21/01/2026</td>
+                <td class="center dias">35d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">4</td>
+                <td class="name">Natali Davila</td>
+                <td><span class="contact">nati.davila@hotmail.com</span></td>
+                <td><span class="contact">1158203035</span></td>
+                <td class="tag"></td>
+                <td class="center">26/12/2025</td>
+                <td class="center dias">61d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">5</td>
+                <td class="name">Hernan Acosta</td>
+                <td><span class="missing">sin email</span></td>
+                <td><span class="missing">sin tel.</span></td>
+                <td class="tag"></td>
+                <td class="center">19/12/2025</td>
+                <td class="center dias">68d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">6</td>
+                <td class="name">Camila Fernández</td>
+                <td><span class="contact">camilafer1984@gmail.com</span></td>
+                <td><span class="contact">1155801828</span></td>
+                <td class="tag"></td>
+                <td class="center">17/12/2025</td>
+                <td class="center dias">70d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">7</td>
+                <td class="name">Patricio Sanchez</td>
+                <td><span class="contact">patols953@gmail.com</span></td>
+                <td><span class="contact">61420809252</span></td>
+                <td class="tag"></td>
+                <td class="center">15/12/2025</td>
+                <td class="center dias">72d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">8</td>
+                <td class="name">Mateo Schreiterer</td>
+                <td><span class="contact">schreiterermateo@gmail.com</span></td>
+                <td><span class="contact">+54 5491148892300</span></td>
+                <td class="tag"></td>
+                <td class="center">15/12/2025</td>
+                <td class="center dias">72d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- MEDIA -->
+
+<div class="section">
+  <div class="section-header yellow">
+    🟡 MEDIA — Consultaron hace 3 a 6 meses
+    <span class="count">31 pacientes · este mes</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Nombre</th>
+        <th>Email</th>
+        <th>Teléfono</th>
+        <th>Interés</th>
+        <th class="center">Consulta</th>
+        <th class="center">Hace</th>
+        <th class="center">✓</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+            <tr class="even">
+                <td class="num">1</td>
+                <td class="name">Pietro Ezio Zucchet</td>
+                <td><span class="contact">ezio_z@hotmail.com</span></td>
+                <td><span class="contact">3704919912</span></td>
+                <td class="tag"></td>
+                <td class="center">24/11/2025</td>
+                <td class="center dias">93d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">2</td>
+                <td class="name">Diego andrades</td>
+                <td><span class="contact">diego.andrades@iff.com</span></td>
+                <td><span class="contact">+54 5491126626012</span></td>
+                <td class="tag"></td>
+                <td class="center">21/11/2025</td>
+                <td class="center dias">96d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">3</td>
+                <td class="name">María de los Milagros Rodriguez</td>
+                <td><span class="contact">mariadelosmilagrosr33@gmail.com</span></td>
+                <td><span class="contact">2243434745</span></td>
+                <td class="tag"></td>
+                <td class="center">19/11/2025</td>
+                <td class="center dias">98d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">4</td>
+                <td class="name">Damian minckas</td>
+                <td><span class="contact">damianmusic@gmail.com</span></td>
+                <td><span class="contact">1157631984</span></td>
+                <td class="tag"></td>
+                <td class="center">14/11/2025</td>
+                <td class="center dias">103d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">5</td>
+                <td class="name">Alejandro Migliorisi</td>
+                <td><span class="contact">alemigliorisi@gmail.com</span></td>
+                <td><span class="contact">+54 1163977530</span></td>
+                <td class="tag"></td>
+                <td class="center">06/11/2025</td>
+                <td class="center dias">111d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">6</td>
+                <td class="name">Enrique Souza Rey</td>
+                <td><span class="contact">souza.rey.enrique@gmail.com</span></td>
+                <td><span class="contact">1155028591</span></td>
+                <td class="tag"></td>
+                <td class="center">30/10/2025</td>
+                <td class="center dias">118d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">7</td>
+                <td class="name">Eduardo Néstor Fernandez</td>
+                <td><span class="contact">suarezlilianae@gmail.com</span></td>
+                <td><span class="contact">1163989524</span></td>
+                <td class="tag"></td>
+                <td class="center">22/10/2025</td>
+                <td class="center dias">126d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">8</td>
+                <td class="name">Liliana Esther Suarez</td>
+                <td><span class="contact">suarezlilianae@gmail.com</span></td>
+                <td><span class="contact">1138630958</span></td>
+                <td class="tag"></td>
+                <td class="center">22/10/2025</td>
+                <td class="center dias">126d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">9</td>
+                <td class="name">Fernandez Suarez Evelyn</td>
+                <td><span class="contact">fsevelyn@hotmail.com</span></td>
+                <td><span class="contact">+54 5491140706481</span></td>
+                <td class="tag"></td>
+                <td class="center">20/10/2025</td>
+                <td class="center dias">128d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">10</td>
+                <td class="name">Maria Ines Bezus</td>
+                <td><span class="contact">mariainesbezus@gmail.com</span></td>
+                <td><span class="contact">+54 5493624808255</span></td>
+                <td class="tag"></td>
+                <td class="center">16/10/2025</td>
+                <td class="center dias">132d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">11</td>
+                <td class="name">Norma Noemi Miceli</td>
+                <td><span class="missing">sin email</span></td>
+                <td><span class="missing">sin tel.</span></td>
+                <td class="tag"></td>
+                <td class="center">14/10/2025</td>
+                <td class="center dias">134d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">12</td>
+                <td class="name">Yamila Solange González</td>
+                <td><span class="contact">gyamila766@gmail.com</span></td>
+                <td><span class="contact">+54 5492932546155</span></td>
+                <td class="tag"></td>
+                <td class="center">06/10/2025</td>
+                <td class="center dias">142d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">13</td>
+                <td class="name">Rocio Poli</td>
+                <td><span class="contact">sesinjoaquin@gmail.com</span></td>
+                <td><span class="contact">+54 5493782441605</span></td>
+                <td class="tag"></td>
+                <td class="center">01/10/2025</td>
+                <td class="center dias">147d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">14</td>
+                <td class="name">florencia tosi</td>
+                <td><span class="contact">flor_vcf3@hotmail.com</span></td>
+                <td><span class="contact">+54 5491167245694</span></td>
+                <td class="tag"></td>
+                <td class="center">01/10/2025</td>
+                <td class="center dias">147d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">15</td>
+                <td class="name">Franco Carnemolla</td>
+                <td><span class="contact">cotidekleva@gmail.com</span></td>
+                <td><span class="contact">1144751667</span></td>
+                <td class="tag"></td>
+                <td class="center">26/09/2025</td>
+                <td class="center dias">152d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">16</td>
+                <td class="name">Sofia Correa</td>
+                <td><span class="contact">correa_sofia@hotmail.com</span></td>
+                <td><span class="contact">+54 5491135697710</span></td>
+                <td class="tag"></td>
+                <td class="center">26/09/2025</td>
+                <td class="center dias">152d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">17</td>
+                <td class="name">Marianela Alberich</td>
+                <td><span class="contact">marianelaalberich@gmail.com</span></td>
+                <td><span class="contact">+54 5491169469947</span></td>
+                <td class="tag"></td>
+                <td class="center">26/09/2025</td>
+                <td class="center dias">152d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">18</td>
+                <td class="name">Gonzalo Acevedo</td>
+                <td><span class="contact">gonzaloacevedo09@gmail.com</span></td>
+                <td><span class="contact">+54 5491151818158</span></td>
+                <td class="tag"></td>
+                <td class="center">25/09/2025</td>
+                <td class="center dias">153d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">19</td>
+                <td class="name">Roumec juan ignacio</td>
+                <td><span class="contact">juaniroumec@gmail.com</span></td>
+                <td><span class="contact">+54 5492914636400</span></td>
+                <td class="tag"></td>
+                <td class="center">22/09/2025</td>
+                <td class="center dias">156d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">20</td>
+                <td class="name">Graciela Doretti</td>
+                <td><span class="contact">gdoretti@gmail.com</span></td>
+                <td><span class="contact">1151825968</span></td>
+                <td class="tag"></td>
+                <td class="center">17/09/2025</td>
+                <td class="center dias">161d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">21</td>
+                <td class="name">Federico González pondal</td>
+                <td><span class="contact">fedejpondal@hotmail.com</span></td>
+                <td><span class="contact">+54 5492664486540</span></td>
+                <td class="tag"></td>
+                <td class="center">17/09/2025</td>
+                <td class="center dias">161d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">22</td>
+                <td class="name">Belen Carranza</td>
+                <td><span class="contact">beluc96@icloud.com</span></td>
+                <td><span class="contact">+54 5491134561655</span></td>
+                <td class="tag"><span class="badge">Ortodoncia</span></td>
+                <td class="center">17/09/2025</td>
+                <td class="center dias">161d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">23</td>
+                <td class="name">Nadia debora melian</td>
+                <td><span class="contact">nadiamelian1627@gmail.com</span></td>
+                <td><span class="contact">1135368099</span></td>
+                <td class="tag"></td>
+                <td class="center">15/09/2025</td>
+                <td class="center dias">163d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">24</td>
+                <td class="name">Anibal Coceres Pedro</td>
+                <td><span class="contact">corban_a.c@hotmail.com</span></td>
+                <td><span class="contact">+54 5491123027996</span></td>
+                <td class="tag"><span class="badge">Carillas</span></td>
+                <td class="center">11/09/2025</td>
+                <td class="center dias">167d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">25</td>
+                <td class="name">Laura Aimar</td>
+                <td><span class="contact">aimar_barreta@yahoo.com.ar</span></td>
+                <td><span class="contact">+54 5492302604600</span></td>
+                <td class="tag"><span class="badge">Carillas</span></td>
+                <td class="center">05/09/2025</td>
+                <td class="center dias">173d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">26</td>
+                <td class="name">Mariano Páez</td>
+                <td><span class="contact">marianopaez88@gmail.com</span></td>
+                <td><span class="contact">1162489801</span></td>
+                <td class="tag"></td>
+                <td class="center">03/09/2025</td>
+                <td class="center dias">175d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">27</td>
+                <td class="name">Martin Jofre</td>
+                <td><span class="contact">omila10@hotmail.com</span></td>
+                <td><span class="contact">+54 11 5450-7797</span></td>
+                <td class="tag"></td>
+                <td class="center">03/09/2025</td>
+                <td class="center dias">175d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">28</td>
+                <td class="name">Lara Gomez</td>
+                <td><span class="contact">laracgomez@hotmail.com</span></td>
+                <td><span class="contact">+54 5491138612700</span></td>
+                <td class="tag"><span class="badge">Carillas</span></td>
+                <td class="center">01/09/2025</td>
+                <td class="center dias">177d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">29</td>
+                <td class="name">Magali Silva</td>
+                <td><span class="contact">magali.as@hotmail.com</span></td>
+                <td><span class="contact">+54 5491140413638</span></td>
+                <td class="tag"></td>
+                <td class="center">01/09/2025</td>
+                <td class="center dias">177d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="">
+                <td class="num">30</td>
+                <td class="name">Melina Fernandez Suarez</td>
+                <td><span class="contact">mm.fs@hotmail.com</span></td>
+                <td><span class="contact">+54 5491140706511</span></td>
+                <td class="tag"></td>
+                <td class="center">29/08/2025</td>
+                <td class="center dias">180d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+            <tr class="even">
+                <td class="num">31</td>
+                <td class="name">Ivan Bahl</td>
+                <td><span class="contact">bahlivan@gmail.com</span></td>
+                <td><span class="contact">+54 5491126448481</span></td>
+                <td class="tag"><span class="badge">Carillas</span></td>
+                <td class="center">29/08/2025</td>
+                <td class="center dias">180d</td>
+                <td class="check"><span class="checkbox"></span></td>
+            </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- Instructions -->
+<div class="instructions">
+  <h3>📋 Instrucciones para el equipo</h3>
+  <ol>
+    <li><strong>Empezar por los 🔴 URGENTES</strong> — son los más frescos, mayor probabilidad de conversión.</li>
+    <li><strong>Primer contacto:</strong> WhatsApp personalizado mencionando el tratamiento de interés. No usar mensajes genéricos.</li>
+    <li><strong>Si no responden en 48hs:</strong> llamada telefónica + segundo mensaje.</li>
+    <li><strong>Marcar el tilde (✓)</strong> cuando el paciente fue contactado y actualizar el estado en el sistema.</li>
+    <li><strong>Si agenda turno:</strong> registrar en el sistema como "Agendado" y notificar al Dr. Merino.</li>
+    <li><strong>Sin email ni teléfono:</strong> consultar con recepción si tienen otro dato de contacto.</li>
+  </ol>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <span>AM Estética Dental · Sistema de Gestión Interno · Confidencial</span>
+  <span>Generado el 2026-02-25 · 45 prospectos en esta hoja</span>
+</div>
+
+</body>
+</html>
