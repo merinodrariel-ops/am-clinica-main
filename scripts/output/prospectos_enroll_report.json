@@ -1,244 +1,411 @@
 {
-  "generatedAt": "2026-02-25T09:46:55.088Z",
-  "mode": "enroll",
-  "stats": {
-    "enrolled": 58,
-    "errors": 0,
-    "skipped": 43,
-    "no_match": 39
-  },
-  "enrolled_patients": [
+  "generatedAt": "2026-02-25T10:36:19.935Z",
+  "mode": "dry_run",
+  "toEnroll": [],
+  "skipped": [
     {
       "name": "Bruno Stratico",
-      "date": "2024-05-20"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Ana Rottjer",
-      "date": "2024-05-22"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Mauro Simonet",
-      "date": "2024-05-29"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Gabriela Distefano",
-      "date": "2025-01-24"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Cristian Gaston Cuello",
-      "date": "2025-02-03"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Santiago Barrientos",
-      "date": "2025-02-10"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Belen Arteaga Ana",
-      "date": "2025-02-12"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Alejandra Ferrari",
-      "date": "2025-03-14"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Castro Cynthia",
-      "date": "2025-04-07"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Romina Silva Chusho Flavia",
-      "date": "2025-04-28"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Sanchez Gisel",
-      "date": "2025-05-09"
+      "reason": "ya inscripto en workflow"
+    },
+    {
+      "name": "Camila Lopez",
+      "reason": "ya tiene tratamiento activo"
     },
     {
       "name": "Gozzerino Marcello",
-      "date": "2025-06-18"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Rodriguez Elizabet",
-      "date": "2025-06-25"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Medina Juliana",
-      "date": "2025-06-27"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "German Chirino Leandro",
-      "date": "2025-07-11"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Zapata Tamara",
-      "date": "2025-07-14"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Santiago Anibal Gomez",
-      "date": "2025-07-22"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Carolina Isabel Garrido",
-      "date": "2025-07-23"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Tanquia Jail",
-      "date": "2025-07-23"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "María Suarez Ana",
-      "date": "2025-08-01"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Lourdes Mendez",
-      "date": "2025-08-14"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Mariano Páez",
-      "date": "2025-09-03"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Nadia debora melian",
-      "date": "2025-09-15"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Federico González pondal",
-      "date": "2025-09-17"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Graciela Doretti",
-      "date": "2025-09-17"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Roumec juan ignacio",
-      "date": "2025-09-22"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Gonzalo Acevedo",
-      "date": "2025-09-25"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Sofia Correa",
-      "date": "2025-09-26"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Marianela Alberich",
-      "date": "2025-09-26"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Franco Carnemolla",
-      "date": "2025-09-26"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Rocio Poli",
-      "date": "2025-10-01"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "florencia tosi",
-      "date": "2025-10-01"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Yamila Solange González",
-      "date": "2025-10-06"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Norma Noemi Miceli",
-      "date": "2025-10-14"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Maria Ines Bezus",
-      "date": "2025-10-16"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Fernandez Suarez Evelyn",
-      "date": "2025-10-20"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Eduardo Néstor Fernandez",
-      "date": "2025-10-22"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Liliana Esther Suarez",
-      "date": "2025-10-22"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Enrique Souza Rey",
-      "date": "2025-10-30"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Alejandro Migliorisi",
-      "date": "2025-11-06"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Damian minckas",
-      "date": "2025-11-14"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "María de los Milagros Rodriguez",
-      "date": "2025-11-19"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Diego andrades",
-      "date": "2025-11-21"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Pietro Ezio Zucchet",
-      "date": "2025-11-24"
+      "reason": "ya inscripto en workflow"
+    },
+    {
+      "name": "Carla Del Vecchio",
+      "reason": "ya tiene tratamiento activo"
+    },
+    {
+      "name": "Angeles Lijo",
+      "reason": "ya tiene tratamiento activo"
     },
     {
       "name": "Patricio Sanchez",
-      "date": "2025-12-15"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Mateo Schreiterer",
-      "date": "2025-12-15"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Camila Fernández",
-      "date": "2025-12-17"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Hernan Acosta",
-      "date": "2025-12-19"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Natali Davila",
-      "date": "2025-12-26"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Dario Pablo Godoy",
-      "date": "2026-01-21"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Pedro Adamovic",
-      "date": "2026-01-23"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Nicolás Leon",
-      "date": "2026-01-23"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Facundo Gonzalez",
-      "date": "2026-01-26"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Lucas Gil",
-      "date": "2026-01-26"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Mercedes Otero",
-      "date": "2026-02-02"
+      "reason": "ya inscripto en workflow"
+    },
+    {
+      "name": "Ana Lia Kobal",
+      "reason": "ya tiene tratamiento activo"
     },
     {
       "name": "nicolás andalaft",
-      "date": "2026-02-11"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Molina Eugenia",
-      "date": "2026-02-18"
+      "reason": "ya inscripto en workflow"
     },
     {
       "name": "Guadalupe Gatti",
-      "date": "2026-02-23"
+      "reason": "ya inscripto en workflow"
+    },
+    {
+      "name": "Nicolas Grimberg",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Luciana Perrone",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Agustina Mochi",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Ingrid",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Guillermo Posse",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Fabian Frick",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Maximiliano Miranda",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Sabina Ferreyra",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Franco Sunsundegui",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Gisele Politi",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Daniela Ramos",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Carolina Malvicino",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Florencia Roumec",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Valentina Vallejos",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Carla Gehrke",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Ariel Rodriguez",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Gonzalo Lucero",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Romina Crespo",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Adriana Cacciacane",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Claudia Acchiardi",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Gabriela Castillo",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Ana Ferrari",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Santiago Lopez",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Matias Collazo",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Martina Albornoz",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Diego Mendez",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Micaela Suarez",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Ileana Duarte",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Natalia Barros",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Lucas Fernandez",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Vanesa Gutierrez",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Paula Trujillo",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Roberto Britos",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Silvana Cano",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Hernan Blanco",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Tamara Solis",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Eduardo Paz",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Lorena Gimenez",
+      "reason": "sin match en base de datos"
+    },
+    {
+      "name": "Alberto Gomez",
+      "reason": "sin match en base de datos"
     }
   ],
   "no_match": [
