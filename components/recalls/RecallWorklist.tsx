@@ -167,9 +167,10 @@ function CompleteModal({ open, onClose, onConfirm }: {
 
 // ─── Recall Card ─────────────────────────────────────────────
 
-function RecallCard({ rule, onAction }: {
+function RecallCard({ rule, onAction, isDuplicate }: {
     rule: RecallRule;
     onAction: () => void;
+    isDuplicate?: boolean;
 }) {
     const [isPending, startTransition] = useTransition();
     const [showComplete, setShowComplete] = useState(false);
@@ -223,9 +224,19 @@ function RecallCard({ rule, onAction }: {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 className={`group relative bg-white dark:bg-gray-800 rounded-2xl border
-          ${isPastDue ? 'border-red-200 dark:border-red-800/50 shadow-red-100 dark:shadow-none' : 'border-gray-100 dark:border-gray-700'}
+          ${isDuplicate ? 'border-orange-300 dark:border-orange-600/60 shadow-orange-100 dark:shadow-none' :
+            isPastDue ? 'border-red-200 dark:border-red-800/50 shadow-red-100 dark:shadow-none' : 'border-gray-100 dark:border-gray-700'}
           shadow-sm hover:shadow-lg transition-all duration-200 p-4`}
             >
+                {/* Duplicate indicator */}
+                {isDuplicate && (
+                    <div className="absolute -top-1.5 -left-1.5" title="Posible duplicado — mismo paciente con múltiples recalls">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white bg-orange-500">
+                            2x
+                        </span>
+                    </div>
+                )}
+
                 {/* Priority indicator */}
                 {rule.priority > 0 && (
                     <div className="absolute -top-1.5 -right-1.5">
@@ -800,9 +811,24 @@ export default function RecallWorklist() {
                     </motion.div>
                 ) : (
                     <AnimatePresence>
-                        {rules.map(rule => (
-                            <RecallCard key={rule.id} rule={rule} onAction={loadData} />
-                        ))}
+                        {(() => {
+                            // Detect patients with more than one recall in the current view
+                            const patientCount = new Map<string, number>();
+                            rules.forEach(r => {
+                                if (r.patient?.id_paciente) {
+                                    patientCount.set(r.patient.id_paciente, (patientCount.get(r.patient.id_paciente) || 0) + 1);
+                                }
+                            });
+                            const duplicatePatients = new Set([...patientCount.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+                            return rules.map(rule => (
+                                <RecallCard
+                                    key={rule.id}
+                                    rule={rule}
+                                    onAction={loadData}
+                                    isDuplicate={!!rule.patient?.id_paciente && duplicatePatients.has(rule.patient.id_paciente)}
+                                />
+                            ));
+                        })()}
                     </AnimatePresence>
                 )}
             </div>
