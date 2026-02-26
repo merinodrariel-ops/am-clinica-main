@@ -64,12 +64,6 @@ function composeClinicalNotes(data: AdmissionSubmission) {
         sections.push(`Alertas de salud: ${data.health_notes}`);
     }
 
-    if (data.documento_identidad_nombre || data.cobertura_nombre) {
-        sections.push(
-            `Adjuntos identidad: ${data.documento_identidad_nombre || 'No enviado'} | Obra social/prepaga: ${data.cobertura_nombre || 'No enviado'}`,
-        );
-    }
-
     sections.push(`Consentimiento digital: privacidad=${data.consentimiento_privacidad ? 'si' : 'no'}, admision=${data.consentimiento_tratamiento ? 'si' : 'no'}`);
     sections.push(`Firma digital: ${data.firma_data_url ? 'capturada' : 'no capturada'}`);
 
@@ -154,7 +148,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 id_paciente: patientUUID,
                 nombre: data.nombre,
                 apellido: data.apellido,
-                documento: data.dni,
+                documento: data.dni || null,
                 email: data.email,
                 telefono: data.telefono,
                 cuit: data.cuit,
@@ -183,7 +177,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 docResult = await createPatientDocuments(driveResult.motherFolderId, {
                     nombre: data.nombre,
                     apellido: data.apellido,
-                    dni: data.dni,
+                    dni: data.dni || '-',
                     fecha: new Date().toLocaleDateString('es-AR'),
                 });
 
@@ -214,7 +208,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 id_paciente: created.id_paciente,
                 nombre: data.nombre,
                 apellido: data.apellido,
-                documento: data.dni,
+                documento: data.dni || null,
                 email: data.email,
                 telefono: data.telefono,
                 cuit: data.cuit || null,
@@ -320,7 +314,7 @@ export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
                 id_paciente: patientUUID,
                 nombre: data.nombre,
                 apellido: data.apellido,
-                documento: data.dni,
+                documento: data.dni || null,
                 email: data.email,
                 telefono: data.telefono,
                 observaciones_generales: data.motivo_consulta,

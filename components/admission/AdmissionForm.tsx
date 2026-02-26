@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { QRCodeCanvas } from 'qrcode.react';
 import {
     AlertTriangle,
     BadgeCheck,
@@ -9,7 +10,6 @@ import {
     ChevronRight,
     ClipboardCheck,
     CloudOff,
-    FileImage,
     HeartPulse,
     Mail,
     Phone,
@@ -132,8 +132,6 @@ const STEP_FIELDS: Record<StepId, (keyof AdmissionDraft)[]> = {
         'salud_condiciones_detalle',
         'salud_medicacion',
         'salud_medicacion_detalle',
-        'documento_identidad_nombre',
-        'cobertura_nombre',
     ],
     4: ['motivo_consulta', 'referencia_origen', 'referencia_recomendado_por', 'profesional'],
     5: ['consentimiento_privacidad', 'consentimiento_tratamiento', 'firma_data_url'],
@@ -234,6 +232,10 @@ export function AdmissionForm() {
     ]);
 
     const progressValue = useMemo(() => Math.round((step / 5) * 100), [step]);
+    const publicAdmissionBase = process.env.NEXT_PUBLIC_APP_URL || '';
+    const publicAdmissionUrl = publicAdmissionBase
+        ? `${publicAdmissionBase.replace(/\/$/, '')}/admision?mode=online`
+        : '';
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -387,8 +389,6 @@ export function AdmissionForm() {
                 consentimiento_privacidad: formData.consentimiento_privacidad,
                 consentimiento_tratamiento: formData.consentimiento_tratamiento,
                 firma_data_url: formData.firma_data_url || '',
-                documento_identidad_nombre: formData.documento_identidad_nombre,
-                cobertura_nombre: formData.cobertura_nombre,
                 mode,
             });
 
@@ -477,22 +477,6 @@ export function AdmissionForm() {
         localStorage.removeItem(STORAGE_KEY);
     }, []);
 
-    const handleUpload = useCallback(
-        (field: 'documento_identidad_nombre' | 'cobertura_nombre', file?: File | null) => {
-            if (!file) return;
-            updateField(field, file.name);
-
-            if (field === 'documento_identidad_nombre' && !formData.dni) {
-                const digits = file.name.replace(/\D/g, '');
-                if (digits.length >= 7) {
-                    updateField('dni', digits.slice(0, 8));
-                    toast.info('Se detectó DNI probable desde el nombre del archivo (OCR beta)');
-                }
-            }
-        },
-        [formData.dni, updateField],
-    );
-
     const beginSignature = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
         const canvas = signatureCanvasRef.current;
         if (!canvas) return;
@@ -564,8 +548,6 @@ export function AdmissionForm() {
             consentimiento_privacidad: formData.consentimiento_privacidad,
             consentimiento_tratamiento: formData.consentimiento_tratamiento,
             firma_data_url: formData.firma_data_url || '',
-            documento_identidad_nombre: formData.documento_identidad_nombre,
-            cobertura_nombre: formData.cobertura_nombre,
             mode,
         });
 
@@ -634,6 +616,19 @@ export function AdmissionForm() {
                             <p className="text-sm text-slate-700">
                                 Recomendado para recepción: comparte esta URL por WhatsApp o genera QR sobre `/admision?mode=online` para auto registro.
                             </p>
+                            {publicAdmissionUrl ? (
+                                <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-[#7dd3fc] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">QR Recepción</p>
+                                        <p className="text-sm text-slate-700">{publicAdmissionUrl}</p>
+                                    </div>
+                                    <QRCodeCanvas value={publicAdmissionUrl} size={96} includeMargin />
+                                </div>
+                            ) : (
+                                <p className="mt-3 text-xs text-slate-500">
+                                    Define `NEXT_PUBLIC_APP_URL` para habilitar QR absoluto (ideal para cartel en recepción).
+                                </p>
+                            )}
                             <a
                                 className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#0891b2] px-4 py-2 text-sm font-semibold text-white"
                                 href={`https://wa.me/?text=${encodeURIComponent(waMessage)}`}
@@ -799,11 +794,11 @@ export function AdmissionForm() {
                                                 className="h-12 rounded-xl"
                                             />
                                         </Field>
-                                        <Field label="DNI / Pasaporte" error={errors.dni}>
+                                        <Field label="DNI (opcional)" error={errors.dni}>
                                             <Input
                                                 value={formData.dni}
                                                 onChange={(event) => updateField('dni', event.target.value)}
-                                                placeholder="Solo números"
+                                                placeholder="Solo si lo deseas cargar"
                                                 className="h-12 rounded-xl"
                                             />
                                         </Field>
@@ -941,7 +936,7 @@ export function AdmissionForm() {
 
                             {step === 3 && (
                                 <section className="space-y-4">
-                                    <SectionHeader icon={<HeartPulse className="h-5 w-5" />} title="Salud y documentos" subtitle="Alertas clínicas inmediatas para el equipo" />
+                                    <SectionHeader icon={<HeartPulse className="h-5 w-5" />} title="Salud clínica" subtitle="Alertas clínicas inmediatas para el equipo" />
 
                                     <HealthToggle
                                         checked={formData.salud_alergias}
@@ -1004,21 +999,6 @@ export function AdmissionForm() {
                                             </ul>
                                         </div>
                                     )}
-
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <UploadField
-                                            label="Foto DNI / Pasaporte"
-                                            value={formData.documento_identidad_nombre || ''}
-                                            hint="OCR asistido (beta)"
-                                            onChange={(file) => handleUpload('documento_identidad_nombre', file)}
-                                        />
-                                        <UploadField
-                                            label="Foto carnet obra social"
-                                            value={formData.cobertura_nombre || ''}
-                                            hint="Para legajo inicial"
-                                            onChange={(file) => handleUpload('cobertura_nombre', file)}
-                                        />
-                                    </div>
                                 </section>
                             )}
 
@@ -1248,29 +1228,5 @@ function HealthToggle({
                 {checked ? <AlertTriangle className="h-5 w-5 text-red-600" /> : <Shield className="h-5 w-5 text-slate-300" />}
             </div>
         </button>
-    );
-}
-
-function UploadField({
-    label,
-    value,
-    hint,
-    onChange,
-}: {
-    label: string;
-    value: string;
-    hint: string;
-    onChange: (file?: File | null) => void;
-}) {
-    return (
-        <label className="block rounded-2xl border border-slate-200 bg-white p-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{label}</span>
-            <div className="mt-2 flex items-center gap-2 text-sm text-slate-700">
-                <FileImage className="h-4 w-4 text-slate-400" />
-                <span className="truncate">{value || 'Ningún archivo seleccionado'}</span>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">{hint}</p>
-            <input type="file" accept="image/*,.pdf" className="mt-2 block w-full text-xs" onChange={(event) => onChange(event.target.files?.[0])} />
-        </label>
     );
 }

@@ -99,10 +99,10 @@ export async function generateLiquidacion(
         // Doctor: sum prestaciones_realizadas grouped by slides validation
         const { data: prestaciones } = await admin
             .from('prestaciones_realizadas')
-            .select('id, descripcion, monto_honorarios, slides_url, fecha')
-            .eq('personal_id', personalId)
-            .gte('fecha', startDate)
-            .lte('fecha', endDate);
+            .select('id, prestacion_nombre, monto_honorarios, slides_url, fecha_realizacion')
+            .eq('profesional_id', personalId)
+            .gte('fecha_realizacion', startDate)
+            .lte('fecha_realizacion', endDate);
 
         const withSlides = (prestaciones || []).filter(p => p.slides_url);
         const withoutSlides = (prestaciones || []).filter(p => !p.slides_url);
@@ -117,15 +117,15 @@ export async function generateLiquidacion(
         breakdown = {
             con_slides: withSlides.map(p => ({
                 id: p.id,
-                descripcion: p.descripcion,
+                descripcion: p.prestacion_nombre,
                 monto_usd: p.monto_honorarios,
-                fecha: p.fecha,
+                fecha: p.fecha_realizacion,
             })),
             sin_slides: withoutSlides.map(p => ({
                 id: p.id,
-                descripcion: p.descripcion,
+                descripcion: p.prestacion_nombre,
                 monto_usd: p.monto_honorarios,
-                fecha: p.fecha,
+                fecha: p.fecha_realizacion,
             })),
             tc_bna_venta: tcBnaVenta,
             total_usd: totalUsd,

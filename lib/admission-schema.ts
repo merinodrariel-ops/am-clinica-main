@@ -5,17 +5,29 @@ export const admissionModeSchema = z.enum(['online', 'manual']);
 const textRequired = (label: string, min = 2) =>
     z.string().trim().min(min, `Ingresa ${label.toLowerCase()}`);
 
+const optionalDni = z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
+    .refine((value) => !value || (value.length >= 7 && value.length <= 14), 'DNI inválido');
+
+const draftDni = z
+    .string()
+    .trim()
+    .refine((value) => value.length === 0 || (value.length >= 7 && value.length <= 14), 'DNI inválido');
+
 const optionalText = z
     .string()
     .trim()
     .optional()
     .transform((value) => (value && value.length > 0 ? value : undefined));
 
-export const admissionDraftBaseObject = z.object({
+const admissionDraftShape = {
     id_paciente: z.string().uuid().optional().or(z.literal('')),
     nombre: textRequired('nombre'),
     apellido: textRequired('apellido'),
-    dni: z.string().trim().min(7, 'DNI inválido').max(14, 'DNI inválido'),
+    dni: draftDni,
     cuit: z.string().trim().optional(),
     whatsapp_pais_code: z.string().trim().min(1, 'Selecciona código país'),
     whatsapp_numero: z.string().trim().min(6, 'Número de WhatsApp inválido'),
@@ -40,9 +52,9 @@ export const admissionDraftBaseObject = z.object({
     consentimiento_privacidad: z.boolean(),
     consentimiento_tratamiento: z.boolean(),
     firma_data_url: z.string().optional(),
-    documento_identidad_nombre: optionalText,
-    cobertura_nombre: optionalText,
-});
+};
+
+export const admissionDraftBaseObject = z.object(admissionDraftShape);
 
 export const admissionDraftSchema = admissionDraftBaseObject
     .superRefine((data, ctx) => {
@@ -127,54 +139,52 @@ export const admissionDraftSchema = admissionDraftBaseObject
         }
     });
 
-export const admissionIdentityStepSchema = admissionDraftBaseObject.pick({
-    nombre: true,
-    apellido: true,
-    dni: true,
-    cuit: true,
+export const admissionIdentityStepSchema = z.object({
+    nombre: admissionDraftShape.nombre,
+    apellido: admissionDraftShape.apellido,
+    dni: admissionDraftShape.dni,
+    cuit: admissionDraftShape.cuit,
 });
 
-export const admissionContactStepSchema = admissionDraftBaseObject.pick({
-    whatsapp_pais_code: true,
-    whatsapp_numero: true,
-    whatsapp_custom_pais_code: true,
-    email_local: true,
-    email_dominio: true,
-    email_custom_domain: true,
-    ciudad: true,
-    zona_barrio: true,
-    custom_barrio: true,
+export const admissionContactStepSchema = z.object({
+    whatsapp_pais_code: admissionDraftShape.whatsapp_pais_code,
+    whatsapp_numero: admissionDraftShape.whatsapp_numero,
+    whatsapp_custom_pais_code: admissionDraftShape.whatsapp_custom_pais_code,
+    email_local: admissionDraftShape.email_local,
+    email_dominio: admissionDraftShape.email_dominio,
+    email_custom_domain: admissionDraftShape.email_custom_domain,
+    ciudad: admissionDraftShape.ciudad,
+    zona_barrio: admissionDraftShape.zona_barrio,
+    custom_barrio: admissionDraftShape.custom_barrio,
 });
 
-export const admissionHealthStepSchema = admissionDraftBaseObject.pick({
-    salud_alergias: true,
-    salud_alergias_detalle: true,
-    salud_condiciones: true,
-    salud_condiciones_detalle: true,
-    salud_medicacion: true,
-    salud_medicacion_detalle: true,
-    documento_identidad_nombre: true,
-    cobertura_nombre: true,
+export const admissionHealthStepSchema = z.object({
+    salud_alergias: admissionDraftShape.salud_alergias,
+    salud_alergias_detalle: admissionDraftShape.salud_alergias_detalle,
+    salud_condiciones: admissionDraftShape.salud_condiciones,
+    salud_condiciones_detalle: admissionDraftShape.salud_condiciones_detalle,
+    salud_medicacion: admissionDraftShape.salud_medicacion,
+    salud_medicacion_detalle: admissionDraftShape.salud_medicacion_detalle,
 });
 
-export const admissionObjectiveStepSchema = admissionDraftBaseObject.pick({
-    motivo_consulta: true,
-    referencia_origen: true,
-    referencia_recomendado_por: true,
-    profesional: true,
+export const admissionObjectiveStepSchema = z.object({
+    motivo_consulta: admissionDraftShape.motivo_consulta,
+    referencia_origen: admissionDraftShape.referencia_origen,
+    referencia_recomendado_por: admissionDraftShape.referencia_recomendado_por,
+    profesional: admissionDraftShape.profesional,
 });
 
-export const admissionConsentStepSchema = admissionDraftBaseObject.pick({
-    consentimiento_privacidad: true,
-    consentimiento_tratamiento: true,
-    firma_data_url: true,
+export const admissionConsentStepSchema = z.object({
+    consentimiento_privacidad: admissionDraftShape.consentimiento_privacidad,
+    consentimiento_tratamiento: admissionDraftShape.consentimiento_tratamiento,
+    firma_data_url: admissionDraftShape.firma_data_url,
 });
 
 export const admissionSubmissionSchema = z.object({
     id_paciente: z.string().uuid().optional(),
     nombre: textRequired('nombre'),
     apellido: textRequired('apellido'),
-    dni: z.string().trim().min(7).max(14),
+    dni: optionalDni,
     cuit: optionalText,
     email: z.string().trim().email('Email inválido'),
     telefono: z.string().trim().min(8, 'WhatsApp inválido'),
@@ -189,8 +199,6 @@ export const admissionSubmissionSchema = z.object({
     consentimiento_privacidad: z.literal(true),
     consentimiento_tratamiento: z.literal(true),
     firma_data_url: z.string().min(100),
-    documento_identidad_nombre: optionalText,
-    cobertura_nombre: optionalText,
     mode: admissionModeSchema,
 });
 
@@ -227,6 +235,4 @@ export const admissionDefaultValues: AdmissionDraft = {
     consentimiento_privacidad: false,
     consentimiento_tratamiento: false,
     firma_data_url: '',
-    documento_identidad_nombre: '',
-    cobertura_nombre: '',
 };

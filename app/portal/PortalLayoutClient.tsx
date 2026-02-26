@@ -11,10 +11,12 @@ import {
     LogOut,
     Settings,
     ChevronRight,
+    Stethoscope,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
     { href: '/portal/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/portal/prestaciones', icon: Stethoscope, label: 'Mis Prestaciones' },
     { href: '/portal/goals', icon: Target, label: 'Objetivos' },
     { href: '/portal/liquidation', icon: DollarSign, label: 'Liquidaciones' },
     { href: '/portal/profile', icon: Users, label: 'Mi Ficha' },
