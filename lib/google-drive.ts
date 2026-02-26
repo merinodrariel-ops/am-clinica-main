@@ -11,7 +11,7 @@ const FOLDER_IDS = {
 } as const;
 
 export const ORTODONCIA_ROOT_FOLDER_ID = '13LCOTm1tyH8QWw_0N5qTADiDkCKUZFpF';
-export const PACIENTES_ROOT_FOLDER_ID = '1DImiMlrJVgqFLdzx0Q0GTrotkbVduhti';
+export const PACIENTES_ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_PACIENTES || '1DImiMlrJVgqFLdzx0Q0GTrotkbVduhti';
 
 /**
  * Standardizes patient folder names: APELLIDO, Nombre
@@ -109,6 +109,7 @@ export async function createTextFileInFolder(
         const stream = Readable.from(buffer);
 
         const response = await drive.files.create({
+            supportsAllDrives: true,
             requestBody: {
                 name: fileName,
                 parents: [folderId],
@@ -173,6 +174,7 @@ export async function uploadToDrive(
 
         // Upload file
         const response = await drive.files.create({
+            supportsAllDrives: true,
             requestBody: {
                 name: fileName,
                 parents: [parentFolderId],
@@ -207,6 +209,8 @@ export async function createDriveFolder(
         // Check if folder exists
         const existingFolders = await drive.files.list({
             q: `name='${folderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
             fields: 'files(id, name)',
         });
 
@@ -216,6 +220,7 @@ export async function createDriveFolder(
 
         // Create folder
         const newFolder = await drive.files.create({
+            supportsAllDrives: true,
             requestBody: {
                 name: folderName,
                 mimeType: 'application/vnd.google-apps.folder',
@@ -238,6 +243,7 @@ export async function getFolderWebViewLink(folderId: string): Promise<string | n
         const drive = getDrive();
         const file = await drive.files.get({
             fileId: folderId,
+            supportsAllDrives: true,
             fields: 'webViewLink',
         });
         return file.data.webViewLink || null;
@@ -376,6 +382,68 @@ export async function ensurePatientContractFolder(
 }
 
 /**
+ * Ensures a patient's mother folder and presentation subfolder exist.
+ * - Mother: "APELLIDO, Nombre"
+ * - Subfolder: "APELLIDO, Nombre - PRESENTACION"
+ */
+export async function ensurePatientPresentationFolder(
+    apellido: string,
+    nombre: string,
+    motherFolderId?: string
+): Promise<{
+    motherFolderId?: string;
+    motherFolderUrl?: string;
+    presentationFolderId?: string;
+    presentationFolderUrl?: string;
+    error?: string;
+}> {
+    try {
+        const drive = getDrive();
+        const motherFolderName = getPatientFolderName(apellido, nombre);
+        const presentationFolderName = `${motherFolderName} - PRESENTACION`;
+
+        let resolvedMotherFolderId = motherFolderId;
+
+        if (resolvedMotherFolderId) {
+            try {
+                await drive.files.get({
+                    fileId: resolvedMotherFolderId,
+                    supportsAllDrives: true,
+                    fields: 'id',
+                });
+            } catch {
+                resolvedMotherFolderId = undefined;
+            }
+        }
+
+        if (!resolvedMotherFolderId) {
+            const motherResult = await createDriveFolder(drive, PACIENTES_ROOT_FOLDER_ID, motherFolderName);
+            if (motherResult.error || !motherResult.folderId) {
+                return { error: motherResult.error || 'No se pudo crear carpeta madre del paciente' };
+            }
+            resolvedMotherFolderId = motherResult.folderId;
+        }
+
+        const presentationResult = await createDriveFolder(drive, resolvedMotherFolderId, presentationFolderName);
+        if (presentationResult.error || !presentationResult.folderId) {
+            return { error: presentationResult.error || 'No se pudo crear carpeta de presentacion del paciente' };
+        }
+
+        const motherFolderUrl = await getFolderWebViewLink(resolvedMotherFolderId);
+        const presentationFolderUrl = await getFolderWebViewLink(presentationResult.folderId);
+
+        return {
+            motherFolderId: resolvedMotherFolderId,
+            motherFolderUrl: motherFolderUrl || undefined,
+            presentationFolderId: presentationResult.folderId,
+            presentationFolderUrl: presentationFolderUrl || undefined,
+        };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
  * List files in any folder by its ID
  */
 export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string }[]; error?: string }> {
@@ -383,6 +451,8 @@ export async function listFolderFiles(folderId: string): Promise<{ files?: { id:
         const drive = getDrive();
         const response = await drive.files.list({
             q: `'${folderId}' in parents and trashed=false`,
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
             fields: 'files(id, name, webViewLink, mimeType, createdTime)',
             orderBy: 'createdTime desc',
         });
@@ -515,6 +585,8 @@ async function replaceSlidesPlaceholders(
 async function findFileByName(drive: ReturnType<typeof google.drive>, name: string) {
     const res = await drive.files.list({
         q: `name = '${name}' and trashed = false`,
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true,
         fields: 'files(id, name)',
         pageSize: 1,
     });
@@ -536,6 +608,7 @@ export async function createContractFromTemplate(
 
         // 1. Copy the template
         const copyRes = await drive.files.copy({
+            supportsAllDrives: true,
             fileId: templateId,
             requestBody: {
                 name: fileName,
@@ -571,5 +644,37 @@ export async function createContractFromTemplate(
     } catch (error) {
         console.error('Error in createContractFromTemplate:', error);
         return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Validates access to a Drive file/folder in My Drive or Shared Drive.
+ */
+export async function getDriveItemAccess(fileId: string): Promise<{
+    ok: boolean;
+    name?: string;
+    mimeType?: string;
+    webViewLink?: string;
+    error?: string;
+}> {
+    try {
+        const drive = getDrive();
+        const res = await drive.files.get({
+            fileId,
+            supportsAllDrives: true,
+            fields: 'id, name, mimeType, webViewLink',
+        });
+
+        return {
+            ok: Boolean(res.data.id),
+            name: res.data.name || undefined,
+            mimeType: res.data.mimeType || undefined,
+            webViewLink: res.data.webViewLink || undefined,
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+        };
     }
 }

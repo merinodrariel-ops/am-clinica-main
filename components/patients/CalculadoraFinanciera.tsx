@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Download, ExternalLink, FileSignature, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Download, ExternalLink, FileSignature, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { Input } from '@/components/ui/Input';
@@ -15,7 +15,11 @@ import {
     formatUsd,
 } from '@/lib/financial-engine';
 import { buildContractMarkdown } from '@/lib/am-dental-contract-template';
-import { generateAutomatedContractToDriveAction } from '@/app/actions/contracts';
+import {
+    checkContractMakerReadinessAction,
+    generateAutomatedContractToDriveAction,
+    type ContractMakerReadinessResult,
+} from '@/app/actions/contracts';
 import { buildFinancingOfferHtml } from '@/lib/financing-offer-template';
 import { formatIsoDateEsAr, getContractSchedule } from '@/lib/contract-dates';
 
@@ -54,6 +58,8 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
     const [rateError, setRateError] = useState<string | null>(null);
     const [creatingDriveContract, setCreatingDriveContract] = useState(false);
     const [driveContractUrl, setDriveContractUrl] = useState<string | null>(null);
+    const [checkingReadiness, setCheckingReadiness] = useState(false);
+    const [readiness, setReadiness] = useState<ContractMakerReadinessResult | null>(null);
 
     const tratamiento = useMemo(() => {
         if (selectedTreatment === OTHER_TREATMENT_OPTION) {
@@ -178,6 +184,28 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
         }
     }, [financingOfferHtml]);
 
+    const runReadinessCheck = useCallback(async () => {
+        setCheckingReadiness(true);
+        try {
+            const result = await checkContractMakerReadinessAction({
+                patientId: patient.id_paciente,
+                bnaVenta,
+            });
+            setReadiness(result);
+            return result;
+        } finally {
+            setCheckingReadiness(false);
+        }
+    }, [patient.id_paciente, bnaVenta]);
+
+    useEffect(() => {
+        if (!patient.id_paciente) return;
+        const timer = setTimeout(() => {
+            void runReadinessCheck();
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [patient.id_paciente, bnaVenta, runReadinessCheck]);
+
     const handleGenerateInDrive = useCallback(async () => {
         if (!tratamiento.trim()) {
             toast.error('Completa el tratamiento antes de generar el contrato.');
@@ -185,6 +213,12 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
         }
         if (bnaVenta <= 0) {
             toast.error('No hay cotizacion BNA Venta valida para generar el contrato.');
+            return;
+        }
+
+        const readinessResult = await runReadinessCheck();
+        if (!readinessResult.ready) {
+            toast.error('ContratoMaker no está listo. Revisa el semáforo de verificación.');
             return;
         }
 
@@ -209,7 +243,17 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
         } finally {
             setCreatingDriveContract(false);
         }
-    }, [patient.id_paciente, tratamiento, bnaVenta, totalUsd, anticipoPct, cuotas]);
+    }, [patient.id_paciente, tratamiento, bnaVenta, totalUsd, anticipoPct, cuotas, runReadinessCheck]);
+
+    const readinessChecks = readiness?.checks;
+    const readinessRows = readinessChecks
+        ? [
+            { key: 'paciente', label: 'Paciente', ...readinessChecks.paciente },
+            { key: 'cotizacion', label: 'Cotización BNA', ...readinessChecks.cotizacion },
+            { key: 'carpeta', label: 'Carpeta contrato', ...readinessChecks.carpeta },
+            { key: 'plantilla', label: 'Plantilla legal', ...readinessChecks.plantilla },
+        ]
+        : [];
 
     return (
         <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-6 text-slate-100 shadow-2xl shadow-cyan-900/20">
@@ -265,6 +309,49 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
                             className="mt-1 border-slate-600 bg-slate-800/70 text-slate-100"
                         />
                     </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-slate-700 bg-slate-900/60 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-cyan-300">Semáforo ContratoMaker</p>
+                        <button
+                            type="button"
+                            onClick={() => void runReadinessCheck()}
+                            disabled={checkingReadiness}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-slate-600 bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-100 hover:bg-slate-700 disabled:opacity-60"
+                        >
+                            <RefreshCw size={12} className={checkingReadiness ? 'animate-spin' : ''} />
+                            {checkingReadiness ? 'Verificando...' : 'Verificar estado'}
+                        </button>
+                    </div>
+
+                    {readinessRows.length > 0 && (
+                        <div className="mt-2 grid grid-cols-1 gap-1.5 md:grid-cols-2">
+                            {readinessRows.map((row) => (
+                                <div key={row.key} className="flex items-start gap-2 rounded-md border border-slate-700/80 bg-slate-950/50 px-2 py-1.5">
+                                    {row.ok ? (
+                                        <CheckCircle2 size={13} className="mt-0.5 text-emerald-400" />
+                                    ) : (
+                                        <AlertTriangle size={13} className="mt-0.5 text-amber-400" />
+                                    )}
+                                    <div className="min-w-0">
+                                        <p className="text-[11px] font-semibold text-slate-200">{row.label}</p>
+                                        <p className="text-[10px] text-slate-400 break-words">{row.detail}</p>
+                                        {'url' in row && row.url && (
+                                            <a
+                                                href={row.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-cyan-300 hover:underline"
+                                            >
+                                                Abrir recurso <ExternalLink size={10} />
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -424,7 +511,7 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
                         <button
                             type="button"
                             onClick={() => void handleGenerateInDrive()}
-                            disabled={creatingDriveContract}
+                            disabled={creatingDriveContract || checkingReadiness || !readiness?.ready}
                             className="inline-flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/30 disabled:opacity-60"
                         >
                             <FileSignature size={14} />

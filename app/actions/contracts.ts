@@ -5,6 +5,7 @@ import {
     extractFolderIdFromUrl,
     createContractFromTemplate,
     ensurePatientContractFolder,
+    getDriveItemAccess,
 } from '@/lib/google-drive';
 import {
     calculateFinancingBreakdown,
@@ -36,6 +37,23 @@ export interface AutomatedContractInput {
     anticipoPct: number;
     cuotas: number;
     bnaVenta: number;
+}
+
+export interface ContractMakerReadinessInput {
+    patientId: string;
+    bnaVenta: number;
+}
+
+export interface ContractMakerReadinessResult {
+    success: boolean;
+    ready: boolean;
+    checks: {
+        paciente: { ok: boolean; detail: string };
+        cotizacion: { ok: boolean; detail: string };
+        carpeta: { ok: boolean; detail: string; url?: string };
+        plantilla: { ok: boolean; detail: string; url?: string };
+    };
+    error?: string;
 }
 
 interface PatientContractData {
@@ -306,9 +324,124 @@ export async function generateAutomatedContractToDriveAction(input: AutomatedCon
         };
     } catch (error) {
         console.error('Error generating automated fintech contract:', error);
+        const message = error instanceof Error ? error.message : 'Error desconocido';
+
+        if (/quota|storage quota|insufficient storage/i.test(message)) {
+            return {
+                success: false,
+                error: 'Google Drive sin espacio (cuota agotada) en la cuenta integradora. Solucion: liberar espacio/ vaciar papelera de esa cuenta o mover la carpeta de contratos a un Shared Drive con espacio.',
+            };
+        }
+
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Error desconocido',
+            error: message,
         };
+    }
+}
+
+export async function checkContractMakerReadinessAction(
+    input: ContractMakerReadinessInput
+): Promise<ContractMakerReadinessResult> {
+    const fail = (message: string): ContractMakerReadinessResult => ({
+        success: false,
+        ready: false,
+        checks: {
+            paciente: { ok: false, detail: message },
+            cotizacion: { ok: false, detail: 'Sin validar' },
+            carpeta: { ok: false, detail: 'Sin validar' },
+            plantilla: { ok: false, detail: 'Sin validar' },
+        },
+        error: message,
+    });
+
+    try {
+        if (!input.patientId) {
+            return fail('Falta seleccionar paciente');
+        }
+
+        const { data: patient, error: fetchError } = await supabase
+            .from('pacientes')
+            .select('id_paciente, nombre, apellido, link_historia_clinica')
+            .eq('id_paciente', input.patientId)
+            .single();
+
+        if (fetchError || !patient) {
+            return fail('Paciente no encontrado');
+        }
+
+        const motherFolderIdFromPatient = extractFolderIdFromUrl(patient.link_historia_clinica);
+        const folderSetup = await ensurePatientContractFolder(
+            patient.apellido || '',
+            patient.nombre || '',
+            motherFolderIdFromPatient || undefined
+        );
+
+        if (folderSetup.error || !folderSetup.contractFolderId) {
+            return {
+                success: true,
+                ready: false,
+                checks: {
+                    paciente: { ok: true, detail: 'Paciente seleccionado' },
+                    cotizacion: {
+                        ok: Number.isFinite(input.bnaVenta) && input.bnaVenta > 0,
+                        detail: Number.isFinite(input.bnaVenta) && input.bnaVenta > 0
+                            ? 'Cotizacion BNA Venta valida'
+                            : 'Cotizacion BNA Venta invalida',
+                    },
+                    carpeta: {
+                        ok: false,
+                        detail: folderSetup.error || 'No se pudo crear/verificar carpeta de contrato',
+                    },
+                    plantilla: { ok: false, detail: 'Sin validar' },
+                },
+            };
+        }
+
+        if (folderSetup.motherFolderUrl && patient.link_historia_clinica !== folderSetup.motherFolderUrl) {
+            await supabase
+                .from('pacientes')
+                .update({ link_historia_clinica: folderSetup.motherFolderUrl })
+                .eq('id_paciente', input.patientId);
+        }
+
+        const templateAccess = await getDriveItemAccess(CONTRACT_TEMPLATE_ID);
+        const templateMimeType = 'application/vnd.google-apps.document';
+        const templateMimeOk = templateAccess.ok && templateAccess.mimeType === templateMimeType;
+
+        const cotizacionOk = Number.isFinite(input.bnaVenta) && input.bnaVenta > 0;
+
+        const checks: ContractMakerReadinessResult['checks'] = {
+            paciente: { ok: true, detail: 'Paciente seleccionado' },
+            cotizacion: {
+                ok: cotizacionOk,
+                detail: cotizacionOk
+                    ? 'Cotizacion BNA Venta valida'
+                    : 'Cotizacion BNA Venta invalida',
+            },
+            carpeta: {
+                ok: true,
+                detail: 'Carpeta madre y subcarpeta de contrato listas',
+                url: folderSetup.contractFolderUrl || folderSetup.motherFolderUrl,
+            },
+            plantilla: {
+                ok: templateMimeOk,
+                detail: templateMimeOk
+                    ? 'Plantilla legal accesible'
+                    : templateAccess.ok
+                        ? 'La plantilla configurada no es un Google Doc'
+                        : templateAccess.error || 'No se puede acceder a la plantilla legal',
+                url: templateAccess.webViewLink,
+            },
+        };
+
+        return {
+            success: true,
+            ready: checks.paciente.ok && checks.cotizacion.ok && checks.carpeta.ok && checks.plantilla.ok,
+            checks,
+        };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Error desconocido';
+        return fail(message);
     }
 }
