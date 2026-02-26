@@ -63,7 +63,10 @@ function getAuth() {
             client_email: clientEmail,
             private_key: privateKey,
         },
-        scopes: ['https://www.googleapis.com/auth/drive'],
+        scopes: [
+            'https://www.googleapis.com/auth/drive',
+            'https://www.googleapis.com/auth/presentations'
+        ],
     });
 
     return auth;
@@ -303,4 +306,111 @@ export async function deleteFromDrive(fileId: string): Promise<{ success: boolea
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
+}
+
+// Template IDs (These should ideally be in .env)
+const TEMPLATE_FICHA_ID = '1r-Sbwz9eXU3z0z2M3_7HIs-1AtL5U-z3L7Hj0s9z0A'; // Example ID
+const TEMPLATE_PRESUPUESTO_ID = '1LzL0z9eXU3z0z2M3_7HIs-1AtL5U-z3L7Hj0s9z0A'; // Example ID
+
+/**
+ * Copies templates and replaces placeholders for a new patient
+ */
+export async function createPatientDocuments(
+    motherFolderId: string,
+    patientData: { nombre: string; apellido: string; dni: string; fecha: string }
+): Promise<{ fichaUrl?: string; presupuestoUrl?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const slides = google.slides({ version: 'v1', auth: getAuth() });
+
+        // 1. Find the PRESENTACION and PRESUPUESTO subfolders
+        const subfolders = await drive.files.list({
+            q: `'${motherFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id, name)',
+        });
+
+        const presentacionFolder = subfolders.data.files?.find(f => f.name?.includes('PRESENTACION'));
+        const presupuestoFolder = subfolders.data.files?.find(f => f.name?.includes('PRESUPUESTO'));
+
+        if (!presentacionFolder || !presupuestoFolder) {
+            return { error: 'Standard subfolders not found in mother folder' };
+        }
+
+        const results: { fichaUrl?: string; presupuestoUrl?: string } = {};
+
+        // 2. Copy and populate "Ficha/Presentacion"
+        // Search for template by name if ID is not confirmed
+        const fichaTemplate = await findFileByName(drive, 'Plantilla Ficha/Presentacion');
+        if (fichaTemplate) {
+            const newFichaName = `Ficha - ${patientData.apellido}, ${patientData.nombre}`;
+            const copyRes = await drive.files.copy({
+                fileId: fichaTemplate.id!,
+                requestBody: {
+                    name: newFichaName,
+                    parents: [presentacionFolder.id!],
+                },
+            });
+
+            if (copyRes.data.id) {
+                await replaceSlidesPlaceholders(slides, copyRes.data.id, patientData);
+                results.fichaUrl = `https://docs.google.com/presentation/d/${copyRes.data.id}/edit`;
+            }
+        }
+
+        // 3. Copy and populate "Presupuesto"
+        const presupuestoTemplate = await findFileByName(drive, 'Plantilla Presupuesto');
+        if (presupuestoTemplate) {
+            const newPresuName = `Presupuesto - ${patientData.apellido}, ${patientData.nombre}`;
+            const copyRes = await drive.files.copy({
+                fileId: presupuestoTemplate.id!,
+                requestBody: {
+                    name: newPresuName,
+                    parents: [presupuestoFolder.id!],
+                },
+            });
+
+            if (copyRes.data.id) {
+                await replaceSlidesPlaceholders(slides, copyRes.data.id, patientData);
+                results.presupuestoUrl = `https://docs.google.com/presentation/d/${copyRes.data.id}/edit`;
+            }
+        }
+
+        return results;
+    } catch (error) {
+        console.error('Error creating patient documents:', error);
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Replaces placeholders in a Google Slides document
+ */
+async function replaceSlidesPlaceholders(
+    slides: any,
+    presentationId: string,
+    data: { nombre: string; apellido: string; dni: string; fecha: string }
+) {
+    const requests = [
+        { replaceAllText: { replaceText: data.nombre, containsText: { text: '{{Nombre}}', matchCase: false } } },
+        { replaceAllText: { replaceText: data.apellido, containsText: { text: '{{Apellido}}', matchCase: false } } },
+        { replaceAllText: { replaceText: data.dni, containsText: { text: '{{DNI}}', matchCase: false } } },
+        { replaceAllText: { replaceText: data.fecha, containsText: { text: '{{Fecha}}', matchCase: false } } },
+    ];
+
+    await slides.presentations.batchUpdate({
+        presentationId,
+        requestBody: { requests },
+    });
+}
+
+/**
+ * Utility to find a file by name anywhere in the accessible Drive
+ */
+async function findFileByName(drive: any, name: string) {
+    const res = await drive.files.list({
+        q: `name = '${name}' and trashed = false`,
+        fields: 'files(id, name)',
+        pageSize: 1,
+    });
+    return res.data.files && res.data.files.length > 0 ? res.data.files[0] : null;
 }

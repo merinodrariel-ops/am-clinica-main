@@ -22,7 +22,8 @@ import {
     MinusCircle,
     Settings,
     Search,
-    Stethoscope
+    Stethoscope,
+    UserPlus
 } from 'lucide-react';
 
 export default function CommandPalette({ children }: { children: React.ReactNode }) {
@@ -58,16 +59,16 @@ export default function CommandPalette({ children }: { children: React.ReactNode
             name: 'Ir a Pacientes',
             shortcut: ['g', 'p'],
             keywords: 'pacientes lista historial personas',
-            perform: () => router.push('/pacientes'),
+            perform: () => router.push('/patients'),
             icon: <Users className="w-5 h-5" />,
         },
         {
-            id: 'portal',
-            name: 'Ir al Portal Profesional',
-            shortcut: ['g', 'o'],
-            keywords: 'portal profesional odontologo doctor',
-            perform: () => router.push('/portal-profesional'),
-            icon: <Stethoscope className="w-5 h-5" />,
+            id: 'admision',
+            name: 'Ir a Formulario de Admisión',
+            shortcut: ['g', 'm'],
+            keywords: 'admision alta nuevo paciente formulario',
+            perform: () => router.push('/admision'),
+            icon: <UserPlus className="w-5 h-5" />,
         },
         {
             id: 'caja-admin',
@@ -140,8 +141,8 @@ function RenderResults() {
                 ) : (
                     <div
                         className={`px-4 py-3 cursor-pointer flex items-center justify-between transition-all duration-200 ${active
-                                ? 'bg-emerald-50/80 dark:bg-emerald-500/10 border-l-4 border-emerald-500'
-                                : 'bg-transparent border-l-4 border-transparent'
+                            ? 'bg-emerald-50/80 dark:bg-emerald-500/10 border-l-4 border-emerald-500'
+                            : 'bg-transparent border-l-4 border-transparent'
                             }`}
                     >
                         <div className="flex items-center gap-4">

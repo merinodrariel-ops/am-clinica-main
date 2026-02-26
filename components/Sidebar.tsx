@@ -42,7 +42,7 @@ const MENU_ITEMS = [
         icon: CalendarDays,
         label: 'Agenda 360',
         href: '/agenda',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'asistente', 'odontologo']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo']
     },
     {
         icon: Users,

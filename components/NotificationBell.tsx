@@ -83,6 +83,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
 
     // ── Compute unread count ───────────────────────────────────────────────────
     useEffect(() => {
+        if (typeof window === 'undefined') return;
         const lastSeen = localStorage.getItem(LAST_SEEN_KEY) || '1970-01-01';
         const count = todos.filter(t => t.created_at > lastSeen).length;
         setUnread(count);
@@ -91,7 +92,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
     // ── Mark as seen when opening panel ───────────────────────────────────────
     const handleOpen = () => {
         setOpen(v => !v);
-        if (!open) {
+        if (!open && typeof window !== 'undefined') {
             localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
             setUnread(0);
         }

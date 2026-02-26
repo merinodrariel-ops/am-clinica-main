@@ -6,8 +6,10 @@ import {
     ExternalLink,
     Search,
     RefreshCw,
-    Loader2
+    Loader2,
+    UserPlus
 } from 'lucide-react';
+import Link from 'next/link';
 import PatientList from '@/components/patients/PatientList';
 import NuevoPacienteForm from '@/components/patients/NuevoPacienteForm';
 import { getPacientes, getTotalPatientsCount, Paciente } from '@/lib/patients';
@@ -105,15 +107,13 @@ export default function PatientsPage() {
                     {/* Registration Buttons - Protected */}
                     {canEdit('pacientes') && (
                         <div className="flex items-center gap-3">
-                            <a
-                                href={GOOGLE_FORM_URL}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 font-medium transition-colors"
+                            <Link
+                                href="/admision"
+                                className="flex items-center gap-2 px-4 py-2.5 border border-purple-200 dark:border-purple-900/30 bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/20 rounded-lg font-medium transition-colors"
                             >
-                                <ExternalLink size={18} />
-                                Formulario Online
-                            </a>
+                                <UserPlus size={18} />
+                                Formulario Admisión
+                            </Link>
                             <button
                                 onClick={() => handleSyncSheets(false)}
                                 disabled={syncing}
