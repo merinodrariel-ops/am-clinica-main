@@ -130,8 +130,8 @@ export default function AdmissionSettingsPage() {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`w-full flex items-center gap-3 px-6 py-4 rounded-3xl transition-all border-2 text-sm font-bold uppercase tracking-wider ${activeTab === tab.id
-                                        ? 'bg-white border-blue-500 text-blue-600 shadow-lg shadow-blue-100'
-                                        : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-white/50'
+                                    ? 'bg-white border-blue-500 text-blue-600 shadow-lg shadow-blue-100'
+                                    : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-white/50'
                                     }`}
                             >
                                 <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-blue-600' : 'text-slate-300'}`} />
@@ -279,25 +279,25 @@ export default function AdmissionSettingsPage() {
                                     <ListCard
                                         title="Barrios de Argentina"
                                         items={settings.neighborhoods}
-                                        onUpdate={(items) => updateNested('neighborhoods', items)}
+                                        onUpdate={(items: string[]) => updateNested('neighborhoods', items)}
                                         icon={MapPin}
                                     />
                                     <ListCard
                                         title="Ciudades / Zonas"
                                         items={settings.cities}
-                                        onUpdate={(items) => updateNested('cities', items)}
+                                        onUpdate={(items: string[]) => updateNested('cities', items)}
                                         icon={Layout}
                                     />
                                     <ListCard
                                         title="Orígenes (Referencia)"
                                         items={settings.origins}
-                                        onUpdate={(items) => updateNested('origins', items)}
+                                        onUpdate={(items: string[]) => updateNested('origins', items)}
                                         icon={Star}
                                     />
                                     <ListCard
                                         title="Motivos de Consulta"
                                         items={settings.reasons}
-                                        onUpdate={(items) => updateNested('reasons', items)}
+                                        onUpdate={(items: string[]) => updateNested('reasons', items)}
                                         icon={Check}
                                     />
                                 </motion.div>

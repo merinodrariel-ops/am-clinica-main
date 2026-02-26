@@ -287,9 +287,9 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
                             Timeline
                         </button>
                     )}
-                    {treatment.metadata?.drive_folder_url && (
+                    {Boolean(treatment.metadata?.drive_folder_url) && (
                         <a
-                            href={treatment.metadata.drive_folder_url}
+                            href={String(treatment.metadata?.drive_folder_url || '')}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-[11px] text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 px-2 py-0.5 rounded transition-colors"

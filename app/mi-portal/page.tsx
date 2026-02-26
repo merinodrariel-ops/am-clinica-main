@@ -116,7 +116,7 @@ export default function PatientPortalAccess() {
 
                                     <button
                                         type="submit"
-                                        disabled={step === 'loading'}
+                                        disabled={false}
                                         className="w-full group/btn relative flex items-center justify-center gap-3 bg-white text-slate-950 font-black py-5 rounded-3xl transition-all active:scale-[0.98] overflow-hidden shadow-[0_12px_24px_rgba(255,255,255,0.1)]"
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-white/40 to-blue-400/0 opacity-0 group-hover/btn:opacity-100 group-hover/btn:animate-[shimmer_1.5s_infinite] pointer-events-none" />

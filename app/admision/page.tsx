@@ -273,7 +273,7 @@ export default function AdmissionPage() {
         formData.referencia_origen;
 
     if (success) {
-        const isMerino = formData.profesional.includes('Merino');
+        const isMerino = formData.profesional?.includes('Merino') ?? false;
         const paymentLink = isMerino ? 'https://mpago.la/2rjmF2W' : 'https://mpago.la/2MJhrW6';
         const agendaLink = isMerino ? 'https://calendar.app.google/oc4VZPzsDkhwB3r58' : 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ0dDbh9UiGp7dk-OBTfyppeCwNcooGMRJdRwt4GGLrYYRuRXhhOVQV6E-yvCkZRdkjqp5xrpjO4';
 
@@ -322,12 +322,10 @@ export default function AdmissionPage() {
                                 <h3 className="font-black text-white text-lg mb-2">Caja Virtual</h3>
                                 <p className="text-xs text-slate-500 mb-6 leading-relaxed">Aboná tu consulta para confirmar definitivamente tu lugar en la agenda.</p>
                                 <Button
-                                    asChild
                                     className="w-full bg-white text-slate-950 border-none hover:bg-slate-100 h-14 rounded-2xl text-base font-black flex items-center justify-center gap-2 shadow-xl transition-all active:scale-95"
+                                    onClick={() => window.open(paymentLink, '_blank')}
                                 >
-                                    <a href={paymentLink} target="_blank" rel="noopener noreferrer">
-                                        Pagar Consulta <ArrowRight className="w-5 h-5" />
-                                    </a>
+                                    Pagar Consulta <ArrowRight className="w-5 h-5" />
                                 </Button>
                             </motion.div>
 
@@ -660,7 +658,7 @@ export default function AdmissionPage() {
                                             <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Tu Elección</p>
                                             <div className="flex items-center justify-between">
                                                 <p className="font-black text-blue-900">{formData.profesional}</p>
-                                                <p className="font-black text-blue-600">{formData.profesional.includes('Merino') ? 'ARS $100.000' : 'ARS $50.000'}</p>
+                                                <p className="font-black text-blue-600">{formData.profesional?.includes('Merino') ? 'ARS $100.000' : 'ARS $50.000'}</p>
                                             </div>
                                         </div>
                                         <div className="space-y-1 col-span-2 border-t border-slate-100 pt-4">

@@ -87,7 +87,7 @@ export async function submitAdmissionAction(data: AdmissionData) {
                 documento: data.dni,
                 email: data.email,
                 telefono: data.telefono,
-                observaciones_generales: `Profesional: ${data.profesional}`,
+                observaciones_generales: `Profesional: ${data.profesional || 'No especificado'}`,
                 link_google_slides: docResult?.fichaUrl || null,
                 origen_registro: 'Admisión Directa',
             } as any);
@@ -97,7 +97,7 @@ export async function submitAdmissionAction(data: AdmissionData) {
 
         // 4. Send Welcome Email with Payment Info
         try {
-            const isMerino = data.profesional.includes('Merino');
+            const isMerino = data.profesional?.includes('Merino') ?? false;
             const paymentLink = isMerino ? 'https://mpago.la/2rjmF2W' : 'https://mpago.la/2MJhrW6';
             const agendaLink = isMerino ? 'https://calendar.app.google/oc4VZPzsDkhwB3r58' : 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ0dDbh9UiGp7dk-OBTfyppeCwNcooGMRJdRwt4GGLrYYRuRXhhOVQV6E-yvCkZRdkjqp5xrpjO4';
             const buttonText = isMerino ? 'Pagar Dr. Merino' : 'Pagar Staff';
