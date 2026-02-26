@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import {
     Wallet, RefreshCw, ChevronLeft, ChevronRight,
     CheckCircle2, Clock, Banknote, AlertTriangle, XCircle, Play,
-    DollarSign, TrendingUp, Users, FileVideo, FileSpreadsheet,
+    DollarSign, TrendingUp, Users, FileVideo, FileSpreadsheet, ListChecks,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -16,6 +16,7 @@ import {
     rejectLiquidacion,
     LiquidacionAdminRow,
 } from '@/app/actions/liquidaciones';
+import { getTarifarioCompleto, TarifarioItem } from '@/app/actions/prestaciones';
 
 const ProsoftImporter = dynamic(() => import('@/components/portal/ProsoftImporter'), { ssr: false });
 
@@ -84,13 +85,90 @@ function PayDateModal({ onConfirm, onClose }: { onConfirm: (d: string) => void; 
     );
 }
 
+// ─── TarifarioView ────────────────────────────────────────────────────────────
+
+function TarifarioView({ items }: { items: TarifarioItem[] }) {
+    const byArea: Record<string, TarifarioItem[]> = {};
+    for (const item of items) {
+        if (!byArea[item.area_nombre]) byArea[item.area_nombre] = [];
+        byArea[item.area_nombre].push(item);
+    }
+
+    const totalUsd = items.filter(i => i.moneda === 'USD').length;
+    const totalArs = items.filter(i => i.moneda === 'ARS').length;
+
+    if (items.length === 0) {
+        return (
+            <div className="flex items-center justify-center py-20 text-slate-500">
+                <ListChecks size={32} className="mr-3 text-slate-700" />
+                Cargando tarifario...
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Summary */}
+            <div className="flex items-center gap-4 flex-wrap">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center gap-2">
+                    <ListChecks size={14} className="text-indigo-400" />
+                    <span className="text-sm text-slate-300 font-medium">{items.length} prestaciones</span>
+                </div>
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-2.5">
+                    <span className="text-sm text-emerald-400 font-medium">{totalUsd} en USD</span>
+                </div>
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-4 py-2.5">
+                    <span className="text-sm text-blue-400 font-medium">{totalArs} en ARS</span>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5">
+                    <span className="text-sm text-slate-400">{Object.keys(byArea).length} áreas</span>
+                </div>
+            </div>
+
+            {/* Areas */}
+            {Object.entries(byArea).map(([area, areaItems]) => {
+                const isUsd = areaItems[0]?.moneda === 'USD';
+                return (
+                    <div key={area} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                        {/* Area header */}
+                        <div className={`flex items-center justify-between px-5 py-3 border-b border-slate-800 ${isUsd ? 'bg-emerald-500/5' : 'bg-blue-500/5'}`}>
+                            <h3 className="font-bold text-white text-sm">{area}</h3>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${isUsd ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-blue-400 bg-blue-500/10 border-blue-500/20'}`}>
+                                {isUsd ? 'USD' : 'ARS'} · {areaItems.length} items
+                            </span>
+                        </div>
+
+                        {/* Items */}
+                        <div className="divide-y divide-slate-800/60">
+                            {areaItems.map(item => (
+                                <div key={item.id} className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-800/30 transition-colors">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-slate-200">{item.nombre}</p>
+                                        {item.terminos && (
+                                            <p className="text-xs text-slate-500 mt-0.5">{item.terminos}</p>
+                                        )}
+                                    </div>
+                                    <span className={`font-mono font-bold text-sm flex-shrink-0 ${isUsd ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                        {isUsd ? 'USD ' : '$'}{item.precio_base.toLocaleString('es-AR')}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LiquidacionesPage() {
     const now = new Date();
     const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const [tab, setTab] = useState<'liquidaciones' | 'prosoft'>('liquidaciones');
+    const [tab, setTab] = useState<'liquidaciones' | 'prosoft' | 'tarifario'>('liquidaciones');
+    const [tarifario, setTarifario] = useState<TarifarioItem[]>([]);
     const [mes, setMes] = useState(defaultMes);
     const [rows, setRows] = useState<LiquidacionAdminRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -111,6 +189,12 @@ export default function LiquidacionesPage() {
     }, [mes]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (tab === 'tarifario' && tarifario.length === 0) {
+            getTarifarioCompleto().then(setTarifario);
+        }
+    }, [tab, tarifario.length]);
 
     // ── Stats ────────────────────────────────────────────────────────────────
     const totalArs = rows.reduce((s, r) => s + Number(r.liquidacion?.total_ars || 0), 0);
@@ -226,12 +310,23 @@ export default function LiquidacionesPage() {
                     <FileSpreadsheet size={14} />
                     Importar Prosoft
                 </button>
+                <button
+                    onClick={() => setTab('tarifario')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'tarifario' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
+                >
+                    <ListChecks size={14} />
+                    Tarifario
+                </button>
             </div>
 
             {tab === 'prosoft' && (
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                     <ProsoftImporter />
                 </div>
+            )}
+
+            {tab === 'tarifario' && (
+                <TarifarioView items={tarifario} />
             )}
 
             {tab === 'liquidaciones' && <>
