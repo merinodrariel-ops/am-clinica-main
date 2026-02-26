@@ -352,6 +352,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     setShowTarifarioResults(true);
                                 }}
                                 onFocus={() => setShowTarifarioResults(true)}
+                                onBlur={() => setTimeout(() => setShowTarifarioResults(false), 150)}
                             />
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                 <Stethoscope size={16} className="text-gray-400" />
@@ -436,6 +437,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                         if (doctorId) setDoctorId(''); // Clear selection if typing
                                     }}
                                     onFocus={() => setShowDoctorResults(true)}
+                                    onBlur={() => setTimeout(() => setShowDoctorResults(false), 150)}
                                 />
                                 {doctorId && (
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
