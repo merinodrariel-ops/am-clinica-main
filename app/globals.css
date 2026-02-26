@@ -55,10 +55,10 @@
 
   --radius: 0.75rem;
 
-  /* Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  /* Glassmorphism - Sharper Contrast */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
 
   /* Sidebar */
   --sidebar-bg: 230 22% 10%;

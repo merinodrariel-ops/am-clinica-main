@@ -278,82 +278,94 @@ export default function AdmissionPage() {
         const agendaLink = isMerino ? 'https://calendar.app.google/oc4VZPzsDkhwB3r58' : 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ0dDbh9UiGp7dk-OBTfyppeCwNcooGMRJdRwt4GGLrYYRuRXhhOVQV6E-yvCkZRdkjqp5xrpjO4';
 
         return (
-            <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#f8fafc_45%,_#eef2ff_100%)] flex items-center justify-center p-6">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-2xl w-full"
-                >
-                    <Card className="p-10 text-center glass-effect border-blue-100 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600" />
+            <main className="min-h-screen bg-gradient-to-br from-slate-950 via-[#0a1128] to-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
+                {/* Ambient Glows */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px]" />
+                </div>
 
-                        <div className="flex justify-center mb-6">
+                <motion.div
+                    initial={{ opacity: 0, y: 30, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                    className="max-w-2xl w-full relative"
+                >
+                    <Card className="p-12 text-center bg-slate-900/40 backdrop-blur-2xl border border-white/[0.08] rounded-[2.5rem] shadow-[0_32px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/10 relative overflow-hidden">
+                        {/* Premium accent line */}
+                        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-indigo-600 to-blue-500" />
+
+                        <div className="flex justify-center mb-10">
                             <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: 'spring', damping: 12 }}
-                                className="bg-green-100 p-4 rounded-full"
+                                initial={{ scale: 0, rotate: -20 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ type: 'spring', damping: 15, stiffness: 200 }}
+                                className="bg-emerald-500/10 p-6 rounded-[2rem] border border-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.1)]"
                             >
-                                <CheckCircle2 className="w-12 h-12 text-green-600" />
+                                <CheckCircle2 className="w-14 h-14 text-emerald-400" />
                             </motion.div>
                         </div>
 
-                        <h1 className="text-3xl font-bold text-slate-900 mb-2">¡Bienvenido a AM Clinica!</h1>
-                        <p className="text-slate-600 mb-8 max-w-md mx-auto">
-                            Hola <span className="font-semibold text-blue-600">{formData.nombre}</span>, ya eres parte de nuestra comunidad. Haz dado el primer paso hacia tu nueva sonrisa.
+                        <h1 className="text-4xl font-black text-white tracking-tight mb-4">¡Bienvenido a la Familia!</h1>
+                        <p className="text-slate-400 font-medium mb-12 max-w-md mx-auto leading-relaxed">
+                            Hola <span className="text-white font-black">{formData.nombre}</span>, ya sos parte de nuestra comunidad. Empezaste el camino hacia tu mejor versión.
                         </p>
 
-                        <div className="grid gap-4 mb-8">
+                        <div className="grid md:grid-cols-2 gap-6 mb-12">
                             <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.1 }}
-                                className="p-6 bg-white/60 rounded-2xl border border-blue-50 text-left flex items-start gap-4 hover:shadow-md transition-shadow"
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.2 }}
+                                className="p-8 bg-white/[0.02] hover:bg-white/[0.04] rounded-3xl border border-white/[0.05] text-left transition-all group"
                             >
-                                <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">1</div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-slate-900">Pasar por Caja Virtual</h3>
-                                    <p className="text-sm text-slate-500 mb-4">Abona tu consulta para confirmar definitivamente tu cupo.</p>
-                                    <Button
-                                        asChild
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl text-lg flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
-                                    >
-                                        <a href={paymentLink} target="_blank" rel="noopener noreferrer">
-                                            Abonar Consulta <ArrowRight className="w-5 h-5" />
-                                        </a>
-                                    </Button>
-                                </div>
+                                <div className="bg-blue-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 font-black mb-6 shadow-lg shadow-blue-500/20">1</div>
+                                <h3 className="font-black text-white text-lg mb-2">Caja Virtual</h3>
+                                <p className="text-xs text-slate-500 mb-6 leading-relaxed">Aboná tu consulta para confirmar definitivamente tu lugar en la agenda.</p>
+                                <Button
+                                    asChild
+                                    className="w-full bg-white text-slate-950 border-none hover:bg-slate-100 h-14 rounded-2xl text-base font-black flex items-center justify-center gap-2 shadow-xl transition-all active:scale-95"
+                                >
+                                    <a href={paymentLink} target="_blank" rel="noopener noreferrer">
+                                        Pagar Consulta <ArrowRight className="w-5 h-5" />
+                                    </a>
+                                </Button>
                             </motion.div>
 
                             <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.2 }}
-                                className="p-6 bg-white/60 rounded-2xl border border-blue-50 text-left flex items-start gap-4 hover:shadow-md transition-shadow"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="p-8 bg-white/[0.02] hover:bg-white/[0.04] rounded-3xl border border-white/[0.05] text-left transition-all group"
                             >
-                                <div className="bg-slate-200 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">2</div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-slate-900">Elegir Horario</h3>
-                                    <p className="text-sm text-slate-500 mb-2">Una vez realizado el pago, nuestra agenda se abrirá para ti.</p>
-                                    <a href={agendaLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold hover:underline flex items-center gap-1">
-                                        Reservar en calendario oficial <ChevronRight className="w-4 h-4" />
-                                    </a>
-                                </div>
+                                <div className="bg-slate-800 text-slate-400 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 font-black mb-6 border border-white/10">2</div>
+                                <h3 className="font-black text-white text-lg mb-2">Agenda</h3>
+                                <p className="text-xs text-slate-500 mb-6 leading-relaxed">Una vez realizado el pago, nuestra agenda oficial se abrirá para vos.</p>
+                                <a href={agendaLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-blue-400 font-black hover:text-blue-300 transition-colors text-sm">
+                                    Reservar mi turno <ChevronRight className="w-4 h-4" />
+                                </a>
                             </motion.div>
                         </div>
 
-                        <div className="mt-10 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
-                            <p className="text-xs text-slate-500 mb-1 font-bold">ACCESO AL PORTAL</p>
-                            <p className="text-sm text-slate-600">
-                                Tu portal está habilitado. Accede con tu DNI <span className="font-bold text-slate-900">{formData.dni}</span> en <a href="/mi-portal" className="text-blue-600 font-bold hover:underline">mi-portal</a>.
+                        <div className="p-6 bg-gradient-to-br from-blue-600/10 to-indigo-600/10 rounded-3xl border border-blue-500/20 shadow-inner">
+                            <div className="flex items-center justify-center gap-3 mb-3">
+                                <ShieldCheck className="w-5 h-5 text-blue-400" />
+                                <p className="text-[10px] text-blue-200 font-black uppercase tracking-[0.2em]">Acceso Seguro al Portal</p>
+                            </div>
+                            <p className="text-sm text-slate-400 leading-relaxed font-medium">
+                                Tu portal ya está activo. Pedí tu <strong className="text-white">Enlace Mágico</strong> usando el email <span className="text-blue-400 font-black">{formData.email_local}</span> en:
                             </p>
+                            <div className="mt-4">
+                                <a href="/mi-portal" className="inline-flex items-center gap-2 text-white bg-white/5 hover:bg-white/10 px-6 py-2.5 rounded-full border border-white/10 transition-all font-black text-sm">
+                                    mi-portal <ArrowRight size={14} className="text-blue-400" />
+                                </a>
+                            </div>
                         </div>
 
                         <button
                             onClick={() => { localStorage.removeItem('am_admission_data'); window.location.reload(); }}
-                            className="mt-6 text-[10px] text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors"
+                            className="mt-12 text-[9px] text-slate-600 uppercase tracking-[0.3em] font-black hover:text-red-500 transition-colors opacity-50"
                         >
-                            Resetear Ficha (Limpiar)
+                            Resetear Ficha y volver a empezar
                         </button>
                     </Card>
                 </motion.div>

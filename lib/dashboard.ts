@@ -126,6 +126,8 @@ export interface OwnerDashboardStats {
     totalPacientes: number;
     primeraVezMes: number;
     listaPrimeraVez: Array<{ nombre: string; apellido: string; primera_consulta_fecha: string }>;
+    primeraVezMensual: Array<{ key: string; label: string; shortLabel: string; count: number }>;
+    primerasConsultasRecientes: Array<{ nombre: string; apellido: string; primera_consulta_fecha: string; monthKey: string }>;
     ingresosMesUsd: number;
     egresosMesUsd: number;
     personasEnFinanciacion: number;
@@ -147,8 +149,20 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth();
+        const monthsToCompare = 6;
         const monthStart = new Date(year, month, 1).toISOString().split('T')[0];
         const nextMonthStart = new Date(year, month + 1, 1).toISOString().split('T')[0];
+        const comparisonMonthStart = new Date(year, month - (monthsToCompare - 1), 1).toISOString().split('T')[0];
+        const monthWindows = Array.from({ length: monthsToCompare }, (_, index) => {
+            const date = new Date(year, month - (monthsToCompare - 1) + index, 1);
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const shortLabel = date
+                .toLocaleDateString('es-AR', { month: 'short' })
+                .replace('.', '')
+                .slice(0, 3);
+            const label = date.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+            return { key, shortLabel, label };
+        });
 
         // 1. Total Patients (active)
         const { count: totalPacientes } = await supabase
@@ -156,14 +170,48 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             .select('*', { count: 'exact', head: true })
             .eq('is_deleted', false);
 
-        // 2. First-time patients this month (based on actual first consultation date)
-        const { data: primeraVezData, count: primeraVezMes } = await supabase
+        // 2. First-time patients (last months window, based on actual first consultation date)
+        const { data: primeraVezData } = await supabase
             .from('pacientes')
             .select('nombre, apellido, primera_consulta_fecha', { count: 'exact' })
             .eq('is_deleted', false)
-            .gte('primera_consulta_fecha', monthStart)
+            .gte('primera_consulta_fecha', comparisonMonthStart)
             .lt('primera_consulta_fecha', nextMonthStart)
             .order('primera_consulta_fecha', { ascending: false });
+
+        const currentMonthKey = monthStart.slice(0, 7);
+        const monthlyCounts = monthWindows.reduce<Record<string, number>>((acc, monthInfo) => {
+            acc[monthInfo.key] = 0;
+            return acc;
+        }, {});
+
+        const primerasConsultasRecientes = (primeraVezData || []).map((p) => {
+            const monthKey = (p.primera_consulta_fecha || '').slice(0, 7);
+            if (monthKey in monthlyCounts) {
+                monthlyCounts[monthKey] += 1;
+            }
+            return {
+                nombre: p.nombre,
+                apellido: p.apellido,
+                primera_consulta_fecha: p.primera_consulta_fecha,
+                monthKey,
+            };
+        });
+
+        const primeraVezMensual = monthWindows.map((monthInfo) => ({
+            ...monthInfo,
+            count: monthlyCounts[monthInfo.key] || 0,
+        }));
+
+        const listaPrimeraVez = primerasConsultasRecientes
+            .filter((p) => p.monthKey === currentMonthKey)
+            .map((p) => ({
+                nombre: p.nombre,
+                apellido: p.apellido,
+                primera_consulta_fecha: p.primera_consulta_fecha,
+            }));
+
+        const primeraVezMes = monthlyCounts[currentMonthKey] || 0;
 
         // 3. Monthly Income (Reception) — pagado, this month
         const { data: incomeData } = await supabase
@@ -205,12 +253,10 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
 
         return {
             totalPacientes: totalPacientes || 0,
-            primeraVezMes: primeraVezMes || 0,
-            listaPrimeraVez: (primeraVezData || []).map(p => ({
-                nombre: p.nombre,
-                apellido: p.apellido,
-                primera_consulta_fecha: p.primera_consulta_fecha,
-            })),
+            primeraVezMes,
+            listaPrimeraVez,
+            primeraVezMensual,
+            primerasConsultasRecientes,
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
             personasEnFinanciacion,
@@ -223,6 +269,8 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             totalPacientes: 0,
             primeraVezMes: 0,
             listaPrimeraVez: [],
+            primeraVezMensual: [],
+            primerasConsultasRecientes: [],
             ingresosMesUsd: 0,
             egresosMesUsd: 0,
             personasEnFinanciacion: 0,

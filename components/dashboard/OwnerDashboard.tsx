@@ -32,7 +32,8 @@ import {
     RotateCcw,
     ChevronDown,
     ChevronUp,
-    Loader2,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react';
 import { getOwnerDashboardStats, type OwnerDashboardStats } from '@/lib/dashboard';
 import PredictiveInsights from './PredictiveInsights';
@@ -136,6 +137,8 @@ interface KpiCardProps {
     isLarge?: boolean;
     badge?: string;
     expandContent?: React.ReactNode;
+    alwaysExpanded?: boolean;
+    cardClassName?: string;
     isEditing: boolean;
     isHidden: boolean;
     onToggleVisibility: (id: CardId) => void;
@@ -154,18 +157,20 @@ function KpiCard({
     isLarge,
     badge,
     expandContent,
+    alwaysExpanded = false,
+    cardClassName = '',
     isEditing,
     isHidden,
     onToggleVisibility,
 }: KpiCardProps) {
-    const [expanded, setExpanded] = useState(false);
+    const [expanded, setExpanded] = useState(alwaysExpanded);
 
     if (isHidden && !isEditing) return null;
 
     return (
         <div
             className={`glass-card rounded-2xl p-6 transition-all duration-300 relative ${isGiant ? 'col-span-1 md:col-span-2' : ''
-                } ${isHidden ? 'opacity-40' : ''} ${isEditing ? 'ring-1 ring-white/10' : ''}`}
+                } ${isHidden ? 'opacity-40' : ''} ${isEditing ? 'ring-1 ring-white/10' : ''} ${cardClassName}`}
             style={{
                 background: isHidden
                     ? 'hsla(230, 15%, 12%, 0.5)'
@@ -236,20 +241,199 @@ function KpiCard({
 
             {expandContent && !isHidden && (
                 <div className="mt-3">
-                    <button
-                        onClick={() => setExpanded(!expanded)}
-                        className="flex items-center gap-1 text-xs transition-colors"
-                        style={{ color: 'hsl(230 10% 50%)' }}
-                    >
-                        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        {expanded ? 'Ocultar detalle' : 'Ver detalle'}
-                    </button>
-                    {expanded && (
+                    {!alwaysExpanded && (
+                        <button
+                            onClick={() => setExpanded(!expanded)}
+                            className="flex items-center gap-1 text-xs transition-colors"
+                            style={{ color: 'hsl(230 10% 50%)' }}
+                        >
+                            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {expanded ? 'Ocultar detalle' : 'Ver detalle'}
+                        </button>
+                    )}
+                    {(alwaysExpanded || expanded) && (
                         <div
-                            className="mt-2 rounded-xl p-3 max-h-48 overflow-y-auto"
+                            className={`rounded-xl p-3 overflow-y-auto ${alwaysExpanded ? 'mt-0 max-h-80' : 'mt-2 max-h-48'}`}
                             style={{ background: 'hsla(230, 15%, 8%, 0.5)' }}
                         >
                             {expandContent}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function NewPatientsTrendDetail({
+    monthly,
+    consultations,
+}: {
+    monthly: OwnerDashboardStats['primeraVezMensual'];
+    consultations: OwnerDashboardStats['primerasConsultasRecientes'];
+}) {
+    const [selectedMonthKey, setSelectedMonthKey] = useState(monthly[monthly.length - 1]?.key || '');
+    const [showSelectedList, setShowSelectedList] = useState(true);
+    const [showJanuaryList, setShowJanuaryList] = useState(false);
+
+    const selectedIndex = monthly.findIndex((month) => month.key === selectedMonthKey);
+    const safeIndex = selectedIndex >= 0 ? selectedIndex : monthly.length - 1;
+    const selectedMonth = monthly[safeIndex];
+    const previousMonth = safeIndex > 0 ? monthly[safeIndex - 1] : null;
+
+    const currentCount = selectedMonth?.count || 0;
+    const previousCount = previousMonth?.count || 0;
+    const changePct = previousCount > 0
+        ? Math.round(((currentCount - previousCount) / previousCount) * 100)
+        : 0;
+    const trendUp = changePct > 0;
+    const trendDown = changePct < 0;
+
+    const maxCount = Math.max(1, ...monthly.map((month) => month.count));
+    const canPrev = safeIndex > 0;
+    const canNext = safeIndex >= 0 && safeIndex < monthly.length - 1;
+    const selectedPatients = consultations.filter((p) => p.monthKey === selectedMonth?.key);
+
+    const januaryMonth = monthly.find((month) => month.key.endsWith('-01'));
+    const januaryPatients = januaryMonth
+        ? consultations.filter((p) => p.monthKey === januaryMonth.key)
+        : [];
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-lg px-2 py-1" style={{ background: 'hsl(230 15% 12%)', border: '1px solid hsl(230 15% 18%)' }}>
+                <button
+                    type="button"
+                    onClick={() => canPrev && setSelectedMonthKey(monthly[safeIndex - 1].key)}
+                    disabled={!canPrev}
+                    className="p-1 rounded disabled:opacity-30"
+                    style={{ color: 'hsl(230 10% 60%)' }}
+                    aria-label="Mes anterior"
+                >
+                    <ChevronLeft size={14} />
+                </button>
+                <div className="text-center">
+                    <p className="text-xs capitalize" style={{ color: 'hsl(210 20% 85%)' }}>{selectedMonth?.label || 'Sin datos'}</p>
+                    <p className="text-[11px]" style={{ color: 'hsl(230 10% 45%)' }}>
+                        {currentCount} nuevos{previousMonth ? ` · vs ${previousMonth.shortLabel}: ${previousCount}` : ''}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => canNext && setSelectedMonthKey(monthly[safeIndex + 1].key)}
+                    disabled={!canNext}
+                    className="p-1 rounded disabled:opacity-30"
+                    style={{ color: 'hsl(230 10% 60%)' }}
+                    aria-label="Mes siguiente"
+                >
+                    <ChevronRight size={14} />
+                </button>
+            </div>
+
+            <div className="grid grid-cols-6 gap-2 items-end h-32">
+                {monthly.map((month) => {
+                    const isSelected = month.key === selectedMonth?.key;
+                    const height = Math.max(10, Math.round((month.count / maxCount) * 100));
+                    return (
+                        <button
+                            type="button"
+                            key={month.key}
+                            onClick={() => setSelectedMonthKey(month.key)}
+                            className="flex flex-col items-center justify-end gap-1"
+                            title={`${month.label}: ${month.count}`}
+                        >
+                            <span className="text-[10px]" style={{ color: isSelected ? 'hsl(165 85% 50%)' : 'hsl(230 10% 45%)' }}>
+                                {month.count}
+                            </span>
+                            <div
+                                className="w-full rounded-md"
+                                style={{
+                                    height: `${height}%`,
+                                    background: isSelected
+                                        ? 'linear-gradient(180deg, hsl(165 100% 42%), hsl(160 80% 35%))'
+                                        : 'hsl(230 12% 30%)',
+                                    border: isSelected
+                                        ? '1px solid hsla(165, 100%, 42%, 0.5)'
+                                        : '1px solid hsl(230 15% 20%)',
+                                }}
+                            />
+                            <span className="text-[10px] uppercase" style={{ color: isSelected ? 'hsl(210 20% 80%)' : 'hsl(230 10% 45%)' }}>
+                                {month.shortLabel}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {(trendUp || trendDown) && (
+                <p className="text-xs" style={{ color: trendUp ? 'hsl(165 85% 50%)' : 'hsl(0 72% 60%)' }}>
+                    {trendUp ? 'Sube' : 'Baja'} {Math.abs(changePct)}% respecto al mes previo.
+                </p>
+            )}
+
+            <p className="text-[11px]" style={{ color: 'hsl(230 10% 45%)' }}>
+                Tocá una barra para cambiar el mes de referencia.
+            </p>
+
+            <div className="pt-2" style={{ borderTop: '1px solid hsl(230 15% 18%)' }}>
+                <button
+                    type="button"
+                    onClick={() => setShowSelectedList((prev) => !prev)}
+                    className="flex items-center gap-1 text-xs transition-colors"
+                    style={{ color: 'hsl(230 10% 50%)' }}
+                >
+                    {showSelectedList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    {showSelectedList ? 'Ocultar lista del mes' : 'Ver lista del mes'}
+                </button>
+
+                {showSelectedList && (
+                    <div className="mt-2 space-y-1.5">
+                        {selectedPatients.length === 0 ? (
+                            <p className="text-xs" style={{ color: 'hsl(230 10% 45%)' }}>
+                                Sin pacientes nuevos para {selectedMonth?.label || 'el mes seleccionado'}.
+                            </p>
+                        ) : (
+                            selectedPatients.slice(0, 8).map((p, i) => (
+                                <div key={`${p.monthKey}-${p.nombre}-${p.apellido}-${i}`} className="flex items-center gap-2 text-xs" style={{ color: 'hsl(210 20% 80%)' }}>
+                                    <span className="font-medium">{p.nombre} {p.apellido}</span>
+                                    <span style={{ color: 'hsl(230 10% 40%)' }}>
+                                        {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {januaryMonth && (
+                <div className="pt-2" style={{ borderTop: '1px solid hsl(230 15% 18%)' }}>
+                    <button
+                        type="button"
+                        onClick={() => setShowJanuaryList((prev) => !prev)}
+                        className="flex items-center gap-1 text-xs transition-colors"
+                        style={{ color: 'hsl(230 10% 50%)' }}
+                    >
+                        {showJanuaryList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        {showJanuaryList ? 'Ocultar lista de enero' : `Ver lista de enero (${januaryMonth.count})`}
+                    </button>
+
+                    {showJanuaryList && (
+                        <div className="mt-2 space-y-1.5">
+                            {januaryPatients.length === 0 ? (
+                                <p className="text-xs" style={{ color: 'hsl(230 10% 45%)' }}>
+                                    No hay pacientes nuevos en enero.
+                                </p>
+                            ) : (
+                                januaryPatients.slice(0, 8).map((p, i) => (
+                                    <div key={`enero-${p.monthKey}-${p.nombre}-${p.apellido}-${i}`} className="flex items-center gap-2 text-xs" style={{ color: 'hsl(210 20% 80%)' }}>
+                                        <span className="font-medium">{p.nombre} {p.apellido}</span>
+                                        <span style={{ color: 'hsl(230 10% 40%)' }}>
+                                            {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     )}
                 </div>
@@ -359,35 +543,22 @@ export default function OwnerDashboard() {
         'primera-vez': {
             id: 'primera-vez',
             icon: UserPlus,
-            label: '1era Vez',
+            label: 'Pacientes Nuevos',
             value: stats.primeraVezMes,
             badge: currentMonth,
-            subtitle: 'Primera consulta real del mes',
+            subtitle: 'Comparativo mensual de primeras consultas',
             gradient: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(140 70% 35%))',
             iconBg: 'hsla(165, 100%, 42%, 0.15)',
             iconColor: 'hsl(165 85% 50%)',
             isLarge: true,
-            expandContent: stats.listaPrimeraVez.length > 0 ? (
-                <ul className="space-y-1.5">
-                    {stats.listaPrimeraVez.map((p, i) => (
-                        <li key={i} className="flex items-center gap-2 text-xs" style={{ color: 'hsl(210 20% 80%)' }}>
-                            <span
-                                className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-                                style={{
-                                    background: 'hsla(165, 100%, 42%, 0.15)',
-                                    color: 'hsl(165, 85%, 50%)',
-                                }}
-                            >
-                                1era vez
-                            </span>
-                            <span className="font-medium">{p.nombre} {p.apellido}</span>
-                            <span style={{ color: 'hsl(230 10% 40%)' }}>
-                                {new Date(p.primera_consulta_fecha + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-            ) : undefined,
+            cardClassName: 'min-h-[360px] md:min-h-[430px]',
+            alwaysExpanded: true,
+            expandContent: (
+                <NewPatientsTrendDetail
+                    monthly={stats.primeraVezMensual}
+                    consultations={stats.primerasConsultasRecientes}
+                />
+            ),
         },
         'ingresos-mes': {
             id: 'ingresos-mes',
