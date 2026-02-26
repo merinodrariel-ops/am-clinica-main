@@ -93,6 +93,12 @@ const MENU_ITEMS = [
         roles: ['owner', 'admin']
     },
     {
+        icon: Wallet,
+        label: 'Liquidaciones',
+        href: '/admin/liquidaciones',
+        roles: ['owner', 'admin']
+    },
+    {
         icon: Briefcase,
         label: 'Mi Portal',
         href: '/portal/dashboard',

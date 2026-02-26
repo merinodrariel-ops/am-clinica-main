@@ -1,4 +1,5 @@
 import { getCurrentWorkerProfile, getWorkerMonthlyStats, getWorkerAchievements, getWorkerLogs, getWorkerLiquidations, getAllGoals, getGoalProgress, getUserAppProfile } from "@/app/actions/worker-portal";
+import CommanderView from '@/components/portal/CommanderView';
 import {
     Users,
     Calendar,
@@ -41,11 +42,20 @@ function getRoleConfig(rol: string) {
 }
 
 export default async function WorkerDashboard() {
+    // Owner/admin see the Commander View instead of their personal portal
+    const userProfile = await getUserAppProfile();
+    if (['owner', 'admin'].includes(userProfile?.role || '')) {
+        return (
+            <div className="p-6 lg:p-8">
+                <CommanderView />
+            </div>
+        );
+    }
+
     const worker = await getCurrentWorkerProfile();
 
     if (!worker) {
-        const userProfile = await getUserAppProfile();
-        const isAdmin = ['admin', 'owner'].includes(userProfile?.role || '');
+        const isAdmin = false; // already handled above for admin/owner
 
         return (
             <div className="flex flex-col items-center justify-center p-12 text-center h-[70vh]">
