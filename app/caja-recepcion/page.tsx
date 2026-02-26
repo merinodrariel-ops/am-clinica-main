@@ -26,7 +26,16 @@ const ContratosFinanciacionTab = dynamic(() => import('@/components/caja/Contrat
     ),
 });
 
-type CajaTab = 'caja' | 'financiacion' | 'contratos';
+const PresentacionesSyncTab = dynamic(() => import('@/components/caja/PresentacionesSyncTab'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex items-center justify-center py-20">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+        </div>
+    ),
+});
+
+type CajaTab = 'caja' | 'financiacion' | 'contratos' | 'presentaciones';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
 import { supabase } from '@/lib/supabase';
@@ -199,7 +208,9 @@ export default function CajaRecepcionPage() {
     const [filterMetodo, setFilterMetodo] = useState('');
     const initialTab = searchParams.get('tab');
     const [activeTab, setActiveTab] = useState<CajaTab>(
-        initialTab === 'financiacion' || initialTab === 'contratos' ? initialTab : 'caja'
+        initialTab === 'financiacion' || initialTab === 'contratos' || initialTab === 'presentaciones'
+            ? initialTab
+            : 'caja'
     );
 
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
@@ -837,6 +848,18 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                         <FileText size={16} />
                         ContratoMaker
                     </button>
+                    <button
+                        onClick={() => setActiveTab('presentaciones')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'presentaciones' ? '' : 'hover:bg-white/5'}`}
+                        style={activeTab === 'presentaciones' ? {
+                            background: 'hsla(200, 100%, 55%, 0.12)',
+                            color: 'hsl(195, 95%, 68%)',
+                            border: '1px solid hsla(200, 100%, 55%, 0.2)',
+                        } : { color: 'hsl(230 10% 50%)' }}
+                    >
+                        <FileImage size={16} />
+                        Presentaciones
+                    </button>
                 </div>
 
                 {/* Tab Content: Financiación */}
@@ -845,6 +868,11 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 {/* Tab Content: Contratos */}
                 {activeTab === 'contratos' && (
                     <ContratosFinanciacionTab initialPatientId={searchParams.get('patientId') || undefined} />
+                )}
+
+                {/* Tab Content: Presentaciones */}
+                {activeTab === 'presentaciones' && (
+                    <PresentacionesSyncTab initialPatientId={searchParams.get('patientId') || undefined} />
                 )}
 
                 {/* Tab Content: Caja */}
