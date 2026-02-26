@@ -1,14 +1,23 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/Button';
 
 export default function AdmissionQrPage() {
+    const [runtimeBaseUrl] = useState(() =>
+        typeof window !== 'undefined' ? window.location.origin : '',
+    );
+
     const admissionUrl = useMemo(() => {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || runtimeBaseUrl;
         return baseUrl ? `${baseUrl.replace(/\/$/, '')}/admision?mode=online` : '';
-    }, []);
+    }, [runtimeBaseUrl]);
+
+    const whatsappShareUrl = useMemo(() => {
+        if (!admissionUrl) return '';
+        return `https://wa.me/?text=${encodeURIComponent(`Hola, te comparto el formulario de admisión: ${admissionUrl}`)}`;
+    }, [admissionUrl]);
 
     const copyLink = async () => {
         if (!admissionUrl) return;
@@ -37,6 +46,14 @@ export default function AdmissionQrPage() {
                             <Button onClick={copyLink} className="h-11 rounded-xl bg-slate-900 text-white hover:bg-slate-800">
                                 Copiar enlace
                             </Button>
+                            <a
+                                href={whatsappShareUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0284c7] px-4 text-sm font-semibold text-white hover:bg-[#0369a1]"
+                            >
+                                Compartir por WhatsApp
+                            </a>
                             <Button onClick={() => window.print()} variant="outline" className="h-11 rounded-xl">
                                 Imprimir QR
                             </Button>

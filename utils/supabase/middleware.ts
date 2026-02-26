@@ -47,9 +47,14 @@ export async function updateSession(request: NextRequest) {
         path === '/login' ||
         path.startsWith('/auth') ||
         path === '/' ||
+        path === '/admision' ||
+        path.startsWith('/admision/') ||
+        path === '/mi-portal' ||
+        path.startsWith('/mi-portal/') ||
         path === '/privacy-policy' ||
         path === '/terms' ||
         path.startsWith('/forgot-password') ||
+        path.startsWith('/api/patient-portal/') ||
         path.startsWith('/api/sync-') ||
         path.startsWith('/api/import-') ||
         path.startsWith('/api/workflows/') ||

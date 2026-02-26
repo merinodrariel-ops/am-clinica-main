@@ -10,8 +10,11 @@ import {
     ChevronRight,
     ClipboardCheck,
     CloudOff,
+    Copy,
     HeartPulse,
+    Link2,
     Mail,
+    MessageCircle,
     Phone,
     RefreshCcw,
     Search,
@@ -169,6 +172,9 @@ function readModeFromUrl(): AdmissionMode | null {
 }
 
 export function AdmissionForm() {
+    const [runtimeBaseUrl] = useState(() =>
+        typeof window !== 'undefined' ? window.location.origin : '',
+    );
     const [mode, setMode] = useState<AdmissionMode>(() => {
         const queryMode = readModeFromUrl();
         if (queryMode) return queryMode;
@@ -232,10 +238,29 @@ export function AdmissionForm() {
     ]);
 
     const progressValue = useMemo(() => Math.round((step / 5) * 100), [step]);
-    const publicAdmissionBase = process.env.NEXT_PUBLIC_APP_URL || '';
+    const publicAdmissionBase = process.env.NEXT_PUBLIC_APP_URL || runtimeBaseUrl;
     const publicAdmissionUrl = publicAdmissionBase
         ? `${publicAdmissionBase.replace(/\/$/, '')}/admision?mode=online`
         : '';
+    const shareAdmissionWhatsAppUrl = useMemo(() => {
+        if (!publicAdmissionUrl) return '';
+        const text = `Hola, te comparto el formulario de admisión de AM Clinica Dental: ${publicAdmissionUrl}`;
+        return `https://wa.me/?text=${encodeURIComponent(text)}`;
+    }, [publicAdmissionUrl]);
+
+    const copyAdmissionLink = useCallback(async () => {
+        if (!publicAdmissionUrl) {
+            toast.error('No pudimos construir el enlace público todavía.');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(publicAdmissionUrl);
+            toast.success('Link copiado para compartir por WhatsApp');
+        } catch {
+            toast.error('No se pudo copiar. Cópialo manualmente desde el campo.');
+        }
+    }, [publicAdmissionUrl]);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -694,6 +719,35 @@ export function AdmissionForm() {
                         </div>
                     </div>
 
+                    <div className="mb-6 rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] p-4">
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0b6c83]">Compartir por WhatsApp</p>
+                        <p className="mt-1 text-sm text-slate-700">Usa este enlace público para enviarlo al paciente en segundos.</p>
+
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <div className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-[#7dd3fc] bg-white px-3">
+                                <Link2 className="h-4 w-4 shrink-0 text-slate-400" />
+                                <span className="truncate text-xs text-slate-700">{publicAdmissionUrl || 'Detectando URL pública...'}</span>
+                            </div>
+                            <Button
+                                type="button"
+                                onClick={copyAdmissionLink}
+                                className="h-11 rounded-xl bg-slate-900 px-4 text-white hover:bg-slate-800"
+                            >
+                                <Copy className="mr-2 h-4 w-4" /> Copiar link
+                            </Button>
+                            {shareAdmissionWhatsAppUrl && (
+                                <a
+                                    href={shareAdmissionWhatsAppUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0284c7] px-4 text-sm font-semibold text-white hover:bg-[#0369a1]"
+                                >
+                                    <MessageCircle className="mr-2 h-4 w-4" /> Enviar por WhatsApp
+                                </a>
+                            )}
+                        </div>
+                    </div>
+
                     {mode === 'manual' && (
                         <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <label className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Autocompletar paciente</label>
@@ -795,12 +849,17 @@ export function AdmissionForm() {
                                             />
                                         </Field>
                                         <Field label="DNI (opcional)" error={errors.dni}>
-                                            <Input
-                                                value={formData.dni}
-                                                onChange={(event) => updateField('dni', event.target.value)}
-                                                placeholder="Solo si lo deseas cargar"
-                                                className="h-12 rounded-xl"
-                                            />
+                                            <>
+                                                <Input
+                                                    value={formData.dni}
+                                                    onChange={(event) => updateField('dni', event.target.value)}
+                                                    placeholder="Solo para casos legales (ej. financiación)"
+                                                    className="h-12 rounded-xl"
+                                                />
+                                                <p className="text-xs text-slate-500">
+                                                    No es obligatorio para admisión general de pacientes.
+                                                </p>
+                                            </>
                                         </Field>
                                         <Field label="CUIT (opcional)" error={errors.cuit}>
                                             <Input
