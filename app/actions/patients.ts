@@ -29,7 +29,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             .from('pacientes')
             .select('*')
             .eq('is_deleted', false)
-            .or(`documento.eq.${patientData.documento || 'nonexistent'},email.eq.${patientData.email || 'nonexistent'}`);
+            .or(`documento.eq.${patientData.documento || 'nonexistent'},email.eq.${patientData.email || 'nonexistent'},cuit.eq.${patientData.cuit || 'nonexistent'}`);
 
         if (searchError) throw new Error(searchError.message);
 
@@ -83,7 +83,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             // Fields to check
             const fields: (keyof Paciente)[] = [
                 'nombre', 'apellido', 'documento', 'fecha_nacimiento',
-                'email', 'telefono', 'ciudad', 'zona_barrio', 'direccion',
+                'email', 'telefono', 'cuit', 'ciudad', 'zona_barrio', 'direccion',
                 'observaciones_generales', 'estado_paciente', 'origen_registro',
                 'whatsapp_pais_code', 'whatsapp_numero', 'email_local', 'email_dominio'
             ];

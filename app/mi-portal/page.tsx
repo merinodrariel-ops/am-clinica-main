@@ -110,6 +110,17 @@ export default function PatientPortalAccess() {
                                 <p className="text-slate-600 text-xs text-center mt-6">
                                     🔒 Enlace de un solo uso · Sin contraseña · Expira en 24h
                                 </p>
+
+                                <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                                    <p className="text-slate-500 text-xs mb-3">¿Sos nuevo paciente?</p>
+                                    <a
+                                        href="/admision"
+                                        className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                                    >
+                                        Completar formulario de admisión
+                                        <ArrowRight size={14} />
+                                    </a>
+                                </div>
                             </motion.div>
                         )}
 

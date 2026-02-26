@@ -15,15 +15,12 @@ function LoginForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [magicLoading, setMagicLoading] = useState(false);
-    const [magicNotice, setMagicNotice] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        setMagicNotice(null);
 
         try {
             const { error } = await supabase.auth.signInWithPassword({
@@ -43,40 +40,6 @@ function LoginForm() {
         }
     };
 
-    const handleMagicLink = async () => {
-        const normalizedEmail = email.trim().toLowerCase();
-        if (!normalizedEmail) {
-            setError('Ingresá tu email para recibir el Magic Link');
-            return;
-        }
-
-        setMagicLoading(true);
-        setError(null);
-        setMagicNotice(null);
-
-        try {
-            const callbackUrl = new URL('/auth/callback', location.origin);
-            callbackUrl.searchParams.set('next', redirectPath);
-
-            const { error: otpError } = await supabase.auth.signInWithOtp({
-                email: normalizedEmail,
-                options: {
-                    emailRedirectTo: callbackUrl.toString(),
-                    shouldCreateUser: true,
-                },
-            });
-
-            if (otpError) {
-                setError(otpError.message);
-            } else {
-                setMagicNotice('Te enviamos un enlace magico a tu email. Revisa bandeja y spam.');
-            }
-        } catch {
-            setError('No se pudo enviar el Magic Link');
-        } finally {
-            setMagicLoading(false);
-        }
-    };
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
@@ -105,10 +68,10 @@ function LoginForm() {
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                     }}>
-                        AM Clínica
+                        Acceso Interno · AM Clínica
                     </h2>
                     <p className="mt-2 text-sm" style={{ color: 'hsl(230 10% 50%)' }}>
-                        Iniciá sesión para acceder a tu cuenta
+                        Iniciá sesión para administrar la clínica
                     </p>
                 </div>
                 <div className="mt-6 flex flex-col gap-2">
@@ -201,11 +164,6 @@ function LoginForm() {
                         </div>
                     )}
 
-                    {magicNotice && (
-                        <div className="text-sm text-center p-2.5 rounded-xl badge-success">
-                            {magicNotice}
-                        </div>
-                    )}
 
                     <div className="flex items-center justify-end">
                         <div className="text-sm">
@@ -218,7 +176,7 @@ function LoginForm() {
                     <div>
                         <button
                             type="submit"
-                            disabled={loading || magicLoading}
+                            disabled={loading}
                             className="w-full flex justify-center py-2.5 px-4 text-sm font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
                                 background: 'linear-gradient(135deg, hsl(165 100% 38%), hsl(165 100% 30%))',
@@ -236,27 +194,6 @@ function LoginForm() {
                         </button>
                     </div>
 
-                    <div>
-                        <button
-                            type="button"
-                            onClick={handleMagicLink}
-                            disabled={loading || magicLoading}
-                            className="w-full flex justify-center py-2.5 px-4 text-sm font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{
-                                background: 'hsla(165, 100%, 42%, 0.08)',
-                                border: '1px solid hsla(165, 100%, 42%, 0.2)',
-                                color: 'hsl(165 85% 50%)',
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'hsla(165, 100%, 42%, 0.12)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'hsla(165, 100%, 42%, 0.08)'}
-                        >
-                            {magicLoading ? (
-                                <Loader2 className="animate-spin h-5 w-5" />
-                            ) : (
-                                'Ingresar con Magic Link'
-                            )}
-                        </button>
-                    </div>
                 </form>
             </div>
         </div>

@@ -65,7 +65,8 @@ function getAuth() {
         },
         scopes: [
             'https://www.googleapis.com/auth/drive',
-            'https://www.googleapis.com/auth/presentations'
+            'https://www.googleapis.com/auth/presentations',
+            'https://www.googleapis.com/auth/documents'
         ],
     });
 
@@ -413,4 +414,57 @@ async function findFileByName(drive: any, name: string) {
         pageSize: 1,
     });
     return res.data.files && res.data.files.length > 0 ? res.data.files[0] : null;
+}
+
+/**
+ * Copies a Google Doc template and replaces placeholders using the Docs API
+ */
+export async function createContractFromTemplate(
+    folderId: string,
+    templateId: string,
+    fileName: string,
+    placeholders: Record<string, string>
+): Promise<{ docId?: string; docUrl?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const docs = google.docs({ version: 'v1', auth: getAuth() });
+
+        // 1. Copy the template
+        const copyRes = await drive.files.copy({
+            fileId: templateId,
+            requestBody: {
+                name: fileName,
+                parents: [folderId],
+            },
+        });
+
+        const newDocId = copyRes.data.id;
+        if (!newDocId) throw new Error('Failed to copy template');
+
+        // 2. Prepare replacement requests for Docs API
+        // Note: Docs API batchUpdate uses a different structure than Slides
+        const requests = Object.entries(placeholders).map(([key, value]) => ({
+            replaceAllText: {
+                replaceText: value || '',
+                containsText: {
+                    text: `{{${key}}}`,
+                    matchCase: false,
+                },
+            },
+        }));
+
+        // 3. Apply the replacements
+        await docs.documents.batchUpdate({
+            documentId: newDocId,
+            requestBody: { requests },
+        });
+
+        return {
+            docId: newDocId,
+            docUrl: `https://docs.google.com/document/d/${newDocId}/edit`,
+        };
+    } catch (error) {
+        console.error('Error in createContractFromTemplate:', error);
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
 }

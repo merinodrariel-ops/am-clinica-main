@@ -19,6 +19,7 @@ import {
     Save,
     Plus,
     FileIcon,
+    FileSignature,
     ExternalLink,
     TrendingUp,
     Check,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
+import ContractGenerator from './ContractGenerator';
 import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
 import Link from 'next/link';
@@ -78,6 +80,7 @@ const TABS = [
     { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
     { id: 'smile_design', label: 'Smile Design ✨', icon: Sparkles },
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
+    { id: 'contrato', label: 'Contrato', icon: FileSignature },
 ];
 
 // Payment-related tabs hidden from odontólogos
@@ -840,6 +843,13 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 patientId={patient.id_paciente}
                                 patientName={`${patient.nombre} ${patient.apellido}`}
                             />
+                        )}
+
+                        {/* Tab: Contrato */}
+                        {activeTab === 'contrato' && (
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
+                                <ContractGenerator patient={patient} />
+                            </div>
                         )}
 
                     </motion.div>

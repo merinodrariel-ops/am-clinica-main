@@ -9,8 +9,10 @@ export interface Paciente {
     id_sede?: number;
     nombre: string;
     apellido: string;
-    documento?: string | null;
-    fecha_nacimiento?: string | null;
+    // Datos de identificación extra
+    documento: string | null;
+    cuit: string | null;
+    fecha_nacimiento: string | null;
     email?: string | null;
     telefono?: string | null;
     fecha_alta?: string | null;

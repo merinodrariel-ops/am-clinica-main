@@ -10,28 +10,36 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export type AdmissionData = {
+    id_paciente?: string; // Optional for incremental updates
     nombre: string;
     apellido: string;
     dni: string;
     email: string;
     telefono: string;
-    profesional: string;
+    cuit?: string;
+    profesional?: string;
+    motivo_consulta?: string;
+    referencia_origen?: string;
 };
 
 export async function submitAdmissionAction(data: AdmissionData) {
     try {
         console.log('Starting admission process for:', data.nombre, data.apellido);
 
-        // 1. Insert into Supabase
+        // 1. Insert into Supabase (Correcting 'dni' to 'documento')
         const { data: created, error: createError } = await supabase
             .from('pacientes')
-            .insert({
+            .upsert({
+                id_paciente: data.id_paciente, // If provided, update existing record
                 nombre: data.nombre,
                 apellido: data.apellido,
-                dni: data.dni,
+                documento: data.dni,
                 email: data.email,
                 telefono: data.telefono,
-                fecha_alta: new Date().toISOString(),
+                cuit: data.cuit,
+                motivo_consulta: data.motivo_consulta,
+                referencia_origen: data.referencia_origen,
+                fecha_alta: data.id_paciente ? undefined : new Date().toISOString(), // Only set on create
                 is_deleted: false,
             })
             .select()
@@ -129,5 +137,42 @@ export async function submitAdmissionAction(data: AdmissionData) {
     } catch (error) {
         console.error('Admission error:', error);
         return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Partial save for lead capture.
+ * Saves only essential data to ensure contact info is kept early.
+ */
+export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
+    try {
+        const { data: upserted, error } = await supabase
+            .from('pacientes')
+            .upsert({
+                id_paciente: data.id_paciente,
+                nombre: data.nombre,
+                apellido: data.apellido,
+                documento: data.dni,
+                email: data.email,
+                telefono: data.telefono,
+                motivo_consulta: data.motivo_consulta,
+                referencia_origen: data.referencia_origen,
+                cuit: data.cuit,
+                is_deleted: false,
+                fecha_alta: data.id_paciente ? undefined : new Date().toISOString(),
+                origen_registro: 'Admisión Web (Lead)'
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Lead upsert error:', error);
+            return { success: false, error: error.message };
+        }
+
+        return { success: true, patientId: upserted.id_paciente };
+    } catch (err) {
+        console.error('Unexpected lead upsert error:', err);
+        return { success: false, error: 'Error inesperado' };
     }
 }
