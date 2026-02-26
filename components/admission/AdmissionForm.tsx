@@ -175,6 +175,7 @@ export function AdmissionForm() {
     const [runtimeBaseUrl] = useState(() =>
         typeof window !== 'undefined' ? window.location.origin : '',
     );
+    const [isInternalSession] = useState(() => readModeFromUrl() === 'manual');
     const [mode, setMode] = useState<AdmissionMode>(() => {
         const queryMode = readModeFromUrl();
         if (queryMode) return queryMode;
@@ -238,6 +239,7 @@ export function AdmissionForm() {
     ]);
 
     const progressValue = useMemo(() => Math.round((step / 5) * 100), [step]);
+    const isInternalMode = mode === 'manual';
     const publicAdmissionBase = process.env.NEXT_PUBLIC_APP_URL || runtimeBaseUrl;
     const publicAdmissionUrl = publicAdmissionBase
         ? `${publicAdmissionBase.replace(/\/$/, '')}/admision?mode=online`
@@ -592,7 +594,7 @@ export function AdmissionForm() {
 
         if (response.result?.success) {
             setSuccess(true);
-            toast.success('Admisión finalizada y automatizaciones activadas');
+            toast.success(isInternalMode ? 'Admisión finalizada y automatizaciones activadas' : 'Admisión enviada con éxito');
             return;
         }
 
@@ -602,6 +604,7 @@ export function AdmissionForm() {
         fullEmail,
         fullPhone,
         healthAlerts,
+        isInternalMode,
         mode,
         submitWithTriggers,
         validateStep,
@@ -612,63 +615,73 @@ export function AdmissionForm() {
         const waMessage = `Hola ${patientName}, gracias por confiar en AM Clinica Dental. Tu carpeta ya fue creada y el Dr. Ariel Merino te espera para tu diagnóstico.`;
 
         return (
-            <main className="min-h-screen bg-gradient-to-br from-[#f4f8fb] via-white to-[#eaf7fb] px-4 py-8 sm:px-6">
+            <main className="min-h-screen bg-gradient-to-br from-[#f4f8fb] via-white to-[#eaf7fb] px-4 py-8 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 sm:px-6">
                 <div className="mx-auto max-w-3xl">
-                    <Card className="rounded-3xl border border-[#c9e5ef] bg-white p-6 shadow-xl sm:p-10">
+                    <Card className="rounded-3xl border border-[#c9e5ef] bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:p-10">
                         <div className="mb-6 flex items-center gap-3">
                             <div className="rounded-2xl bg-[#0ea5c6]/10 p-3 text-[#0b6c83]">
                                 <BadgeCheck className="h-6 w-6" />
                             </div>
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#0b6c83]">Admisión completada</p>
-                                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Checklist de automatización ejecutado</h1>
+                                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">
+                                    {isInternalSession ? 'Checklist de automatización ejecutado' : 'Solicitud recibida correctamente'}
+                                </h1>
                             </div>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            {Object.entries(lastResult?.triggers || {}).map(([key, status]) => (
-                                <div
-                                    key={key}
-                                    className={`rounded-2xl border p-4 ${status.ok ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
-                                >
-                                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">{key}</p>
-                                    <p className="mt-1 text-sm font-medium text-slate-900">{status.detail}</p>
+                        {isInternalSession ? (
+                            <>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    {Object.entries(lastResult?.triggers || {}).map(([key, status]) => (
+                                        <div
+                                            key={key}
+                                            className={`rounded-2xl border p-4 ${status.ok ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+                                        >
+                                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">{key}</p>
+                                            <p className="mt-1 text-sm font-medium text-slate-900">{status.detail}</p>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
 
-                        <div className="mt-6 rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] p-4">
-                            <p className="text-sm text-slate-700">
-                                Recomendado para recepción: comparte esta URL por WhatsApp o genera QR sobre `/admision?mode=online` para auto registro.
-                            </p>
-                            {publicAdmissionUrl ? (
-                                <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-[#7dd3fc] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">QR Recepción</p>
-                                        <p className="text-sm text-slate-700">{publicAdmissionUrl}</p>
-                                    </div>
-                                    <QRCodeCanvas value={publicAdmissionUrl} size={96} includeMargin />
+                                <div className="mt-6 rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] p-4">
+                                    <p className="text-sm text-slate-700">
+                                        Recomendado para recepción: comparte esta URL por WhatsApp o genera QR sobre `/admision?mode=online` para auto registro.
+                                    </p>
+                                    {publicAdmissionUrl ? (
+                                        <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-[#7dd3fc] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">QR Recepción</p>
+                                                <p className="text-sm text-slate-700">{publicAdmissionUrl}</p>
+                                            </div>
+                                            <QRCodeCanvas value={publicAdmissionUrl} size={96} includeMargin />
+                                        </div>
+                                    ) : (
+                                        <p className="mt-3 text-xs text-slate-500">
+                                            Define `NEXT_PUBLIC_APP_URL` para habilitar QR absoluto (ideal para cartel en recepción).
+                                        </p>
+                                    )}
+                                    <a
+                                        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#0891b2] px-4 py-2 text-sm font-semibold text-white"
+                                        href={`https://wa.me/?text=${encodeURIComponent(waMessage)}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Enviar WhatsApp de bienvenida
+                                    </a>
                                 </div>
-                            ) : (
-                                <p className="mt-3 text-xs text-slate-500">
-                                    Define `NEXT_PUBLIC_APP_URL` para habilitar QR absoluto (ideal para cartel en recepción).
-                                </p>
-                            )}
-                            <a
-                                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#0891b2] px-4 py-2 text-sm font-semibold text-white"
-                                href={`https://wa.me/?text=${encodeURIComponent(waMessage)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                            >
-                                Enviar WhatsApp de bienvenida
-                            </a>
-                        </div>
+                            </>
+                        ) : (
+                            <div className="rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] p-4 text-sm text-slate-700">
+                                Gracias por completar tu admisión. Nuestro equipo revisará tus datos y te contactará por WhatsApp para coordinar el siguiente paso.
+                            </div>
+                        )}
 
                         <Button
                             onClick={resetForm}
                             className="mt-8 h-12 w-full rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
                         >
-                            Cargar nueva admisión
+                            {isInternalSession ? 'Cargar nueva admisión' : 'Finalizar'}
                         </Button>
                     </Card>
                 </div>
@@ -677,7 +690,7 @@ export function AdmissionForm() {
     }
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-[#f4f8fb] via-white to-[#eaf7fb] px-4 py-6 sm:px-6 sm:py-8">
+        <main className="min-h-screen bg-gradient-to-br from-[#f4f8fb] via-white to-[#eaf7fb] px-4 py-6 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 sm:px-6 sm:py-8">
             <div className="mx-auto max-w-4xl">
                 {!isOnline && (
                     <div className="mb-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -693,33 +706,37 @@ export function AdmissionForm() {
                     </div>
                 )}
 
-                <Card className="rounded-3xl border border-[#c9e5ef] bg-white p-4 shadow-xl sm:p-8">
+                <Card className="rounded-3xl border border-[#c9e5ef] bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-500 [&_select]:text-slate-900 sm:p-8">
                     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#0b6c83]">AM Clinica Dental</p>
-                            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Formulario de Admisión</h1>
-                            <p className="mt-1 text-sm text-slate-600">Flujo guiado, mobile-first y preparado para recepción.</p>
+                            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Formulario de Admisión</h1>
+                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                {isInternalSession ? 'Flujo guiado, mobile-first y preparado para recepción.' : 'Completa tus datos para iniciar tu atención.'}
+                            </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1 text-sm">
-                            <button
-                                type="button"
-                                onClick={() => setMode('online')}
-                                className={`rounded-xl px-3 py-2 font-semibold ${mode === 'online' ? 'bg-white text-slate-900 shadow' : 'text-slate-600'}`}
-                            >
-                                Modo online
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setMode('manual')}
-                                className={`rounded-xl px-3 py-2 font-semibold ${mode === 'manual' ? 'bg-white text-slate-900 shadow' : 'text-slate-600'}`}
-                            >
-                                Modo recepción
-                            </button>
-                        </div>
+                        {isInternalSession && (
+                            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1 text-sm">
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('online')}
+                                    className={`rounded-xl px-3 py-2 font-semibold ${mode === 'online' ? 'bg-white text-slate-900 shadow' : 'text-slate-600'}`}
+                                >
+                                    Modo online
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('manual')}
+                                    className={`rounded-xl px-3 py-2 font-semibold ${mode === 'manual' ? 'bg-white text-slate-900 shadow' : 'text-slate-600'}`}
+                                >
+                                    Modo recepción
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    <div className="mb-6 rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] p-4">
+                    {isInternalSession && <div className="mb-6 rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] p-4">
                         <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0b6c83]">Compartir por WhatsApp</p>
                         <p className="mt-1 text-sm text-slate-700">Usa este enlace público para enviarlo al paciente en segundos.</p>
 
@@ -746,7 +763,7 @@ export function AdmissionForm() {
                                 </a>
                             )}
                         </div>
-                    </div>
+                    </div>}
 
                     {mode === 'manual' && (
                         <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -881,7 +898,7 @@ export function AdmissionForm() {
                                             <select
                                                 value={formData.whatsapp_pais_code}
                                                 onChange={(event) => updateField('whatsapp_pais_code', event.target.value)}
-                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                             >
                                                 {PAIS_CODES.map((item) => (
                                                     <option key={item.code} value={item.code}>
@@ -928,7 +945,7 @@ export function AdmissionForm() {
                                             <select
                                                 value={formData.email_dominio}
                                                 onChange={(event) => updateField('email_dominio', event.target.value)}
-                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                             >
                                                 {EMAIL_DOMAINS.map((domain) => (
                                                     <option key={domain} value={domain}>
@@ -955,7 +972,7 @@ export function AdmissionForm() {
                                             <select
                                                 value={formData.ciudad}
                                                 onChange={(event) => updateField('ciudad', event.target.value)}
-                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                             >
                                                 {settings.cities.map((city) => (
                                                     <option key={city} value={city}>
@@ -968,7 +985,7 @@ export function AdmissionForm() {
                                             <select
                                                 value={formData.zona_barrio}
                                                 onChange={(event) => updateField('zona_barrio', event.target.value)}
-                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                             >
                                                 <option value="">Seleccionar</option>
                                                 {settings.neighborhoods.map((item) => (
@@ -1089,7 +1106,7 @@ export function AdmissionForm() {
                                             <select
                                                 value={formData.referencia_origen}
                                                 onChange={(event) => updateField('referencia_origen', event.target.value)}
-                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+                                                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                             >
                                                 <option value="">Seleccionar</option>
                                                 {settings.origins.map((origin) => (
