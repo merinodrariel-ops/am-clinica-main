@@ -87,9 +87,10 @@ DECLARE
     v_apellido TEXT;
     v_area     TEXT;
     v_tipo     TEXT;
+    v_rol      TEXT;
     v_pid      UUID;
 BEGIN
-    -- Skip if no name or email
+    -- Skip if no email
     IF NEW.email IS NULL THEN
         RETURN NEW;
     END IF;
@@ -109,6 +110,7 @@ BEGIN
         WHEN 'reception'       THEN 'Recepción'
         WHEN 'laboratorio'     THEN 'Laboratorio'
         WHEN 'asistente'       THEN 'Asistente Dental'
+        WHEN 'odontologo'      THEN 'Odontología General'
         WHEN 'pricing_manager' THEN 'Administración'
         WHEN 'developer'       THEN 'Tecnología'
         WHEN 'partner_viewer'  THEN 'Administración'
@@ -116,7 +118,20 @@ BEGIN
     END;
 
     -- Map role → tipo
-    v_tipo := CASE WHEN NEW.role = 'owner' THEN 'profesional' ELSE 'empleado' END;
+    v_tipo := CASE WHEN NEW.role IN ('owner', 'odontologo') THEN 'profesional' ELSE 'empleado' END;
+
+    -- Map role → rol (display label, NOT NULL in personal)
+    v_rol := CASE NEW.role
+        WHEN 'owner'           THEN 'Director/a'
+        WHEN 'admin'           THEN 'Administrativo/a'
+        WHEN 'reception'       THEN 'Recepcionista'
+        WHEN 'laboratorio'     THEN 'Laboratorio'
+        WHEN 'asistente'       THEN 'Asistente'
+        WHEN 'odontologo'      THEN 'Odontólogo/a'
+        WHEN 'developer'       THEN 'Desarrollador/a'
+        WHEN 'partner_viewer'  THEN 'Socio/a'
+        ELSE                        'Personal'
+    END;
 
     -- Try to find linked personal record
     SELECT id INTO v_pid FROM public.personal WHERE user_id = NEW.id;
@@ -146,11 +161,11 @@ BEGIN
                 updated_at = now()
             WHERE id = v_pid;
         ELSE
-            -- Create brand new record
+            -- Create brand new record (all NOT NULL columns covered)
             INSERT INTO public.personal (
-                nombre, apellido, email, area, tipo, activo, user_id, valor_hora_ars
+                nombre, apellido, email, area, tipo, rol, activo, user_id, valor_hora_ars
             ) VALUES (
-                v_nombre, v_apellido, NEW.email, v_area, v_tipo, true, NEW.id, 0
+                v_nombre, v_apellido, NEW.email, v_area, v_tipo, v_rol, true, NEW.id, 0
             )
             ON CONFLICT DO NOTHING;
         END IF;
