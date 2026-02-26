@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import AgendaCalendar from '@/components/agenda/AgendaCalendar';
-import AgendaAutopilotPanel from '@/components/agenda/AgendaAutopilotPanel';
+import TodaySchedulePanel from '@/components/agenda/TodaySchedulePanel';
 import WaitingRoomDashboard from '@/components/agenda/WaitingRoomDashboard';
 import DoctorScheduleConfig from '@/components/agenda/DoctorScheduleConfig';
-import { Calendar, Users, Settings, BrainCircuit } from 'lucide-react';
+import { Calendar, Users, Settings } from 'lucide-react';
 
 type Tab = 'calendar' | 'waiting' | 'config';
 
@@ -57,7 +57,7 @@ export default function AgendaPage() {
                         <AgendaCalendar />
                     </div>
                     <div className="min-h-[320px] xl:min-h-0">
-                        <AgendaAutopilotPanel />
+                        <TodaySchedulePanel />
                     </div>
                 </div>
             )}

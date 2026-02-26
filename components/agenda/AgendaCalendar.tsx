@@ -17,8 +17,9 @@ import { getAppointments, updateAppointment, getDoctors } from '@/app/actions/ag
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown } from 'lucide-react';
-import { useEffect } from 'react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone } from 'lucide-react';
+import { useEffect, useRef as useRefCallback } from 'react';
+import { toast } from 'sonner';
 
 interface AppointmentModalData {
     id?: string;
@@ -65,7 +66,28 @@ interface Doctor {
     role: string;
 }
 
+interface QuickPopup {
+    appointmentId: string;
+    title: string;
+    patientName: string;
+    doctorName: string;
+    startTime: string;
+    currentStatus: string;
+    x: number;
+    y: number;
+    fullData: AppointmentModalData;
+}
+
 type ViewMode = 'calendar' | 'resource';
+
+const STATUS_FLOW: { key: string; label: string; color: string }[] = [
+    { key: 'confirmed',   label: 'Confirmado',   color: 'bg-blue-500' },
+    { key: 'arrived',     label: 'Llegó',        color: 'bg-green-500' },
+    { key: 'in_progress', label: 'En atención',  color: 'bg-purple-500' },
+    { key: 'completed',   label: 'Finalizado',   color: 'bg-gray-400' },
+    { key: 'cancelled',   label: 'Cancelado',    color: 'bg-red-500' },
+    { key: 'no_show',     label: 'No vino',      color: 'bg-gray-800' },
+];
 
 // Doctor palette — assigned deterministically by index
 const DOCTOR_COLORS = [
@@ -86,6 +108,8 @@ export default function AgendaCalendar() {
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [activeDoctorIds, setActiveDoctorIds] = useState<Set<string>>(new Set(['all']));
     const [resourceDate, setResourceDate] = useState<Date>(new Date());
+    const [quickPopup, setQuickPopup] = useState<QuickPopup | null>(null);
+    const [updatingStatus, setUpdatingStatus] = useState(false);
     const { role } = useAuth();
 
     // Load doctors for filter bar
@@ -114,7 +138,7 @@ export default function AgendaCalendar() {
         const safeStart = event.start || new Date();
         const safeEnd = event.end || new Date(safeStart.getTime() + 30 * 60 * 1000);
 
-        setSelectedEvent({
+        const fullData: AppointmentModalData = {
             id: event.id,
             title: event.title,
             start: safeStart,
@@ -126,7 +150,42 @@ export default function AgendaCalendar() {
             doctorId: props.doctor_id || '',
             patient: props.patient,
             doctor: props.doctor
+        };
+
+        // Calcular posición del popup cerca del evento
+        const rect = (arg.el as HTMLElement).getBoundingClientRect();
+        const x = Math.min(rect.left, window.innerWidth - 320);
+        const y = Math.min(rect.bottom + 8, window.innerHeight - 280);
+
+        setQuickPopup({
+            appointmentId: event.id,
+            title: event.title,
+            patientName: props.patient?.full_name || '',
+            doctorName: props.doctor?.full_name || '',
+            startTime: safeStart.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            currentStatus: props.status || 'confirmed',
+            x, y,
+            fullData,
         });
+    };
+
+    const handleQuickStatusChange = async (appointmentId: string, newStatus: string) => {
+        setUpdatingStatus(true);
+        try {
+            await updateAppointment(appointmentId, { status: newStatus });
+            setQuickPopup(null);
+            refreshCalendar();
+            toast.success('Estado actualizado');
+        } catch {
+            toast.error('Error al actualizar');
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
+    const openFullModal = (data: AppointmentModalData) => {
+        setQuickPopup(null);
+        setSelectedEvent(data);
         setModalOpen(true);
     };
 
@@ -417,6 +476,79 @@ export default function AgendaCalendar() {
                     onSave={refreshCalendar}
                     initialData={selectedEvent}
                 />
+            )}
+
+            {/* Quick Status Popup */}
+            {quickPopup && (
+                <>
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setQuickPopup(null)}
+                    />
+                    {/* Popup */}
+                    <div
+                        className="fixed z-50 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+                        style={{ left: quickPopup.x, top: quickPopup.y }}
+                    >
+                        {/* Header */}
+                        <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="font-semibold text-gray-900 dark:text-white text-sm truncate leading-tight">
+                                        {quickPopup.patientName || quickPopup.title}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        {quickPopup.startTime}
+                                        {quickPopup.doctorName && ` · ${quickPopup.doctorName.split(' ')[0]}`}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setQuickPopup(null)}
+                                    className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-0.5"
+                                >
+                                    <X size={15} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Status pills */}
+                        <div className="p-3 space-y-1.5">
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">
+                                Cambiar estado
+                            </p>
+                            {STATUS_FLOW.map(s => (
+                                <button
+                                    key={s.key}
+                                    disabled={updatingStatus}
+                                    onClick={() => handleQuickStatusChange(quickPopup.appointmentId, s.key)}
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50 ${
+                                        quickPopup.currentStatus === s.key
+                                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    }`}
+                                >
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${s.color}`} />
+                                    {s.label}
+                                    {quickPopup.currentStatus === s.key && (
+                                        <span className="ml-auto text-[10px] text-gray-400">actual</span>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Edit button */}
+                        <div className="px-3 pb-3">
+                            <button
+                                onClick={() => openFullModal(quickPopup.fullData)}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-xl transition-colors hover:bg-blue-50"
+                            >
+                                <Edit2 size={12} />
+                                Editar turno completo
+                            </button>
+                        </div>
+                    </div>
+                </>
             )}
         </div>
     );

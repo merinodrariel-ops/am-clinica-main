@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
-import { X, Loader2, Search, User, Trash2, Check, Stethoscope } from 'lucide-react';
+import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -62,6 +62,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [patients, setPatients] = useState<Patient[]>([]);
     const [searching, setSearching] = useState(false);
     const [selectedPatientName, setSelectedPatientName] = useState('');
+    const [selectedPatientPhone, setSelectedPatientPhone] = useState('');
 
 
     // Tarifario Search State
@@ -260,14 +261,27 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     </div>
                                     <div>
                                         <span className="block font-medium text-gray-900 dark:text-white leading-tight">{selectedPatientName}</span>
-                                        <span className="text-xs text-blue-500 font-medium">Paciente Registrado</span>
+                                        {selectedPatientPhone ? (
+                                            <a
+                                                href={`https://wa.me/${selectedPatientPhone.replace(/\D/g, '').replace(/^0/, '549')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={e => e.stopPropagation()}
+                                                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium mt-0.5"
+                                            >
+                                                <MessageCircle size={11} />
+                                                {selectedPatientPhone}
+                                            </a>
+                                        ) : (
+                                            <span className="text-xs text-blue-500 font-medium">Paciente Registrado</span>
+                                        )}
                                     </div>
                                 </div>
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => { setPatientId(''); setSelectedPatientName(''); setSearchTerm(''); }}
+                                    onClick={() => { setPatientId(''); setSelectedPatientName(''); setSelectedPatientPhone(''); setSearchTerm(''); }}
                                     className="text-gray-400 hover:text-red-500 rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all h-auto p-2"
                                 >
                                     <X size={18} />
@@ -304,6 +318,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                                 onClick={() => {
                                                     setPatientId(p.id);
                                                     setSelectedPatientName(p.full_name);
+                                                    setSelectedPatientPhone(p.phone || '');
                                                     setSearchTerm('');
                                                     setPatients([]);
                                                     if (!title) setTitle(`Consulta - ${p.full_name}`);
