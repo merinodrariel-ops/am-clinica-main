@@ -73,58 +73,52 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [doctorSearch, setDoctorSearch] = useState('');
     const [showDoctorResults, setShowDoctorResults] = useState(false);
 
+    // Cargar datos de soporte solo cuando abre el modal
     useEffect(() => {
         if (isOpen) {
             loadDoctors();
             loadTarifario();
-            if (initialData) {
-                // Edit Mode
-                setTitle(initialData.title || '');
-                setPatientId(initialData.patientId || '');
-                setDoctorId(initialData.doctorId || '');
-                if (initialData.doctor) {
-                    setDoctorId(initialData.doctorId || '');
-                    setDoctorSearch(initialData.doctor.full_name || '');
-                } else if (doctors.length > 0) {
-                    // Find the doctor name if only id is available locally
-                    const doc = doctors.find(d => d.id === initialData.doctorId);
-                    if (doc) setDoctorSearch(doc.full_name);
-                }
-                // Ensure dates are valid Date objects
-                const start = initialData.start instanceof Date ? initialData.start : new Date(initialData.start);
-                const end = initialData.end instanceof Date ? initialData.end : new Date(initialData.end);
-
-                setStartTime(toDateTimeLocal(start));
-                setEndTime(toDateTimeLocal(end));
-                setStatus(initialData.status || 'confirmed');
-                setType(initialData.type || 'consulta');
-                setNotes(initialData.notes || '');
-                setSelectedPatientName(initialData.patient?.full_name || '');
-            } else if (initialDate) {
-                // Create Mode with specific date (from single click)
-                setTitle('');
-                setPatientId('');
-                setDoctorId('');
-                setDoctorSearch('');
-                setSelectedPatientName('');
-                setSearchTerm('');
-                setTarifarioSearch('');
-
-                // For single click, initialDate is the start time
-                const start = new Date(initialDate);
-                const end = new Date(start);
-                end.setMinutes(end.getMinutes() + 30);
-                setStartTime(toDateTimeLocal(start));
-                setEndTime(toDateTimeLocal(end));
-
-                setStatus('confirmed');
-                setType('consulta');
-                setNotes('');
-                setSelectedPatientName('');
-                setSearchTerm('');
-            }
         }
-    }, [isOpen, initialData, initialDate, doctors]);
+    }, [isOpen]);
+
+    // Inicializar formulario cuando cambian los datos iniciales
+    useEffect(() => {
+        if (!isOpen) return;
+        if (initialData) {
+            // Edit Mode
+            setTitle(initialData.title || '');
+            setPatientId(initialData.patientId || '');
+            setDoctorId(initialData.doctorId || '');
+            if (initialData.doctor) {
+                setDoctorSearch(initialData.doctor.full_name || '');
+            }
+            const start = initialData.start instanceof Date ? initialData.start : new Date(initialData.start);
+            const end = initialData.end instanceof Date ? initialData.end : new Date(initialData.end);
+            setStartTime(toDateTimeLocal(start));
+            setEndTime(toDateTimeLocal(end));
+            setStatus(initialData.status || 'confirmed');
+            setType(initialData.type || 'consulta');
+            setNotes(initialData.notes || '');
+            setSelectedPatientName(initialData.patient?.full_name || '');
+        } else if (initialDate) {
+            // Create Mode con fecha específica
+            setTitle('');
+            setPatientId('');
+            setDoctorId('');
+            setDoctorSearch('');
+            setSelectedPatientName('');
+            setSearchTerm('');
+            setTarifarioSearch('');
+            const start = new Date(initialDate);
+            const end = new Date(start);
+            end.setMinutes(end.getMinutes() + 30);
+            setStartTime(toDateTimeLocal(start));
+            setEndTime(toDateTimeLocal(end));
+            setStatus('confirmed');
+            setType('consulta');
+            setNotes('');
+        }
+    }, [isOpen, initialData, initialDate]);
 
     // Search Patients Debounce
     useEffect(() => {
