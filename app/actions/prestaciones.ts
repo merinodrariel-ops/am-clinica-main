@@ -267,6 +267,36 @@ export async function getPrestacionesAdmin(
     return (data || []) as PrestacionRealizada[];
 }
 
+// ─── HC del paciente ─────────────────────────────────────────────────────────
+
+export interface PrestacionConProfesional extends PrestacionRealizada {
+    profesional_nombre?: string;
+    profesional_apellido?: string;
+}
+
+/** Todas las prestaciones de un paciente, con nombre del profesional */
+export async function getPrestacionesByPaciente(
+    pacienteId: string
+): Promise<PrestacionConProfesional[]> {
+    const admin = getAdminClient();
+    const { data, error } = await admin
+        .from('prestaciones_realizadas')
+        .select('*, personal!profesional_id (nombre, apellido)')
+        .eq('paciente_id', pacienteId)
+        .order('fecha_realizacion', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching prestaciones del paciente:', error);
+        return [];
+    }
+
+    return (data || []).map((p: Record<string, unknown>) => ({
+        ...(p as unknown as PrestacionRealizada),
+        profesional_nombre: (p.personal as { nombre?: string } | null)?.nombre,
+        profesional_apellido: (p.personal as { apellido?: string } | null)?.apellido,
+    }));
+}
+
 // ─── Pacientes (search) ───────────────────────────────────────────────────────
 
 export async function buscarPacientes(q: string): Promise<

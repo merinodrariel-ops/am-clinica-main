@@ -35,6 +35,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { supabase } from '@/lib/supabase';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
+import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import PatientCommandCenter from './PatientCommandCenter';
 import PatientCadence from '@/components/recalls/PatientCadence';
 
@@ -67,6 +68,7 @@ interface PatientDashboardProps {
     planes: PlanTratamiento[];
     payments: Movement[];
     appointments: AppointmentSignal[];
+    prestaciones?: PrestacionConProfesional[];
 }
 
 const TABS = [
@@ -81,7 +83,7 @@ const TABS = [
 // Payment-related tabs hidden from odontólogos
 const PAYMENT_TABS = new Set(['finanzas']);
 
-export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments }: PatientDashboardProps) {
+export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [] }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { role } = useAuth();
@@ -440,6 +442,73 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Prestaciones Realizadas — HC desde la app */}
+                        {activeTab === 'historia' && prestaciones.length > 0 && (
+                            <div className="mt-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+                                <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-base font-semibold">Prestaciones Realizadas</h2>
+                                        <p className="text-xs text-gray-400 mt-0.5">{prestaciones.length} registros · cargados desde el portal</p>
+                                    </div>
+                                    <div className="flex gap-3 text-xs font-medium">
+                                        <span className="text-blue-600 dark:text-blue-400">
+                                            ARS {prestaciones.filter(p => p.moneda_cobro === 'ARS').reduce((s, p) => s + Number(p.monto_honorarios || 0), 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                                        </span>
+                                        {prestaciones.some(p => p.moneda_cobro === 'USD') && (
+                                            <span className="text-emerald-600 dark:text-emerald-400">
+                                                USD {prestaciones.filter(p => p.moneda_cobro === 'USD').reduce((s, p) => s + Number(p.monto_honorarios || 0), 0).toFixed(2)}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-gray-50 dark:divide-gray-800">
+                                    {prestaciones.map(p => {
+                                        const profNombre = [p.profesional_nombre, p.profesional_apellido].filter(Boolean).join(' ') || '—';
+                                        const fecha = new Date(p.fecha_realizacion + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+                                        const isUsd = p.moneda_cobro === 'USD';
+                                        return (
+                                            <div key={p.id} className="px-5 py-4 flex flex-col md:flex-row md:items-center gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-sm text-gray-800 dark:text-gray-200">{p.prestacion_nombre}</p>
+                                                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                                        <span className="text-xs text-gray-400">{fecha}</span>
+                                                        <span className="text-xs text-gray-400">·</span>
+                                                        <span className="text-xs text-gray-500 font-medium">{profNombre}</span>
+                                                        {p.notas && (
+                                                            <>
+                                                                <span className="text-xs text-gray-400">·</span>
+                                                                <span className="text-xs text-gray-400 italic">{p.notas}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3 flex-shrink-0">
+                                                    <span className={`font-mono font-bold text-sm ${isUsd ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                                        {isUsd ? 'USD ' : '$'}{Number(p.monto_honorarios || 0).toLocaleString('es-AR')}
+                                                    </span>
+                                                    {p.slides_url ? (
+                                                        <a
+                                                            href={p.slides_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
+                                                        >
+                                                            <ExternalLink size={10} />
+                                                            Slides
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-xs px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                                                            Sin slides
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
 
