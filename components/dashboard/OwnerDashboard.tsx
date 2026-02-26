@@ -39,7 +39,7 @@ import PredictiveInsights from './PredictiveInsights';
 
 const STORAGE_KEY = 'owner-dashboard-layout';
 
-type CardId = 'total-pacientes' | 'primera-vez' | 'ingresos-mes' | 'egresos-mes' | 'en-financiacion' | 'deuda-total';
+type CardId = 'total-pacientes' | 'primera-vez' | 'ingresos-mes' | 'egresos-mes' | 'en-financiacion' | 'deuda-total' | 'predictive-pulse';
 
 interface LayoutConfig {
     order: CardId[];
@@ -47,6 +47,7 @@ interface LayoutConfig {
 }
 
 const DEFAULT_ORDER: CardId[] = [
+    'predictive-pulse',
     'total-pacientes',
     'primera-vez',
     'ingresos-mes',
@@ -296,11 +297,12 @@ export default function OwnerDashboard() {
         }
     }, []);
 
-    const toggleVisibility = useCallback((id: CardId) => {
+    const toggleVisibility = useCallback((id: string) => {
+        const cardId = id as CardId;
         setLayout(prev => {
-            const hidden = prev.hidden.includes(id)
-                ? prev.hidden.filter(h => h !== id)
-                : [...prev.hidden, id];
+            const hidden = prev.hidden.includes(cardId)
+                ? prev.hidden.filter(h => h !== cardId)
+                : [...prev.hidden, cardId];
             const newLayout = { ...prev, hidden };
             saveLayout(newLayout);
             return newLayout;
@@ -342,7 +344,7 @@ export default function OwnerDashboard() {
 
     if (!stats) return null;
 
-    const cardData: Record<CardId, Omit<KpiCardProps, 'isEditing' | 'isHidden' | 'onToggleVisibility'>> = {
+    const cardData: Partial<Record<CardId, Omit<KpiCardProps, 'isEditing' | 'isHidden' | 'onToggleVisibility'>>> = {
         'total-pacientes': {
             id: 'total-pacientes',
             icon: Users,
@@ -529,7 +531,6 @@ export default function OwnerDashboard() {
                 </div>
             )}
 
-            <PredictiveInsights />
 
             {/* Cards Grid */}
             <DndContext
@@ -540,6 +541,19 @@ export default function OwnerDashboard() {
                 <SortableContext items={visibleCards} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {visibleCards.map(id => {
+                            if (id === 'predictive-pulse') {
+                                return (
+                                    <div key={id} className="col-span-1 md:col-span-2">
+                                        <SortableCard id={id} isEditing={isEditing}>
+                                            <PredictiveInsights
+                                                isEditing={isEditing}
+                                                isHidden={layout.hidden.includes(id)}
+                                                onToggleVisibility={toggleVisibility}
+                                            />
+                                        </SortableCard>
+                                    </div>
+                                );
+                            }
                             const card = cardData[id];
                             if (!card) return null;
                             return (

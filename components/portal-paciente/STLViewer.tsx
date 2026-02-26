@@ -103,12 +103,14 @@ export default function STLViewer({ url }: STLViewerProps) {
                         const scale = 80 / maxDim;
 
                         const material = new THREE.MeshPhysicalMaterial({
-                            color: 0xF0EDE8,        // Warm tooth-white
-                            roughness: 0.25,
-                            metalness: 0.05,
-                            reflectivity: 0.5,
-                            clearcoat: 0.3,
-                            clearcoatRoughness: 0.1,
+                            color: 0xF7F3EE,        // Clean, bright tooth-white
+                            roughness: 0.18,        // Slightly smoother for a polished look
+                            metalness: 0.02,
+                            reflectivity: 0.8,      // Higher reflectivity for "glaze" feel
+                            clearcoat: 0.5,         // More clearcoat for that glossy finish
+                            clearcoatRoughness: 0.05,
+                            transmission: 0.1,      // Subtle translucency 
+                            thickness: 0.5,
                         });
 
                         const mesh = new THREE.Mesh(geometry, material);

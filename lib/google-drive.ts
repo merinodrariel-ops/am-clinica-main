@@ -10,6 +10,44 @@ const FOLDER_IDS = {
     'pacientes': process.env.GOOGLE_DRIVE_FOLDER_PACIENTES || '',
 } as const;
 
+export const ORTODONCIA_ROOT_FOLDER_ID = '13LCOTm1tyH8QWw_0N5qTADiDkCKUZFpF';
+export const PACIENTES_ROOT_FOLDER_ID = '1DImiMlrJVgqFLdzx0Q0GTrotkbVduhti';
+
+/**
+ * Standardizes patient folder names: APELLIDO, Nombre
+ */
+export function getPatientFolderName(apellido: string, nombre: string): string {
+    const cleanApellido = (apellido || '').toUpperCase().trim();
+    const cleanNombre = (nombre || '').trim();
+    // Capitalize first letter of name, rest lowercase
+    const formattedNombre = cleanNombre ? cleanNombre.charAt(0).toUpperCase() + cleanNombre.slice(1).toLowerCase() : '';
+
+    return `${cleanApellido}, ${formattedNombre}`.trim();
+}
+
+
+/**
+ * Extracts a Google Drive folder ID from various URL formats
+ */
+export function extractFolderIdFromUrl(url: string | null | undefined): string | null {
+    if (!url) return null;
+
+    // Handle standard folder URLs: drive.google.com/drive/folders/ID
+    // Also handle possible variations
+    const folderMatch = url.match(/folders\/([a-zA-Z0-9_-]{25,})/);
+    if (folderMatch && folderMatch[1]) return folderMatch[1];
+
+    // Handle open?id=ID format
+    const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]{25,})/);
+    if (idMatch && idMatch[1]) return idMatch[1];
+
+    // If the input itself looks like an ID, return it
+    if (/^[a-zA-Z0-9_-]{25,}$/.test(url)) return url;
+
+    return null;
+}
+
+
 type AreaType = keyof typeof FOLDER_IDS;
 
 function getAuth() {
@@ -68,7 +106,7 @@ export async function uploadToDrive(
 
         // Create subfolder if specified
         if (subfolder) {
-            const subfolderResult = await getOrCreateSubfolder(drive, parentFolderId, subfolder);
+            const subfolderResult = await createDriveFolder(drive, parentFolderId, subfolder);
             if (subfolderResult.error) {
                 return { success: false, error: subfolderResult.error };
             }
@@ -110,7 +148,7 @@ export async function uploadToDrive(
     }
 }
 
-async function getOrCreateSubfolder(
+export async function createDriveFolder(
     drive: ReturnType<typeof google.drive>,
     parentFolderId: string,
     folderName: string
@@ -143,29 +181,100 @@ async function getOrCreateSubfolder(
 }
 
 /**
- * List files in a folder
+ * Retrieves the webViewLink for a folder ID
  */
-export async function listDriveFiles(
-    area: AreaType,
-    subfolder?: string
-): Promise<{ files?: { id: string; name: string; webViewLink: string }[]; error?: string }> {
+export async function getFolderWebViewLink(folderId: string): Promise<string | null> {
     try {
         const drive = getDrive();
-        let folderId = FOLDER_IDS[area];
+        const file = await drive.files.get({
+            fileId: folderId,
+            fields: 'webViewLink',
+        });
+        return file.data.webViewLink || null;
+    } catch (error) {
+        console.error('Error fetching folder webViewLink:', error);
+        return null;
+    }
+}
 
-        if (!folderId) {
-            return { error: `Folder not configured for area: ${area}` };
+
+/**
+ * Creates a folder for a workflow (e.g. Orthodontics)
+ */
+export async function createWorkflowFolder(folderName: string, parentId?: string): Promise<{ folderId?: string; webViewLink?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const parentFolderId = parentId || ORTODONCIA_ROOT_FOLDER_ID;
+        const result = await createDriveFolder(drive, parentFolderId, folderName);
+
+        if (result.error) return { error: result.error };
+
+        // Get the webViewLink
+        const file = await drive.files.get({
+
+            fileId: result.folderId!,
+            fields: 'webViewLink',
+        });
+
+        return {
+            folderId: result.folderId,
+            webViewLink: file.data.webViewLink || undefined
+        };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Ensures the standard patient hierarchy exists:
+ * Mother Folder (APELLIDO, Nombre)
+ *   ├── APELLIDO, Nombre - FOTO & VIDEO
+ *   ├── APELLIDO, Nombre - PRESENTACION
+ *   └── APELLIDO, Nombre - PRESUPUESTO
+ */
+export async function ensureStandardPatientFolders(apellido: string, nombre: string): Promise<{ motherFolderId?: string; motherFolderUrl?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const motherFolderName = getPatientFolderName(apellido, nombre);
+
+        // 1. Ensure Mother Folder exists
+        const motherResult = await createDriveFolder(drive, PACIENTES_ROOT_FOLDER_ID, motherFolderName);
+        if (motherResult.error || !motherResult.folderId) return { error: motherResult.error };
+
+        const motherFolderId = motherResult.folderId;
+
+        // 2. Create the 3 standard subfolders
+        const subfolders = [
+            `${motherFolderName} - FOTO & VIDEO`,
+            `${motherFolderName} - PRESENTACION`,
+            `${motherFolderName} - PRESUPUESTO`
+        ];
+
+        for (const subName of subfolders) {
+            await createDriveFolder(drive, motherFolderId, subName);
         }
 
-        if (subfolder) {
-            const subfolderResult = await getOrCreateSubfolder(drive, folderId, subfolder);
-            if (subfolderResult.error) return { error: subfolderResult.error };
-            folderId = subfolderResult.folderId!;
-        }
+        // 3. Get Mother Folder URL
+        const motherUrl = await getFolderWebViewLink(motherFolderId);
 
+        return {
+            motherFolderId,
+            motherFolderUrl: motherUrl || undefined
+        };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * List files in any folder by its ID
+ */
+export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string }[]; error?: string }> {
+    try {
+        const drive = getDrive();
         const response = await drive.files.list({
             q: `'${folderId}' in parents and trashed=false`,
-            fields: 'files(id, name, webViewLink)',
+            fields: 'files(id, name, webViewLink, mimeType, createdTime)',
             orderBy: 'createdTime desc',
         });
 
@@ -174,6 +283,8 @@ export async function listDriveFiles(
                 id: f.id!,
                 name: f.name!,
                 webViewLink: f.webViewLink!,
+                mimeType: f.mimeType!,
+                createdTime: f.createdTime!,
             })) || [],
         };
     } catch (error) {

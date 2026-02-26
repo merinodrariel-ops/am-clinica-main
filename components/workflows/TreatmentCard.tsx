@@ -2,7 +2,9 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-import { Clock, AlertCircle, ChevronRight, User } from 'lucide-react';
+import { Clock, AlertCircle, ChevronRight, User, ExternalLink, Loader2, HardDrive } from 'lucide-react';
+import { getPatientPortalUrl } from '@/app/actions/patient-portal';
+import { toast } from 'sonner';
 import clsx from 'clsx';
 import type { PatientTreatment, PatientSummary } from './types';
 
@@ -17,6 +19,23 @@ interface TreatmentCardProps {
 }
 
 export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPercent = 0, onClick, onPatientClick, onMoveToNext }: TreatmentCardProps) {
+    const [isPortalLoading, setIsPortalLoading] = React.useState(false);
+
+    const handlePortalClick = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isPortalLoading) return;
+
+        setIsPortalLoading(true);
+        try {
+            const url = await getPatientPortalUrl(treatment.patient_id || treatment.patient.id_paciente);
+            window.open(url, '_blank');
+        } catch (error) {
+            console.error('Portal access error:', error);
+            toast.error(error instanceof Error ? error.message : 'Error al acceder al portal');
+        } finally {
+            setIsPortalLoading(false);
+        }
+    };
     const {
         attributes,
         listeners,
@@ -268,6 +287,29 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
                             Timeline
                         </button>
                     )}
+                    {treatment.metadata?.drive_folder_url && (
+                        <a
+                            href={treatment.metadata.drive_folder_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-[11px] text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 px-2 py-0.5 rounded transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            <HardDrive size={11} />
+                            Drive
+                        </a>
+                    )}
+                    <button
+                        type="button"
+                        className="flex items-center gap-1 text-[11px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-0.5 rounded transition-colors"
+                        onClick={handlePortalClick}
+                        disabled={isPortalLoading}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        {isPortalLoading ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                        Portal
+                    </button>
                     {onMoveToNext && (
                         <button
                             type="button"

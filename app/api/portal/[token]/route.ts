@@ -59,7 +59,7 @@ export async function GET(
 
         supabase
             .from('patient_treatments')
-            .select('id, status, last_stage_change, workflow_id, current_stage_id')
+            .select('id, status, last_stage_change, workflow_id, current_stage_id, metadata')
             .eq('patient_id', patientId)
             .eq('status', 'active')
             .order('created_at', { ascending: false })
@@ -95,9 +95,38 @@ export async function GET(
     // 3. Si hay tratamiento activo, buscar su workflow + etapas
     let treatment = null;
     let allStages = null;
+    const allFiles = [...(filesRes.data || [])];
 
     if (treatmentRes.data && treatmentRes.data.length > 0) {
         const t = treatmentRes.data[0];
+
+        // Fetch de Drive si hay carpeta configurada
+        const metadata = (t.metadata as Record<string, any>) || {};
+        if (metadata.drive_folder_id) {
+            try {
+                const { listFolderFiles } = await import('@/lib/google-drive');
+                const driveFiles = await listFolderFiles(metadata.drive_folder_id);
+
+                if (driveFiles.files) {
+                    // Agregar archivos de Drive a la lista (especialmente STLs)
+                    driveFiles.files.forEach(df => {
+                        const isStl = df.name.toLowerCase().endsWith('.stl');
+                        if (isStl) {
+                            allFiles.push({
+                                id: df.id,
+                                file_type: 'stl',
+                                label: df.name,
+                                file_url: `/api/drive/file/${df.id}`,
+                                thumbnail_url: null,
+                                created_at: df.createdTime
+                            });
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Error fetching Drive files for portal:', err);
+            }
+        }
 
         const [workflowRes, stageRes, allStagesRes] = await Promise.all([
             supabase
@@ -137,7 +166,7 @@ export async function GET(
         treatment,
         allStages,
         plan: planRes.data?.[0] || null,
-        files: filesRes.data || [],
+        files: allFiles,
         nextAppointment: appointmentRes.data?.[0] || null,
     });
 }

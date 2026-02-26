@@ -305,6 +305,14 @@ export async function createTreatment(data: {
     }
 
     revalidatePath('/workflows');
+
+    // Trigger Google Drive automation for Orthodontics
+    try {
+        await ensurePatientDriveFolder(newTreatment.id);
+    } catch (e) {
+        console.error('Error in ensurePatientDriveFolder:', e);
+    }
+
     return newTreatment;
 }
 
@@ -463,6 +471,13 @@ export async function moveTreatmentStage(
     } catch (error) {
         console.error('Error in recurrent cycle trigger:', error);
         // Do not fail the request, just log
+    }
+
+    // 5. Ensure Drive folder exists (handles move from non-ortho or historical cases)
+    try {
+        await ensurePatientDriveFolder(treatmentId);
+    } catch (e) {
+        console.error('Error in ensurePatientDriveFolder (move):', e);
     }
 
     revalidatePath('/workflows');
@@ -725,6 +740,111 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
             eventKey: patientEventKey,
         });
     }
+}
+
+/**
+ * Ensures a patient has a Google Drive folder hierarchy for their clinical workflows.
+ * Supports Orthodontics, Smile Design (Exocad), Surgery, etc.
+ */
+async function ensurePatientDriveFolder(treatmentId: string) {
+    const supabase = await createClient();
+
+    // 1. Fetch treatment, patient and workflow info
+    const { data: treatment, error: treatmentError } = await supabase
+        .from('patient_treatments')
+        .select(`
+            id,
+            metadata,
+            patient:pacientes(id_paciente, nombre, apellido, link_historia_clinica),
+            workflow:clinical_workflows(name)
+        `)
+        .eq('id', treatmentId)
+        .single();
+
+    if (treatmentError || !treatment) return;
+
+    // 2. Check if folder already exists in metadata
+    const metadata = (treatment.metadata as Record<string, any>) || {};
+    if (metadata.drive_folder_id) return;
+
+    // 3. Determine workflow type and folder suffix
+    const workflowData = treatment.workflow as any;
+    const workflowName = Array.isArray(workflowData) ? workflowData[0]?.name : workflowData?.name;
+    const lowerName = (workflowName || '').toLowerCase();
+
+    let suffix = (workflowName || 'TRATAMIENTO').toUpperCase();
+    if (lowerName.includes('ortodoncia') || lowerName.includes('alineador')) {
+        suffix = 'AM ALINEADORES';
+    } else if (lowerName.includes('sonrisa') || lowerName.includes('exocad')) {
+        suffix = 'EXOCAD';
+    } else if (lowerName.includes('cirugia') || lowerName.includes('implante')) {
+        suffix = 'CIRUGIA';
+    }
+
+    const patientData = treatment.patient as any;
+    const patientRootName = `${(patientData.apellido || '').toUpperCase()}, ${(patientData.nombre || '').charAt(0).toUpperCase() + (patientData.nombre || '').slice(1).toLowerCase()}`.trim();
+    const folderName = `${patientRootName} - ${suffix}`;
+
+    // 4. Ensure Hierarchy on Google Drive
+    const {
+        ensureStandardPatientFolders,
+        createWorkflowFolder
+    } = await import('@/lib/google-drive');
+
+    // Step A: Ensure Mother Folder and Admin subfolders exist
+    const hierarchy = await ensureStandardPatientFolders(patientData.apellido, patientData.nombre);
+
+    if (hierarchy.error || !hierarchy.motherFolderId) {
+        console.error('Error ensuring patient hierarchy:', hierarchy.error);
+        return;
+    }
+
+    // Update patient record if needed
+    if (hierarchy.motherFolderUrl && hierarchy.motherFolderUrl !== patientData.link_historia_clinica) {
+        await supabase
+            .from('pacientes')
+            .update({ link_historia_clinica: hierarchy.motherFolderUrl })
+            .eq('id_paciente', patientData.id_paciente);
+    }
+
+    // Step B: Create the specific treatment subfolder inside the parent
+    const result = await createWorkflowFolder(folderName, hierarchy.motherFolderId);
+
+    if (result.error || !result.folderId) {
+        console.error('Error creating workflow subfolder:', result.error);
+        return;
+    }
+
+    // 5. Update treatment metadata
+    const updatedMetadata = {
+        ...metadata,
+        drive_folder_id: result.folderId,
+        drive_folder_url: result.webViewLink
+    };
+
+    await supabase
+        .from('patient_treatments')
+        .update({ metadata: updatedMetadata })
+        .eq('id', treatmentId);
+
+
+    // 5. Send notification email to lab
+    const { sendEmail } = await import('@/lib/nodemailer');
+    const labEmail = 'amesteticadentallab@gmail.com';
+    const subject = `Nueva Carpeta de Paciente: ${folderName}`;
+    const html = `
+        <div style="font-family: Arial, sans-serif; color: #111827;">
+            <h2 style="margin: 0 0 8px;">Nueva Carpeta en Google Drive</h2>
+            <p style="margin: 0 0 8px;">Se ha creado automáticamente la carpeta para el paciente en el flujo de Ortodoncia.</p>
+            <ul style="margin: 0; padding-left: 18px;">
+                <li><strong>Paciente:</strong> ${folderName}</li>
+                <li><strong>Workflow:</strong> ${workflowName}</li>
+                <li><strong>Enlace:</strong> <a href="${result.webViewLink}">Ver Carpeta en Drive</a></li>
+            </ul>
+        </div>
+    `;
+
+    await sendEmail({ to: labEmail, subject, html });
 }
 
 async function checkAndTriggerLaboratorioCase(treatmentId: string, stageId: string) {

@@ -171,6 +171,26 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
 
             if (createError) throw new Error(createError.message);
 
+            // NEW: Create Google Drive hierarchy for new patients
+            try {
+                const { ensureStandardPatientFolders } = await import('@/lib/google-drive');
+                const driveResult = await ensureStandardPatientFolders(created.apellido, created.nombre);
+
+                if (driveResult.motherFolderUrl) {
+                    // Update patient with the link
+                    await supabase
+                        .from('pacientes')
+                        .update({ link_historia_clinica: driveResult.motherFolderUrl })
+                        .eq('id_paciente', created.id_paciente);
+
+                    // Update the 'created' object for the return data
+                    created.link_historia_clinica = driveResult.motherFolderUrl;
+                }
+            } catch (driveErr) {
+                console.error('Error creating Drive folder for new patient:', driveErr);
+                // We don't throw here to avoid failing patient creation due to Drive issues
+            }
+
             // Audit Log (Create)
             await supabase.from('audit_log').insert({
                 modulo: 'Pacientes',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Sparkles, TrendingUp, TrendingDown, Target, Lightbulb, Zap, Loader2 } from 'lucide-react';
+import { Sparkles, TrendingUp, TrendingDown, Target, Lightbulb, Zap, Loader2, Eye, EyeOff } from 'lucide-react';
 
 interface Analysis {
     forecast: {
@@ -13,7 +13,17 @@ interface Analysis {
     recommendations: string[];
 }
 
-export default function PredictiveInsights() {
+interface PredictiveInsightsProps {
+    isEditing?: boolean;
+    isHidden?: boolean;
+    onToggleVisibility?: (id: string) => void;
+}
+
+export default function PredictiveInsights({
+    isEditing,
+    isHidden,
+    onToggleVisibility,
+}: PredictiveInsightsProps) {
     const [data, setData] = useState<Analysis | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -34,9 +44,11 @@ export default function PredictiveInsights() {
         fetchPulse();
     }, []);
 
+    if (isHidden && !isEditing) return null;
+
     if (loading) {
         return (
-            <div className="glass-card rounded-2xl p-6 mb-6 animate-pulse" style={{ background: 'hsla(230, 15%, 12%, 0.6)' }}>
+            <div className={`glass-card rounded-2xl p-6 mb-6 animate-pulse ${isHidden ? 'opacity-40' : ''}`} style={{ background: 'hsla(230, 15%, 12%, 0.6)' }}>
                 <div className="flex items-center gap-3 mb-4">
                     <div className="h-10 w-10 rounded-xl bg-white/5" />
                     <div className="h-6 w-48 rounded-lg bg-white/5" />
@@ -58,8 +70,23 @@ export default function PredictiveInsights() {
     if (!data) return null;
 
     return (
-        <div className="glass-card rounded-2xl p-6 mb-6 relative overflow-hidden group border border-white/5 hover:border-white/10 transition-all duration-500"
-            style={{ background: 'linear-gradient(135deg, hsla(230, 15%, 12%, 0.7), hsla(230, 15%, 15%, 0.4))' }}>
+        <div className={`glass-card rounded-2xl p-6 mb-6 relative overflow-hidden group border border-white/5 hover:border-white/10 transition-all duration-500 ${isHidden ? 'opacity-40' : ''} ${isEditing ? 'ring-1 ring-white/10' : ''}`}
+            style={{ background: isHidden ? 'hsla(230, 15%, 12%, 0.5)' : 'linear-gradient(135deg, hsla(230, 15%, 12%, 0.7), hsla(230, 15%, 15%, 0.4))' }}>
+
+            {isEditing && (
+                <button
+                    onClick={() => onToggleVisibility?.('predictive-pulse')}
+                    className="absolute top-4 right-4 z-20 p-2 rounded-xl transition-all hover:scale-110 active:scale-95"
+                    style={{
+                        background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 25%, 0.8)',
+                        color: isHidden ? 'hsl(0, 70%, 60%)' : 'hsl(230, 10%, 60%)',
+                        border: '1px solid hsla(230, 100%, 100%, 0.1)'
+                    }}
+                    title={isHidden ? 'Mostrar' : 'Ocultar'}
+                >
+                    {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+            )}
 
             {/* Background Accent */}
             <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full group-hover:bg-indigo-500/15 transition-all duration-700" />
@@ -77,10 +104,12 @@ export default function PredictiveInsights() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
-                        <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-white/60">Live Analysis</span>
-                    </div>
+                    {!isEditing && (
+                        <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
+                            <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-white/60">Live Analysis</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
