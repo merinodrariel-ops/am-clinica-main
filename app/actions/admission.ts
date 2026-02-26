@@ -27,10 +27,13 @@ export async function submitAdmissionAction(data: AdmissionData) {
         console.log('Starting admission process for:', data.nombre, data.apellido);
 
         // 1. Insert into Supabase (Correcting 'dni' to 'documento')
+        // Sanitize id_paciente to handle empty strings (UUID error)
+        const patientUUID = data.id_paciente || undefined;
+
         const { data: created, error: createError } = await supabase
             .from('pacientes')
             .upsert({
-                id_paciente: data.id_paciente, // If provided, update existing record
+                id_paciente: patientUUID,
                 nombre: data.nombre,
                 apellido: data.apellido,
                 documento: data.dni,
@@ -39,7 +42,7 @@ export async function submitAdmissionAction(data: AdmissionData) {
                 cuit: data.cuit,
                 observaciones_generales: data.motivo_consulta,
                 referencia_origen: data.referencia_origen,
-                fecha_alta: data.id_paciente ? undefined : new Date().toISOString(), // Only set on create
+                fecha_alta: patientUUID ? undefined : new Date().toISOString(), // Only set on create
                 is_deleted: false,
             })
             .select()
@@ -146,10 +149,12 @@ export async function submitAdmissionAction(data: AdmissionData) {
  */
 export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
     try {
+        const patientUUID = data.id_paciente || undefined;
+
         const { data: upserted, error } = await supabase
             .from('pacientes')
             .upsert({
-                id_paciente: data.id_paciente,
+                id_paciente: patientUUID,
                 nombre: data.nombre,
                 apellido: data.apellido,
                 documento: data.dni,
@@ -159,7 +164,7 @@ export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
                 referencia_origen: data.referencia_origen,
                 cuit: data.cuit,
                 is_deleted: false,
-                fecha_alta: data.id_paciente ? undefined : new Date().toISOString(),
+                fecha_alta: patientUUID ? undefined : new Date().toISOString(),
                 origen_registro: 'Admisión Web (Lead)'
             })
             .select()
