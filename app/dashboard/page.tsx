@@ -31,6 +31,9 @@ const OwnerDashboard = dynamic(() => import('@/components/dashboard/OwnerDashboa
     ssr: false,
     loading: () => <Skeleton className="h-[400px] w-full rounded-xl" />
 });
+const SilentPatientsPanel = dynamic(() => import('@/components/patients/SilentPatientsPanel'), {
+    ssr: false,
+});
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -67,6 +70,9 @@ export default function DashboardPage() {
 
             {/* Owner-only Dashboard */}
             {role === 'owner' && <OwnerDashboard />}
+
+            {/* Pacientes con tratamiento activo sin turno hace +45 días */}
+            {(role === 'owner' || role === 'admin') && <SilentPatientsPanel />}
 
             <UserAlerts />
             <CajaAlerts />

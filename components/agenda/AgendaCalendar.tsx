@@ -17,7 +17,7 @@ import { getAppointments, updateAppointment, getDoctors } from '@/app/actions/ag
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown, X, Edit2, Phone } from 'lucide-react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff } from 'lucide-react';
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 
@@ -110,6 +110,11 @@ export default function AgendaCalendar() {
     const [resourceDate, setResourceDate] = useState<Date>(new Date());
     const [quickPopup, setQuickPopup] = useState<QuickPopup | null>(null);
     const [updatingStatus, setUpdatingStatus] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognitionRef = useRef<any>(null);
+    const [voiceText, setVoiceText] = useState('');
+    const [isListening, setIsListening] = useState(false);
+    const [voiceOpen, setVoiceOpen] = useState(false);
     const { role } = useAuth();
 
     // Load doctors for filter bar
@@ -188,6 +193,58 @@ export default function AgendaCalendar() {
         setSelectedEvent(data);
         setModalOpen(true);
     };
+
+    // ── Voice Notes ──────────────────────────────────────────────────────────
+    const stopVoice = useCallback(() => {
+        recognitionRef.current?.stop();
+        recognitionRef.current = null;
+        setIsListening(false);
+    }, []);
+
+    const startVoice = useCallback(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+        if (!SR) { toast.error('Tu navegador no soporta dictado. Usá Chrome.'); return; }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rec = new SR() as any;
+        rec.lang = 'es-AR';
+        rec.continuous = true;
+        rec.interimResults = true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rec.onresult = (e: any) => {
+            let t = '';
+            for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+            setVoiceText(t);
+        };
+        rec.onend = () => setIsListening(false);
+        rec.start();
+        recognitionRef.current = rec;
+        setIsListening(true);
+    }, []);
+
+    const saveVoiceNote = useCallback(async () => {
+        if (!quickPopup || !voiceText.trim()) return;
+        setUpdatingStatus(true);
+        try {
+            await updateAppointment(quickPopup.appointmentId, { notes: voiceText.trim() });
+            toast.success('Nota clínica guardada');
+            stopVoice();
+            setVoiceOpen(false);
+            setVoiceText('');
+            setQuickPopup(null);
+            refreshCalendar();
+        } catch {
+            toast.error('Error al guardar nota');
+        } finally {
+            setUpdatingStatus(false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quickPopup, voiceText, stopVoice]);
+
+    // Cleanup voice when popup closes
+    useEffect(() => {
+        if (!quickPopup) { stopVoice(); setVoiceOpen(false); setVoiceText(''); }
+    }, [quickPopup, stopVoice]);
 
     const handleEventDrop = async (arg: EventDropArg) => {
         const { event } = arg;
@@ -538,7 +595,7 @@ export default function AgendaCalendar() {
                         </div>
 
                         {/* Edit button */}
-                        <div className="px-3 pb-3">
+                        <div className="px-3 pb-2">
                             <button
                                 onClick={() => openFullModal(quickPopup.fullData)}
                                 className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-xl transition-colors hover:bg-blue-50"
@@ -546,6 +603,63 @@ export default function AgendaCalendar() {
                                 <Edit2 size={12} />
                                 Editar turno completo
                             </button>
+                        </div>
+
+                        {/* Voice Note */}
+                        <div className="px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-800">
+                            {!voiceOpen ? (
+                                <button
+                                    onClick={() => setVoiceOpen(true)}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-xl transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-900/20 dark:text-emerald-400"
+                                >
+                                    <Mic size={12} />
+                                    Dictar nota clínica
+                                </button>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <textarea
+                                            value={voiceText}
+                                            onChange={e => setVoiceText(e.target.value)}
+                                            placeholder={isListening ? 'Hablá ahora...' : 'Nota clínica...'}
+                                            rows={3}
+                                            className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
+                                        />
+                                        {isListening && (
+                                            <div className="absolute top-2 right-2 flex items-end gap-0.5 h-4">
+                                                {[0, 1, 2].map(i => (
+                                                    <div key={i} className="w-0.5 bg-emerald-500 rounded-full animate-pulse" style={{ height: `${8 + i * 4}px`, animationDelay: `${i * 150}ms` }} />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            onClick={isListening ? stopVoice : startVoice}
+                                            className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold rounded-xl transition-colors border ${
+                                                isListening
+                                                    ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800'
+                                                    : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800'
+                                            }`}
+                                        >
+                                            {isListening ? <><MicOff size={11} /> Parar</> : <><Mic size={11} /> Grabar</>}
+                                        </button>
+                                        <button
+                                            disabled={!voiceText.trim() || updatingStatus}
+                                            onClick={saveVoiceNote}
+                                            className="flex-1 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-xl disabled:opacity-40 hover:bg-blue-700 transition-colors"
+                                        >
+                                            Guardar
+                                        </button>
+                                        <button
+                                            onClick={() => { stopVoice(); setVoiceOpen(false); setVoiceText(''); }}
+                                            className="px-2 py-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        >
+                                            <X size={11} className="text-gray-400" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </>
