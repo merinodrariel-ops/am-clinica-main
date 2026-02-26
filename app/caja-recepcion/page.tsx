@@ -5,6 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users } from 'lucide-react';
+import { ComprobanteLink } from '@/components/caja/ComprobanteLink';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -1251,15 +1252,13 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                     </span>
                                                                 )}
                                                                 {mov.comprobante_url && (
-                                                                    <a
-                                                                        href={mov.comprobante_url}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
+                                                                    <ComprobanteLink
+                                                                        storedValue={mov.comprobante_url}
+                                                                        area="caja-recepcion"
                                                                         className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg text-green-600 hover:text-green-700 transition-colors"
-                                                                        title="Ver comprobante adjunto"
-                                                                    >
-                                                                        <FileText size={16} />
-                                                                    </a>
+                                                                        iconSize={16}
+                                                                        label="Ver comprobante adjunto"
+                                                                    />
                                                                 )}
 
                                                                 {mov.categoria !== 'Egreso' && (

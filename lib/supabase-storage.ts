@@ -98,10 +98,10 @@ export async function uploadToStorage(
                 .getPublicUrl(data.path);
             publicOrSignedUrl = publicData.publicUrl;
         } else {
-            // Get a signed URL valid for 1 hour
+            // Get a signed URL valid for 7 days (604800 s)
             const { data: signedData } = await getSupabase().storage
                 .from(bucket)
-                .createSignedUrl(data.path, 3600);
+                .createSignedUrl(data.path, 60 * 60 * 24 * 7);
             publicOrSignedUrl = signedData?.signedUrl;
         }
 
@@ -197,5 +197,43 @@ export async function deleteFromStorage(
         return { success: true };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Regenera una URL firmada fresca a partir de una URL expirada o un path.
+ * Soporta tanto URLs viejas ya almacenadas en DB (con token JWT expirado)
+ * como paths crudos (p.ej. "2026-02/mov-xxx.jpg").
+ *
+ * Formato signed URL de Supabase:
+ *   https://{ref}.supabase.co/storage/v1/object/sign/{bucket}/{path}?token=...
+ */
+export async function refreshSignedUrl(
+    storedValue: string,
+    area: AreaType,
+    expiresIn = 60 * 60 * 24 * 7 // 7 días por defecto
+): Promise<string | null> {
+    try {
+        let filePath: string;
+
+        if (storedValue.startsWith('https://')) {
+            // URL firmada ya expirada — extraer el path del bucket
+            const url = new URL(storedValue);
+            const match = url.pathname.match(/\/object\/sign\/[^/]+\/(.+)/);
+            if (!match) return null;
+            filePath = match[1];
+        } else {
+            // Ya es un path directo
+            filePath = storedValue;
+        }
+
+        const { data, error } = await getSupabase().storage
+            .from(BUCKETS[area].name)
+            .createSignedUrl(filePath, expiresIn);
+
+        if (error) return null;
+        return data?.signedUrl ?? null;
+    } catch {
+        return null;
     }
 }

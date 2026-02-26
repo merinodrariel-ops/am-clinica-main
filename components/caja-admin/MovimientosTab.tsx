@@ -52,6 +52,7 @@ import {
 } from "@/lib/caja-admin";
 import { updateCajaAdminMovimientoSecure } from "@/app/actions/caja-admin";
 import { createClient } from "@/utils/supabase/client";
+import { ComprobanteLink } from "@/components/caja/ComprobanteLink";
 import { useAuth } from "@/contexts/AuthContext";
 import HistorialEdicionesModal from "@/components/caja/HistorialEdicionesModal";
 import { ComprobanteUpload } from "@/components/caja/ComprobanteUpload";
@@ -1552,14 +1553,14 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
                       <Paperclip className="w-4 h-4 text-slate-400" />
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <ComprobanteLink
+                        storedValue={url}
+                        area="caja-admin"
                         className="text-sm text-indigo-600 hover:text-indigo-500 truncate"
-                      >
-                        Ver adjunto {idx + 1}
-                      </a>
+                        iconSize={14}
+                        label={`Ver adjunto ${idx + 1}`}
+                        showLabel
+                      />
                     </div>
                     <Button
                       variant="ghost"
@@ -1580,7 +1581,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
             <ComprobanteUpload
               area="caja-admin"
               onUploadComplete={(result) => {
-                setAdjuntos([...adjuntos, result.url]);
+                setAdjuntos([...adjuntos, result.path || result.url]);
               }}
             />
           </div>

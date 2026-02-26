@@ -810,7 +810,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
 
                                     <ComprobanteUpload
                                         area="caja-recepcion"
-                                        onUploadComplete={(res) => setFormData(prev => ({ ...prev, comprobante_url: res.url }))}
+                                        onUploadComplete={(res) => setFormData(prev => ({ ...prev, comprobante_url: res.path || res.url }))}
                                         className="w-full"
                                     />
 
