@@ -37,7 +37,7 @@ export async function submitAdmissionAction(data: AdmissionData) {
                 email: data.email,
                 telefono: data.telefono,
                 cuit: data.cuit,
-                motivo_consulta: data.motivo_consulta,
+                observaciones_generales: data.motivo_consulta,
                 referencia_origen: data.referencia_origen,
                 fecha_alta: data.id_paciente ? undefined : new Date().toISOString(), // Only set on create
                 is_deleted: false,
@@ -155,7 +155,7 @@ export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
                 documento: data.dni,
                 email: data.email,
                 telefono: data.telefono,
-                motivo_consulta: data.motivo_consulta,
+                observaciones_generales: data.motivo_consulta,
                 referencia_origen: data.referencia_origen,
                 cuit: data.cuit,
                 is_deleted: false,
