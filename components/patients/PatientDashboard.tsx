@@ -19,7 +19,6 @@ import {
     Save,
     Plus,
     FileIcon,
-    FileSignature,
     ExternalLink,
     TrendingUp,
     Check,
@@ -29,7 +28,6 @@ import {
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
-import ContractGenerator from './ContractGenerator';
 import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
 import Link from 'next/link';
@@ -74,17 +72,14 @@ interface PatientDashboardProps {
 const TABS = [
     { id: 'datos', label: 'Datos Personales', icon: User },
     { id: 'historia', label: 'Historia Clínica', icon: FileText },
-    { id: 'financiamiento', label: 'Plan de Pagos', icon: TrendingUp },
-    { id: 'pagos', label: 'Historial de Pagos', icon: CreditCard },
-    { id: 'planes', label: 'Planes (Presupuestos)', icon: DollarSign },
+    { id: 'finanzas', label: 'Finanzas', icon: TrendingUp },
     { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
     { id: 'smile_design', label: 'Smile Design ✨', icon: Sparkles },
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
-    { id: 'contrato', label: 'Contrato', icon: FileSignature },
 ];
 
 // Payment-related tabs hidden from odontólogos
-const PAYMENT_TABS = new Set(['financiamiento', 'pagos', 'planes']);
+const PAYMENT_TABS = new Set(['finanzas']);
 
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments }: PatientDashboardProps) {
     const router = useRouter();
@@ -92,7 +87,12 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const { role } = useAuth();
     const isOdontologo = role === 'odontologo';
     const visibleTabs = isOdontologo ? TABS.filter(t => !PAYMENT_TABS.has(t.id)) : TABS;
-    const defaultTab = searchParams.get('tab') || 'datos';
+    const requestedTab = searchParams.get('tab') || 'datos';
+    const defaultTabRaw = ['financiamiento', 'pagos', 'planes'].includes(requestedTab)
+        ? 'finanzas'
+        : requestedTab;
+    const tabIds = new Set(TABS.map((tab) => tab.id));
+    const defaultTab = tabIds.has(defaultTabRaw) ? defaultTabRaw : 'datos';
     const [activeTab, setActiveTab] = useState(
         isOdontologo && PAYMENT_TABS.has(defaultTab) ? 'datos' : defaultTab
     );
@@ -443,8 +443,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             </div>
                         )}
 
-                        {/* Tab 3: Historial de Pagos (Read Only) */}
-                        {activeTab === 'pagos' && (
+                        {/* Tab: Finanzas (Historial + Plan + Presupuestos) */}
+                        {activeTab === 'finanzas' && (
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
                                 <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                                     <div>
@@ -516,8 +516,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             </div>
                         )}
 
-                        {/* Tab 4: Planes de Tratamiento */}
-                        {activeTab === 'planes' && (
+                        {/* Sección: Planes de Tratamiento */}
+                        {activeTab === 'finanzas' && (
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
                                 <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                                     <h2 className="text-lg font-semibold">Planes de Tratamiento</h2>
@@ -603,8 +603,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
 
                         )}
 
-                        {/* Tab: Financiación */}
-                        {activeTab === 'financiamiento' && (
+                        {/* Sección: Financiación */}
+                        {activeTab === 'finanzas' && (
                             <div className="space-y-6">
                                 {/* Header / Config Card */}
                                 <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
@@ -623,6 +623,13 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 )}
                                             </h2>
                                             <p className="text-gray-500 text-sm mt-1">Gestión de cuotas y saldos</p>
+                                            <Link
+                                                href={`/caja-recepcion?tab=contratos&patientId=${patient.id_paciente}`}
+                                                className="inline-flex items-center gap-1 text-xs mt-2 text-blue-600 hover:underline"
+                                            >
+                                                Generar contrato en Caja Recepción
+                                                <ExternalLink size={12} />
+                                            </Link>
                                         </div>
                                         <button
                                             onClick={() => {
@@ -843,13 +850,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 patientId={patient.id_paciente}
                                 patientName={`${patient.nombre} ${patient.apellido}`}
                             />
-                        )}
-
-                        {/* Tab: Contrato */}
-                        {activeTab === 'contrato' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
-                                <ContractGenerator patient={patient} />
-                            </div>
                         )}
 
                     </motion.div>

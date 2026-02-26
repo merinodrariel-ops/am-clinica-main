@@ -22,7 +22,16 @@ export function getPatientFolderName(apellido: string, nombre: string): string {
     // Capitalize first letter of name, rest lowercase
     const formattedNombre = cleanNombre ? cleanNombre.charAt(0).toUpperCase() + cleanNombre.slice(1).toLowerCase() : '';
 
-    return `${cleanApellido}, ${formattedNombre}`.trim();
+    if (cleanApellido && formattedNombre) {
+        return `${cleanApellido}, ${formattedNombre}`;
+    }
+    if (cleanApellido) {
+        return cleanApellido;
+    }
+    if (formattedNombre) {
+        return formattedNombre;
+    }
+    return 'PACIENTE';
 }
 
 
@@ -83,6 +92,43 @@ export interface UploadResult {
     fileId?: string;
     webViewLink?: string;
     error?: string;
+}
+
+/**
+ * Creates a plain text/markdown file inside a specific Drive folder.
+ */
+export async function createTextFileInFolder(
+    folderId: string,
+    fileName: string,
+    content: string,
+    mimeType: string = 'text/markdown'
+): Promise<{ fileId?: string; webViewLink?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const buffer = Buffer.from(content, 'utf-8');
+        const stream = Readable.from(buffer);
+
+        const response = await drive.files.create({
+            requestBody: {
+                name: fileName,
+                parents: [folderId],
+                mimeType,
+            },
+            media: {
+                mimeType,
+                body: stream,
+            },
+            fields: 'id, webViewLink',
+        });
+
+        return {
+            fileId: response.data.id || undefined,
+            webViewLink: response.data.webViewLink || undefined,
+        };
+    } catch (error) {
+        console.error('Error creating text file in folder:', error);
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
 }
 
 /**
@@ -271,6 +317,65 @@ export async function ensureStandardPatientFolders(apellido: string, nombre: str
 }
 
 /**
+ * Ensures a patient's mother folder and contract subfolder exist.
+ * - Mother: "APELLIDO, Nombre"
+ * - Subfolder: "APELLIDO, Nombre - Contrato"
+ * If an existing motherFolderId is provided but inaccessible, a new mother folder is created.
+ */
+export async function ensurePatientContractFolder(
+    apellido: string,
+    nombre: string,
+    motherFolderId?: string
+): Promise<{
+    motherFolderId?: string;
+    motherFolderUrl?: string;
+    contractFolderId?: string;
+    contractFolderUrl?: string;
+    error?: string;
+}> {
+    try {
+        const drive = getDrive();
+        const motherFolderName = getPatientFolderName(apellido, nombre);
+        const contractFolderName = `${motherFolderName} - Contrato`;
+
+        let resolvedMotherFolderId = motherFolderId;
+
+        if (resolvedMotherFolderId) {
+            try {
+                await drive.files.get({ fileId: resolvedMotherFolderId, fields: 'id' });
+            } catch {
+                resolvedMotherFolderId = undefined;
+            }
+        }
+
+        if (!resolvedMotherFolderId) {
+            const motherResult = await createDriveFolder(drive, PACIENTES_ROOT_FOLDER_ID, motherFolderName);
+            if (motherResult.error || !motherResult.folderId) {
+                return { error: motherResult.error || 'No se pudo crear carpeta madre del paciente' };
+            }
+            resolvedMotherFolderId = motherResult.folderId;
+        }
+
+        const contractResult = await createDriveFolder(drive, resolvedMotherFolderId, contractFolderName);
+        if (contractResult.error || !contractResult.folderId) {
+            return { error: contractResult.error || 'No se pudo crear carpeta de contrato del paciente' };
+        }
+
+        const motherFolderUrl = await getFolderWebViewLink(resolvedMotherFolderId);
+        const contractFolderUrl = await getFolderWebViewLink(contractResult.folderId);
+
+        return {
+            motherFolderId: resolvedMotherFolderId,
+            motherFolderUrl: motherFolderUrl || undefined,
+            contractFolderId: contractResult.folderId,
+            contractFolderUrl: contractFolderUrl || undefined,
+        };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
  * List files in any folder by its ID
  */
 export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string }[]; error?: string }> {
@@ -387,7 +492,7 @@ export async function createPatientDocuments(
  * Replaces placeholders in a Google Slides document
  */
 async function replaceSlidesPlaceholders(
-    slides: any,
+    slides: ReturnType<typeof google.slides>,
     presentationId: string,
     data: { nombre: string; apellido: string; dni: string; fecha: string }
 ) {
@@ -407,7 +512,7 @@ async function replaceSlidesPlaceholders(
 /**
  * Utility to find a file by name anywhere in the accessible Drive
  */
-async function findFileByName(drive: any, name: string) {
+async function findFileByName(drive: ReturnType<typeof google.drive>, name: string) {
     const res = await drive.files.list({
         q: `name = '${name}' and trashed = false`,
         fields: 'files(id, name)',

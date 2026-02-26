@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,7 +17,16 @@ const FinanciacionTab = dynamic(() => import('@/components/caja/FinanciacionTab'
     ),
 });
 
-type CajaTab = 'caja' | 'financiacion';
+const ContratosFinanciacionTab = dynamic(() => import('@/components/caja/ContratosFinanciacionTab'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex items-center justify-center py-20">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+        </div>
+    ),
+});
+
+type CajaTab = 'caja' | 'financiacion' | 'contratos';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
 import { supabase } from '@/lib/supabase';
@@ -176,6 +186,7 @@ const PAYMENT_DATA: Record<string, PaymentMethod> = {
 };
 
 export default function CajaRecepcionPage() {
+    const searchParams = useSearchParams();
     const { role } = useAuth();
     const [stats, setStats] = useState<Stats | null>(null);
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
@@ -186,7 +197,10 @@ export default function CajaRecepcionPage() {
     const [privacyMode, setPrivacyMode] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterMetodo, setFilterMetodo] = useState('');
-    const [activeTab, setActiveTab] = useState<CajaTab>('caja');
+    const initialTab = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState<CajaTab>(
+        initialTab === 'financiacion' || initialTab === 'contratos' ? initialTab : 'caja'
+    );
 
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
     const [showTransferencia, setShowTransferencia] = useState(false);
@@ -811,10 +825,27 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                         <CreditCard size={16} />
                         Financiación
                     </button>
+                    <button
+                        onClick={() => setActiveTab('contratos')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'contratos' ? '' : 'hover:bg-white/5'}`}
+                        style={activeTab === 'contratos' ? {
+                            background: 'hsla(165, 100%, 42%, 0.12)',
+                            color: 'hsl(165, 85%, 50%)',
+                            border: '1px solid hsla(165, 100%, 42%, 0.2)',
+                        } : { color: 'hsl(230 10% 50%)' }}
+                    >
+                        <FileText size={16} />
+                        ContratoMaker
+                    </button>
                 </div>
 
                 {/* Tab Content: Financiación */}
                 {activeTab === 'financiacion' && <FinanciacionTab />}
+
+                {/* Tab Content: Contratos */}
+                {activeTab === 'contratos' && (
+                    <ContratosFinanciacionTab initialPatientId={searchParams.get('patientId') || undefined} />
+                )}
 
                 {/* Tab Content: Caja */}
                 {activeTab === 'caja' && (<>
