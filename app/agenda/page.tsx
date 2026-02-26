@@ -1,24 +1,82 @@
+'use client';
+
+import { useState } from 'react';
 import AgendaCalendar from '@/components/agenda/AgendaCalendar';
 import AgendaAutopilotPanel from '@/components/agenda/AgendaAutopilotPanel';
+import WaitingRoomDashboard from '@/components/agenda/WaitingRoomDashboard';
+import DoctorScheduleConfig from '@/components/agenda/DoctorScheduleConfig';
+import { Calendar, Users, Settings, BrainCircuit } from 'lucide-react';
+
+type Tab = 'calendar' | 'waiting' | 'config';
+
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'calendar', label: 'Agenda 360',       icon: <Calendar  size={15} /> },
+    { id: 'waiting',  label: 'Sala de Espera',   icon: <Users     size={15} /> },
+    { id: 'config',   label: 'Configuración',    icon: <Settings  size={15} /> },
+];
 
 export default function AgendaPage() {
+    const [activeTab, setActiveTab] = useState<Tab>('calendar');
+
     return (
         <div className="h-[calc(100vh-theme(spacing.20))] flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+            {/* Page Header */}
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Agenda 360</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Gestión de turnos y estado operativo</p>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                        AM·Scheduler
+                    </h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Sistema de agenda propietario · Reemplaza Google Calendar y Calendly
+                    </p>
+                </div>
+
+                {/* Tab Bar */}
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                    {TABS.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                activeTab === tab.id
+                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            {tab.icon}
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[minmax(0,2.1fr)_minmax(320px,1fr)] gap-4">
-                <div className="min-h-[65vh] xl:min-h-0">
-                    <AgendaCalendar />
+            {/* Tab Content */}
+            {activeTab === 'calendar' && (
+                <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[minmax(0,2.1fr)_minmax(320px,1fr)] gap-4">
+                    <div className="min-h-[65vh] xl:min-h-0">
+                        <AgendaCalendar />
+                    </div>
+                    <div className="min-h-[320px] xl:min-h-0">
+                        <AgendaAutopilotPanel />
+                    </div>
                 </div>
-                <div className="min-h-[320px] xl:min-h-0">
-                    <AgendaAutopilotPanel />
+            )}
+
+            {activeTab === 'waiting' && (
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="max-w-3xl mx-auto">
+                        <WaitingRoomDashboard />
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {activeTab === 'config' && (
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="max-w-4xl mx-auto">
+                        <DoctorScheduleConfig />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

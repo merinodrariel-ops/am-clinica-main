@@ -143,10 +143,10 @@ export async function searchPatients(query: string) {
 
 export async function getDoctors() {
     const supabase = await createClient();
-    // Assuming doctors have role 'owner', 'admin' or specific doctor role
     const { data } = await supabase
         .from('profiles')
         .select('id, full_name, role')
-        .in('role', ['owner', 'admin', 'developer']);
+        .in('role', ['owner', 'admin', 'developer', 'odontologo'])
+        .order('full_name');
     return data || [];
 }

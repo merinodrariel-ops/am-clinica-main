@@ -1,0 +1,359 @@
+'use client';
+
+/**
+ * DoctorResourceView — Custom Multi-Doctor Column View
+ *
+ * Renders a day timeline where each doctor occupies a column.
+ * Time slots on Y-axis (7:30 – 21:00, 15-min increments).
+ * Events positioned absolutely within each column.
+ * No FullCalendar Premium required.
+ */
+
+import { useEffect, useState, useRef } from 'react';
+import { getAppointments } from '@/app/actions/agenda';
+import { Loader2, UserCircle2 } from 'lucide-react';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Doctor {
+    id: string;
+    full_name: string;
+    role: string;
+}
+
+interface Appointment {
+    id: string;
+    title: string | null;
+    start_time: string;
+    end_time: string;
+    status: string;
+    type: string;
+    notes: string | null;
+    patient_id: string | null;
+    doctor_id: string | null;
+    patient?: { full_name?: string } | null;
+    doctor?: { full_name?: string } | null;
+}
+
+interface DoctorResourceViewProps {
+    date: Date;
+    doctors: Doctor[];
+    activeDoctorIds: Set<string>;
+    doctorColors: string[];
+    onEventClick: (apt: Appointment) => void;
+    onSlotClick: (start: Date, end: Date, doctorId: string) => void;
+    canEdit: boolean;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const START_HOUR  = 7.5;  // 07:30
+const END_HOUR    = 21;   // 21:00
+const SLOT_MINS   = 15;
+const SLOT_HEIGHT = 40;   // px per 15-min slot
+const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MINS;
+const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
+
+function minutesSinceMidnight(isoStr: string): number {
+    const d = new Date(isoStr);
+    return d.getHours() * 60 + d.getMinutes();
+}
+
+function topPercent(isoStr: string): number {
+    const mins = minutesSinceMidnight(isoStr);
+    const startMins = START_HOUR * 60;
+    return Math.max(0, mins - startMins);
+}
+
+function durationMins(start: string, end: string): number {
+    return (new Date(end).getTime() - new Date(start).getTime()) / 60000;
+}
+
+function slotToTime(slotIndex: number): Date {
+    const totalMins = START_HOUR * 60 + slotIndex * SLOT_MINS;
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d;
+}
+
+function formatTime(isoStr: string): string {
+    return new Date(isoStr).toLocaleTimeString('es-AR', {
+        hour: '2-digit', minute: '2-digit', hour12: false,
+        timeZone: 'America/Argentina/Buenos_Aires',
+    });
+}
+
+function getStatusBadgeStyle(status: string): string {
+    const map: Record<string, string> = {
+        confirmed:   'bg-blue-500',
+        pending:     'bg-amber-500',
+        arrived:     'bg-green-500',
+        in_progress: 'bg-purple-500',
+        completed:   'bg-gray-400',
+        cancelled:   'bg-red-500',
+        no_show:     'bg-gray-800',
+    };
+    return map[status] ?? 'bg-blue-500';
+}
+
+// ─── Time label column ────────────────────────────────────────────────────────
+
+function TimeColumn() {
+    const slots = Array.from({ length: TOTAL_SLOTS + 1 }, (_, i) => i);
+    return (
+        <div
+            className="flex-shrink-0 w-14 border-r border-gray-100 dark:border-gray-800 relative"
+            style={{ height: TOTAL_HEIGHT }}
+        >
+            {slots.map(i => {
+                const totalMins = START_HOUR * 60 + i * SLOT_MINS;
+                const h = Math.floor(totalMins / 60);
+                const m = totalMins % 60;
+                if (m !== 0) return null;
+                return (
+                    <div
+                        key={i}
+                        className="absolute right-2 text-[10px] font-medium text-gray-400 dark:text-gray-600 leading-none"
+                        style={{ top: i * SLOT_HEIGHT - 6 }}
+                    >
+                        {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+// ─── Doctor Column ────────────────────────────────────────────────────────────
+
+interface DoctorColumnProps {
+    doctor: Doctor;
+    color: string;
+    appointments: Appointment[];
+    date: Date;
+    onEventClick: (apt: Appointment) => void;
+    onSlotClick: (start: Date, end: Date, doctorId: string) => void;
+    canEdit: boolean;
+}
+
+function DoctorColumn({
+    doctor, color, appointments, date,
+    onEventClick, onSlotClick, canEdit
+}: DoctorColumnProps) {
+    const nowRef = useRef<HTMLDivElement>(null);
+    const isToday = new Date().toDateString() === date.toDateString();
+    const nowMins = minutesSinceMidnight(new Date().toISOString());
+    const nowTop  = Math.max(0, (nowMins - START_HOUR * 60));
+
+    // Handle click on empty slot
+    const handleColumnClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!canEdit) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const slotIndex = Math.floor(y / SLOT_HEIGHT);
+        const startDate = slotToTime(slotIndex);
+        startDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+        const endDate = new Date(startDate.getTime() + 30 * 60000);
+        onSlotClick(startDate, endDate, doctor.id);
+    };
+
+    return (
+        <div
+            className="flex-1 min-w-[140px] relative border-r border-gray-100 dark:border-gray-800 cursor-pointer select-none"
+            style={{ height: TOTAL_HEIGHT }}
+            onClick={handleColumnClick}
+        >
+            {/* Grid lines every 15 min */}
+            {Array.from({ length: TOTAL_SLOTS }, (_, i) => (
+                <div
+                    key={i}
+                    className={`absolute left-0 right-0 ${
+                        i % 4 === 0
+                            ? 'border-t border-gray-200 dark:border-gray-700'
+                            : 'border-t border-gray-100 dark:border-gray-800'
+                    }`}
+                    style={{ top: i * SLOT_HEIGHT }}
+                />
+            ))}
+
+            {/* Now indicator */}
+            {isToday && nowMins >= START_HOUR * 60 && nowMins <= END_HOUR * 60 && (
+                <div
+                    ref={nowRef}
+                    className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
+                    style={{ top: nowTop }}
+                >
+                    <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 flex-shrink-0" />
+                    <div className="flex-1 h-px bg-red-400" />
+                </div>
+            )}
+
+            {/* Appointments */}
+            {appointments.map(apt => {
+                const topPx     = topPercent(apt.start_time);
+                const heightPx  = Math.max(SLOT_HEIGHT, (durationMins(apt.start_time, apt.end_time) / SLOT_MINS) * SLOT_HEIGHT);
+                const isShort   = heightPx <= SLOT_HEIGHT;
+
+                return (
+                    <div
+                        key={apt.id}
+                        className="absolute left-1 right-1 rounded-lg z-10 overflow-hidden shadow-md cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all group"
+                        style={{
+                            top:        topPx,
+                            height:     heightPx,
+                            background: color,
+                            minHeight:  SLOT_HEIGHT,
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick(apt);
+                        }}
+                    >
+                        {/* Status indicator strip */}
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${getStatusBadgeStyle(apt.status)}`} />
+
+                        <div className="pl-2.5 pr-1.5 py-1 h-full flex flex-col justify-start overflow-hidden">
+                            <p className="text-white text-[11px] font-bold leading-tight truncate">
+                                {apt.title || apt.patient?.full_name || 'Cita'}
+                            </p>
+                            {!isShort && apt.patient?.full_name && apt.patient.full_name !== apt.title && (
+                                <p className="text-white/80 text-[10px] truncate leading-tight mt-0.5">
+                                    {apt.patient.full_name}
+                                </p>
+                            )}
+                            {!isShort && (
+                                <p className="text-white/70 text-[10px] leading-tight mt-auto">
+                                    {formatTime(apt.start_time)} – {formatTime(apt.end_time)}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function DoctorResourceView({
+    date, doctors, activeDoctorIds, doctorColors,
+    onEventClick, onSlotClick, canEdit
+}: DoctorResourceViewProps) {
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [loading, setLoading] = useState(true);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const visibleDoctors = doctors.filter(d =>
+        activeDoctorIds.has('all') || activeDoctorIds.has(d.id)
+    );
+
+    useEffect(() => {
+        async function load() {
+            setLoading(true);
+            const start = new Date(date);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(date);
+            end.setHours(23, 59, 59, 999);
+            try {
+                const data = await getAppointments(start.toISOString(), end.toISOString());
+                setAppointments(data as Appointment[]);
+            } catch (err) {
+                console.error('[ResourceView] Load error:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        load();
+    }, [date]);
+
+    // Scroll to current hour on mount
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const nowMins = minutesSinceMidnight(new Date().toISOString());
+        const scrollTop = Math.max(0, (nowMins - START_HOUR * 60) * SLOT_HEIGHT / SLOT_MINS - 200);
+        containerRef.current.scrollTop = scrollTop;
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-full text-gray-400">
+                <Loader2 className="animate-spin mr-2" size={18} />
+                <span className="text-sm">Cargando agenda...</span>
+            </div>
+        );
+    }
+
+    if (visibleDoctors.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
+                <UserCircle2 size={48} strokeWidth={1} />
+                <p className="text-sm">No hay doctores seleccionados</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col h-full">
+            {/* Doctor Headers */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 flex-shrink-0">
+                <div className="w-14 flex-shrink-0" />
+                {visibleDoctors.map((doc, idx) => {
+                    const color = doctorColors[doctors.indexOf(doc) % doctorColors.length];
+                    const dayApts = appointments.filter(a => a.doctor_id === doc.id);
+                    return (
+                        <div
+                            key={doc.id}
+                            className="flex-1 min-w-[140px] px-3 py-2.5 border-r border-gray-200 dark:border-gray-700"
+                        >
+                            <div className="flex items-center gap-2">
+                                <div
+                                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                                    style={{ backgroundColor: color }}
+                                >
+                                    {doc.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-gray-900 dark:text-white truncate leading-tight">
+                                        {doc.full_name}
+                                    </p>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                                        {dayApts.length} turno{dayApts.length !== 1 ? 's' : ''}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Scrollable Time Grid */}
+            <div
+                ref={containerRef}
+                className="flex-1 overflow-y-auto overflow-x-auto"
+            >
+                <div className="flex" style={{ minHeight: TOTAL_HEIGHT }}>
+                    <TimeColumn />
+                    {visibleDoctors.map((doc, idx) => {
+                        const color   = doctorColors[doctors.indexOf(doc) % doctorColors.length];
+                        const docApts = appointments.filter(a => a.doctor_id === doc.id);
+                        return (
+                            <DoctorColumn
+                                key={doc.id}
+                                doctor={doc}
+                                color={color}
+                                appointments={docApts}
+                                date={date}
+                                onEventClick={onEventClick}
+                                onSlotClick={onSlotClick}
+                                canEdit={canEdit}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
