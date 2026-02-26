@@ -1,4 +1,4 @@
-'use server';
+// Google Drive utilities - not used directly as Server Actions from the client
 
 import { google } from 'googleapis';
 import { Readable } from 'stream';
