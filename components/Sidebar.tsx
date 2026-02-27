@@ -36,19 +36,19 @@ const MENU_ITEMS = [
         icon: LayoutDashboard,
         label: 'Dashboard',
         href: '/dashboard',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'odontologo']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'odontologo', 'recaptacion']
     },
     {
         icon: CalendarDays,
         label: 'Agenda 360',
         href: '/agenda',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: Users,
         label: 'Pacientes',
         href: '/patients',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: Banknote,
@@ -78,13 +78,13 @@ const MENU_ITEMS = [
         icon: Bell,
         label: 'Recall Engine',
         href: '/recalls',
-        roles: ['owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo']
+        roles: ['owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: CheckSquare,
         label: 'Tareas',
         href: '/todos',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio', 'asistente', 'odontologo']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: Stethoscope,

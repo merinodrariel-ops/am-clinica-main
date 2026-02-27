@@ -43,3 +43,6 @@ next-env.d.ts
 # legacy scripts & debug artifacts
 /scripts/_legacy/
 lint_report.txt
+
+# Google Credentials
+google_credentials.json

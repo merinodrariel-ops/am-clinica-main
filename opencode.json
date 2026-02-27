@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "google-drive": {
+      "type": "local",
+      "command": [
+        "bash",
+        "/Users/am/Downloads/antigravity apps/am-clinica-main/mcp_google_drive.sh"
+      ]
+    }
+  }
+}

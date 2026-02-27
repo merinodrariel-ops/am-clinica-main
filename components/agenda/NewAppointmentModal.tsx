@@ -203,16 +203,23 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     type,
                     notes
                 };
-                await updateAppointment(initialData.id, updates);
+                const result = await updateAppointment(initialData.id, updates);
+                if (!result.success) {
+                    throw new Error(result.error || 'No se pudo actualizar el turno');
+                }
             } else {
                 // Create
-                await createAppointment(formData);
+                const result = await createAppointment(formData);
+                if (!result.success) {
+                    throw new Error(result.error || 'No se pudo crear el turno');
+                }
             }
             onSave();
             onClose();
         } catch (error) {
             console.error(error);
-            alert('Error al guardar la cita');
+            const message = error instanceof Error ? error.message : 'Error al guardar la cita';
+            alert(message);
         } finally {
             setLoading(false);
         }
@@ -222,12 +229,16 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         if (!initialData?.id || !confirm('¿Estás seguro de eliminar esta cita?')) return;
         setLoading(true);
         try {
-            await deleteAppointment(initialData.id);
+            const result = await deleteAppointment(initialData.id);
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo eliminar el turno');
+            }
             onSave();
             onClose();
         } catch (error) {
             console.error(error);
-            alert('Error al eliminar');
+            const message = error instanceof Error ? error.message : 'Error al eliminar';
+            alert(message);
         } finally {
             setLoading(false);
         }

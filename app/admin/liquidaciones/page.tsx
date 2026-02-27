@@ -6,7 +6,7 @@ import {
     Wallet, RefreshCw, ChevronLeft, ChevronRight,
     CheckCircle2, Clock, Banknote, AlertTriangle, XCircle, Play,
     DollarSign, TrendingUp, Users, FileVideo, FileSpreadsheet, ListChecks,
-    Search, PencilLine, ChevronDown, ChevronUp,
+    Search, PencilLine, ChevronDown, ChevronUp, Download, Printer, CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -21,6 +21,7 @@ import {
     UpdateLiquidacionManualInput,
 } from '@/app/actions/liquidaciones';
 import { getTarifarioCompleto, TarifarioItem, updateTarifarioItem } from '@/app/actions/prestaciones';
+import { getRegistrosHorasMes, RegistroHoras } from '@/app/actions/registro-horas';
 
 const ProsoftImporter = dynamic(() => import('@/components/portal/ProsoftImporter'), { ssr: false });
 const RegistroHorasDashboard = dynamic(() => import('@/components/admin/RegistroHorasDashboard'), { ssr: false });
@@ -290,6 +291,551 @@ function EditLiquidacionModal({
                         {saving ? <RefreshCw size={13} className="animate-spin" /> : <PencilLine size={13} />}
                         Guardar cambios
                     </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function HorasDetalleModal({
+    worker,
+    mes,
+    rows,
+    loading,
+    onClose,
+}: {
+    worker: LiquidacionAdminRow;
+    mes: string;
+    rows: RegistroHoras[];
+    loading: boolean;
+    onClose: () => void;
+}) {
+    const [year, month] = mes.split('-').map(Number);
+    const monthStart = `${mes}-01`;
+    const monthEnd = `${mes}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+
+    const [fromDate, setFromDate] = useState(monthStart);
+    const [toDate, setToDate] = useState(monthEnd);
+    const [dayMode, setDayMode] = useState<'all' | 'weekdays' | 'weekends'>('all');
+    const [activePreset, setActivePreset] = useState<'month' | 'thisWeek' | 'last7' | 'weekends' | 'custom'>('month');
+
+    useEffect(() => {
+        setFromDate(monthStart);
+        setToDate(monthEnd);
+        setDayMode('all');
+        setActivePreset('month');
+    }, [monthStart, monthEnd]);
+
+    function formatIsoDate(date: Date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function clampToMonth(dateIso: string) {
+        if (dateIso < monthStart) return monthStart;
+        if (dateIso > monthEnd) return monthEnd;
+        return dateIso;
+    }
+
+    function applyPresetThisWeek() {
+        const now = new Date();
+        const dayIndex = (now.getDay() + 6) % 7;
+        const start = new Date(now);
+        start.setDate(now.getDate() - dayIndex);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+
+        setFromDate(clampToMonth(formatIsoDate(start)));
+        setToDate(clampToMonth(formatIsoDate(end)));
+        setDayMode('all');
+        setActivePreset('thisWeek');
+    }
+
+    function applyPresetLast7Days() {
+        const today = clampToMonth(formatIsoDate(new Date()));
+        const endDate = new Date(`${today}T12:00:00`);
+        const startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 6);
+
+        setFromDate(clampToMonth(formatIsoDate(startDate)));
+        setToDate(today);
+        setDayMode('all');
+        setActivePreset('last7');
+    }
+
+    function applyPresetFullMonth() {
+        setFromDate(monthStart);
+        setToDate(monthEnd);
+        setDayMode('all');
+        setActivePreset('month');
+    }
+
+    function applyPresetWeekends() {
+        applyPresetFullMonth();
+        setDayMode('weekends');
+        setActivePreset('weekends');
+    }
+
+    const activePresetLabel: Record<typeof activePreset, string> = {
+        month: 'Mes completo',
+        thisWeek: 'Esta semana',
+        last7: 'Últimos 7 días',
+        weekends: 'Solo fin de semana',
+        custom: 'Personalizado',
+    };
+
+    const sortedRows = [...rows].sort((a, b) => {
+        if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+        return (a.hora_ingreso || '').localeCompare(b.hora_ingreso || '');
+    });
+
+    const rangeFrom = fromDate <= toDate ? fromDate : toDate;
+    const rangeTo = fromDate <= toDate ? toDate : fromDate;
+
+    const filteredRows = sortedRows.filter(reg => {
+        if (reg.fecha < rangeFrom || reg.fecha > rangeTo) return false;
+        const day = new Date(`${reg.fecha}T12:00:00`).getDay();
+        if (dayMode === 'weekdays') return day >= 1 && day <= 5;
+        if (dayMode === 'weekends') return day === 0 || day === 6;
+        return true;
+    });
+
+    const totalHoras = filteredRows.reduce((sum, r) => sum + Number(r.horas || 0), 0);
+    const totalDias = new Set(filteredRows.map(r => r.fecha)).size;
+
+    const weekMap = new Map<string, {
+        start: Date;
+        end: Date;
+        totalHoras: number;
+        registros: number;
+        horasPorDia: number[];
+    }>();
+
+    for (const reg of filteredRows) {
+        const date = new Date(`${reg.fecha}T12:00:00`);
+        const dayIndex = (date.getDay() + 6) % 7; // Lun=0 ... Dom=6
+
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - dayIndex);
+        weekStart.setHours(0, 0, 0, 0);
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+
+        const key = weekStart.toISOString().slice(0, 10);
+        if (!weekMap.has(key)) {
+            weekMap.set(key, {
+                start: weekStart,
+                end: weekEnd,
+                totalHoras: 0,
+                registros: 0,
+                horasPorDia: [0, 0, 0, 0, 0, 0, 0],
+            });
+        }
+
+        const bucket = weekMap.get(key)!;
+        const horas = Number(reg.horas || 0);
+        bucket.totalHoras += horas;
+        bucket.registros += 1;
+        bucket.horasPorDia[dayIndex] += horas;
+    }
+
+    const weeklyRows = Array.from(weekMap.entries())
+        .map(([key, value]) => ({ key, ...value }))
+        .sort((a, b) => a.key.localeCompare(b.key));
+
+    function formatFecha(fechaISO: string) {
+        return new Date(`${fechaISO}T12:00:00`).toLocaleDateString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        });
+    }
+
+    function safeFileName(text: string) {
+        return text
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9_-]/g, '')
+            .toLowerCase();
+    }
+
+    async function exportExcel() {
+        if (filteredRows.length === 0) return;
+        try {
+            const XLSX = await import('xlsx');
+            const wb = XLSX.utils.book_new();
+
+            const detalle = filteredRows.map(reg => {
+                const fecha = new Date(`${reg.fecha}T12:00:00`);
+                return {
+                    Fecha: fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                    Dia: fecha.toLocaleDateString('es-AR', { weekday: 'long' }),
+                    Ingreso: reg.hora_ingreso || '',
+                    Egreso: reg.hora_egreso || '',
+                    Horas: Number(reg.horas || 0),
+                    Estado: reg.estado,
+                    Observaciones: reg.observaciones || '',
+                };
+            });
+
+            const resumen = weeklyRows.map((w, idx) => ({
+                Semana: idx + 1,
+                Desde: w.start.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                Hasta: w.end.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                Lunes: Number(w.horasPorDia[0].toFixed(2)),
+                Martes: Number(w.horasPorDia[1].toFixed(2)),
+                Miercoles: Number(w.horasPorDia[2].toFixed(2)),
+                Jueves: Number(w.horasPorDia[3].toFixed(2)),
+                Viernes: Number(w.horasPorDia[4].toFixed(2)),
+                Sabado: Number(w.horasPorDia[5].toFixed(2)),
+                Domingo: Number(w.horasPorDia[6].toFixed(2)),
+                TotalSemana: Number(w.totalHoras.toFixed(2)),
+                Registros: w.registros,
+            }));
+
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), 'Detalle diario');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), 'Resumen semanal');
+
+            const file = `horarios_${safeFileName(`${worker.nombre}_${worker.apellido || ''}`)}_${mes}.xlsx`;
+            XLSX.writeFile(wb, file);
+            toast.success('Excel exportado');
+        } catch {
+            toast.error('No se pudo exportar a Excel');
+        }
+    }
+
+    function exportPdf() {
+        if (filteredRows.length === 0) return;
+
+        const escapeHtml = (value: string) =>
+            value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+        const weeklyHtml = weeklyRows
+            .map((w, idx) => `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${w.start.toLocaleDateString('es-AR')}</td>
+                    <td>${w.end.toLocaleDateString('es-AR')}</td>
+                    <td>${w.horasPorDia[0].toFixed(2)}</td>
+                    <td>${w.horasPorDia[1].toFixed(2)}</td>
+                    <td>${w.horasPorDia[2].toFixed(2)}</td>
+                    <td>${w.horasPorDia[3].toFixed(2)}</td>
+                    <td>${w.horasPorDia[4].toFixed(2)}</td>
+                    <td>${w.horasPorDia[5].toFixed(2)}</td>
+                    <td>${w.horasPorDia[6].toFixed(2)}</td>
+                    <td><strong>${w.totalHoras.toFixed(2)}</strong></td>
+                </tr>
+            `)
+            .join('');
+
+        const detalleHtml = filteredRows
+            .map(reg => {
+                const date = new Date(`${reg.fecha}T12:00:00`);
+                const dia = date.toLocaleDateString('es-AR', { weekday: 'long' });
+                return `
+                    <tr>
+                        <td>${date.toLocaleDateString('es-AR')}</td>
+                        <td style="text-transform: capitalize;">${dia}</td>
+                        <td>${reg.hora_ingreso || '--:--'}</td>
+                        <td>${reg.hora_egreso || '--:--'}</td>
+                        <td><strong>${Number(reg.horas || 0).toFixed(2)}</strong></td>
+                        <td>${escapeHtml(reg.estado || '')}</td>
+                        <td>${escapeHtml(reg.observaciones || '')}</td>
+                    </tr>
+                `;
+            })
+            .join('');
+
+        const popup = window.open('', '_blank');
+        if (!popup) {
+            toast.error('El navegador bloqueó la ventana de impresión');
+            return;
+        }
+
+        popup.document.write(`
+            <html>
+                <head>
+                    <title>Detalle de horarios - ${worker.nombre} ${worker.apellido || ''}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+                        h1 { margin: 0 0 6px 0; font-size: 20px; }
+                        .meta { margin: 0 0 18px 0; color: #555; font-size: 12px; }
+                        .stats { margin: 10px 0 18px 0; font-size: 12px; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+                        th, td { border: 1px solid #ddd; padding: 6px; font-size: 11px; text-align: left; }
+                        th { background: #f5f5f5; font-weight: 600; }
+                        .section { margin-top: 14px; margin-bottom: 6px; font-size: 14px; font-weight: 700; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Detalle de horarios</h1>
+                    <p class="meta">${escapeHtml(worker.nombre)} ${escapeHtml(worker.apellido || '')} · ${escapeHtml(mesLabel(mes))}</p>
+                    <p class="stats">Registros: ${filteredRows.length} | Días: ${totalDias} | Horas totales: ${totalHoras.toFixed(2)}</p>
+
+                    <div class="section">Resumen semanal</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Desde</th><th>Hasta</th>
+                                <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>${weeklyHtml}</tbody>
+                    </table>
+
+                    <div class="section">Detalle diario</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th><th>Día</th><th>Ingreso</th><th>Egreso</th><th>Horas</th><th>Estado</th><th>Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>${detalleHtml}</tbody>
+                    </table>
+                </body>
+            </html>
+        `);
+
+        popup.document.close();
+        popup.focus();
+        setTimeout(() => popup.print(), 200);
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/70 p-4 md:p-8 overflow-y-auto">
+            <div className="max-w-4xl mx-auto rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+                    <div>
+                        <h3 className="text-white font-semibold">Detalle de horas</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            {worker.nombre} {worker.apellido} · {mesLabel(mes)}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={exportExcel}
+                            disabled={loading || filteredRows.length === 0}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-300 hover:text-white disabled:opacity-50"
+                        >
+                            <Download size={12} /> Excel
+                        </button>
+                        <button
+                            onClick={exportPdf}
+                            disabled={loading || filteredRows.length === 0}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-300 hover:text-white disabled:opacity-50"
+                        >
+                            <Printer size={12} /> PDF
+                        </button>
+                        <button onClick={onClose} className="text-slate-400 hover:text-white text-sm ml-1">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+
+                <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/40">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="px-2.5 py-1 rounded-full border border-slate-700 text-slate-300">{filteredRows.length} registros</span>
+                        <span className="px-2.5 py-1 rounded-full border border-slate-700 text-slate-300">{totalDias} días</span>
+                        <span className="px-2.5 py-1 rounded-full border border-violet-500/30 text-violet-300 font-medium">
+                            {totalHoras.toLocaleString('es-AR', { maximumFractionDigits: 2 })} h totales
+                        </span>
+                        <span className="px-2.5 py-1 rounded-full border border-slate-700 text-slate-300 inline-flex items-center gap-1">
+                            <CalendarDays size={12} /> {weeklyRows.length} semanas
+                        </span>
+                    </div>
+                </div>
+
+                <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/20">
+                    <div className="flex flex-wrap items-end gap-2">
+                        <div>
+                            <label className="block text-[11px] text-slate-500 mb-1">Desde</label>
+                            <input
+                                type="date"
+                                value={fromDate}
+                                min={monthStart}
+                                max={monthEnd}
+                                onChange={e => {
+                                    setFromDate(e.target.value);
+                                    setActivePreset('custom');
+                                }}
+                                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] text-slate-500 mb-1">Hasta</label>
+                            <input
+                                type="date"
+                                value={toDate}
+                                min={monthStart}
+                                max={monthEnd}
+                                onChange={e => {
+                                    setToDate(e.target.value);
+                                    setActivePreset('custom');
+                                }}
+                                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-1 border border-slate-700 rounded-lg p-1">
+                            <button
+                                onClick={() => {
+                                    setDayMode('all');
+                                    setActivePreset('custom');
+                                }}
+                                className={`px-2 py-1 text-xs rounded-md ${dayMode === 'all' ? 'bg-violet-600 text-white' : 'text-slate-300 hover:text-white'}`}
+                            >
+                                Todos
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setDayMode('weekdays');
+                                    setActivePreset('custom');
+                                }}
+                                className={`px-2 py-1 text-xs rounded-md ${dayMode === 'weekdays' ? 'bg-violet-600 text-white' : 'text-slate-300 hover:text-white'}`}
+                            >
+                                Lun-Vie
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setDayMode('weekends');
+                                    setActivePreset('custom');
+                                }}
+                                className={`px-2 py-1 text-xs rounded-md ${dayMode === 'weekends' ? 'bg-violet-600 text-white' : 'text-slate-300 hover:text-white'}`}
+                            >
+                                Sáb-Dom
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={applyPresetFullMonth}
+                            className="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 border border-slate-700 rounded-lg"
+                        >
+                            Mes completo
+                        </button>
+                        <button
+                            onClick={applyPresetThisWeek}
+                            className="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 border border-slate-700 rounded-lg"
+                        >
+                            Esta semana
+                        </button>
+                        <button
+                            onClick={applyPresetLast7Days}
+                            className="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 border border-slate-700 rounded-lg"
+                        >
+                            Últimos 7 días
+                        </button>
+                        <button
+                            onClick={applyPresetWeekends}
+                            className="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 border border-slate-700 rounded-lg"
+                        >
+                            Solo fin de semana
+                        </button>
+
+                        <button
+                            onClick={applyPresetFullMonth}
+                            className="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 border border-slate-700 rounded-lg"
+                        >
+                            Restablecer
+                        </button>
+
+                        <span className="ml-auto text-xs text-slate-400 px-2.5 py-1.5 border border-slate-700 rounded-lg">
+                            Preset activo: <span className="text-violet-300 font-medium">{activePresetLabel[activePreset]}</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div className="p-5">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-16 text-slate-500">
+                            <RefreshCw size={18} className="animate-spin mr-2" />
+                            Cargando detalle...
+                        </div>
+                    ) : filteredRows.length === 0 ? (
+                        <div className="text-center py-16 text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+                            No hay registros para los filtros seleccionados.
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="rounded-xl border border-slate-800 bg-slate-950/20 overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead className="bg-slate-900/80 border-b border-slate-800">
+                                        <tr>
+                                            <th className="text-left px-3 py-2 text-slate-400 font-medium">Semana</th>
+                                            <th className="text-left px-3 py-2 text-slate-400 font-medium">Rango</th>
+                                            <th className="text-right px-3 py-2 text-slate-400 font-medium">Lun</th>
+                                            <th className="text-right px-3 py-2 text-slate-400 font-medium">Mar</th>
+                                            <th className="text-right px-3 py-2 text-slate-400 font-medium">Mié</th>
+                                            <th className="text-right px-3 py-2 text-slate-400 font-medium">Jue</th>
+                                            <th className="text-right px-3 py-2 text-slate-400 font-medium">Vie</th>
+                                            <th className="text-right px-3 py-2 text-slate-400 font-medium">Sáb</th>
+                                            <th className="text-right px-3 py-2 text-slate-400 font-medium">Dom</th>
+                                            <th className="text-right px-3 py-2 text-slate-300 font-semibold">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/70">
+                                        {weeklyRows.map((week, idx) => (
+                                            <tr key={week.key} className="hover:bg-slate-900/50">
+                                                <td className="px-3 py-2 text-slate-200">Semana {idx + 1}</td>
+                                                <td className="px-3 py-2 text-slate-400">
+                                                    {week.start.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                                    {' - '}
+                                                    {week.end.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                                </td>
+                                                {week.horasPorDia.map((h, i) => (
+                                                    <td key={i} className="px-3 py-2 text-right text-slate-300">
+                                                        {h > 0 ? h.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '—'}
+                                                    </td>
+                                                ))}
+                                                <td className="px-3 py-2 text-right text-violet-300 font-semibold">
+                                                    {week.totalHoras.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="space-y-2">
+                            {filteredRows.map(reg => {
+                                const fecha = new Date(`${reg.fecha}T12:00:00`);
+                                const dia = fecha.toLocaleDateString('es-AR', { weekday: 'long' });
+                                const fechaLabel = formatFecha(reg.fecha);
+
+                                return (
+                                    <div key={reg.id} className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <p className="text-sm text-white font-medium capitalize">{dia} · {fechaLabel}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">Estado: {reg.estado}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm text-violet-300 font-semibold">
+                                                    {Number(reg.horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })} h
+                                                </p>
+                                                <p className="text-xs text-slate-400">
+                                                    {reg.hora_ingreso || '--:--'} → {reg.hora_egreso || '--:--'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {reg.observaciones && (
+                                            <p className="text-xs text-amber-300/90 mt-2">{reg.observaciones}</p>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -621,6 +1167,9 @@ export default function LiquidacionesPage() {
     const [editing, setEditing] = useState<{ row: LiquidacionAdminRow; liq: LiquidacionResult } | null>(null);
     const [savingEdit, setSavingEdit] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [detalleHorasTarget, setDetalleHorasTarget] = useState<LiquidacionAdminRow | null>(null);
+    const [detalleHorasRows, setDetalleHorasRows] = useState<RegistroHoras[]>([]);
+    const [detalleHorasLoading, setDetalleHorasLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid' | 'sin_generar'>('all');
 
@@ -725,6 +1274,20 @@ export default function LiquidacionesPage() {
         }
     }
 
+    async function openDetalleHoras(row: LiquidacionAdminRow) {
+        setDetalleHorasTarget(row);
+        setDetalleHorasRows([]);
+        setDetalleHorasLoading(true);
+        try {
+            const registros = await getRegistrosHorasMes(mes, row.personal_id);
+            setDetalleHorasRows(registros);
+        } catch {
+            toast.error('No se pudo cargar el detalle de horas');
+        } finally {
+            setDetalleHorasLoading(false);
+        }
+    }
+
     // ── Render ───────────────────────────────────────────────────────────────
     return (
         <div className="min-h-screen bg-slate-950 text-white p-6">
@@ -742,6 +1305,16 @@ export default function LiquidacionesPage() {
                     onClose={() => setEditing(null)}
                     onSave={handleManualEdit}
                     saving={savingEdit}
+                />
+            )}
+
+            {detalleHorasTarget && (
+                <HorasDetalleModal
+                    worker={detalleHorasTarget}
+                    mes={mes}
+                    rows={detalleHorasRows}
+                    loading={detalleHorasLoading}
+                    onClose={() => setDetalleHorasTarget(null)}
                 />
             )}
 
@@ -980,6 +1553,12 @@ export default function LiquidacionesPage() {
                                                                 {row.nombre} {row.apellido}
                                                             </p>
                                                             <p className="text-xs text-slate-500">{row.area || '—'}</p>
+                                                            <button
+                                                                onClick={() => openDetalleHoras(row)}
+                                                                className="text-[11px] text-violet-300 hover:text-violet-200 mt-0.5 transition-colors"
+                                                            >
+                                                                Ver horarios del mes
+                                                            </button>
                                                         </div>
                                                         {row.tiene_pendientes && (
                                                             <div title="Prestaciones sin Slides" className="ml-1">

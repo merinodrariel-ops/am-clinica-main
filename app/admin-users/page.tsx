@@ -23,6 +23,7 @@ interface Profile {
     email: string;
     full_name: string;
     role: string;
+    telefono?: string;
     is_active: boolean;
     created_at: string;
 }
@@ -158,7 +159,7 @@ export default function UserManagementPage() {
         setEditData({
             fullName: user.full_name || '',
             role: user.role || 'partner_viewer',
-            telefono: (user as any).telefono || ''
+            telefono: user.telefono || ''
         });
         setEditStatus('idle');
         setErrorMessage('');
@@ -421,6 +422,7 @@ export default function UserManagementPage() {
                                     >
                                         <option value="partner_viewer">Partner Viewer (Solo Lectura)</option>
                                         <option value="reception">Recepción</option>
+                                        <option value="recaptacion">Recaptación</option>
                                         <option value="laboratorio">Laboratorio</option>
                                         <option value="asistente">Asistente</option>
                                         <option value="odontologo">Odontólogo</option>
@@ -584,6 +586,7 @@ export default function UserManagementPage() {
                                     >
                                         <option value="partner_viewer">Partner Viewer (Solo Lectura)</option>
                                         <option value="reception">Recepción</option>
+                                        <option value="recaptacion">Recaptación</option>
                                         <option value="laboratorio">Laboratorio</option>
                                         <option value="asistente">Asistente</option>
                                         <option value="odontologo">Odontólogo</option>

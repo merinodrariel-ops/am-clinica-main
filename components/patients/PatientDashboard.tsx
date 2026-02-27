@@ -83,7 +83,7 @@ const TABS = [
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
 ];
 
-// Payment-related tabs hidden from odontólogos
+// Payment-related tabs hidden from restricted clinical/ops roles
 const PAYMENT_TABS = new Set(['finanzas']);
 
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [] }: PatientDashboardProps) {
@@ -91,7 +91,9 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const searchParams = useSearchParams();
     const { role } = useAuth();
     const isOdontologo = role === 'odontologo';
-    const visibleTabs = isOdontologo ? TABS.filter(t => !PAYMENT_TABS.has(t.id)) : TABS;
+    const isRecaptacion = role === 'recaptacion';
+    const hidePaymentTabs = isOdontologo || isRecaptacion;
+    const visibleTabs = hidePaymentTabs ? TABS.filter(t => !PAYMENT_TABS.has(t.id)) : TABS;
     const requestedTab = searchParams.get('tab') || 'datos';
     const defaultTabRaw = ['financiamiento', 'pagos', 'planes'].includes(requestedTab)
         ? 'finanzas'
@@ -99,7 +101,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const tabIds = new Set(TABS.map((tab) => tab.id));
     const defaultTab = tabIds.has(defaultTabRaw) ? defaultTabRaw : 'datos';
     const [activeTab, setActiveTab] = useState(
-        isOdontologo && PAYMENT_TABS.has(defaultTab) ? 'datos' : defaultTab
+        hidePaymentTabs && PAYMENT_TABS.has(defaultTab) ? 'datos' : defaultTab
     );
     const [isEditing, setIsEditing] = useState(false);
 

@@ -62,11 +62,11 @@ export async function getUserAppProfile(): Promise<{ role: string | null } | nul
     return profile;
 }
 
-export async function getAppUsers(): Promise<{ id: string, full_name: string, email: string }[]> {
+export async function getAppUsers(): Promise<{ id: string, full_name: string, email: string, role: string }[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, full_name, email, role')
         .order('full_name');
 
     if (error) {
@@ -633,9 +633,28 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
         throw new Error('Acceso denegado: Se requieren permisos de administrador o dueño');
     }
 
-    // Prepare data for update
+    // Prepare data for personal update
     const cleanData = { ...data };
+    const requestedAppRole = typeof cleanData.app_role === 'string' && cleanData.app_role.trim().length > 0
+        ? cleanData.app_role.trim()
+        : null;
+
+    // If frontend sends empty string, persist NULL in personal.user_id
+    if (cleanData.user_id === '') {
+        cleanData.user_id = undefined;
+    }
+
     delete (cleanData as any).full_name; // Computed or handled elsewhere
+    delete (cleanData as any).app_role;
+
+    // Resolve current linked auth user (before/after potential relink)
+    const { data: currentWorker, error: currentWorkerError } = await supabase
+        .from('personal')
+        .select('user_id')
+        .eq('id', workerId)
+        .single();
+
+    if (currentWorkerError) throw new Error(currentWorkerError.message);
 
     const { error } = await supabase
         .from('personal')
@@ -643,6 +662,39 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
         .eq('id', workerId);
 
     if (error) throw new Error(error.message);
+
+    if (requestedAppRole) {
+        const targetUserId = (data.user_id && data.user_id.trim().length > 0)
+            ? data.user_id
+            : (currentWorker?.user_id || null);
+
+        if (!targetUserId) {
+            throw new Error('No se pudo actualizar el rol de app: el prestador no está vinculado a un usuario.');
+        }
+
+        const admin = getAdminClient();
+
+        const { error: profileRoleError } = await admin
+            .from('profiles')
+            .update({ role: requestedAppRole })
+            .eq('id', targetUserId);
+
+        if (profileRoleError) throw new Error(profileRoleError.message);
+
+        const { data: authUserData, error: getAuthUserError } = await admin.auth.admin.getUserById(targetUserId);
+        if (getAuthUserError) throw new Error(getAuthUserError.message);
+
+        const nextMetadata = {
+            ...(authUserData.user?.user_metadata || {}),
+            role: requestedAppRole,
+        };
+
+        const { error: authRoleError } = await admin.auth.admin.updateUserById(targetUserId, {
+            user_metadata: nextMetadata,
+        });
+
+        if (authRoleError) throw new Error(authRoleError.message);
+    }
 
     revalidatePath('/admin/staff');
     revalidatePath(`/admin/staff/${workerId}`);

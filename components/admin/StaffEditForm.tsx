@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { WorkerProfile, WorkerRole } from '@/types/worker-portal';
 import { updateWorkerProfileAdmin, getAppUsers } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
-import { Save, X, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2 } from 'lucide-react';
+import { Save, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2 } from 'lucide-react';
 
 interface StaffEditFormProps {
     worker: WorkerProfile;
@@ -14,11 +14,21 @@ interface StaffEditFormProps {
 
 export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEditFormProps) {
     const [isSaving, setIsSaving] = useState(false);
-    const [appUsers, setAppUsers] = useState<{ id: string, full_name: string, email: string }[]>([]);
+    const [appUsers, setAppUsers] = useState<{ id: string, full_name: string, email: string, role: string }[]>([]);
+    const [linkedUserId, setLinkedUserId] = useState(worker.user_id || '');
+    const [appRole, setAppRole] = useState('');
 
     useEffect(() => {
         getAppUsers().then(setAppUsers).catch(console.error);
     }, []);
+
+    useEffect(() => {
+        if (!linkedUserId || appUsers.length === 0) return;
+        const selected = appUsers.find((u) => u.id === linkedUserId);
+        if (selected) {
+            setAppRole(selected.role || 'partner_viewer');
+        }
+    }, [linkedUserId, appUsers]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -39,21 +49,34 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             porcentaje_honorarios: Number(fd.get('porcentaje_honorarios')),
             activo: fd.get('activo') === 'on',
             matricula_provincial: fd.get('matricula_provincial') as string,
-            user_id: fd.get('user_id') as string || undefined,
+            user_id: linkedUserId || undefined,
+            app_role: appRole || undefined,
         };
 
         try {
             await updateWorkerProfileAdmin(worker.id, data);
             toast.success('Perfil actualizado correctamente');
             onSuccess();
-        } catch (err: any) {
-            toast.error(err.message || 'Error al actualizar el perfil');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Error al actualizar el perfil');
         } finally {
             setIsSaving(false);
         }
     };
 
     const ROLES: WorkerRole[] = ['dentist', 'assistant', 'technician', 'cleaning', 'admin', 'reception', 'lab', 'marketing', 'other'];
+    const APP_ROLE_OPTIONS = [
+        { value: 'partner_viewer', label: 'Partner Viewer (Solo Lectura)' },
+        { value: 'reception', label: 'Recepción' },
+        { value: 'recaptacion', label: 'Recaptación' },
+        { value: 'laboratorio', label: 'Laboratorio' },
+        { value: 'asistente', label: 'Asistente' },
+        { value: 'odontologo', label: 'Odontólogo' },
+        { value: 'pricing_manager', label: 'Pricing Manager' },
+        { value: 'developer', label: 'Developer' },
+        { value: 'admin', label: 'Administrador' },
+        { value: 'owner', label: 'Owner (Dueño)' },
+    ];
 
     return (
         <form onSubmit={handleSubmit} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 md:space-y-8 animate-in fade-in zoom-in duration-300">
@@ -213,7 +236,17 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                             <label className="text-xs font-bold text-slate-500 uppercase ml-1">Vincular con Usuario de la App</label>
                             <select
                                 name="user_id"
-                                defaultValue={worker.user_id || ''}
+                                value={linkedUserId}
+                                onChange={(e) => {
+                                    const nextUserId = e.target.value;
+                                    setLinkedUserId(nextUserId);
+                                    if (!nextUserId) {
+                                        setAppRole('');
+                                        return;
+                                    }
+                                    const selected = appUsers.find((u) => u.id === nextUserId);
+                                    setAppRole(selected?.role || 'partner_viewer');
+                                }}
                                 className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-white outline-none transition-all appearance-none"
                             >
                                 <option value="">No vinculado</option>
@@ -225,6 +258,27 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                             </select>
                             <p className="text-[10px] text-slate-500 mt-1 italic">
                                 Vincule este perfil de personal con un usuario registrado para que pueda acceder a su portal individual.
+                            </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Rol de App (permisos reales)</label>
+                            <select
+                                name="app_role"
+                                value={appRole}
+                                onChange={(e) => setAppRole(e.target.value)}
+                                disabled={!linkedUserId}
+                                className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-white outline-none transition-all appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <option value="">Sin cambios</option>
+                                {APP_ROLE_OPTIONS.map((roleOption) => (
+                                    <option key={roleOption.value} value={roleOption.value}>
+                                        {roleOption.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-slate-500 mt-1 italic">
+                                Este campo define permisos del sistema (agenda, pacientes, cajas, admin). No depende del campo &quot;Rol en Clínica&quot;.
                             </p>
                         </div>
                     </div>

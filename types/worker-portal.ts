@@ -13,6 +13,7 @@ export type GoalCategory = 'compliance' | 'attendance' | 'performance' | 'growth
 export interface WorkerProfile {
     id: string;
     user_id?: string;
+    app_role?: string;
     nombre: string;
     apellido?: string;
     rol: string;

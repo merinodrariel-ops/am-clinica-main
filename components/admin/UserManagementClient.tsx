@@ -21,6 +21,19 @@ interface User {
     invitation_sent_at?: string;
 }
 
+const APP_ROLE_OPTIONS = [
+    { value: 'partner_viewer', label: 'Partner Viewer (Solo Lectura)' },
+    { value: 'reception', label: 'Recepción' },
+    { value: 'recaptacion', label: 'Recaptación' },
+    { value: 'laboratorio', label: 'Laboratorio' },
+    { value: 'asistente', label: 'Asistente' },
+    { value: 'odontologo', label: 'Odontólogo' },
+    { value: 'pricing_manager', label: 'Pricing Manager' },
+    { value: 'developer', label: 'Developer' },
+    { value: 'admin', label: 'Administrador' },
+    { value: 'owner', label: 'Owner (Dueño)' },
+];
+
 export default function UserManagementClient({ initialUsers }: { initialUsers: User[] }) {
     const [users, setUsers] = useState<User[]>(initialUsers);
     const [search, setSearch] = useState('');
@@ -254,9 +267,9 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                             <div>
                                 <label className="block text-sm font-medium mb-1">Rol</label>
                                 <select name="role" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
-                                    <option value="reception">Recepción</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="owner">Owner</option>
+                                    {APP_ROLE_OPTIONS.map((roleOption) => (
+                                        <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="flex justify-end gap-2 mt-6">
@@ -287,9 +300,9 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                             <div>
                                 <label className="block text-sm font-medium mb-1">Rol</label>
                                 <select name="role" defaultValue={selectedUser.role} required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
-                                    <option value="reception">Recepción</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="owner">Owner</option>
+                                    {APP_ROLE_OPTIONS.map((roleOption) => (
+                                        <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="flex justify-end gap-2 mt-6">

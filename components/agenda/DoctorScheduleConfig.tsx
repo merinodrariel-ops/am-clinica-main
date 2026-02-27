@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { getDoctors } from '@/app/actions/agenda';
 import { Save, Plus, Trash2, Loader2, Bell, Clock, UserCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -213,13 +214,9 @@ export default function DoctorScheduleConfig() {
 
     useEffect(() => {
         async function loadDoctors() {
-            const { data } = await supabase
-                .from('profiles')
-                .select('id, full_name, role')
-                .in('role', ['owner', 'admin', 'developer', 'odontologo'])
-                .order('full_name');
-            setDoctors(data ?? []);
-            if (data?.length) setActiveDoctorId(data[0].id);
+            const data = await getDoctors();
+            setDoctors(data);
+            if (data.length) setActiveDoctorId(data[0].id);
         }
         async function loadRules() {
             const { data } = await supabase

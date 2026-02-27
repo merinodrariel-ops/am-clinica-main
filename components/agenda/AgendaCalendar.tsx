@@ -326,7 +326,7 @@ export default function AgendaCalendar() {
         });
     };
 
-    const canEdit = ['owner', 'admin', 'reception', 'developer'].includes(role || '');
+    const canEdit = ['owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo', 'recaptacion'].includes(role || '');
 
     return (
         <div className="h-full bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">

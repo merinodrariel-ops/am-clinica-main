@@ -143,10 +143,53 @@ export async function searchPatients(query: string) {
 
 export async function getDoctors() {
     const supabase = await createClient();
-    const { data } = await supabase
+
+    // Source doctors from `personal` to avoid listing non-clinical app users.
+    const { data: staff, error: staffError } = await supabase
+        .from('personal')
+        .select('user_id, nombre, apellido')
+        .eq('activo', true)
+        .eq('tipo', 'profesional')
+        .not('user_id', 'is', null)
+        .order('nombre');
+
+    if (staffError) {
+        console.error('Error fetching professional staff:', staffError);
+        return [];
+    }
+
+    const userIds = (staff || [])
+        .map((row: { user_id: string | null }) => row.user_id)
+        .filter((id): id is string => Boolean(id));
+
+    if (userIds.length === 0) {
+        return [];
+    }
+
+    const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, role')
-        .in('role', ['owner', 'admin', 'developer', 'odontologo'])
-        .order('full_name');
-    return data || [];
+        .in('id', userIds);
+
+    if (profilesError) {
+        console.error('Error fetching doctor profiles:', profilesError);
+        return [];
+    }
+
+    const profileById = new Map((profiles || []).map(profile => [profile.id, profile]));
+
+    return (staff || [])
+        .map((row: { user_id: string | null; nombre: string | null; apellido: string | null }) => {
+            const profile = row.user_id ? profileById.get(row.user_id) : null;
+            if (!profile || !row.user_id) return null;
+
+            const fallbackName = `${row.nombre || ''} ${row.apellido || ''}`.trim();
+            return {
+                id: profile.id,
+                full_name: profile.full_name || fallbackName || 'Profesional',
+                role: profile.role,
+            };
+        })
+        .filter((doctor): doctor is { id: string; full_name: string; role: string } => Boolean(doctor))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name, 'es', { sensitivity: 'base' }));
 }
