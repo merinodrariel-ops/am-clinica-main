@@ -49,7 +49,7 @@ export default function RegistroHorasDashboard() {
             setResumen(curr);
             setResumenPrev(prevData);
         }).catch(console.error)
-          .finally(() => setLoading(false));
+            .finally(() => setLoading(false));
     }, [mes]);
 
     // Build chart data: merge current and previous by employee name
@@ -165,7 +165,7 @@ export default function RegistroHorasDashboard() {
                                     <Tooltip
                                         contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
                                         labelStyle={{ color: '#e2e8f0' }}
-                                        formatter={(v: number) => [`${v}h`]}
+                                        formatter={(v: number | string | undefined) => [typeof v === 'number' ? `${v}h` : v || '0h']}
                                     />
                                     <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
                                     <Bar dataKey={mesLabel(prevMes(mes))} fill="#334155" radius={[3, 3, 0, 0]} />
