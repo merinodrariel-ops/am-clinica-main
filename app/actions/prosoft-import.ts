@@ -88,8 +88,8 @@ async function fetchCsv(sheetId: string, gid: string): Promise<string[][]> {
 
     const text = await res.text();
 
-    // Parse CSV (simple: handles quoted fields with commas)
-    return text.split('\n').map(line => {
+    // Parse CSV (handles \r\n and quoted fields with commas)
+    return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map(line => {
         const cells: string[] = [];
         let cur = '';
         let inQuote = false;
@@ -118,37 +118,48 @@ function parseProsoftMatrix(rows: string[][], mes: string): {
 } {
     const [year, month] = mes.split('-').map(Number);
 
-    // Find the header row: the one that contains day numbers (1..31)
+    // Find the header row: the row with the most day-number columns (1–31).
+    // Search up to 20 rows to handle Prosoft layouts with multiple info rows at the top.
     let headerRowIdx = -1;
     let dayColumns: Record<number, number> = {};
+    let bestDayCount = 0;
 
-    for (let r = 0; r < Math.min(5, rows.length); r++) {
+    for (let r = 0; r < Math.min(20, rows.length); r++) {
         const row = rows[r];
         let dayCount = 0;
         const cols: Record<number, number> = {};
 
-        for (let c = 1; c < row.length; c++) {
-            const cell = row[c].trim();
-            // Headers like "1", "1\nLun", "1 Lun", "Lun 1" etc.
-            const dayMatch = cell.match(/^(\d{1,2})/);
+        for (let c = 0; c < row.length; c++) {
+            // Normalize: strip \r, collapse whitespace
+            const cell = row[c].replace(/\r/g, '').trim();
+            // Accept any 1-2 digit number found in the cell (handles "1", "01", "1 Lun", "Lun 1", "LUN\n1", etc.)
+            const dayMatch = cell.match(/(?:^|\D)(\d{1,2})(?:\D|$)/);
             if (dayMatch) {
                 const day = parseInt(dayMatch[1]);
                 if (day >= 1 && day <= 31) {
-                    cols[c] = day;
-                    dayCount++;
+                    // Only count as day column if not the first column (first col = employee name)
+                    if (c > 0) {
+                        cols[c] = day;
+                        dayCount++;
+                    }
                 }
             }
         }
 
-        if (dayCount >= 5) {   // At least 5 day columns confirms this is the header
+        // Pick the row with the most day columns (need at least 3)
+        if (dayCount > bestDayCount) {
+            bestDayCount = dayCount;
             headerRowIdx = r;
             dayColumns = cols;
-            break;
         }
     }
 
-    if (headerRowIdx === -1) {
-        throw new Error('No se encontró la fila de encabezado de días en la planilla.');
+    if (headerRowIdx === -1 || bestDayCount < 3) {
+        throw new Error(
+            `No se encontró la fila de encabezado de días en la planilla. ` +
+            `Verificá que la planilla sea pública y tenga el formato Prosoft estándar ` +
+            `(primera columna = nombre, resto = días del mes).`
+        );
     }
 
     // Validate days belong to the given month
