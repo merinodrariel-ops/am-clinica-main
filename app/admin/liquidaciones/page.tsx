@@ -19,6 +19,7 @@ import {
 import { getTarifarioCompleto, TarifarioItem } from '@/app/actions/prestaciones';
 
 const ProsoftImporter = dynamic(() => import('@/components/portal/ProsoftImporter'), { ssr: false });
+const RegistroHorasDashboard = dynamic(() => import('@/components/admin/RegistroHorasDashboard'), { ssr: false });
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -167,7 +168,7 @@ export default function LiquidacionesPage() {
     const now = new Date();
     const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const [tab, setTab] = useState<'liquidaciones' | 'prosoft' | 'tarifario'>('liquidaciones');
+    const [tab, setTab] = useState<'liquidaciones' | 'prosoft' | 'tarifario' | 'horas'>('liquidaciones');
     const [tarifario, setTarifario] = useState<TarifarioItem[]>([]);
     const [mes, setMes] = useState(defaultMes);
     const [rows, setRows] = useState<LiquidacionAdminRow[]>([]);
@@ -317,6 +318,13 @@ export default function LiquidacionesPage() {
                     <ListChecks size={14} />
                     Tarifario
                 </button>
+                <button
+                    onClick={() => setTab('horas')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'horas' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
+                >
+                    <Clock size={14} />
+                    Horas
+                </button>
             </div>
 
             {tab === 'prosoft' && (
@@ -327,6 +335,12 @@ export default function LiquidacionesPage() {
 
             {tab === 'tarifario' && (
                 <TarifarioView items={tarifario} />
+            )}
+
+            {tab === 'horas' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <RegistroHorasDashboard />
+                </div>
             )}
 
             {tab === 'liquidaciones' && <>

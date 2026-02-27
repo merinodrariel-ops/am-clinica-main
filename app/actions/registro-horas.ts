@@ -76,6 +76,90 @@ export async function getRegistrosHorasMes(
     return (data || []) as RegistroHoras[];
 }
 
+export interface ResumenEmpleado {
+    personal_id: string;
+    nombre: string;
+    apellido: string | null;
+    dias: number;
+    total_horas: number;
+    prom_horas_dia: number;
+    hora_ingreso_min: string | null;  // earliest entry in month
+    hora_egreso_max: string | null;   // latest exit in month
+}
+
+export interface ResumenMes {
+    mes: string;
+    empleados: ResumenEmpleado[];
+    total_horas: number;
+    total_dias_persona: number;
+}
+
+export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
+    const admin = getAdminClient();
+    const [year, month] = mes.split('-').map(Number);
+    const start = `${mes}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const end = `${mes}-${String(lastDay).padStart(2, '0')}`;
+
+    const { data } = await admin
+        .from('registro_horas')
+        .select('personal_id, horas, hora_ingreso, hora_egreso, personal!inner(nombre, apellido)')
+        .gte('fecha', start)
+        .lte('fecha', end);
+
+    if (!data || data.length === 0) {
+        return { mes, empleados: [], total_horas: 0, total_dias_persona: 0 };
+    }
+
+    // Group by personal_id
+    const byPersonal = new Map<string, {
+        nombre: string; apellido: string | null;
+        horas: number[]; ingresos: string[]; egresos: string[];
+    }>();
+
+    for (const row of data as Record<string, unknown>[]) {
+        const pid = row.personal_id as string;
+        const p = (Array.isArray(row.personal) ? row.personal[0] : row.personal) as { nombre: string; apellido: string | null };
+        if (!byPersonal.has(pid)) {
+            byPersonal.set(pid, { nombre: p.nombre, apellido: p.apellido, horas: [], ingresos: [], egresos: [] });
+        }
+        const entry = byPersonal.get(pid)!;
+        entry.horas.push(Number(row.horas) || 0);
+        if (row.hora_ingreso && row.hora_ingreso !== '00:00') entry.ingresos.push(row.hora_ingreso as string);
+        if (row.hora_egreso && row.hora_egreso !== '00:00') entry.egresos.push(row.hora_egreso as string);
+    }
+
+    const empleados: ResumenEmpleado[] = [];
+    let total_horas = 0;
+    let total_dias = 0;
+
+    for (const [pid, e] of byPersonal.entries()) {
+        const th = e.horas.reduce((a, b) => a + b, 0);
+        const dias = e.horas.length;
+        total_horas += th;
+        total_dias += dias;
+        empleados.push({
+            personal_id: pid,
+            nombre: e.nombre,
+            apellido: e.apellido,
+            dias,
+            total_horas: Math.round(th * 100) / 100,
+            prom_horas_dia: dias > 0 ? Math.round((th / dias) * 100) / 100 : 0,
+            hora_ingreso_min: e.ingresos.length > 0 ? e.ingresos.sort()[0] : null,
+            hora_egreso_max: e.egresos.length > 0 ? e.egresos.sort().at(-1)! : null,
+        });
+    }
+
+    empleados.sort((a, b) => b.total_horas - a.total_horas);
+
+    return {
+        mes,
+        empleados,
+        total_horas: Math.round(total_horas * 100) / 100,
+        total_dias_persona: total_dias,
+    };
+}
+
 export async function getCorreccionesDeRegistro(
     registroId: string
 ): Promise<CorreccionHoras[]> {
