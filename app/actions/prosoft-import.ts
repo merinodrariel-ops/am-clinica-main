@@ -168,16 +168,33 @@ function parseProsoftMatrix(rows: string[][], mes: string): {
         Object.entries(dayColumns).filter(([, d]) => d <= lastDay)
     );
 
-    // Employee rows: every row after the header that has a non-empty first column
+    // Detect name column: the non-day column (among first 3 cols) with the most
+    // alphabetic content in the data rows. Handles Prosoft layouts where col 0
+    // is a row-index number and col 1 is the actual employee name.
+    const dayColSet = new Set(Object.keys(validDays).map(Number));
+    const candidateCols = [0, 1, 2].filter(c => !dayColSet.has(c));
+    let nameColIdx = 0;
+    let bestAlpha = -1;
+    for (const c of candidateCols) {
+        let alpha = 0;
+        for (let r = headerRowIdx + 1; r < Math.min(headerRowIdx + 10, rows.length); r++) {
+            const val = (rows[r][c] || '').trim();
+            if (/[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/.test(val)) alpha++;
+        }
+        if (alpha > bestAlpha) { bestAlpha = alpha; nameColIdx = c; }
+    }
+
+    // Employee rows: every row after the header with a non-empty name column
     // and at least one time cell
     const employeeRows: { rawName: string; timeCells: Record<number, string> }[] = [];
 
     for (let r = headerRowIdx + 1; r < rows.length; r++) {
         const row = rows[r];
-        const rawName = row[0]?.trim() || '';
+        const rawName = (row[nameColIdx] || '').replace(/\r/g, '').trim();
         if (!rawName) continue;
-        // Skip totals/summary rows
+        // Skip totals/summary rows and pure-number rows (row-index artifacts)
         if (/total|resumen|horas|promedio/i.test(rawName)) continue;
+        if (/^\d+$/.test(rawName)) continue;
 
         const timeCells: Record<number, string> = {};
         let hasAny = false;
