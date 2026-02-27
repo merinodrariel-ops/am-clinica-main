@@ -207,7 +207,7 @@ async function matchEmployees(
     for (const name of names) {
         const saved = savedMaps?.find((m: Record<string, unknown>) => m.raw_name === name);
         if (saved?.personal) {
-            const p = saved.personal as { id: string; nombre: string; apellido: string };
+            const p = (Array.isArray(saved.personal) ? saved.personal[0] : saved.personal) as { id: string; nombre: string; apellido: string };
             result.set(name, p);
         } else {
             unmapped.push(name);
@@ -233,11 +233,11 @@ async function matchEmployees(
 
             const score =
                 fullName === normName ? 100 :
-                reverseName === normName ? 100 :
-                fullName.includes(normName) || normName.includes(fullName) ? 80 :
-                reverseName.includes(normName) || normName.includes(reverseName) ? 80 :
-                norm(w.nombre) === normName ? 70 :
-                normName.includes(norm(w.nombre)) ? 60 : 0;
+                    reverseName === normName ? 100 :
+                        fullName.includes(normName) || normName.includes(fullName) ? 80 :
+                            reverseName.includes(normName) || normName.includes(reverseName) ? 80 :
+                                norm(w.nombre) === normName ? 70 :
+                                    normName.includes(norm(w.nombre)) ? 60 : 0;
 
             if (score > bestScore) {
                 bestScore = score;
@@ -300,7 +300,7 @@ export async function getProsoftMappings(): Promise<
         .order('raw_name');
 
     return (data || []).map((m: Record<string, unknown>) => {
-        const p = m.personal as { nombre: string; apellido: string | null };
+        const p = (Array.isArray(m.personal) ? m.personal[0] : m.personal) as { nombre: string; apellido: string | null };
         return {
             raw_name: m.raw_name as string,
             personal_id: m.personal_id as string,
