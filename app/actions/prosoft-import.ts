@@ -64,6 +64,7 @@ interface ParsedTime {
     salida: string;
     horas: number;
     incompleto?: boolean;
+    observaciones?: string;
 }
 
 async function parseTimeCell(cell: string): Promise<ParsedTime | null> {

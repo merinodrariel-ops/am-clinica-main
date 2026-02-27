@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import StaffPhotoUploader from '@/components/admin/StaffPhotoUploader';
+import StaffDocumentUploader from '@/components/admin/StaffDocumentUploader';
 import StaffEditForm from './StaffEditForm';
 import { useRouter } from 'next/navigation';
 
@@ -236,13 +237,14 @@ export default function StaffDetailView({
                                         )}
                                         <span className="text-sm font-medium text-slate-300">{slot.label}</span>
                                     </div>
-                                    {doc?.url ? (
-                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition-colors">
-                                            <ExternalLink size={14} />
-                                        </a>
-                                    ) : (
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase">Faltante</span>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        {doc?.url && (
+                                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors" title="Ver documento">
+                                                <ExternalLink size={16} />
+                                            </a>
+                                        )}
+                                        <StaffDocumentUploader workerId={worker.id} docKey={slot.key} docLabel={slot.label} existingUrl={doc?.url} />
+                                    </div>
                                 </div>
                             );
                         })}

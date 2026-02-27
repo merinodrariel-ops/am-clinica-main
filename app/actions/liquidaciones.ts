@@ -194,6 +194,7 @@ export async function generateLiquidacion(
                 modelo_pago: modeloPago,
                 total_ars: totalArs,
                 total_usd: totalUsd ?? null,
+                total_horas: isDoctor ? 0 : ((breakdown.total_horas as number) || 0),
                 tc_bna_venta: tcBnaVenta,
                 tc_liquidacion: tcBnaVenta,
                 prestaciones_validadas: prestacionesValidadas,
