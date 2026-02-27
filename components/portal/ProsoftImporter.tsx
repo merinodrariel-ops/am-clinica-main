@@ -49,6 +49,8 @@ export default function ProsoftImporter() {
     const [pendingMaps, setPendingMaps] = useState<Record<string, string>>({}); // rawName → personalId
     const [savingMap, setSavingMap] = useState<string | null>(null);
     const [showMappings, setShowMappings] = useState(false);
+    const [editingMapping, setEditingMapping] = useState<string | null>(null); // raw_name being edited
+    const [editValue, setEditValue] = useState<string>(''); // personalId for edit
 
     useEffect(() => {
         getAllPersonalBasic().then(setAllPersonal).catch(() => {});
@@ -127,6 +129,23 @@ export default function ProsoftImporter() {
         toast.success('Equivalencia eliminada');
     }
 
+    async function handleEditMapping(rawName: string) {
+        if (!editValue) { toast.error('Seleccioná un empleado'); return; }
+        setSavingMap(rawName);
+        try {
+            const res = await saveProsoftMapping(rawName, editValue);
+            if (!res.success) { toast.error(res.error || 'Error al guardar'); return; }
+            toast.success('Equivalencia actualizada');
+            const fresh = await getProsoftMappings();
+            setSavedMappings(fresh);
+            setEditingMapping(null);
+        } catch {
+            toast.error('Error al actualizar');
+        } finally {
+            setSavingMap(null);
+        }
+    }
+
     const matchedRows = preview?.filas.filter(f => f.personalId) ?? [];
     const unmatchedRows = preview?.filas.filter(f => !f.personalId) ?? [];
 
@@ -163,18 +182,55 @@ export default function ProsoftImporter() {
                     ) : (
                         <div className="divide-y divide-slate-800">
                             {savedMappings.map(m => (
-                                <div key={m.raw_name} className="flex items-center justify-between px-4 py-2.5">
-                                    <div className="flex items-center gap-3 text-xs">
-                                        <span className="text-amber-300 font-mono">{m.raw_name}</span>
-                                        <span className="text-slate-500">→</span>
-                                        <span className="text-emerald-400">{m.nombre} {m.apellido || ''}</span>
+                                <div key={m.raw_name} className="px-4 py-2.5 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3 text-xs min-w-0">
+                                            <span className="text-amber-300 font-mono truncate">{m.raw_name}</span>
+                                            <span className="text-slate-500 flex-shrink-0">→</span>
+                                            <span className="text-emerald-400 flex-shrink-0">{m.nombre} {m.apellido || ''}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                                            <button
+                                                onClick={() => {
+                                                    setEditingMapping(editingMapping === m.raw_name ? null : m.raw_name);
+                                                    setEditValue(m.personal_id);
+                                                }}
+                                                className="text-xs text-slate-400 hover:text-teal-400 transition-colors"
+                                            >
+                                                {editingMapping === m.raw_name ? 'Cancelar' : 'Editar'}
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteMapping(m.raw_name)}
+                                                className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={() => handleDeleteMapping(m.raw_name)}
-                                        className="text-xs text-slate-500 hover:text-red-400 transition-colors"
-                                    >
-                                        Eliminar
-                                    </button>
+                                    {editingMapping === m.raw_name && (
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={editValue}
+                                                onChange={e => setEditValue(e.target.value)}
+                                                className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+                                            >
+                                                <option value="">— Seleccionar —</option>
+                                                {allPersonal.map(p => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.apellido ? `${p.apellido}, ${p.nombre}` : p.nombre}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                onClick={() => handleEditMapping(m.raw_name)}
+                                                disabled={savingMap === m.raw_name}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs rounded-lg transition-colors"
+                                            >
+                                                {savingMap === m.raw_name ? <RefreshCw size={10} className="animate-spin" /> : <Save size={10} />}
+                                                Guardar
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

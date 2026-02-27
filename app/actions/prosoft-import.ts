@@ -49,21 +49,49 @@ function norm(s: string) {
         .trim();
 }
 
+function padTime(t: string): string {
+    // "8:00" → "08:00", "17:00" → "17:00"
+    const [h, m] = t.split(':');
+    return `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
+}
+
 function parseTimeCell(cell: string): { entrada: string; salida: string; horas: number } | null {
-    // Cell value can be "08:00 17:00" or "08:00\n17:00"
-    const parts = cell.trim().split(/[\s\n]+/).filter(Boolean);
-    if (parts.length < 2) return null;
+    const raw = cell.replace(/\r/g, '').trim();
+    if (!raw) return null;
 
-    const [entrada, salida] = parts;
     const timeRe = /^\d{1,2}:\d{2}$/;
-    if (!timeRe.test(entrada) || !timeRe.test(salida)) return null;
 
-    const [eh, em] = entrada.split(':').map(Number);
-    const [sh, sm] = salida.split(':').map(Number);
-    const horas = (sh * 60 + sm - (eh * 60 + em)) / 60;
-    if (horas <= 0 || horas > 16) return null;
+    // --- Format A: two HH:MM values separated by space, newline, dash or "a"
+    // e.g. "08:00 17:00", "8:00-17:00", "08:00\n17:00", "08:00 a 17:00"
+    const parts = raw.split(/[\s\n\-]+|(?:\s*a\s*)/).map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+        const [e, s] = parts;
+        if (timeRe.test(e) && timeRe.test(s)) {
+            const entrada = padTime(e);
+            const salida = padTime(s);
+            const [eh, em] = entrada.split(':').map(Number);
+            const [sh, sm] = salida.split(':').map(Number);
+            const horas = (sh * 60 + sm - (eh * 60 + em)) / 60;
+            if (horas > 0 && horas <= 16) {
+                return { entrada, salida, horas: Math.round(horas * 100) / 100 };
+            }
+        }
+    }
 
-    return { entrada, salida, horas: Math.round(horas * 100) / 100 };
+    // --- Format B: single number = total hours worked (e.g. "8", "7.5", "8,5")
+    // No entry/exit time available — use 00:00 placeholders
+    const numStr = raw.replace(',', '.');
+    const num = parseFloat(numStr);
+    if (!isNaN(num) && num > 0 && num <= 16 && /^\d+([.,]\d+)?$/.test(raw)) {
+        return { entrada: '00:00', salida: '00:00', horas: Math.round(num * 100) / 100 };
+    }
+
+    // --- Format C: "P" / "X" / "A" presence markers → treat as 8h default
+    if (/^[Pp]$/.test(raw)) {
+        return { entrada: '00:00', salida: '00:00', horas: 8 };
+    }
+
+    return null;
 }
 
 // Extract spreadsheet ID and optional gid from a Google Sheets URL
