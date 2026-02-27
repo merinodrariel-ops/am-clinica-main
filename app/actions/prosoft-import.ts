@@ -21,6 +21,7 @@ export interface ProsoftRow {
         entrada: string;        // HH:MM
         salida: string;         // HH:MM
         horas: number;
+        incompleto?: boolean;   // true when only one time is recorded
     }[];
 }
 
@@ -55,15 +56,25 @@ function padTime(t: string): string {
     return `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
 }
 
-function parseTimeCell(cell: string): { entrada: string; salida: string; horas: number } | null {
+interface ParsedTime {
+    entrada: string;
+    salida: string;
+    horas: number;
+    incompleto?: boolean;
+}
+
+function parseTimeCell(cell: string): ParsedTime | null {
+    // Normalize: collapse \r, but preserve internal \n (multi-line cell content)
     const raw = cell.replace(/\r/g, '').trim();
     if (!raw) return null;
 
     const timeRe = /^\d{1,2}:\d{2}$/;
 
-    // --- Format A: two HH:MM values separated by space, newline, dash or "a"
+    // Split on any whitespace (including \n), dash, or "a" as separator
     // e.g. "08:00 17:00", "8:00-17:00", "08:00\n17:00", "08:00 a 17:00"
     const parts = raw.split(/[\s\n\-]+|(?:\s*a\s*)/).map(s => s.trim()).filter(Boolean);
+
+    // --- Format A: two HH:MM → complete record
     if (parts.length >= 2) {
         const [e, s] = parts;
         if (timeRe.test(e) && timeRe.test(s)) {
@@ -75,18 +86,24 @@ function parseTimeCell(cell: string): { entrada: string; salida: string; horas: 
             if (horas > 0 && horas <= 16) {
                 return { entrada, salida, horas: Math.round(horas * 100) / 100 };
             }
+            // Negative or zero diff (overnight?) — still record as incomplete
+            return { entrada, salida, horas: 0, incompleto: true };
         }
     }
 
+    // --- Format D: single HH:MM → incomplete (only entry or only exit recorded)
+    if (parts.length === 1 && timeRe.test(parts[0])) {
+        return { entrada: padTime(parts[0]), salida: '00:00', horas: 0, incompleto: true };
+    }
+
     // --- Format B: single number = total hours worked (e.g. "8", "7.5", "8,5")
-    // No entry/exit time available — use 00:00 placeholders
     const numStr = raw.replace(',', '.');
     const num = parseFloat(numStr);
     if (!isNaN(num) && num > 0 && num <= 16 && /^\d+([.,]\d+)?$/.test(raw)) {
         return { entrada: '00:00', salida: '00:00', horas: Math.round(num * 100) / 100 };
     }
 
-    // --- Format C: "P" / "X" / "A" presence markers → treat as 8h default
+    // --- Format C: presence markers → 8h default
     if (/^[Pp]$/.test(raw)) {
         return { entrada: '00:00', salida: '00:00', horas: 8 };
     }
@@ -106,6 +123,50 @@ function extractSheetParams(url: string): { id: string; gid: string } | null {
     return { id, gid };
 }
 
+// Proper RFC-4180 CSV parser that handles quoted multi-line cells.
+// The old line-split approach broke Prosoft cells like "08:00\n17:00" (entry/exit on two lines).
+function parseCsvText(text: string): string[][] {
+    const rows: string[][] = [];
+    const src = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    let cur = '';
+    let inQuote = false;
+    let cells: string[] = [];
+
+    for (let i = 0; i < src.length; i++) {
+        const ch = src[i];
+
+        if (inQuote) {
+            if (ch === '"') {
+                // Escaped "" inside quoted field
+                if (src[i + 1] === '"') { cur += '"'; i++; }
+                else { inQuote = false; }
+            } else {
+                cur += ch; // newlines inside quotes stay in the cell
+            }
+        } else {
+            if (ch === '"') {
+                inQuote = true;
+            } else if (ch === ',') {
+                cells.push(cur.trim());
+                cur = '';
+            } else if (ch === '\n') {
+                cells.push(cur.trim());
+                if (cells.some(c => c !== '')) rows.push(cells);
+                cells = [];
+                cur = '';
+            } else {
+                cur += ch;
+            }
+        }
+    }
+    // Last cell / row
+    cells.push(cur.trim());
+    if (cells.some(c => c !== '')) rows.push(cells);
+
+    return rows;
+}
+
 async function fetchCsv(sheetId: string, gid: string): Promise<string[][]> {
     const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
     const res = await fetch(csvUrl, { cache: 'no-store' });
@@ -115,27 +176,7 @@ async function fetchCsv(sheetId: string, gid: string): Promise<string[][]> {
     }
 
     const text = await res.text();
-
-    // Parse CSV (handles \r\n and quoted fields with commas)
-    return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map(line => {
-        const cells: string[] = [];
-        let cur = '';
-        let inQuote = false;
-
-        for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (ch === '"') {
-                inQuote = !inQuote;
-            } else if (ch === ',' && !inQuote) {
-                cells.push(cur.trim());
-                cur = '';
-            } else {
-                cur += ch;
-            }
-        }
-        cells.push(cur.trim());
-        return cells;
-    }).filter(r => r.some(c => c !== ''));
+    return parseCsvText(text);
 }
 
 // ─── Parse Matrix ─────────────────────────────────────────────────────────────
@@ -438,17 +479,32 @@ export async function importProsoftData(
         }
 
         for (const reg of fila.registros) {
+            const estado = reg.incompleto ? 'pending' : 'approved';
+            const observaciones = reg.incompleto
+                ? `Fichaje incompleto — falta horario de entrada o salida (Prosoft ${mes})`
+                : `Importado desde Prosoft (${mes})`;
+
             // Check if record already exists (dedup by personal_id + fecha)
             const { data: existing } = await admin
                 .from('registro_horas')
-                .select('id')
+                .select('id, horas')
                 .eq('personal_id', fila.personalId)
                 .eq('fecha', reg.fecha)
-                .limit(1)
-                .single();
+                .maybeSingle();
 
             if (existing) {
-                skipped++;
+                // Skip if the existing record has real hours (could be manually corrected)
+                if (Number(existing.horas) > 0 && !reg.incompleto) {
+                    skipped++;
+                    continue;
+                }
+                // Update if existing record had 0h (bad previous import) or if new data is complete
+                const { error } = await admin
+                    .from('registro_horas')
+                    .update({ horas: reg.horas, hora_ingreso: reg.entrada, hora_egreso: reg.salida, estado, observaciones })
+                    .eq('id', existing.id);
+                if (error) errors.push(`${fila.rawName} ${reg.fecha}: ${error.message}`);
+                else inserted++;
                 continue;
             }
 
@@ -458,8 +514,8 @@ export async function importProsoftData(
                 horas: reg.horas,
                 hora_ingreso: reg.entrada,
                 hora_egreso: reg.salida,
-                estado: 'approved',
-                observaciones: `Importado desde Prosoft (${mes})`,
+                estado,
+                observaciones,
             });
 
             if (error) {

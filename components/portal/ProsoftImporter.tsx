@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link } from 'lucide-react';
+import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     previewProsoftImport, importProsoftData,
@@ -336,35 +336,52 @@ export default function ProsoftImporter() {
 
                     {/* Employee list */}
                     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden max-h-80 overflow-y-auto">
-                        {matchedRows.map((fila) => (
-                            <div key={fila.rawName} className="border-b border-slate-800/50 last:border-0">
-                                <button
-                                    onClick={() => setExpandedRow(expandedRow === fila.rawName ? null : fila.rawName)}
-                                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800/40 transition-colors text-left"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <UserCheck size={14} className="text-emerald-400 flex-shrink-0" />
-                                        <div>
-                                            <p className="text-sm text-white font-medium">{fila.rawName}</p>
-                                            <p className="text-xs text-slate-400">→ {fila.personalNombre}</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs text-slate-500">{fila.registros.length} días</span>
-                                </button>
-
-                                {expandedRow === fila.rawName && (
-                                    <div className="px-4 pb-3 grid grid-cols-3 gap-1.5">
-                                        {fila.registros.map(r => (
-                                            <div key={r.fecha} className="bg-slate-800 rounded-lg px-2 py-1.5 text-xs">
-                                                <p className="text-slate-300 font-medium">Día {r.dia}</p>
-                                                <p className="text-slate-400">{r.entrada}–{r.salida}</p>
-                                                <p className="text-teal-400">{r.horas}h</p>
+                        {matchedRows.map((fila) => {
+                            const incomplete = fila.registros.filter(r => r.incompleto).length;
+                            return (
+                                <div key={fila.rawName} className="border-b border-slate-800/50 last:border-0">
+                                    <button
+                                        onClick={() => setExpandedRow(expandedRow === fila.rawName ? null : fila.rawName)}
+                                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800/40 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <UserCheck size={14} className="text-emerald-400 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm text-white font-medium">{fila.rawName}</p>
+                                                <p className="text-xs text-slate-400">→ {fila.personalNombre}</p>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {incomplete > 0 && (
+                                                <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5">
+                                                    <Clock size={9} /> {incomplete} incompleto{incomplete > 1 ? 's' : ''}
+                                                </span>
+                                            )}
+                                            <span className="text-xs text-slate-500">{fila.registros.length} días</span>
+                                        </div>
+                                    </button>
+
+                                    {expandedRow === fila.rawName && (
+                                        <div className="px-4 pb-3 grid grid-cols-3 gap-1.5">
+                                            {fila.registros.map(r => (
+                                                <div key={r.fecha} className={`rounded-lg px-2 py-1.5 text-xs border ${r.incompleto ? 'bg-amber-500/5 border-amber-500/20' : 'bg-slate-800 border-transparent'}`}>
+                                                    <p className="text-slate-300 font-medium flex items-center gap-1">
+                                                        Día {r.dia}
+                                                        {r.incompleto && <Clock size={9} className="text-amber-400" />}
+                                                    </p>
+                                                    <p className="text-slate-400">
+                                                        {r.entrada !== '00:00' ? r.entrada : '?'}–{r.salida !== '00:00' ? r.salida : '?'}
+                                                    </p>
+                                                    <p className={r.incompleto ? 'text-amber-400' : 'text-teal-400'}>
+                                                        {r.incompleto ? 'pendiente' : `${r.horas}h`}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
 
                     {/* Import button */}
@@ -391,20 +408,26 @@ export default function ProsoftImporter() {
             {result && preview && (
                 <div className="space-y-4">
                     {/* Status bar */}
-                    <div className={`flex items-center gap-3 p-4 rounded-xl border ${result.inserted > 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-slate-700'}`}>
-                        {result.inserted > 0
-                            ? <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
-                            : <XCircle size={18} className="text-slate-400 flex-shrink-0" />
-                        }
-                        <div className="flex-1">
-                            <p className="text-sm font-semibold text-white">Importación completada — {mesLabel(mes)}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                                <span className="text-emerald-400 font-medium">{result.inserted} registros insertados</span>
-                                {result.skipped > 0 && <> · <span className="text-slate-300">{result.skipped} omitidos (ya existían)</span></>}
-                                {result.errors.length > 0 && <> · <span className="text-red-400">{result.errors.length} errores</span></>}
-                            </p>
-                        </div>
-                    </div>
+                    {(() => {
+                        const totalIncomplete = matchedRows.reduce((s, f) => s + f.registros.filter(r => r.incompleto).length, 0);
+                        return (
+                            <div className={`flex items-center gap-3 p-4 rounded-xl border ${result.inserted > 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-slate-700'}`}>
+                                {result.inserted > 0
+                                    ? <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
+                                    : <XCircle size={18} className="text-slate-400 flex-shrink-0" />
+                                }
+                                <div className="flex-1">
+                                    <p className="text-sm font-semibold text-white">Importación completada — {mesLabel(mes)}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">
+                                        <span className="text-emerald-400 font-medium">{result.inserted} registros insertados</span>
+                                        {result.skipped > 0 && <> · <span className="text-slate-300">{result.skipped} omitidos (ya existían)</span></>}
+                                        {totalIncomplete > 0 && <> · <span className="text-amber-400">{totalIncomplete} fichajes incompletos (quedan como pendiente)</span></>}
+                                        {result.errors.length > 0 && <> · <span className="text-red-400">{result.errors.length} errores</span></>}
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* KPIs */}
                     {(() => {
@@ -449,23 +472,32 @@ export default function ProsoftImporter() {
                                 <tbody className="divide-y divide-slate-800/50">
                                     {matchedRows
                                         .map(f => {
-                                            const totalH = f.registros.reduce((s, r) => s + r.horas, 0);
+                                            const complete = f.registros.filter(r => !r.incompleto);
+                                            const incomplete = f.registros.filter(r => r.incompleto);
+                                            const totalH = complete.reduce((s, r) => s + r.horas, 0);
                                             const dias = f.registros.length;
-                                            const ingresos = f.registros.filter(r => r.entrada !== '00:00').map(r => r.entrada).sort();
-                                            const egresos = f.registros.filter(r => r.salida !== '00:00').map(r => r.salida).sort();
+                                            const ingresos = complete.filter(r => r.entrada !== '00:00').map(r => r.entrada).sort();
+                                            const egresos = complete.filter(r => r.salida !== '00:00').map(r => r.salida).sort();
                                             const horaRango = ingresos.length > 0
                                                 ? `${ingresos[0]} – ${egresos.at(-1) ?? '?'}`
                                                 : '—';
-                                            return { f, totalH, dias, horaRango };
+                                            return { f, totalH, dias, horaRango, incompleteCount: incomplete.length };
                                         })
                                         .sort((a, b) => b.totalH - a.totalH)
-                                        .map(({ f, totalH, dias, horaRango }) => (
+                                        .map(({ f, totalH, dias, horaRango, incompleteCount }) => (
                                             <tr key={f.rawName} className="hover:bg-slate-800/30 transition-colors">
                                                 <td className="px-4 py-2.5">
                                                     <p className="text-white font-medium">{f.personalNombre}</p>
                                                     <p className="text-slate-500 text-[10px]">{f.rawName}</p>
                                                 </td>
-                                                <td className="px-3 py-2.5 text-center text-slate-300">{dias}</td>
+                                                <td className="px-3 py-2.5 text-center text-slate-300">
+                                                    {dias}
+                                                    {incompleteCount > 0 && (
+                                                        <span className="ml-1 text-amber-400" title={`${incompleteCount} fichajes incompletos`}>
+                                                            ({incompleteCount} pend.)
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="px-3 py-2.5 text-right font-semibold text-teal-400">{Math.round(totalH * 10) / 10}h</td>
                                                 <td className="px-3 py-2.5 text-right text-slate-300">{dias > 0 ? `${Math.round(totalH / dias * 10) / 10}h` : '—'}</td>
                                                 <td className="px-3 py-2.5 text-center text-slate-400 font-mono">{horaRango}</td>
