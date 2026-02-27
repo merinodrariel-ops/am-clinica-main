@@ -53,8 +53,8 @@ export default function ProsoftImporter() {
     const [editValue, setEditValue] = useState<string>(''); // personalId for edit
 
     useEffect(() => {
-        getAllPersonalBasic().then(setAllPersonal).catch(() => {});
-        getProsoftMappings().then(setSavedMappings).catch(() => {});
+        getAllPersonalBasic().then(setAllPersonal).catch(() => { });
+        getProsoftMappings().then(setSavedMappings).catch(() => { });
     }, []);
 
     async function handlePreview() {
@@ -363,178 +363,200 @@ export default function ProsoftImporter() {
 
                                     {expandedRow === fila.rawName && (
                                         <div className="px-4 pb-3 grid grid-cols-3 gap-1.5">
-                                            {fila.registros.map(r => (
-                                                <div key={r.fecha} className={`rounded-lg px-2 py-1.5 text-xs border ${r.incompleto ? 'bg-amber-500/5 border-amber-500/20' : 'bg-slate-800 border-transparent'}`}>
-                                                    <p className="text-slate-300 font-medium flex items-center gap-1">
-                                                        Día {r.dia}
-                                                        {r.incompleto && <Clock size={9} className="text-amber-400" />}
-                                                    </p>
-                                                    <p className="text-slate-400">
-                                                        {r.entrada !== '00:00' ? r.entrada : '?'}–{r.salida !== '00:00' ? r.salida : '?'}
-                                                    </p>
-                                                    <p className={r.incompleto ? 'text-amber-400' : 'text-teal-400'}>
-                                                        {r.incompleto ? 'pendiente' : `${r.horas}h`}
-                                                    </p>
+                                            <div className="px-4 pb-3">
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-xs">
+                                                        <thead>
+                                                            <tr className="border-b border-slate-800 text-slate-400">
+                                                                <th className="px-2 py-1 text-left font-medium">Día</th>
+                                                                <th className="px-2 py-1 text-center font-medium">Horario</th>
+                                                                <th className="px-2 py-1 text-right font-medium">Horas</th>
+                                                                <th className="px-2 py-1 text-left font-medium">Notas</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-800/50">
+                                                            {fila.registros.map((r, idx) => (
+                                                                <tr key={`${fila.rawName}-${idx}`} className="hover:bg-slate-800/30 transition-colors">
+                                                                    <td className="px-2 py-1">
+                                                                        <p className="text-slate-300 font-medium flex items-center gap-1">
+                                                                            Día {r.dia}
+                                                                            {r.incompleto && <Clock size={9} className="text-amber-400" />}
+                                                                        </p>
+                                                                    </td>
+                                                                    <td className="px-2 py-1 text-center text-slate-400">
+                                                                        {r.entrada !== '00:00' ? r.entrada : '?'}–{r.salida !== '00:00' ? r.salida : '?'}
+                                                                    </td>
+                                                                    <td className="px-2 py-1 text-right font-medium">
+                                                                        <p className={r.incompleto ? 'text-amber-400' : 'text-teal-400'}>
+                                                                            {r.incompleto ? 'pendiente' : `${r.horas}h`}
+                                                                        </p>
+                                                                    </td>
+                                                                    <td className="px-2 py-1 text-slate-500 text-[10px] italic max-w-[150px] truncate">
+                                                                        {r.observaciones}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
                                     )}
-                                </div>
-                            );
+                                        </div>
+                                    );
                         })}
-                    </div>
+                                </div>
 
-                    {/* Import button */}
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs text-slate-400">
-                            Se importarán los registros de <strong className="text-white">{matchedRows.length}</strong> empleados para <strong className="text-white">{mesLabel(mes)}</strong>
-                        </p>
-                        <button
-                            onClick={handleImport}
-                            disabled={importing || matchedRows.length === 0}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
-                        >
-                            {importing
-                                ? <RefreshCw size={14} className="animate-spin" />
-                                : <Upload size={14} />
-                            }
-                            Confirmar importación
-                        </button>
-                    </div>
+                    {/* Import button */ }
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs text-slate-400">
+                                    Se importarán los registros de <strong className="text-white">{matchedRows.length}</strong> empleados para <strong className="text-white">{mesLabel(mes)}</strong>
+                                </p>
+                                <button
+                                    onClick={handleImport}
+                                    disabled={importing || matchedRows.length === 0}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
+                                >
+                                    {importing
+                                        ? <RefreshCw size={14} className="animate-spin" />
+                                        : <Upload size={14} />
+                                    }
+                                    Confirmar importación
+                                </button>
+                            </div>
                 </div>
             )}
 
-            {/* Result Dashboard */}
-            {result && preview && (
-                <div className="space-y-4">
-                    {/* Status bar */}
-                    {(() => {
-                        const totalIncomplete = matchedRows.reduce((s, f) => s + f.registros.filter(r => r.incompleto).length, 0);
-                        return (
-                            <div className={`flex items-center gap-3 p-4 rounded-xl border ${result.inserted > 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-slate-700'}`}>
-                                {result.inserted > 0
-                                    ? <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
-                                    : <XCircle size={18} className="text-slate-400 flex-shrink-0" />
-                                }
-                                <div className="flex-1">
-                                    <p className="text-sm font-semibold text-white">Importación completada — {mesLabel(mes)}</p>
-                                    <p className="text-xs text-slate-400 mt-0.5">
-                                        <span className="text-emerald-400 font-medium">{result.inserted} registros insertados</span>
-                                        {result.skipped > 0 && <> · <span className="text-slate-300">{result.skipped} omitidos (ya existían)</span></>}
-                                        {totalIncomplete > 0 && <> · <span className="text-amber-400">{totalIncomplete} fichajes incompletos (quedan como pendiente)</span></>}
-                                        {result.errors.length > 0 && <> · <span className="text-red-400">{result.errors.length} errores</span></>}
-                                    </p>
+                    {/* Result Dashboard */}
+                    {result && preview && (
+                        <div className="space-y-4">
+                            {/* Status bar */}
+                            {(() => {
+                                const totalIncomplete = matchedRows.reduce((s, f) => s + f.registros.filter(r => r.incompleto).length, 0);
+                                return (
+                                    <div className={`flex items-center gap-3 p-4 rounded-xl border ${result.inserted > 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-slate-700'}`}>
+                                        {result.inserted > 0
+                                            ? <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
+                                            : <XCircle size={18} className="text-slate-400 flex-shrink-0" />
+                                        }
+                                        <div className="flex-1">
+                                            <p className="text-sm font-semibold text-white">Importación completada — {mesLabel(mes)}</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">
+                                                <span className="text-emerald-400 font-medium">{result.inserted} registros insertados</span>
+                                                {result.skipped > 0 && <> · <span className="text-slate-300">{result.skipped} omitidos (ya existían)</span></>}
+                                                {totalIncomplete > 0 && <> · <span className="text-amber-400">{totalIncomplete} fichajes incompletos (quedan como pendiente)</span></>}
+                                                {result.errors.length > 0 && <> · <span className="text-red-400">{result.errors.length} errores</span></>}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* KPIs */}
+                            {(() => {
+                                const filas = matchedRows;
+                                const totalHoras = filas.reduce((s, f) => s + f.registros.reduce((a, r) => a + r.horas, 0), 0);
+                                const totalDias = filas.reduce((s, f) => s + f.registros.length, 0);
+                                const promPorPersona = filas.length > 0 ? totalHoras / filas.length : 0;
+                                return (
+                                    <div className="grid grid-cols-4 gap-3">
+                                        {[
+                                            { label: 'Empleados', value: filas.length, color: 'text-teal-400' },
+                                            { label: 'Horas totales', value: `${Math.round(totalHoras * 10) / 10}h`, color: 'text-violet-400' },
+                                            { label: 'Días-persona', value: totalDias, color: 'text-blue-400' },
+                                            { label: 'Prom. por empleado', value: `${Math.round(promPorPersona * 10) / 10}h`, color: 'text-amber-400' },
+                                        ].map(k => (
+                                            <div key={k.label} className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                                                <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
+                                                <p className="text-xs text-slate-400 mt-0.5">{k.label}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Detail table */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                                <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                                    <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Detalle por empleado</p>
+                                    <p className="text-xs text-slate-500">{mesLabel(mes)}</p>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="border-b border-slate-800 text-slate-400">
+                                                <th className="px-4 py-2 text-left font-medium">Empleado</th>
+                                                <th className="px-3 py-2 text-center font-medium">Días</th>
+                                                <th className="px-3 py-2 text-right font-medium">Total horas</th>
+                                                <th className="px-3 py-2 text-right font-medium">Prom/día</th>
+                                                <th className="px-3 py-2 text-center font-medium">Horario típico</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800/50">
+                                            {matchedRows
+                                                .map(f => {
+                                                    const complete = f.registros.filter(r => !r.incompleto);
+                                                    const incomplete = f.registros.filter(r => r.incompleto);
+                                                    const totalH = complete.reduce((s, r) => s + r.horas, 0);
+                                                    const dias = f.registros.length;
+                                                    const ingresos = complete.filter(r => r.entrada !== '00:00').map(r => r.entrada).sort();
+                                                    const egresos = complete.filter(r => r.salida !== '00:00').map(r => r.salida).sort();
+                                                    const horaRango = ingresos.length > 0
+                                                        ? `${ingresos[0]} – ${egresos.at(-1) ?? '?'}`
+                                                        : '—';
+                                                    return { f, totalH, dias, horaRango, incompleteCount: incomplete.length };
+                                                })
+                                                .sort((a, b) => b.totalH - a.totalH)
+                                                .map(({ f, totalH, dias, horaRango, incompleteCount }) => (
+                                                    <tr key={f.rawName} className="hover:bg-slate-800/30 transition-colors">
+                                                        <td className="px-4 py-2.5">
+                                                            <p className="text-white font-medium">{f.personalNombre}</p>
+                                                            <p className="text-slate-500 text-[10px]">{f.rawName}</p>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-slate-300">
+                                                            {dias}
+                                                            {incompleteCount > 0 && (
+                                                                <span className="ml-1 text-amber-400" title={`${incompleteCount} fichajes incompletos`}>
+                                                                    ({incompleteCount} pend.)
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right font-semibold text-teal-400">{Math.round(totalH * 10) / 10}h</td>
+                                                        <td className="px-3 py-2.5 text-right text-slate-300">{dias > 0 ? `${Math.round(totalH / dias * 10) / 10}h` : '—'}</td>
+                                                        <td className="px-3 py-2.5 text-center text-slate-400 font-mono">{horaRango}</td>
+                                                    </tr>
+                                                ))
+                                            }
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-slate-700 bg-slate-800/40">
+                                                <td className="px-4 py-2.5 text-white font-semibold">TOTAL</td>
+                                                <td className="px-3 py-2.5 text-center text-slate-300">
+                                                    {matchedRows.reduce((s, f) => s + f.registros.length, 0)}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right font-bold text-teal-300">
+                                                    {Math.round(matchedRows.reduce((s, f) => s + f.registros.reduce((a, r) => a + r.horas, 0), 0) * 10) / 10}h
+                                                </td>
+                                                <td colSpan={2} />
+                                            </tr>
+                                        </tfoot>
+                                    </table>
                                 </div>
                             </div>
-                        );
-                    })()}
 
-                    {/* KPIs */}
-                    {(() => {
-                        const filas = matchedRows;
-                        const totalHoras = filas.reduce((s, f) => s + f.registros.reduce((a, r) => a + r.horas, 0), 0);
-                        const totalDias = filas.reduce((s, f) => s + f.registros.length, 0);
-                        const promPorPersona = filas.length > 0 ? totalHoras / filas.length : 0;
-                        return (
-                            <div className="grid grid-cols-4 gap-3">
-                                {[
-                                    { label: 'Empleados', value: filas.length, color: 'text-teal-400' },
-                                    { label: 'Horas totales', value: `${Math.round(totalHoras * 10) / 10}h`, color: 'text-violet-400' },
-                                    { label: 'Días-persona', value: totalDias, color: 'text-blue-400' },
-                                    { label: 'Prom. por empleado', value: `${Math.round(promPorPersona * 10) / 10}h`, color: 'text-amber-400' },
-                                ].map(k => (
-                                    <div key={k.label} className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
-                                        <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
-                                        <p className="text-xs text-slate-400 mt-0.5">{k.label}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        );
-                    })()}
+                            {result.errors.length > 0 && (
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-300 space-y-1">
+                                    {result.errors.map((e, i) => <p key={i}>{e}</p>)}
+                                </div>
+                            )}
 
-                    {/* Detail table */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                            <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Detalle por empleado</p>
-                            <p className="text-xs text-slate-500">{mesLabel(mes)}</p>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead>
-                                    <tr className="border-b border-slate-800 text-slate-400">
-                                        <th className="px-4 py-2 text-left font-medium">Empleado</th>
-                                        <th className="px-3 py-2 text-center font-medium">Días</th>
-                                        <th className="px-3 py-2 text-right font-medium">Total horas</th>
-                                        <th className="px-3 py-2 text-right font-medium">Prom/día</th>
-                                        <th className="px-3 py-2 text-center font-medium">Horario típico</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800/50">
-                                    {matchedRows
-                                        .map(f => {
-                                            const complete = f.registros.filter(r => !r.incompleto);
-                                            const incomplete = f.registros.filter(r => r.incompleto);
-                                            const totalH = complete.reduce((s, r) => s + r.horas, 0);
-                                            const dias = f.registros.length;
-                                            const ingresos = complete.filter(r => r.entrada !== '00:00').map(r => r.entrada).sort();
-                                            const egresos = complete.filter(r => r.salida !== '00:00').map(r => r.salida).sort();
-                                            const horaRango = ingresos.length > 0
-                                                ? `${ingresos[0]} – ${egresos.at(-1) ?? '?'}`
-                                                : '—';
-                                            return { f, totalH, dias, horaRango, incompleteCount: incomplete.length };
-                                        })
-                                        .sort((a, b) => b.totalH - a.totalH)
-                                        .map(({ f, totalH, dias, horaRango, incompleteCount }) => (
-                                            <tr key={f.rawName} className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="px-4 py-2.5">
-                                                    <p className="text-white font-medium">{f.personalNombre}</p>
-                                                    <p className="text-slate-500 text-[10px]">{f.rawName}</p>
-                                                </td>
-                                                <td className="px-3 py-2.5 text-center text-slate-300">
-                                                    {dias}
-                                                    {incompleteCount > 0 && (
-                                                        <span className="ml-1 text-amber-400" title={`${incompleteCount} fichajes incompletos`}>
-                                                            ({incompleteCount} pend.)
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2.5 text-right font-semibold text-teal-400">{Math.round(totalH * 10) / 10}h</td>
-                                                <td className="px-3 py-2.5 text-right text-slate-300">{dias > 0 ? `${Math.round(totalH / dias * 10) / 10}h` : '—'}</td>
-                                                <td className="px-3 py-2.5 text-center text-slate-400 font-mono">{horaRango}</td>
-                                            </tr>
-                                        ))
-                                    }
-                                </tbody>
-                                <tfoot>
-                                    <tr className="border-t-2 border-slate-700 bg-slate-800/40">
-                                        <td className="px-4 py-2.5 text-white font-semibold">TOTAL</td>
-                                        <td className="px-3 py-2.5 text-center text-slate-300">
-                                            {matchedRows.reduce((s, f) => s + f.registros.length, 0)}
-                                        </td>
-                                        <td className="px-3 py-2.5 text-right font-bold text-teal-300">
-                                            {Math.round(matchedRows.reduce((s, f) => s + f.registros.reduce((a, r) => a + r.horas, 0), 0) * 10) / 10}h
-                                        </td>
-                                        <td colSpan={2} />
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-
-                    {result.errors.length > 0 && (
-                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-300 space-y-1">
-                            {result.errors.map((e, i) => <p key={i}>{e}</p>)}
+                            <button
+                                onClick={() => { setResult(null); setPreview(null); setUrl(''); }}
+                                className="text-xs text-slate-400 hover:text-white transition-colors"
+                            >
+                                ← Nueva importación
+                            </button>
                         </div>
                     )}
-
-                    <button
-                        onClick={() => { setResult(null); setPreview(null); setUrl(''); }}
-                        className="text-xs text-slate-400 hover:text-white transition-colors"
-                    >
-                        ← Nueva importación
-                    </button>
                 </div>
-            )}
-        </div>
-    );
+            );
 }

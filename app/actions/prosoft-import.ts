@@ -1,6 +1,8 @@
 'use server';
 
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { parseImplicitHours } from '@/lib/gemini';
+import { addDays, format, parse, differenceInMinutes } from 'date-fns';
 
 function getAdminClient() {
     return createAdminClient(
@@ -22,6 +24,7 @@ export interface ProsoftRow {
         salida: string;         // HH:MM
         horas: number;
         incompleto?: boolean;   // true when only one time is recorded
+        observaciones?: string; // AI notes or metadata
     }[];
 }
 
@@ -63,7 +66,7 @@ interface ParsedTime {
     incompleto?: boolean;
 }
 
-function parseTimeCell(cell: string): ParsedTime | null {
+async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
     // Normalize: collapse \r, but preserve internal \n (multi-line cell content)
     const raw = cell.replace(/\r/g, '').trim();
     if (!raw) return null;
@@ -80,13 +83,27 @@ function parseTimeCell(cell: string): ParsedTime | null {
         if (timeRe.test(e) && timeRe.test(s)) {
             const entrada = padTime(e);
             const salida = padTime(s);
-            const [eh, em] = entrada.split(':').map(Number);
-            const [sh, sm] = salida.split(':').map(Number);
-            const horas = (sh * 60 + sm - (eh * 60 + em)) / 60;
-            if (horas > 0 && horas <= 16) {
-                return { entrada, salida, horas: Math.round(horas * 100) / 100 };
+
+            const start = parse(entrada, 'HH:mm', new Date());
+            let end = parse(salida, 'HH:mm', new Date());
+
+            // Handle overnight shifts (e.g. 22:00 to 06:00)
+            if (end < start) {
+                end = addDays(end, 1);
             }
-            // Negative or zero diff (overnight?) — still record as incomplete
+
+            const diffMinutes = differenceInMinutes(end, start);
+            const horas = diffMinutes / 60;
+
+            if (horas > 0 && horas <= 24) {
+                return {
+                    entrada,
+                    salida,
+                    horas: Math.round(horas * 100) / 100,
+                    observaciones: end > parse(salida, 'HH:mm', new Date()) ? 'Turno noche (cruza medianoche)' : undefined
+                };
+            }
+            // Something went wrong or too long shift
             return { entrada, salida, horas: 0, incompleto: true };
         }
     }
@@ -99,13 +116,30 @@ function parseTimeCell(cell: string): ParsedTime | null {
     // --- Format B: single number = total hours worked (e.g. "8", "7.5", "8,5")
     const numStr = raw.replace(',', '.');
     const num = parseFloat(numStr);
-    if (!isNaN(num) && num > 0 && num <= 16 && /^\d+([.,]\d+)?$/.test(raw)) {
+    if (!isNaN(num) && num > 0 && num <= 24 && /^\d+([.,]\d+)?$/.test(raw)) {
         return { entrada: '00:00', salida: '00:00', horas: Math.round(num * 100) / 100 };
     }
 
-    // --- Format C: presence markers → 8h default
+    // --- Format C: presence markers → 8h default (Now with AI fallback for "P", "Sábado", etc.)
+    // If it's a known simple case, we return fast. Otherwise, we go to AI.
     if (/^[Pp]$/.test(raw)) {
-        return { entrada: '00:00', salida: '00:00', horas: 8 };
+        return { entrada: '00:00', salida: '00:00', horas: 8, observaciones: 'Marcación de presencia (P)' };
+    }
+
+    // AI Fallback for anything else (implicit hours, text, complex formats)
+    try {
+        const aiResult = await parseImplicitHours(raw);
+        if (aiResult.horas > 0 || aiResult.incompleto) {
+            return {
+                entrada: aiResult.entrada || '00:00',
+                salida: aiResult.salida || '00:00',
+                horas: aiResult.horas,
+                incompleto: aiResult.incompleto,
+                observaciones: aiResult.observaciones || 'Detectado por IA'
+            };
+        }
+    } catch (error) {
+        console.error("AI Fallback failed:", error);
     }
 
     return null;
@@ -427,19 +461,20 @@ export async function previewProsoftImport(
     const sinMatch: string[] = [];
     let totalRegistros = 0;
 
-    const filas: ProsoftRow[] = employeeRows.map(emp => {
+    const filas: ProsoftRow[] = await Promise.all(employeeRows.map(async (emp) => {
         const match = matchMap.get(emp.rawName);
         if (!match) sinMatch.push(emp.rawName);
 
-        const registros = Object.entries(emp.timeCells)
-            .map(([dayStr, cell]) => {
+        const registrosPromises = Object.entries(emp.timeCells)
+            .map(async ([dayStr, cell]) => {
                 const dia = parseInt(dayStr);
-                const parsed = parseTimeCell(cell);
+                const parsed = await parseTimeCell(cell);
                 if (!parsed) return null;
                 const fecha = `${year}-${String(month).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
                 return { dia, fecha, ...parsed };
-            })
-            .filter(Boolean) as ProsoftRow['registros'];
+            });
+
+        const registros = (await Promise.all(registrosPromises)).filter(Boolean) as ProsoftRow['registros'];
 
         totalRegistros += registros.length;
 
@@ -449,7 +484,7 @@ export async function previewProsoftImport(
             personalNombre: match ? `${match.nombre} ${match.apellido || ''}`.trim() : '',
             registros,
         };
-    });
+    }));
 
     return { mes, filas, sinMatch, totalRegistros };
 }
@@ -480,9 +515,13 @@ export async function importProsoftData(
 
         for (const reg of fila.registros) {
             const estado = reg.incompleto ? 'pending' : 'approved';
-            const observaciones = reg.incompleto
+            let observaciones = reg.incompleto
                 ? `Fichaje incompleto — falta horario de entrada o salida (Prosoft ${mes})`
                 : `Importado desde Prosoft (${mes})`;
+
+            if (reg.observaciones) {
+                observaciones += ` | ${reg.observaciones}`;
+            }
 
             // Check if record already exists (dedup by personal_id + fecha)
             const { data: existing } = await admin
