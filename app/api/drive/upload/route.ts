@@ -5,6 +5,24 @@ import { Readable } from 'stream';
 
 const UPLOAD_ALLOWED_ROLES = ['owner', 'admin', 'asistente', 'laboratorio'];
 
+function getDriveUploadErrorMessage(error: unknown): string {
+    const fallback = error instanceof Error ? error.message : 'Error subiendo archivo';
+
+    if (!error || typeof error !== 'object') {
+        return fallback;
+    }
+
+    const maybeResponse = (error as { response?: { data?: { error?: { message?: string; errors?: Array<{ reason?: string }> } } } }).response;
+    const apiError = maybeResponse?.data?.error;
+    const reason = apiError?.errors?.[0]?.reason;
+
+    if (reason === 'storageQuotaExceeded') {
+        return 'No se pudo subir el archivo porque la autenticacion actual usa Service Account sin cuota de almacenamiento. Configura OAuth de usuario (GOOGLE_DRIVE_OAUTH_CLIENT_ID, GOOGLE_DRIVE_OAUTH_CLIENT_SECRET y GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN).';
+    }
+
+    return apiError?.message || fallback;
+}
+
 export async function POST(request: Request) {
     try {
         // 1. Verify session + role
@@ -61,7 +79,7 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Drive upload error:', error);
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Error subiendo archivo' },
+            { error: getDriveUploadErrorMessage(error) },
             { status: 500 }
         );
     }

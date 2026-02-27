@@ -36,6 +36,8 @@ export interface LiquidacionResult {
     personal_id: string;
     mes: string;
     modelo_pago: 'hora_ars' | 'prestacion_usd';
+    total_horas?: number;
+    valor_hora_snapshot?: number;
     total_ars: number;
     total_usd?: number;
     tc_bna_venta: number;
@@ -43,10 +45,33 @@ export interface LiquidacionResult {
     prestaciones_validadas: number;
     prestaciones_pendientes: number;
     breakdown: Record<string, unknown>;
-    estado: 'Pendiente' | 'Aprobado' | 'Pagado' | 'Anulado';
+    estado: 'pending' | 'approved' | 'paid' | 'rejected';
     fecha_pago?: string;
     observaciones?: string;
     created_at?: string;
+}
+
+export interface UpdateLiquidacionManualInput {
+    id: string;
+    modelo_pago: 'hora_ars' | 'prestacion_usd';
+    moneda: 'ARS' | 'USD';
+    precio_unitario: number;
+    cantidad: number;
+    tc_liquidacion: number;
+    observaciones?: string;
+}
+
+function round(value: number, decimals = 2): number {
+    const factor = 10 ** decimals;
+    return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+function normalizeEstado(raw: string | null | undefined): LiquidacionResult['estado'] {
+    const value = (raw || '').toLowerCase();
+    if (value === 'approved' || value === 'aprobado') return 'approved';
+    if (value === 'paid' || value === 'pagado') return 'paid';
+    if (value === 'rejected' || value === 'anulado' || value === 'rechazado') return 'rejected';
+    return 'pending';
 }
 
 export interface LiquidacionAdminRow {
@@ -105,7 +130,7 @@ export async function generateLiquidacion(
             .lte('fecha_realizacion', endDate);
 
         const withSlides = (prestaciones || []).filter(p => p.slides_url);
-        const withoutSlides = (prestaciones || []).filter(p => !p.bottom_slides_url); // Typo fix or check: based on context usually p.slides_url
+        const withoutSlides = (prestaciones || []).filter(p => !p.slides_url);
 
         prestacionesValidadas = withSlides.length;
         prestacionesPendientes = withoutSlides.length;
@@ -174,7 +199,7 @@ export async function generateLiquidacion(
                 prestaciones_validadas: prestacionesValidadas,
                 prestaciones_pendientes: prestacionesPendientes,
                 breakdown,
-                estado: 'Pendiente',
+                estado: 'pending',
             },
             { onConflict: 'personal_id,mes' }
         )
@@ -199,7 +224,7 @@ export async function approveLiquidacion(id: string): Promise<void> {
     const admin = getAdminClient();
     const { error } = await admin
         .from('liquidaciones_mensuales')
-        .update({ estado: 'Pendiente' }) // 'Aprobado' is not in constraint yet, pending migration
+        .update({ estado: 'approved' })
         .eq('id', id);
 
     if (error) throw new Error(error.message);
@@ -210,7 +235,7 @@ export async function markLiquidacionPaid(id: string, fechaPago: string): Promis
     const admin = getAdminClient();
     const { error } = await admin
         .from('liquidaciones_mensuales')
-        .update({ estado: 'Pagado', fecha_pago: fechaPago })
+        .update({ estado: 'paid', fecha_pago: fechaPago })
         .eq('id', id);
 
     if (error) throw new Error(error.message);
@@ -221,11 +246,86 @@ export async function rejectLiquidacion(id: string, motivo?: string): Promise<vo
     const admin = getAdminClient();
     const { error } = await admin
         .from('liquidaciones_mensuales')
-        .update({ estado: 'Anulado', observaciones: motivo ?? null })
+        .update({ estado: 'rejected', observaciones: motivo ?? null })
         .eq('id', id);
 
     if (error) throw new Error(error.message);
     revalidatePath('/admin/liquidaciones');
+}
+
+export async function updateLiquidacionManual(input: UpdateLiquidacionManualInput): Promise<void> {
+    const admin = getAdminClient();
+
+    const precioUnitario = Number(input.precio_unitario);
+    const cantidad = Number(input.cantidad);
+    const tcLiquidacion = Number(input.tc_liquidacion);
+
+    if (!Number.isFinite(precioUnitario) || precioUnitario < 0) {
+        throw new Error('Precio unitario inválido');
+    }
+
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        throw new Error('Cantidad inválida');
+    }
+
+    if (!Number.isFinite(tcLiquidacion) || tcLiquidacion <= 0) {
+        throw new Error('Tipo de cambio inválido');
+    }
+
+    const { data: current, error: currentError } = await admin
+        .from('liquidaciones_mensuales')
+        .select('id, tc_bna_venta, breakdown, total_horas, valor_hora_snapshot')
+        .eq('id', input.id)
+        .single();
+
+    if (currentError || !current) {
+        throw new Error('Liquidación no encontrada');
+    }
+
+    const montoBase = round(precioUnitario * cantidad, 2);
+    const totalArs = input.moneda === 'USD'
+        ? round(montoBase * tcLiquidacion, 2)
+        : round(montoBase, 2);
+    const totalUsd = input.moneda === 'USD'
+        ? round(montoBase, 2)
+        : round(montoBase / tcLiquidacion, 2);
+
+    const breakdownActual =
+        current.breakdown && typeof current.breakdown === 'object' && !Array.isArray(current.breakdown)
+            ? current.breakdown as Record<string, unknown>
+            : {};
+
+    const { error } = await admin
+        .from('liquidaciones_mensuales')
+        .update({
+            modelo_pago: input.modelo_pago,
+            total_ars: totalArs,
+            total_usd: totalUsd,
+            tc_liquidacion: round(tcLiquidacion, 4),
+            tc_bna_venta: current.tc_bna_venta ?? round(tcLiquidacion, 4),
+            total_horas: input.modelo_pago === 'hora_ars' ? round(cantidad, 2) : current.total_horas,
+            valor_hora_snapshot: input.modelo_pago === 'hora_ars' ? round(precioUnitario, 2) : current.valor_hora_snapshot,
+            observaciones: input.observaciones?.trim() || null,
+            breakdown: {
+                ...breakdownActual,
+                manual_override: {
+                    moneda: input.moneda,
+                    precio_unitario: round(precioUnitario, 2),
+                    cantidad: round(cantidad, 2),
+                    monto_base: montoBase,
+                    tc_liquidacion: round(tcLiquidacion, 4),
+                    total_ars: totalArs,
+                    total_usd: totalUsd,
+                    edited_at: new Date().toISOString(),
+                },
+            },
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', input.id);
+
+    if (error) throw new Error(error.message);
+    revalidatePath('/admin/liquidaciones');
+    revalidatePath('/portal/liquidation');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,6 +355,12 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
 
     return (workersRes.data || []).map(w => {
         const liq = liqMap.get(w.id);
+        const liquidacionNormalizada = liq
+            ? ({
+                ...liq,
+                estado: normalizeEstado(liq.estado),
+            } as LiquidacionResult)
+            : undefined;
         const isDoctor = w.tipo === 'profesional';
         return {
             personal_id: w.id,
@@ -264,8 +370,10 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             area: w.area,
             tipo: w.tipo || 'empleado',
             modelo_pago: isDoctor ? 'prestacion_usd' : 'hora_ars',
-            liquidacion: liq as LiquidacionResult | undefined,
-            tiene_pendientes: Boolean(liq && Number((liq as LiquidacionResult).prestaciones_pendientes) > 0),
+            liquidacion: liquidacionNormalizada,
+            tiene_pendientes: Boolean(
+                liquidacionNormalizada && Number(liquidacionNormalizada.prestaciones_pendientes) > 0
+            ),
         };
     });
 }

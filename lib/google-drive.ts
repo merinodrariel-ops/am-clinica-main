@@ -59,12 +59,34 @@ export function extractFolderIdFromUrl(url: string | null | undefined): string |
 
 type AreaType = keyof typeof FOLDER_IDS;
 
-function getAuth() {
+const DRIVE_DEFAULT_SCOPES = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/presentations',
+    'https://www.googleapis.com/auth/documents',
+];
+
+function getAuth(scopes: string[] = DRIVE_DEFAULT_SCOPES) {
+    const oauthClientId = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID;
+    const oauthClientSecret = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET;
+    const oauthRefreshToken = process.env.GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN;
+    const oauthRedirectUri = process.env.GOOGLE_DRIVE_OAUTH_REDIRECT_URI || 'https://developers.google.com/oauthplayground';
+
+    // Preferred mode for personal Google accounts (Google One): user OAuth refresh token.
+    if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
+        const oauth2Client = new google.auth.OAuth2(oauthClientId, oauthClientSecret, oauthRedirectUri);
+        oauth2Client.setCredentials({
+            refresh_token: oauthRefreshToken,
+        });
+        return oauth2Client;
+    }
+
     const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
     const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!clientEmail || !privateKey) {
-        throw new Error('Google Service Account credentials not configured');
+        throw new Error(
+            'Google Drive auth not configured. Set GOOGLE_DRIVE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN (recommended) or GOOGLE_SERVICE_ACCOUNT_EMAIL/PRIVATE_KEY.'
+        );
     }
 
     const auth = new google.auth.GoogleAuth({
@@ -72,11 +94,7 @@ function getAuth() {
             client_email: clientEmail,
             private_key: privateKey,
         },
-        scopes: [
-            'https://www.googleapis.com/auth/drive',
-            'https://www.googleapis.com/auth/presentations',
-            'https://www.googleapis.com/auth/documents'
-        ],
+        scopes,
     });
 
     return auth;

@@ -1,0 +1,67 @@
+[
+  {
+    "patient_id": "9b635d01-883f-4d4d-bf17-061c66001368",
+    "patient_name": "ALI, Lourdes",
+    "matches": "Ali Lourdes | Ali, Lourdes."
+  },
+  {
+    "patient_id": "ec296fbc-d427-429a-bc20-9c817d515522",
+    "patient_name": "ANTONELLI, Romina",
+    "matches": "Antonelli  Romina Mara | Antonelli, Romina"
+  },
+  {
+    "patient_id": "6ac4e983-c7f9-4107-b330-8f0b487ff4c8",
+    "patient_name": "ARIADNA, Buonvicino",
+    "matches": "Buonvicino, Ariadna copy | Buonvicino, Ariadna"
+  },
+  {
+    "patient_id": "be64c881-5297-40ac-aa18-1e1dd3bebe57",
+    "patient_name": "ARIEL, Merino",
+    "matches": "Ariel Merino | Merino Ariel"
+  },
+  {
+    "patient_id": "44b4b521-41dc-4da0-92de-10487e72473f",
+    "patient_name": "BAHL, Ivan",
+    "matches": " Bahl, Ivan | Iván Bahl"
+  },
+  {
+    "patient_id": "27368ed1-53f3-413d-a287-34d0bf5eb695",
+    "patient_name": "CABRERA, Julieta",
+    "matches": "Cabrera, Julieta | Cabrera Julieta"
+  },
+  {
+    "patient_id": "4dfe79e7-7a68-44d1-93e2-1b6dead86b68",
+    "patient_name": "FERNANDA, Sanchez",
+    "matches": "Sanchez, Fernanda | Sanchez, Fernanda"
+  },
+  {
+    "patient_id": "c32c8212-9395-4ff0-9e40-812f588323eb",
+    "patient_name": "FERNANDEZ, Maria belen",
+    "matches": "Fernandez, Maria Belen | Copia de Fernandez, Maria Belen - 2 de diciembre, 20:26"
+  },
+  {
+    "patient_id": "49607950-8216-4f0b-950b-f858875c7903",
+    "patient_name": "FERNANDEZ SUAREZ, Melina",
+    "matches": "Fernandez Suarez, Melina | Melina Fernández Suárez"
+  },
+  {
+    "patient_id": "f61ef565-119c-4fca-9a52-8ecd617ce86b",
+    "patient_name": "GISEL, Sanchez",
+    "matches": "Sanchez, Gisela | Sanchez, Giselle"
+  },
+  {
+    "patient_id": "4e74219c-75c6-42aa-85ca-d3f13c117ed5",
+    "patient_name": "GLANTZ, Ruben",
+    "matches": "Glantz, Ruben | Copia de Glantz, Ruben | Glantz, Ruben"
+  },
+  {
+    "patient_id": "647b9dd0-c366-47f4-a86c-e6843a26e7d3",
+    "patient_name": "GONZALEZ, Matias hernan",
+    "matches": "Gonzalez Matias Hernan | Gonzalez, Matias Hernan | Gonzalez, Matias Hernan"
+  },
+  {
+    "patient_id": "d9315f34-c4b1-4812-bb62-e1d4d529be2f",
+    "patient_name": "JULIANA, Medina",
+    "matches": "Medina, Juliana | Medina, Juliana"
+  }
+]

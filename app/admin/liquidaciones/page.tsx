@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
     Wallet, RefreshCw, ChevronLeft, ChevronRight,
     CheckCircle2, Clock, Banknote, AlertTriangle, XCircle, Play,
     DollarSign, TrendingUp, Users, FileVideo, FileSpreadsheet, ListChecks,
+    Search, PencilLine, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -14,9 +15,12 @@ import {
     approveLiquidacion,
     markLiquidacionPaid,
     rejectLiquidacion,
+    updateLiquidacionManual,
     LiquidacionAdminRow,
+    LiquidacionResult,
+    UpdateLiquidacionManualInput,
 } from '@/app/actions/liquidaciones';
-import { getTarifarioCompleto, TarifarioItem } from '@/app/actions/prestaciones';
+import { getTarifarioCompleto, TarifarioItem, updateTarifarioItem } from '@/app/actions/prestaciones';
 
 const ProsoftImporter = dynamic(() => import('@/components/portal/ProsoftImporter'), { ssr: false });
 const RegistroHorasDashboard = dynamic(() => import('@/components/admin/RegistroHorasDashboard'), { ssr: false });
@@ -86,17 +90,304 @@ function PayDateModal({ onConfirm, onClose }: { onConfirm: (d: string) => void; 
     );
 }
 
+// ─── EditLiquidacionModal ─────────────────────────────────────────────────────
+
+function EditLiquidacionModal({
+    row,
+    liq,
+    onClose,
+    onSave,
+    saving,
+}: {
+    row: LiquidacionAdminRow;
+    liq: LiquidacionResult;
+    onClose: () => void;
+    onSave: (input: UpdateLiquidacionManualInput) => Promise<void>;
+    saving: boolean;
+}) {
+    const breakdown = (liq.breakdown || {}) as Record<string, unknown>;
+    const manualOverride =
+        breakdown.manual_override && typeof breakdown.manual_override === 'object'
+            ? breakdown.manual_override as Record<string, unknown>
+            : null;
+
+    const initialMoneda =
+        manualOverride?.moneda === 'USD'
+            ? 'USD'
+            : manualOverride?.moneda === 'ARS'
+                ? 'ARS'
+                : liq.modelo_pago === 'prestacion_usd'
+                    ? 'USD'
+                    : 'ARS';
+
+    const montoActual = initialMoneda === 'USD'
+        ? Number(liq.total_usd || 0)
+        : Number(liq.total_ars || 0);
+
+    const [modeloPago, setModeloPago] = useState<'hora_ars' | 'prestacion_usd'>(liq.modelo_pago || row.modelo_pago);
+    const [moneda, setMoneda] = useState<'ARS' | 'USD'>(initialMoneda);
+    const [precio, setPrecio] = useState(
+        String(Number(manualOverride?.precio_unitario ?? liq.valor_hora_snapshot ?? montoActual ?? 0))
+    );
+    const [cantidad, setCantidad] = useState(
+        String(Number(manualOverride?.cantidad ?? liq.total_horas ?? 1))
+    );
+    const [tc, setTc] = useState(String(Number(liq.tc_liquidacion || liq.tc_bna_venta || 1)));
+    const [observaciones, setObservaciones] = useState(liq.observaciones || '');
+
+    const precioN = Number(precio.replace(',', '.'));
+    const cantidadN = Number(cantidad.replace(',', '.'));
+    const tcN = Number(tc.replace(',', '.'));
+
+    const montoBase = Number.isFinite(precioN * cantidadN) ? Math.max(0, precioN * cantidadN) : 0;
+    const totalArs = moneda === 'USD' ? montoBase * (Number.isFinite(tcN) ? tcN : 0) : montoBase;
+    const totalUsd = moneda === 'USD'
+        ? montoBase
+        : (Number.isFinite(tcN) && tcN > 0 ? montoBase / tcN : 0);
+
+    const invalid =
+        !Number.isFinite(precioN) ||
+        precioN < 0 ||
+        !Number.isFinite(cantidadN) ||
+        cantidadN <= 0 ||
+        !Number.isFinite(tcN) ||
+        tcN <= 0;
+
+    async function submit() {
+        if (invalid) return;
+        await onSave({
+            id: liq.id,
+            modelo_pago: modeloPago,
+            moneda,
+            precio_unitario: precioN,
+            cantidad: cantidadN,
+            tc_liquidacion: tcN,
+            observaciones,
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+                    <div>
+                        <h3 className="text-white font-semibold">Editar liquidación</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">{row.nombre} {row.apellido} · {mesLabel(liq.mes.slice(0, 7))}</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="text-slate-400 hover:text-white text-sm transition-colors"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-5 py-4">
+                    <div>
+                        <label className="block text-xs text-slate-400 mb-1">Tipo de liquidación</label>
+                        <select
+                            value={modeloPago}
+                            onChange={e => setModeloPago(e.target.value as 'hora_ars' | 'prestacion_usd')}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                        >
+                            <option value="hora_ars">ARS por hora</option>
+                            <option value="prestacion_usd">USD por prestación</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs text-slate-400 mb-1">Moneda base</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(['ARS', 'USD'] as const).map(opt => (
+                                <button
+                                    key={opt}
+                                    onClick={() => setMoneda(opt)}
+                                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                                        moneda === opt
+                                            ? 'border-violet-500 bg-violet-500/20 text-violet-300'
+                                            : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs text-slate-400 mb-1">Precio unitario ({moneda})</label>
+                        <input
+                            value={precio}
+                            onChange={e => setPrecio(e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                            inputMode="decimal"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs text-slate-400 mb-1">Cantidad</label>
+                        <input
+                            value={cantidad}
+                            onChange={e => setCantidad(e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                            inputMode="decimal"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs text-slate-400 mb-1">TC liquidación</label>
+                        <input
+                            value={tc}
+                            onChange={e => setTc(e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                            inputMode="decimal"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs text-slate-400 mb-1">Estado actual</label>
+                        <div className="h-[38px] rounded-lg border border-slate-700 bg-slate-800 px-3 flex items-center text-sm text-slate-300">
+                            {ESTADO_CONFIG[liq.estado]?.label || 'Pendiente'}
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="block text-xs text-slate-400 mb-1">Observaciones</label>
+                        <textarea
+                            value={observaciones}
+                            onChange={e => setObservaciones(e.target.value)}
+                            rows={3}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                            placeholder="Nota interna de ajuste (opcional)"
+                        />
+                    </div>
+                </div>
+
+                <div className="mx-5 mb-4 rounded-xl border border-violet-500/20 bg-violet-500/5 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-widest text-violet-300/80 font-semibold mb-2">Preview</p>
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <span className="text-slate-300">Base: {moneda} {montoBase.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+                        <span className="text-slate-500">|</span>
+                        <span className="text-emerald-300">ARS {totalArs.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+                        <span className="text-slate-500">|</span>
+                        <span className="text-blue-300">USD {totalUsd.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-5 py-4">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="px-4 py-2 text-sm text-slate-400 hover:text-white disabled:opacity-60 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={submit}
+                        disabled={saving || invalid}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white transition-colors"
+                    >
+                        {saving ? <RefreshCw size={13} className="animate-spin" /> : <PencilLine size={13} />}
+                        Guardar cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── TarifarioView ────────────────────────────────────────────────────────────
 
 function TarifarioView({ items }: { items: TarifarioItem[] }) {
+    const [localItems, setLocalItems] = useState<TarifarioItem[]>(items);
+    const [query, setQuery] = useState('');
+    const [monedaFilter, setMonedaFilter] = useState<'all' | 'ARS' | 'USD'>('all');
+    const [areaFilter, setAreaFilter] = useState<string>('all');
+    const [expandedAreas, setExpandedAreas] = useState<Record<string, boolean>>({});
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [savingId, setSavingId] = useState<string | null>(null);
+    const [draft, setDraft] = useState({
+        nombre: '',
+        precio_base: '',
+        moneda: 'ARS' as 'ARS' | 'USD',
+        terminos: '',
+    });
+
+    useEffect(() => {
+        setLocalItems(items);
+        const nextExpanded: Record<string, boolean> = {};
+        for (const item of items) {
+            nextExpanded[item.area_nombre] = true;
+        }
+        setExpandedAreas(nextExpanded);
+    }, [items]);
+
+    const areas = Array.from(new Set(localItems.map(i => i.area_nombre))).sort((a, b) => a.localeCompare(b));
+    const totalUsd = localItems.filter(i => i.moneda === 'USD').length;
+    const totalArs = localItems.filter(i => i.moneda === 'ARS').length;
+
+    const queryText = query.trim().toLowerCase();
+    const filtered = localItems.filter(item => {
+        if (monedaFilter !== 'all' && item.moneda !== monedaFilter) return false;
+        if (areaFilter !== 'all' && item.area_nombre !== areaFilter) return false;
+        if (!queryText) return true;
+        const haystack = `${item.nombre} ${item.area_nombre} ${item.terminos || ''}`.toLowerCase();
+        return haystack.includes(queryText);
+    });
+
     const byArea: Record<string, TarifarioItem[]> = {};
-    for (const item of items) {
+    for (const item of filtered) {
         if (!byArea[item.area_nombre]) byArea[item.area_nombre] = [];
         byArea[item.area_nombre].push(item);
     }
 
-    const totalUsd = items.filter(i => i.moneda === 'USD').length;
-    const totalArs = items.filter(i => i.moneda === 'ARS').length;
+    function startEditing(item: TarifarioItem) {
+        setEditingId(item.id);
+        setDraft({
+            nombre: item.nombre,
+            precio_base: String(Number(item.precio_base || 0)),
+            moneda: item.moneda,
+            terminos: item.terminos || '',
+        });
+    }
+
+    function stopEditing() {
+        setEditingId(null);
+        setSavingId(null);
+    }
+
+    async function saveItem(itemId: string) {
+        const precio = Number(draft.precio_base.replace(',', '.'));
+        if (!Number.isFinite(precio) || precio < 0) {
+            toast.error('Ingresá un precio válido');
+            return;
+        }
+
+        setSavingId(itemId);
+        try {
+            const updated = await updateTarifarioItem({
+                id: itemId,
+                nombre: draft.nombre,
+                precio_base: precio,
+                moneda: draft.moneda,
+                terminos: draft.terminos,
+            });
+            setLocalItems(prev => prev.map(item => (item.id === itemId ? updated : item)));
+            toast.success('Prestación actualizada');
+            setEditingId(null);
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'No se pudo guardar el cambio');
+        } finally {
+            setSavingId(null);
+        }
+    }
+
+    function adjustPrice(percentage: number) {
+        const current = Number(draft.precio_base.replace(',', '.'));
+        if (!Number.isFinite(current)) return;
+        const next = current * (1 + percentage / 100);
+        setDraft(prev => ({ ...prev, precio_base: String(Math.round((next + Number.EPSILON) * 100) / 100) }));
+    }
 
     if (items.length === 0) {
         return (
@@ -108,56 +399,208 @@ function TarifarioView({ items }: { items: TarifarioItem[] }) {
     }
 
     return (
-        <div className="space-y-6">
-            {/* Summary */}
-            <div className="flex items-center gap-4 flex-wrap">
+        <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-3">
                 <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center gap-2">
                     <ListChecks size={14} className="text-indigo-400" />
-                    <span className="text-sm text-slate-300 font-medium">{items.length} prestaciones</span>
+                    <span className="text-sm text-slate-300 font-medium">{localItems.length} prestaciones</span>
                 </div>
-                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-2.5">
-                    <span className="text-sm text-emerald-400 font-medium">{totalUsd} en USD</span>
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-2.5 text-sm text-emerald-400 font-medium">
+                    {totalUsd} en USD
                 </div>
-                <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-4 py-2.5">
-                    <span className="text-sm text-blue-400 font-medium">{totalArs} en ARS</span>
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-4 py-2.5 text-sm text-blue-400 font-medium">
+                    {totalArs} en ARS
                 </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5">
-                    <span className="text-sm text-slate-400">{Object.keys(byArea).length} áreas</span>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-400">
+                    {areas.length} áreas
                 </div>
             </div>
 
-            {/* Areas */}
-            {Object.entries(byArea).map(([area, areaItems]) => {
-                const isUsd = areaItems[0]?.moneda === 'USD';
-                return (
-                    <div key={area} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                        {/* Area header */}
-                        <div className={`flex items-center justify-between px-5 py-3 border-b border-slate-800 ${isUsd ? 'bg-emerald-500/5' : 'bg-blue-500/5'}`}>
-                            <h3 className="font-bold text-white text-sm">{area}</h3>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${isUsd ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-blue-400 bg-blue-500/10 border-blue-500/20'}`}>
-                                {isUsd ? 'USD' : 'ARS'} · {areaItems.length} items
-                            </span>
-                        </div>
-
-                        {/* Items */}
-                        <div className="divide-y divide-slate-800/60">
-                            {areaItems.map(item => (
-                                <div key={item.id} className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-800/30 transition-colors">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-slate-200">{item.nombre}</p>
-                                        {item.terminos && (
-                                            <p className="text-xs text-slate-500 mt-0.5">{item.terminos}</p>
-                                        )}
-                                    </div>
-                                    <span className={`font-mono font-bold text-sm flex-shrink-0 ${isUsd ? 'text-emerald-400' : 'text-blue-400'}`}>
-                                        {isUsd ? 'USD ' : '$'}{item.precio_base.toLocaleString('es-AR')}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative flex-1 min-w-[220px]">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder="Buscar prestación, área o términos..."
+                            className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        />
                     </div>
-                );
-            })}
+                    {(['all', 'ARS', 'USD'] as const).map(opt => (
+                        <button
+                            key={opt}
+                            onClick={() => setMonedaFilter(opt)}
+                            className={`px-3 py-2 rounded-lg text-xs border transition-colors ${
+                                monedaFilter === opt
+                                    ? 'bg-violet-600 border-violet-500 text-white'
+                                    : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
+                            }`}
+                        >
+                            {opt === 'all' ? 'Todas monedas' : opt}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setAreaFilter('all')}
+                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                            areaFilter === 'all'
+                                ? 'bg-violet-600 border-violet-500 text-white'
+                                : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
+                        }`}
+                    >
+                        Todas las áreas
+                    </button>
+                    {areas.map(area => (
+                        <button
+                            key={area}
+                            onClick={() => setAreaFilter(area)}
+                            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                                areaFilter === area
+                                    ? 'bg-violet-600 border-violet-500 text-white'
+                                    : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
+                            }`}
+                        >
+                            {area}
+                        </button>
+                    ))}
+                    <span className="ml-auto text-xs text-slate-500 self-center">{filtered.length} resultados</span>
+                </div>
+            </div>
+
+            {filtered.length === 0 ? (
+                <div className="text-center py-14 text-sm text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                    No hay prestaciones para ese filtro.
+                </div>
+            ) : (
+                Object.entries(byArea).map(([area, areaItems]) => (
+                    <div key={area} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                        <button
+                            onClick={() => setExpandedAreas(prev => ({ ...prev, [area]: !prev[area] }))}
+                            className="w-full flex items-center justify-between px-5 py-3 bg-slate-950/30 border-b border-slate-800 hover:bg-slate-950/50 transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-white text-sm">{area}</h3>
+                                <span className="text-xs text-slate-500">{areaItems.length}</span>
+                            </div>
+                            {expandedAreas[area] ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
+                        </button>
+
+                        {expandedAreas[area] && (
+                            <div className="divide-y divide-slate-800/60">
+                                {areaItems
+                                    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                    .map(item => {
+                                        const isEditing = editingId === item.id;
+                                        const isSaving = savingId === item.id;
+
+                                        return (
+                                            <div key={item.id} className="px-5 py-3 hover:bg-slate-800/30 transition-colors">
+                                                {!isEditing ? (
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <p className="text-sm text-slate-100 font-medium">{item.nombre}</p>
+                                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${item.moneda === 'USD' ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' : 'text-blue-300 bg-blue-500/10 border-blue-500/20'}`}>
+                                                                    {item.moneda}
+                                                                </span>
+                                                            </div>
+                                                            {item.terminos && (
+                                                                <p className="text-xs text-slate-500 mt-1">{item.terminos}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-right flex-shrink-0">
+                                                            <p className={`font-mono font-bold text-sm ${item.moneda === 'USD' ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                                                {item.moneda === 'USD' ? 'USD ' : '$'}{Number(item.precio_base || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                            </p>
+                                                            <button
+                                                                onClick={() => startEditing(item)}
+                                                                className="mt-1 inline-flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200 transition-colors"
+                                                            >
+                                                                <PencilLine size={11} /> Editar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-3">
+                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                            <input
+                                                                value={draft.nombre}
+                                                                onChange={e => setDraft(prev => ({ ...prev, nombre: e.target.value }))}
+                                                                className="md:col-span-2 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                                                                placeholder="Nombre"
+                                                            />
+                                                            <select
+                                                                value={draft.moneda}
+                                                                onChange={e => setDraft(prev => ({ ...prev, moneda: e.target.value as 'ARS' | 'USD' }))}
+                                                                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                                                            >
+                                                                <option value="ARS">ARS</option>
+                                                                <option value="USD">USD</option>
+                                                            </select>
+                                                            <input
+                                                                value={draft.precio_base}
+                                                                onChange={e => setDraft(prev => ({ ...prev, precio_base: e.target.value }))}
+                                                                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                                                                inputMode="decimal"
+                                                                placeholder="Precio"
+                                                            />
+                                                        </div>
+
+                                                        <textarea
+                                                            value={draft.terminos}
+                                                            onChange={e => setDraft(prev => ({ ...prev, terminos: e.target.value }))}
+                                                            rows={2}
+                                                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                                                            placeholder="Términos / nota opcional"
+                                                        />
+
+                                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => adjustPrice(-10)}
+                                                                    className="px-2 py-1 rounded-md border border-slate-700 text-xs text-slate-400 hover:text-white"
+                                                                >
+                                                                    -10%
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => adjustPrice(10)}
+                                                                    className="px-2 py-1 rounded-md border border-slate-700 text-xs text-slate-400 hover:text-white"
+                                                                >
+                                                                    +10%
+                                                                </button>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={stopEditing}
+                                                                    disabled={isSaving}
+                                                                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                                                                >
+                                                                    Cancelar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => saveItem(item.id)}
+                                                                    disabled={isSaving}
+                                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-xs text-white"
+                                                                >
+                                                                    {isSaving ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                                                                    Guardar
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        )}
+                    </div>
+                ))
+            )}
         </div>
     );
 }
@@ -175,6 +618,10 @@ export default function LiquidacionesPage() {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState<string | null>(null);
     const [payModal, setPayModal] = useState<string | null>(null); // liq id
+    const [editing, setEditing] = useState<{ row: LiquidacionAdminRow; liq: LiquidacionResult } | null>(null);
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid' | 'sin_generar'>('all');
 
     const load = useCallback(async () => {
@@ -208,10 +655,14 @@ export default function LiquidacionesPage() {
     const tcBna = rows.find(r => r.liquidacion?.tc_bna_venta)?.liquidacion?.tc_bna_venta;
 
     // ── Filter ───────────────────────────────────────────────────────────────
+    const searchQuery = search.trim().toLowerCase();
     const filteredRows = rows.filter(r => {
-        if (filter === 'all') return true;
-        if (filter === 'sin_generar') return !r.liquidacion;
-        return r.liquidacion?.estado === filter;
+        if (filter !== 'all' && filter === 'sin_generar' && r.liquidacion) return false;
+        if (filter !== 'all' && filter !== 'sin_generar' && r.liquidacion?.estado !== filter) return false;
+        if (!searchQuery) return true;
+        const fullName = `${r.nombre} ${r.apellido || ''}`.toLowerCase();
+        const area = (r.area || '').toLowerCase();
+        return fullName.includes(searchQuery) || area.includes(searchQuery);
     });
 
     // ── Actions ──────────────────────────────────────────────────────────────
@@ -260,6 +711,20 @@ export default function LiquidacionesPage() {
         }
     }
 
+    async function handleManualEdit(input: UpdateLiquidacionManualInput) {
+        setSavingEdit(true);
+        try {
+            await updateLiquidacionManual(input);
+            toast.success('Liquidación actualizada');
+            setEditing(null);
+            load();
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'No se pudo guardar la edición');
+        } finally {
+            setSavingEdit(false);
+        }
+    }
+
     // ── Render ───────────────────────────────────────────────────────────────
     return (
         <div className="min-h-screen bg-slate-950 text-white p-6">
@@ -267,6 +732,16 @@ export default function LiquidacionesPage() {
                 <PayDateModal
                     onConfirm={(d) => handlePay(payModal, d)}
                     onClose={() => setPayModal(null)}
+                />
+            )}
+
+            {editing && (
+                <EditLiquidacionModal
+                    row={editing.row}
+                    liq={editing.liq}
+                    onClose={() => setEditing(null)}
+                    onSave={handleManualEdit}
+                    saving={savingEdit}
                 />
             )}
 
@@ -388,8 +863,28 @@ export default function LiquidacionesPage() {
                 </div>
             </div>
 
-            {/* Filter tabs */}
-            <div className="flex gap-2 mb-4 flex-wrap">
+            {/* Search + Filter tabs */}
+            <div className="mb-4 space-y-3">
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1 max-w-md">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Buscar por nombre o área..."
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        />
+                    </div>
+                    <button
+                        onClick={load}
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
+                    >
+                        <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                        Actualizar
+                    </button>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
                 {([
                     ['all', 'Todos', rows.length],
                     ['sin_generar', 'Sin generar', sinLiq],
@@ -409,14 +904,10 @@ export default function LiquidacionesPage() {
                         {label} ({count})
                     </button>
                 ))}
-
-                <button
-                    onClick={load}
-                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
-                >
-                    <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                    Actualizar
-                </button>
+                    <span className="ml-auto text-xs text-slate-500 self-center">
+                        {filteredRows.length} resultados
+                    </span>
+                </div>
             </div>
 
             {/* Table */}
@@ -435,6 +926,7 @@ export default function LiquidacionesPage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-slate-800">
+                                    <th className="w-10 px-2 py-3" />
                                     <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Prestador</th>
                                     <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Modelo</th>
                                     <th className="text-right px-4 py-3 text-xs text-slate-400 font-medium">Monto</th>
@@ -447,140 +939,203 @@ export default function LiquidacionesPage() {
                                     const liq = row.liquidacion;
                                     const estadoCfg = liq ? ESTADO_CONFIG[liq.estado] : null;
                                     const isGenerating = generating === row.personal_id;
+                                    const isExpanded = expandedRow === row.personal_id;
+                                    const modeloPagoActual = liq?.modelo_pago || row.modelo_pago;
+                                    const breakdown = (liq?.breakdown || {}) as Record<string, unknown>;
+                                    const manualOverride =
+                                        breakdown.manual_override && typeof breakdown.manual_override === 'object'
+                                            ? breakdown.manual_override as Record<string, unknown>
+                                            : null;
 
                                     return (
-                                        <tr key={row.personal_id} className="hover:bg-slate-800/30 transition-colors">
-                                            {/* Prestador */}
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-3">
-                                                    {row.foto_url ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={row.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
-                                                            {row.nombre[0]}{row.apellido?.[0] || ''}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <p className="font-medium text-white text-xs">
-                                                            {row.nombre} {row.apellido}
-                                                        </p>
-                                                        <p className="text-xs text-slate-500">{row.area || '—'}</p>
-                                                    </div>
-                                                    {row.tiene_pendientes && (
-                                                        <div title="Prestaciones sin Slides" className="ml-1">
-                                                            <FileVideo size={14} className="text-amber-400" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-
-                                            {/* Modelo */}
-                                            <td className="px-4 py-3">
-                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
-                                                    row.modelo_pago === 'prestacion_usd'
-                                                        ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
-                                                        : 'bg-teal-500/10 text-teal-300 border-teal-500/20'
-                                                }`}>
-                                                    {row.modelo_pago === 'prestacion_usd' ? '$ USD/prestación' : '⏱ ARS/hora'}
-                                                </span>
-                                            </td>
-
-                                            {/* Monto */}
-                                            <td className="px-4 py-3 text-right">
-                                                {liq ? (
-                                                    <div>
-                                                        <p className="font-semibold text-white">{formatARS(Number(liq.total_ars || 0))}</p>
-                                                        {liq.total_usd && (
-                                                            <p className="text-xs text-slate-400">{formatUSD(Number(liq.total_usd))}</p>
-                                                        )}
-                                                        {liq.prestaciones_pendientes > 0 && (
-                                                            <p className="text-xs text-amber-400">
-                                                                +{liq.prestaciones_pendientes} sin slides
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-600 text-xs">—</span>
-                                                )}
-                                            </td>
-
-                                            {/* Estado */}
-                                            <td className="px-4 py-3 text-center">
-                                                {estadoCfg ? (
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${estadoCfg.cls}`}>
-                                                        {estadoCfg.icon}
-                                                        {estadoCfg.label}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-slate-600 text-xs">Sin liquidar</span>
-                                                )}
-                                            </td>
-
-                                            {/* Acciones */}
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    {!liq && (
+                                        <Fragment key={row.personal_id}>
+                                            <tr className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-2 py-3 text-center">
+                                                    {liq ? (
                                                         <button
-                                                            onClick={() => handleGenerate(row.personal_id)}
-                                                            disabled={isGenerating}
-                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
+                                                            onClick={() => setExpandedRow(isExpanded ? null : row.personal_id)}
+                                                            className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+                                                            title={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
                                                         >
-                                                            {isGenerating
-                                                                ? <RefreshCw size={11} className="animate-spin" />
-                                                                : <Play size={11} />
-                                                            }
-                                                            Generar
+                                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                                         </button>
+                                                    ) : (
+                                                        <span className="text-slate-700">•</span>
                                                     )}
+                                                </td>
 
-                                                    {liq?.estado === 'pending' && (
-                                                        <>
+                                                {/* Prestador */}
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        {row.foto_url ? (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img src={row.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                                                                {row.nombre[0]}{row.apellido?.[0] || ''}
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <p className="font-medium text-white text-xs">
+                                                                {row.nombre} {row.apellido}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500">{row.area || '—'}</p>
+                                                        </div>
+                                                        {row.tiene_pendientes && (
+                                                            <div title="Prestaciones sin Slides" className="ml-1">
+                                                                <FileVideo size={14} className="text-amber-400" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+
+                                                {/* Modelo */}
+                                                <td className="px-4 py-3">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                                                        modeloPagoActual === 'prestacion_usd'
+                                                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
+                                                            : 'bg-teal-500/10 text-teal-300 border-teal-500/20'
+                                                    }`}>
+                                                        {modeloPagoActual === 'prestacion_usd' ? '$ USD/prestación' : '⏱ ARS/hora'}
+                                                    </span>
+                                                </td>
+
+                                                {/* Monto */}
+                                                <td className="px-4 py-3 text-right">
+                                                    {liq ? (
+                                                        <div>
+                                                            <p className="font-semibold text-white">{formatARS(Number(liq.total_ars || 0))}</p>
+                                                            {liq.total_usd && (
+                                                                <p className="text-xs text-slate-400">{formatUSD(Number(liq.total_usd))}</p>
+                                                            )}
+                                                            {manualOverride && (
+                                                                <p className="text-[10px] text-violet-300">ajuste manual</p>
+                                                            )}
+                                                            {liq.prestaciones_pendientes > 0 && (
+                                                                <p className="text-xs text-amber-400">
+                                                                    +{liq.prestaciones_pendientes} sin slides
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs">—</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Estado */}
+                                                <td className="px-4 py-3 text-center">
+                                                    {estadoCfg ? (
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${estadoCfg.cls}`}>
+                                                            {estadoCfg.icon}
+                                                            {estadoCfg.label}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs">Sin liquidar</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Acciones */}
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                                        {!liq && (
                                                             <button
                                                                 onClick={() => handleGenerate(row.personal_id)}
                                                                 disabled={isGenerating}
-                                                                className="flex items-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg text-xs transition-colors"
-                                                                title="Recalcular"
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
                                                             >
-                                                                <RefreshCw size={11} className={isGenerating ? 'animate-spin' : ''} />
+                                                                {isGenerating
+                                                                    ? <RefreshCw size={11} className="animate-spin" />
+                                                                    : <Play size={11} />
+                                                                }
+                                                                Generar
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleApprove(liq.id)}
-                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs transition-colors"
-                                                            >
-                                                                <CheckCircle2 size={11} />
-                                                                Aprobar
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleReject(liq.id)}
-                                                                className="px-2 py-1.5 text-red-400 hover:text-red-300 text-xs transition-colors"
-                                                                title="Rechazar"
-                                                            >
-                                                                <XCircle size={14} />
-                                                            </button>
-                                                        </>
-                                                    )}
+                                                        )}
 
-                                                    {liq?.estado === 'approved' && (
-                                                        <button
-                                                            onClick={() => setPayModal(liq.id)}
-                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
-                                                        >
-                                                            <Banknote size={11} />
-                                                            Marcar pagada
-                                                        </button>
-                                                    )}
+                                                        {liq?.estado === 'pending' && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleGenerate(row.personal_id)}
+                                                                    disabled={isGenerating}
+                                                                    className="flex items-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg text-xs transition-colors"
+                                                                    title="Recalcular"
+                                                                >
+                                                                    <RefreshCw size={11} className={isGenerating ? 'animate-spin' : ''} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleApprove(liq.id)}
+                                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs transition-colors"
+                                                                >
+                                                                    <CheckCircle2 size={11} />
+                                                                    Aprobar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleReject(liq.id)}
+                                                                    className="px-2 py-1.5 text-red-400 hover:text-red-300 text-xs transition-colors"
+                                                                    title="Rechazar"
+                                                                >
+                                                                    <XCircle size={14} />
+                                                                </button>
+                                                            </>
+                                                        )}
 
-                                                    {liq?.estado === 'paid' && (
-                                                        <span className="text-xs text-slate-500">
-                                                            {liq.fecha_pago
-                                                                ? new Date(liq.fecha_pago).toLocaleDateString('es-AR')
-                                                                : 'Pagada'}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                        {liq?.estado === 'approved' && (
+                                                            <button
+                                                                onClick={() => setPayModal(liq.id)}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
+                                                            >
+                                                                <Banknote size={11} />
+                                                                Marcar pagada
+                                                            </button>
+                                                        )}
+
+                                                        {liq && (
+                                                            <button
+                                                                onClick={() => setEditing({ row, liq })}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-violet-700/70 hover:bg-violet-700 text-white rounded-lg text-xs transition-colors"
+                                                            >
+                                                                <PencilLine size={11} />
+                                                                Editar
+                                                            </button>
+                                                        )}
+
+                                                        {liq?.estado === 'paid' && (
+                                                            <span className="text-xs text-slate-500">
+                                                                {liq.fecha_pago
+                                                                    ? new Date(liq.fecha_pago).toLocaleDateString('es-AR')
+                                                                    : 'Pagada'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            {liq && isExpanded && (
+                                                <tr className="bg-slate-950/60">
+                                                    <td colSpan={6} className="px-4 py-3">
+                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">TC</p>
+                                                                <p className="text-sm text-white font-semibold">{Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
+                                                            </div>
+                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">Precio</p>
+                                                                <p className="text-sm text-white font-semibold">
+                                                                    {manualOverride?.moneda === 'USD' ? 'USD' : 'ARS'} {Number(manualOverride?.precio_unitario || liq.valor_hora_snapshot || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                                </p>
+                                                            </div>
+                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">Cantidad</p>
+                                                                <p className="text-sm text-white font-semibold">{Number(manualOverride?.cantidad || liq.total_horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
+                                                            </div>
+                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">Observaciones</p>
+                                                                <p className="text-sm text-slate-200 truncate">{liq.observaciones || 'Sin notas'}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
                                     );
                                 })}
                             </tbody>

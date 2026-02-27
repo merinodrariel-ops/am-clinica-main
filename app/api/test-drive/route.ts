@@ -1,24 +1,10 @@
 import { NextResponse } from 'next/server';
-import { google } from 'googleapis';
+import { getDriveClient } from '@/lib/google-drive';
 import { Readable } from 'stream';
 
 export async function GET() {
     try {
-        const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-        const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
         const folderId = process.env.GOOGLE_DRIVE_FOLDER_ADMIN;
-
-        if (!clientEmail || !privateKey) {
-            return NextResponse.json({
-                success: false,
-                error: 'Credentials not configured',
-                details: {
-                    hasEmail: !!clientEmail,
-                    hasKey: !!privateKey,
-                    hasFolderId: !!folderId,
-                }
-            }, { status: 500 });
-        }
 
         if (!folderId) {
             return NextResponse.json({
@@ -27,15 +13,7 @@ export async function GET() {
             }, { status: 500 });
         }
 
-        const auth = new google.auth.GoogleAuth({
-            credentials: {
-                client_email: clientEmail,
-                private_key: privateKey,
-            },
-            scopes: ['https://www.googleapis.com/auth/drive'],
-        });
-
-        const drive = google.drive({ version: 'v3', auth });
+        const drive = getDriveClient();
 
         // Create simple test content
         const testContent = Buffer.from(`Test file created at ${new Date().toISOString()}\nFolder ID: ${folderId}`);

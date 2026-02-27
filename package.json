@@ -47,7 +47,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.35",
     "@types/nodemailer": "^7.0.9",
     "@types/qrcode.react": "^1.0.5",
     "@types/react": "^19",

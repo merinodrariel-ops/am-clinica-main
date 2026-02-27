@@ -116,15 +116,26 @@ async function getFolderWebViewLink(folderId: string): Promise<string | null> {
     }
 }
 
-async function moveFileToFolder(fileId: string, newParentId: string, currentParentId: string): Promise<void> {
+async function moveFileToFolder(fileId: string, newParentId: string): Promise<void> {
     if (DRY_RUN) return;
-    await drive.files.update({
-        fileId,
-        supportsAllDrives: true,
-        addParents: newParentId,
-        removeParents: currentParentId,
-        fields: 'id',
-    });
+    try {
+        const file = await drive.files.get({
+            fileId: fileId,
+            fields: 'parents'
+        });
+        const currentParents = file.data.parents?.join(',') || '';
+
+        await drive.files.update({
+            fileId,
+            supportsAllDrives: true,
+            enforceSingleParent: true,
+            addParents: newParentId,
+            removeParents: currentParents,
+            fields: 'id',
+        });
+    } catch (err: any) {
+        throw new Error(`Error en moveFileToFolder: ${err.message}`);
+    }
 }
 
 interface PatientRow {
@@ -256,6 +267,7 @@ async function main() {
     let ambiguousMatches = 0;
     const moveSamples: string[] = [];
     const claimedLooseFileIds = new Set<string>();
+    const ambiguousMatchesRows: any[] = [];
     const errors: string[] = [];
 
     for (const patient of needsFolder) {
@@ -319,7 +331,14 @@ async function main() {
                     );
                 });
 
-                if (matchingFiles.length > 1) ambiguousMatches++;
+                if (matchingFiles.length > 1) {
+                    ambiguousMatches++;
+                    ambiguousMatchesRows.push({
+                        patient_id: patient.id_paciente,
+                        patient_name: folderName,
+                        matches: matchingFiles.map(f => f.name).join(' | ')
+                    });
+                }
                 if (matchingFiles.length > 0) matchedPatients++;
 
                 for (const file of matchingFiles) {
@@ -330,7 +349,7 @@ async function main() {
                     if (moveSamples.length < MOVE_SAMPLE_LIMIT) {
                         moveSamples.push(`${file.name} -> ${folderName}`);
                     }
-                    await moveFileToFolder(file.id, presentationFolderId, PACIENTES_ROOT);
+                    await moveFileToFolder(file.id, presentationFolderId);
                     moved++;
                 }
             }
@@ -378,6 +397,17 @@ async function main() {
     if (errors.length > 0) {
         console.log('\n  Errores detallados:');
         errors.forEach(e => console.log(`    - ${e}`));
+    }
+
+    // 8. Export report
+    if (ambiguousMatchesRows.length > 0) {
+        const reportPath = 'scripts/output/ambiguous_presentations.json';
+        const fs = require('fs');
+        const path = require('path');
+        const dir = path.dirname(reportPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(reportPath, JSON.stringify(ambiguousMatchesRows, null, 2));
+        console.log(`\n📄 Reporte de ambigüedades exportado a: ${reportPath}`);
     }
     if (DRY_RUN) {
         console.log('\n  ⚠️  Esto fue un DRY RUN. Para ejecutar de verdad:');

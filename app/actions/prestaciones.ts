@@ -22,6 +22,14 @@ export interface TarifarioItem {
     terminos?: string;
 }
 
+export interface UpdateTarifarioItemInput {
+    id: string;
+    nombre?: string;
+    precio_base?: number;
+    moneda?: 'ARS' | 'USD';
+    terminos?: string;
+}
+
 export interface PrestacionRealizada {
     id: string;
     profesional_id: string;
@@ -125,6 +133,69 @@ export async function getTarifarioCompleto(): Promise<TarifarioItem[]> {
         .order('nombre');
 
     return (data || []) as TarifarioItem[];
+}
+
+export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Promise<TarifarioItem> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile || !['owner', 'admin'].includes(profile.role)) {
+        throw new Error('No autorizado para editar tarifario');
+    }
+
+    const admin = getAdminClient();
+
+    if (!input.id) {
+        throw new Error('ID de prestación inválido');
+    }
+
+    const patch: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+    };
+
+    if (typeof input.nombre === 'string') {
+        const nombre = input.nombre.trim();
+        if (!nombre) throw new Error('El nombre no puede estar vacío');
+        patch.nombre = nombre;
+    }
+
+    if (typeof input.precio_base === 'number') {
+        if (!Number.isFinite(input.precio_base) || input.precio_base < 0) {
+            throw new Error('Precio inválido');
+        }
+        patch.precio_base = Math.round((input.precio_base + Number.EPSILON) * 100) / 100;
+    }
+
+    if (input.moneda) {
+        patch.moneda = input.moneda;
+    }
+
+    if (typeof input.terminos === 'string') {
+        patch.terminos = input.terminos.trim() || null;
+    }
+
+    const { data, error } = await admin
+        .from('prestaciones_lista')
+        .update(patch)
+        .eq('id', input.id)
+        .select('id, nombre, area_nombre, precio_base, moneda, terminos')
+        .single();
+
+    if (error || !data) {
+        throw new Error(error?.message || 'No se pudo actualizar el tarifario');
+    }
+
+    revalidatePath('/admin/liquidaciones');
+    revalidatePath('/portal/prestaciones');
+
+    return data as TarifarioItem;
 }
 
 // ─── Registrar ────────────────────────────────────────────────────────────────

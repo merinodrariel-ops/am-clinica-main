@@ -1,24 +1,5 @@
 import { NextResponse } from 'next/server';
-import { google } from 'googleapis';
-
-function getAuth() {
-    const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-    const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-    if (!clientEmail || !privateKey) {
-        throw new Error('Google Service Account credentials not configured');
-    }
-
-    const auth = new google.auth.GoogleAuth({
-        credentials: {
-            client_email: clientEmail,
-            private_key: privateKey,
-        },
-        scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    });
-
-    return auth;
-}
+import { getDriveClient } from '@/lib/google-drive';
 
 export async function GET(
     request: Request,
@@ -31,8 +12,7 @@ export async function GET(
     }
 
     try {
-        const auth = getAuth();
-        const drive = google.drive({ version: 'v3', auth });
+        const drive = getDriveClient();
 
         // Get file metadata to check name/mimeType
         const fileMetadata = await drive.files.get({
@@ -40,9 +20,8 @@ export async function GET(
             fields: 'name, mimeType',
         });
 
-        // Optional: Add security check here (e.g. check session or token)
-        // For now, we allow access if the service account can see it.
-        // In a production app, you might want to verify the patient's identity.
+        // Optional: Add security check here (e.g. check session or token).
+        // In production, you might want to verify the patient's identity.
 
         const response = await drive.files.get(
             { fileId, alt: 'media' },
