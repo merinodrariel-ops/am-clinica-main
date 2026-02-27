@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createBrowserClient } from '@supabase/ssr';
 import { toast } from 'sonner';
+import { createSmileReviewFollowupAction } from '@/app/actions/smile-followup';
 import {
     Loader2, Save, Sparkles, RotateCcw, Download, Video, RotateCcw as ResetIcon,
-    ScanFace, Wand2, AlertCircle, Camera, CheckCircle2, ChevronRight, Share2,
+    ScanFace, Wand2, AlertCircle, Camera, CheckCircle2, ChevronRight, Share2, Link2, MessageCircle, Clipboard,
     Play, X, Maximize2
 } from 'lucide-react';
 import { ImageComparator } from '../patients/ImageComparator';
@@ -24,8 +25,11 @@ type Phase = 'drop' | 'aligning' | 'preview' | 'processing' | 'result';
 
 interface Props {
     patientId: string;
+    patientName?: string;
     onSaved?: () => void;
 }
+
+const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
 
 // ─── Image utilities ──────────────────────────────────────────────────────────
 
@@ -346,16 +350,20 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function SmileDesign({ patientId, onSaved }: Props) {
+export default function SmileDesign({ patientId, patientName, onSaved }: Props) {
     const [phase, setPhase] = useState<Phase>('drop');
     const [isDragging, setIsDragging] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
+    const [isPreparingManualPair, setIsPreparingManualPair] = useState(false);
+    const [isCreatingFollowupTask, setIsCreatingFollowupTask] = useState(false);
+    const [followupTaskCreated, setFollowupTaskCreated] = useState(false);
     const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
     const [intensity, setIntensity] = useState(5);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [runtimeBaseUrl] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''));
 
     // Image data
     const [beforeDataUrl, setBeforeDataUrl] = useState<string | null>(null);     // aligned original
@@ -372,6 +380,10 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
     const compareRef = useRef<HTMLDivElement>(null);
     const draggingCompare = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const manualBeforeInputRef = useRef<HTMLInputElement>(null);
+    const manualAfterInputRef = useRef<HTMLInputElement>(null);
+    const [manualBeforeFile, setManualBeforeFile] = useState<File | null>(null);
+    const [manualAfterFile, setManualAfterFile] = useState<File | null>(null);
 
     // Prevent browser default drag
     useEffect(() => {
@@ -383,6 +395,14 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
             window.removeEventListener('drop', prevent);
         };
     }, []);
+
+    const comparisonShareUrl = beforeStoredUrl && afterStoredUrl
+        ? `${runtimeBaseUrl}/sonrisa/comparador?before=${encodeURIComponent(beforeStoredUrl)}&after=${encodeURIComponent(afterStoredUrl)}&patient=${encodeURIComponent(patientName || 'Paciente')}`
+        : '';
+
+    const whatsappThanksMessage = comparisonShareUrl
+        ? `Hola ${patientName || ''}, gracias por confiar en AM Clinica Dental. Gracias por darnos la oportunidad de cambiar tu vida a traves de tu sonrisa. Te compartimos tu comparativo antes/despues: ${comparisonShareUrl}\n\nSi queres, podes dejarnos tu referencia en Google: ${GOOGLE_REVIEW_LINK}`
+        : '';
 
     // ── Ingest + Auto-align ───────────────────────────────────────────────────
     const ingestFile = useCallback(async (file: File) => {
@@ -447,6 +467,63 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
     const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) await ingestFile(file);
+    };
+
+    const handlePrepareManualPair = async () => {
+        if (!manualBeforeFile || !manualAfterFile) {
+            toast.error('Subí ambas fotos: antes y después');
+            return;
+        }
+
+        setIsPreparingManualPair(true);
+        setErrorMsg(null);
+
+        try {
+            const [beforeCompressed, afterCompressed] = await Promise.all([
+                compressImage(manualBeforeFile),
+                compressImage(manualAfterFile),
+            ]);
+
+            const beforeBlob = base64ToBlob(beforeCompressed.base64, beforeCompressed.mimeType);
+            const afterBlob = base64ToBlob(afterCompressed.base64, afterCompressed.mimeType);
+            const ts = Date.now();
+
+            const [beforeUpload, afterUpload] = await Promise.all([
+                supabase.storage
+                    .from('patient-portal-files')
+                    .upload(`portal/${patientId}/before_real_${ts}.jpg`, beforeBlob, {
+                        upsert: false,
+                        contentType: beforeCompressed.mimeType,
+                    }),
+                supabase.storage
+                    .from('patient-portal-files')
+                    .upload(`portal/${patientId}/after_real_${ts}.jpg`, afterBlob, {
+                        upsert: false,
+                        contentType: afterCompressed.mimeType,
+                    }),
+            ]);
+
+            if (beforeUpload.error) throw beforeUpload.error;
+            if (afterUpload.error) throw afterUpload.error;
+
+            const { data: { publicUrl: beforeUrl } } = supabase.storage
+                .from('patient-portal-files').getPublicUrl(beforeUpload.data.path);
+            const { data: { publicUrl: afterUrl } } = supabase.storage
+                .from('patient-portal-files').getPublicUrl(afterUpload.data.path);
+
+            setBeforeDataUrl(beforeCompressed.dataUrl);
+            setAfterDataUrl(afterCompressed.dataUrl);
+            setBeforeStoredUrl(`${beforeUrl}?t=${ts}`);
+            setAfterStoredUrl(`${afterUrl}?t=${ts}`);
+            setSliderPos(50);
+            setPhase('result');
+            toast.success('Comparador antes/después preparado');
+        } catch (err) {
+            console.error('[SmileDesign] manual pair error:', err);
+            toast.error('No se pudo preparar el comparador manual');
+        } finally {
+            setIsPreparingManualPair(false);
+        }
     };
 
     // ── Process with Gemini ───────────────────────────────────────────────────
@@ -519,11 +596,16 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
         try {
             const ts = new Date().toISOString().split('T')[0];
             const label = `Smile Design ${ts} (Intensidad ${intensity}/10)`;
+            const afterLabel = `Antes/Después ${ts} · Resultado`;
 
             await Promise.all([
                 supabase.from('patient_files').insert({
                     patient_id: patientId, file_type: 'photo_before',
                     label: `${label} – Antes`, file_url: beforeStoredUrl, is_visible_to_patient: true,
+                }),
+                supabase.from('patient_files').insert({
+                    patient_id: patientId, file_type: 'photo_after',
+                    label: afterLabel, file_url: afterStoredUrl, is_visible_to_patient: true,
                 }),
                 supabase.from('patient_files').insert({
                     patient_id: patientId, file_type: 'smile_design',
@@ -569,13 +651,73 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
         }
     };
 
+    const handleCopyComparisonLink = async () => {
+        if (!comparisonShareUrl) {
+            toast.error('Aún no hay link de comparador disponible');
+            return;
+        }
+
+        await navigator.clipboard.writeText(comparisonShareUrl);
+        toast.success('Link del comparador copiado');
+    };
+
+    const handleCopyWhatsappMessage = async () => {
+        if (!whatsappThanksMessage) {
+            toast.error('Generá o subí un antes/después para crear el mensaje');
+            return;
+        }
+
+        await navigator.clipboard.writeText(whatsappThanksMessage);
+        toast.success('Mensaje de agradecimiento copiado');
+    };
+
+    const handleOpenWhatsapp = () => {
+        if (!whatsappThanksMessage) {
+            toast.error('Generá o subí un antes/después para compartir');
+            return;
+        }
+
+        window.open(`https://wa.me/?text=${encodeURIComponent(whatsappThanksMessage)}`, '_blank');
+    };
+
+    const handleCreateFollowupTask = async () => {
+        if (!comparisonShareUrl || !patientId) {
+            toast.error('Falta comparador para crear seguimiento');
+            return;
+        }
+
+        setIsCreatingFollowupTask(true);
+        try {
+            const res = await createSmileReviewFollowupAction({
+                patientId,
+                patientName: patientName || 'Paciente',
+                comparisonUrl: comparisonShareUrl,
+            });
+
+            if (!res.success) {
+                throw new Error(res.error || 'No se pudo crear tarea');
+            }
+
+            setFollowupTaskCreated(true);
+            toast.success('Tarea de recontacto creada para recepción');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Error al crear seguimiento');
+        } finally {
+            setIsCreatingFollowupTask(false);
+        }
+    };
+
 
     const reset = () => {
         setPhase('drop');
         setBeforeDataUrl(null); setAfterDataUrl(null);
         setBeforeBase64(null); setBeforeStoredUrl(null); setAfterStoredUrl(null);
         setIntensity(5); setErrorMsg(null);
+        setManualBeforeFile(null); setManualAfterFile(null);
+        setFollowupTaskCreated(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
+        if (manualBeforeInputRef.current) manualBeforeInputRef.current.value = '';
+        if (manualAfterInputRef.current) manualAfterInputRef.current.value = '';
     };
 
     // ─── Render ───────────────────────────────────────────────────────────────
@@ -624,49 +766,98 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                        onDragOver={onDragOver}
-                        onDragLeave={onDragLeave}
-                        onDrop={onDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`relative flex-1 min-h-[500px] rounded-[2rem] cursor-pointer overflow-hidden border-2 transition-all duration-500 group flex flex-col items-center justify-center gap-8 ${isDragging
-                            ? 'border-violet-500 bg-violet-500/10 shadow-[0_0_80px_rgba(124,58,237,0.15)] ring-4 ring-violet-500/10'
-                            : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10'
-                            }`}
+                        className="space-y-6"
                     >
-                        {/* Interactive Grid Background */}
-                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
-                            style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+                        <div
+                            onDragOver={onDragOver}
+                            onDragLeave={onDragLeave}
+                            onDrop={onDrop}
+                            onClick={() => fileInputRef.current?.click()}
+                            className={`relative flex-1 min-h-[500px] rounded-[2rem] cursor-pointer overflow-hidden border-2 transition-all duration-500 group flex flex-col items-center justify-center gap-8 ${isDragging
+                                ? 'border-violet-500 bg-violet-500/10 shadow-[0_0_80px_rgba(124,58,237,0.15)] ring-4 ring-violet-500/10'
+                                : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10'
+                                }`}
+                        >
+                            <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
+                                style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
 
-                        <div className="relative z-10 flex flex-col items-center text-center px-10">
-                            <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="relative mb-6"
-                            >
-                                <div className={`w-32 h-32 rounded-[2.5rem] flex items-center justify-center transition-all duration-500 ${isDragging ? 'bg-violet-500 scale-110' : 'bg-slate-900 border border-white/10 group-hover:border-violet-500/50'
-                                    }`}>
-                                    <Camera size={48} className={`transition-all duration-500 ${isDragging ? 'text-white' : 'text-slate-700 group-hover:text-violet-400'}`} />
+                            <div className="relative z-10 flex flex-col items-center text-center px-10">
+                                <motion.div
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="relative mb-6"
+                                >
+                                    <div className={`w-32 h-32 rounded-[2.5rem] flex items-center justify-center transition-all duration-500 ${isDragging ? 'bg-violet-500 scale-110' : 'bg-slate-900 border border-white/10 group-hover:border-violet-500/50'
+                                        }`}>
+                                        <Camera size={48} className={`transition-all duration-500 ${isDragging ? 'text-white' : 'text-slate-700 group-hover:text-violet-400'}`} />
+                                    </div>
+                                    <div className="absolute -top-4 -right-4 w-12 h-12 rounded-2xl bg-teal-500/20 backdrop-blur-xl border border-teal-500/30 flex items-center justify-center shadow-lg">
+                                        <Sparkles size={20} className="text-teal-400" />
+                                    </div>
+                                </motion.div>
+
+                                <h3 className="text-2xl font-bold text-white mb-2 leading-tight">
+                                    {isDragging ? '¡Soltala ahora!' : 'Subí una foto de rostro'}
+                                </h3>
+                                <p className="text-slate-500 text-sm max-w-[280px] leading-relaxed">
+                                    Arrastrá el archivo o hacé click para seleccionar de tu galería.
+                                </p>
+
+                                <div className="mt-10 flex flex-wrap justify-center gap-3">
+                                    <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">JPG</span>
+                                    <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">PNG</span>
+                                    <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">WEBP</span>
                                 </div>
-                                <div className="absolute -top-4 -right-4 w-12 h-12 rounded-2xl bg-teal-500/20 backdrop-blur-xl border border-teal-500/30 flex items-center justify-center shadow-lg">
-                                    <Sparkles size={20} className="text-teal-400" />
-                                </div>
-                            </motion.div>
-
-                            <h3 className="text-2xl font-bold text-white mb-2 leading-tight">
-                                {isDragging ? '¡Soltala ahora!' : 'Subí una foto de rostro'}
-                            </h3>
-                            <p className="text-slate-500 text-sm max-w-[280px] leading-relaxed">
-                                Arrastrá el archivo o hacé click para seleccionar de tu galería.
-                            </p>
-
-                            <div className="mt-10 flex flex-wrap justify-center gap-3">
-                                <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">JPG</span>
-                                <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">PNG</span>
-                                <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">WEBP</span>
                             </div>
+
+                            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
                         </div>
 
-                        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+                        <div className="rounded-[2rem] border border-white/10 bg-white/[0.02] p-6">
+                            <div className="mb-4 flex items-center gap-2">
+                                <Share2 size={16} className="text-teal-400" />
+                                <p className="text-sm font-bold uppercase tracking-[0.14em] text-slate-300">Modo seguimiento (antes y después reales)</p>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-4">
+                                Cargá las dos fotos reales y generá un comparador para recontacto, agradecimiento y referencia en Google.
+                            </p>
+
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <label className="rounded-xl border border-white/10 bg-slate-900/50 p-3 cursor-pointer hover:border-violet-400/40 transition-colors">
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Foto antes</span>
+                                    <p className="mt-1 text-xs text-slate-200 truncate">{manualBeforeFile?.name || 'Seleccionar archivo'}</p>
+                                    <input
+                                        ref={manualBeforeInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(event) => setManualBeforeFile(event.target.files?.[0] || null)}
+                                    />
+                                </label>
+
+                                <label className="rounded-xl border border-white/10 bg-slate-900/50 p-3 cursor-pointer hover:border-teal-400/40 transition-colors">
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Foto después</span>
+                                    <p className="mt-1 text-xs text-slate-200 truncate">{manualAfterFile?.name || 'Seleccionar archivo'}</p>
+                                    <input
+                                        ref={manualAfterInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(event) => setManualAfterFile(event.target.files?.[0] || null)}
+                                    />
+                                </label>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handlePrepareManualPair}
+                                disabled={isPreparingManualPair}
+                                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-teal-500 disabled:opacity-50"
+                            >
+                                {isPreparingManualPair ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                {isPreparingManualPair ? 'Preparando...' : 'Generar comparador manual'}
+                            </button>
+                        </div>
                     </motion.div>
                 )}
 
@@ -882,6 +1073,62 @@ export default function SmileDesign({ patientId, onSaved }: Props) {
                             >
                                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                                 Finalizar y Guardar
+                            </button>
+                        </div>
+
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                                Recontacto y referencias
+                            </p>
+
+                            <div className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-xs text-slate-300 break-all">
+                                {comparisonShareUrl || 'Guardá o prepará el comparador para generar link compartible.'}
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleCopyComparisonLink}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-semibold text-slate-200 hover:bg-white/10"
+                                >
+                                    <Link2 size={13} />
+                                    Copiar link comparador
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleCopyWhatsappMessage}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-semibold text-slate-200 hover:bg-white/10"
+                                >
+                                    <Clipboard size={13} />
+                                    Copiar mensaje
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleOpenWhatsapp}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-green-400/30 bg-green-500/10 px-3 py-2 text-[11px] font-semibold text-green-300 hover:bg-green-500/20"
+                                >
+                                    <MessageCircle size={13} />
+                                    Enviar por WhatsApp
+                                </button>
+                                <a
+                                    href={GOOGLE_REVIEW_LINK}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-2 text-[11px] font-semibold text-teal-300 hover:bg-teal-500/20"
+                                >
+                                    <Share2 size={13} />
+                                    Abrir link Google Review
+                                </a>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleCreateFollowupTask}
+                                disabled={isCreatingFollowupTask || followupTaskCreated}
+                                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-indigo-500 disabled:opacity-50"
+                            >
+                                {isCreatingFollowupTask ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                {followupTaskCreated ? 'Seguimiento creado' : 'Crear tarea de recontacto'}
                             </button>
                         </div>
                     </motion.div>

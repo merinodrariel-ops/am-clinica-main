@@ -908,6 +908,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             <div className="py-2">
                                 <SmileDesign
                                     patientId={patient.id_paciente}
+                                    patientName={`${patient.nombre} ${patient.apellido}`}
                                     onSaved={() => setActiveTab('portal')}
                                 />
                             </div>

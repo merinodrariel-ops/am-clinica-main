@@ -51,6 +51,7 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/admision/') ||
         path === '/mi-portal' ||
         path.startsWith('/mi-portal/') ||
+        path.startsWith('/sonrisa/comparador') ||
         path === '/privacy-policy' ||
         path === '/terms' ||
         path.startsWith('/forgot-password') ||
