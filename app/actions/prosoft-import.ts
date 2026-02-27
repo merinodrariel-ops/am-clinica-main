@@ -194,14 +194,35 @@ async function matchEmployees(
     names: string[]
 ): Promise<Map<string, { id: string; nombre: string; apellido: string }>> {
     const admin = getAdminClient();
+
+    // 1. Check saved DB mappings first (exact raw_name match)
+    const { data: savedMaps } = await admin
+        .from('prosoft_name_map')
+        .select('raw_name, personal_id, personal!inner(id, nombre, apellido)')
+        .in('raw_name', names);
+
+    const result = new Map<string, { id: string; nombre: string; apellido: string }>();
+    const unmapped: string[] = [];
+
+    for (const name of names) {
+        const saved = savedMaps?.find((m: Record<string, unknown>) => m.raw_name === name);
+        if (saved?.personal) {
+            const p = saved.personal as { id: string; nombre: string; apellido: string };
+            result.set(name, p);
+        } else {
+            unmapped.push(name);
+        }
+    }
+
+    if (unmapped.length === 0) return result;
+
+    // 2. Fuzzy match for the rest
     const { data: workers } = await admin
         .from('personal')
         .select('id, nombre, apellido')
         .eq('activo', true);
 
-    const result = new Map<string, { id: string; nombre: string; apellido: string }>();
-
-    for (const rawName of names) {
+    for (const rawName of unmapped) {
         const normName = norm(rawName);
         let bestMatch: { id: string; nombre: string; apellido: string } | null = null;
         let bestScore = 0;
@@ -210,7 +231,6 @@ async function matchEmployees(
             const fullName = norm(`${w.nombre} ${w.apellido || ''}`);
             const reverseName = norm(`${w.apellido || ''} ${w.nombre}`);
 
-            // Check contains (both directions)
             const score =
                 fullName === normName ? 100 :
                 reverseName === normName ? 100 :
@@ -231,6 +251,63 @@ async function matchEmployees(
     }
 
     return result;
+}
+
+// ─── Name map management ──────────────────────────────────────────────────────
+
+export async function getAllPersonalBasic(): Promise<
+    { id: string; nombre: string; apellido: string | null }[]
+> {
+    const admin = getAdminClient();
+    const { data } = await admin
+        .from('personal')
+        .select('id, nombre, apellido')
+        .eq('activo', true)
+        .order('apellido')
+        .order('nombre');
+    return (data || []) as { id: string; nombre: string; apellido: string | null }[];
+}
+
+export async function saveProsoftMapping(
+    rawName: string,
+    personalId: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = getAdminClient();
+    const { error } = await admin
+        .from('prosoft_name_map')
+        .upsert({ raw_name: rawName, personal_id: personalId, updated_at: new Date().toISOString() }, {
+            onConflict: 'raw_name',
+        });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+export async function deleteProsoftMapping(
+    rawName: string
+): Promise<{ success: boolean }> {
+    const admin = getAdminClient();
+    await admin.from('prosoft_name_map').delete().eq('raw_name', rawName);
+    return { success: true };
+}
+
+export async function getProsoftMappings(): Promise<
+    { raw_name: string; personal_id: string; nombre: string; apellido: string | null }[]
+> {
+    const admin = getAdminClient();
+    const { data } = await admin
+        .from('prosoft_name_map')
+        .select('raw_name, personal_id, personal!inner(nombre, apellido)')
+        .order('raw_name');
+
+    return (data || []).map((m: Record<string, unknown>) => {
+        const p = m.personal as { nombre: string; apellido: string | null };
+        return {
+            raw_name: m.raw_name as string,
+            personal_id: m.personal_id as string,
+            nombre: p.nombre,
+            apellido: p.apellido,
+        };
+    });
 }
 
 // ─── Preview ──────────────────────────────────────────────────────────────────
