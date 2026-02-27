@@ -76,7 +76,7 @@ export async function getRegistrosHorasMes(
     return (data || []) as RegistroHoras[];
 }
 
-export interface ResumenEmpleado {
+export interface ResumenPrestador {
     personal_id: string;
     nombre: string;
     apellido: string | null;
@@ -89,7 +89,7 @@ export interface ResumenEmpleado {
 
 export interface ResumenMes {
     mes: string;
-    empleados: ResumenEmpleado[];
+    prestadores: ResumenPrestador[];
     total_horas: number;
     total_dias_persona: number;
 }
@@ -108,7 +108,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         .lte('fecha', end);
 
     if (!data || data.length === 0) {
-        return { mes, empleados: [], total_horas: 0, total_dias_persona: 0 };
+        return { mes, prestadores: [], total_horas: 0, total_dias_persona: 0 };
     }
 
     // Group by personal_id
@@ -129,7 +129,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         if (row.hora_egreso && row.hora_egreso !== '00:00') entry.egresos.push(row.hora_egreso as string);
     }
 
-    const empleados: ResumenEmpleado[] = [];
+    const prestadores: ResumenPrestador[] = [];
     let total_horas = 0;
     let total_dias = 0;
 
@@ -138,7 +138,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         const dias = e.horas.length;
         total_horas += th;
         total_dias += dias;
-        empleados.push({
+        prestadores.push({
             personal_id: pid,
             nombre: e.nombre,
             apellido: e.apellido,
@@ -150,11 +150,11 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         });
     }
 
-    empleados.sort((a, b) => b.total_horas - a.total_horas);
+    prestadores.sort((a, b) => b.total_horas - a.total_horas);
 
     return {
         mes,
-        empleados,
+        prestadores,
         total_horas: Math.round(total_horas * 100) / 100,
         total_dias_persona: total_dias,
     };

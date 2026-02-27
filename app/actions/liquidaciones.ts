@@ -368,7 +368,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             apellido: w.apellido,
             foto_url: w.foto_url,
             area: w.area,
-            tipo: w.tipo || 'empleado',
+            tipo: w.tipo || 'prestador',
             modelo_pago: isDoctor ? 'prestacion_usd' : 'hora_ars',
             liquidacion: liquidacionNormalizada,
             tiene_pendientes: Boolean(

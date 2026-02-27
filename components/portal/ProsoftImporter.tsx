@@ -94,7 +94,7 @@ export default function ProsoftImporter() {
 
     async function handleSaveMapping(rawName: string) {
         const personalId = pendingMaps[rawName];
-        if (!personalId) { toast.error('Seleccioná un empleado'); return; }
+        if (!personalId) { toast.error('Seleccioná un prestador'); return; }
         setSavingMap(rawName);
         try {
             const res = await saveProsoftMapping(rawName, personalId);
@@ -130,7 +130,7 @@ export default function ProsoftImporter() {
     }
 
     async function handleEditMapping(rawName: string) {
-        if (!editValue) { toast.error('Seleccioná un empleado'); return; }
+        if (!editValue) { toast.error('Seleccioná un prestador'); return; }
         setSavingMap(rawName);
         try {
             const res = await saveProsoftMapping(rawName, editValue);
@@ -149,7 +149,7 @@ export default function ProsoftImporter() {
     function exportToCsv() {
         if (!preview) return;
 
-        const headers = ["Empleado", "Días", "Total Horas", "Prom/Día", "Horario Típico"];
+        const headers = ["Prestador", "Días", "Total Horas", "Prom/Día", "Horario Típico"];
         const rows = matchedRows.map(f => {
             const complete = f.registros.filter(r => !r.incompleto);
             const totalH = complete.reduce((s, r) => s + r.horas, 0);
@@ -178,7 +178,7 @@ export default function ProsoftImporter() {
     function exportDetailedCsv() {
         if (!preview) return;
 
-        const headers = ["Empleado", "Fecha", "Día", "Entrada", "Salida", "Horas", "Estado", "Notas"];
+        const headers = ["Prestador", "Fecha", "Día", "Entrada", "Salida", "Horas", "Estado", "Notas"];
         const rows: any[] = [];
 
         matchedRows.forEach(f => {
@@ -377,7 +377,7 @@ export default function ProsoftImporter() {
                     <div className="grid grid-cols-3 gap-3">
                         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
                             <p className="text-lg font-bold text-emerald-400">{matchedRows.length}</p>
-                            <p className="text-xs text-slate-400">Empleados encontrados</p>
+                            <p className="text-xs text-slate-400">Prestadores encontrados</p>
                         </div>
                         <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
                             <p className="text-lg font-bold text-white">{preview.totalRegistros}</p>
@@ -397,7 +397,7 @@ export default function ProsoftImporter() {
                             <div className="px-4 py-3 border-b border-amber-500/20">
                                 <p className="text-xs font-medium text-amber-300 flex items-center gap-2">
                                     <AlertTriangle size={13} />
-                                    {unmatchedRows.length} nombre{unmatchedRows.length > 1 ? 's' : ''} sin coincidencia — asignales un empleado y guardá
+                                    {unmatchedRows.length} nombre{unmatchedRows.length > 1 ? 's' : ''} sin coincidencia — asignales un prestador y guardá
                                 </p>
                             </div>
                             <div className="divide-y divide-amber-500/10">
@@ -413,7 +413,7 @@ export default function ProsoftImporter() {
                                                 onChange={e => setPendingMaps(prev => ({ ...prev, [fila.rawName]: e.target.value }))}
                                                 className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500 min-w-[200px]"
                                             >
-                                                <option value="">— Seleccionar empleado —</option>
+                                                <option value="">— Seleccionar prestador —</option>
                                                 {allPersonal.map(p => (
                                                     <option key={p.id} value={p.id}>
                                                         {p.apellido ? `${p.apellido}, ${p.nombre}` : p.nombre}
@@ -539,7 +539,7 @@ export default function ProsoftImporter() {
                     {/* Import button */}
                     <div className="flex items-center justify-between">
                         <p className="text-xs text-slate-400">
-                            Se importarán los registros de <strong className="text-white">{matchedRows.length}</strong> empleados para <strong className="text-white">{mesLabel(mes)}</strong>
+                            Se importarán los registros de <strong className="text-white">{matchedRows.length}</strong> prestadores para <strong className="text-white">{mesLabel(mes)}</strong>
                         </p>
                         <button
                             onClick={handleImport}
@@ -592,10 +592,10 @@ export default function ProsoftImporter() {
                             return (
                                 <div className="grid grid-cols-4 gap-3">
                                     {[
-                                        { label: 'Empleados', value: filas.length, color: 'text-teal-400' },
+                                        { label: 'Prestadores', value: filas.length, color: 'text-teal-400' },
                                         { label: 'Horas totales', value: `${Math.round(totalHoras * 10) / 10}h`, color: 'text-violet-400' },
                                         { label: 'Días-persona', value: totalDias, color: 'text-blue-400' },
-                                        { label: 'Prom. por empleado', value: `${Math.round(promPorPersona * 10) / 10}h`, color: 'text-amber-400' },
+                                        { label: 'Prom. por prestador', value: `${Math.round(promPorPersona * 10) / 10}h`, color: 'text-amber-400' },
                                     ].map(k => (
                                         <div key={k.label} className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
                                             <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
@@ -609,7 +609,7 @@ export default function ProsoftImporter() {
                         {/* Detail table */}
                         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden print:border-slate-300 print:text-black">
                             <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between print:border-slate-300">
-                                <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide print:text-black">Detalle por empleado</p>
+                                <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide print:text-black">Detalle por prestador</p>
                                 <div className="flex items-center gap-3 print:hidden">
                                     <button
                                         onClick={exportToCsv}
@@ -639,7 +639,7 @@ export default function ProsoftImporter() {
                                 <table className="w-full text-xs">
                                     <thead>
                                         <tr className="border-b border-slate-800 text-slate-400">
-                                            <th className="px-4 py-2 text-left font-medium">Empleado</th>
+                                            <th className="px-4 py-2 text-left font-medium">Prestador</th>
                                             <th className="px-3 py-2 text-center font-medium">Días</th>
                                             <th className="px-3 py-2 text-right font-medium">Total horas</th>
                                             <th className="px-3 py-2 text-right font-medium">Prom/día</th>

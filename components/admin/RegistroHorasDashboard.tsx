@@ -52,11 +52,11 @@ export default function RegistroHorasDashboard() {
             .finally(() => setLoading(false));
     }, [mes]);
 
-    // Build chart data: merge current and previous by employee name
+    // Build chart data: merge current and previous by provider name
     const chartData = (() => {
         if (!resumen) return [];
-        return resumen.empleados.map(e => {
-            const prevEmp = resumenPrev?.empleados.find(
+        return resumen.prestadores.map(e => {
+            const prevEmp = resumenPrev?.prestadores.find(
                 p => p.personal_id === e.personal_id
             );
             return {
@@ -99,7 +99,7 @@ export default function RegistroHorasDashboard() {
                 <div className="flex items-center justify-center py-20 text-slate-500">
                     <RefreshCw size={20} className="animate-spin mr-2" /> Cargando...
                 </div>
-            ) : !resumen || resumen.empleados.length === 0 ? (
+            ) : !resumen || resumen.prestadores.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-500">
                     <Clock size={36} className="text-slate-700 mb-3" />
                     <p>No hay registros de horas para {mesLabel(mes)}</p>
@@ -124,21 +124,21 @@ export default function RegistroHorasDashboard() {
                         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-1">
                                 <Users size={13} className="text-violet-400" />
-                                <span className="text-xs text-slate-400">Empleados activos</span>
+                                <span className="text-xs text-slate-400">Prestadores activos</span>
                             </div>
-                            <p className="text-xl font-bold text-white">{resumen.empleados.length}</p>
+                            <p className="text-xl font-bold text-white">{resumen.prestadores.length}</p>
                             {resumenPrev && (
-                                <p className="text-xs text-slate-500 mt-1">vs {resumenPrev.empleados.length} en {mesLabel(prevMes(mes))}</p>
+                                <p className="text-xs text-slate-500 mt-1">vs {resumenPrev.prestadores.length} en {mesLabel(prevMes(mes))}</p>
                             )}
                         </div>
                         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-1">
                                 <TrendingUp size={13} className="text-teal-400" />
-                                <span className="text-xs text-slate-400">Prom. por empleado</span>
+                                <span className="text-xs text-slate-400">Prom. por prestador</span>
                             </div>
                             <p className="text-xl font-bold text-white">
-                                {resumen.empleados.length > 0
-                                    ? `${Math.round(resumen.total_horas / resumen.empleados.length * 10) / 10}h`
+                                {resumen.prestadores.length > 0
+                                    ? `${Math.round(resumen.total_horas / resumen.prestadores.length * 10) / 10}h`
                                     : '—'
                                 }
                             </p>
@@ -156,7 +156,7 @@ export default function RegistroHorasDashboard() {
                     {chartData.length > 0 && (
                         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
                             <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-4">
-                                Horas por empleado — {mesLabel(prevMes(mes))} vs {mesLabel(mes)}
+                                Horas por prestador — {mesLabel(prevMes(mes))} vs {mesLabel(mes)}
                             </p>
                             <ResponsiveContainer width="100%" height={220}>
                                 <BarChart data={chartData} barGap={4} margin={{ left: -10, right: 10 }}>
@@ -188,7 +188,7 @@ export default function RegistroHorasDashboard() {
                             <table className="w-full text-xs">
                                 <thead>
                                     <tr className="border-b border-slate-800 text-slate-400">
-                                        <th className="px-4 py-2.5 text-left font-medium">Empleado</th>
+                                        <th className="px-4 py-2.5 text-left font-medium">Prestador</th>
                                         <th className="px-3 py-2.5 text-center font-medium">Días</th>
                                         <th className="px-3 py-2.5 text-right font-medium">{mesLabel(prevMes(mes))}</th>
                                         <th className="px-3 py-2.5 text-right font-medium">{mesLabel(mes)}</th>
@@ -198,8 +198,8 @@ export default function RegistroHorasDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
-                                    {resumen.empleados.map(e => {
-                                        const prev = resumenPrev?.empleados.find(p => p.personal_id === e.personal_id);
+                                    {resumen.prestadores.map(e => {
+                                        const prev = resumenPrev?.prestadores.find(p => p.personal_id === e.personal_id);
                                         const dif = prev ? e.total_horas - prev.total_horas : null;
                                         const horario = e.hora_ingreso_min && e.hora_egreso_max
                                             ? `${e.hora_ingreso_min} – ${e.hora_egreso_max}`

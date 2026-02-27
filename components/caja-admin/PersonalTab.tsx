@@ -323,10 +323,10 @@ export default function PersonalTab({ tcBna }: Props) {
     }
 
     // Filter personal by type and search
-    const empleados = personal.filter(p => p.tipo === 'prestador' || !p.tipo);
+    const prestadores = personal.filter(p => p.tipo === 'prestador' || !p.tipo);
     const profesionales = personal.filter(p => p.tipo === 'profesional');
 
-    const filteredEmpleados = empleados.filter(p =>
+    const filteredPrestadores = prestadores.filter(p =>
         searchTerm === '' ||
         p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.apellido?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -384,7 +384,7 @@ export default function PersonalTab({ tcBna }: Props) {
                         <Users className="w-4 h-4" />
                         Staff General
                         <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full ml-2">
-                            {empleados.length}
+                            {prestadores.length}
                         </span>
                     </Button>
                     <Button
@@ -895,7 +895,7 @@ export default function PersonalTab({ tcBna }: Props) {
             {/* Equipo (Prestadores de Servicio) Tab Content */}
             {activeTab === 'equipo' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredEmpleados.length === 0 ? (
+                    {filteredPrestadores.length === 0 ? (
                         <div className="col-span-full p-12 text-center text-slate-400">
                             <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                             <p>No hay miembros del staff registrados</p>
@@ -908,7 +908,7 @@ export default function PersonalTab({ tcBna }: Props) {
                             </Button>
                         </div>
                     ) : (
-                        filteredEmpleados.map((p) => (
+                        filteredPrestadores.map((p) => (
                             <motion.div
                                 key={p.id}
                                 initial={{ opacity: 0, y: 10 }}

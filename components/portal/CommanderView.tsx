@@ -30,7 +30,7 @@ export default async function CommanderView() {
     const sinGenerar = rows.filter(r => !r.liquidacion).length;
     const conSlidesPendientes = rows.filter(r => r.tiene_pendientes);
     const sinHorasAprobadas = rows.filter(r =>
-        r.tipo === 'empleado' && !r.liquidacion
+        r.tipo !== 'profesional' && !r.liquidacion
     );
 
     const tcBna = rows.find(r => r.liquidacion?.tc_bna_venta)?.liquidacion?.tc_bna_venta;
@@ -148,7 +148,7 @@ export default async function CommanderView() {
                             <div className="flex items-center gap-2 mb-3">
                                 <Clock size={16} className="text-slate-400" />
                                 <h3 className="text-sm font-bold text-slate-300">
-                                    {sinHorasAprobadas.length} empleado{sinHorasAprobadas.length > 1 ? 's' : ''} sin liquidar
+                                    {sinHorasAprobadas.length} prestador{sinHorasAprobadas.length > 1 ? 'es' : ''} sin liquidar
                                 </h3>
                             </div>
                             <div className="space-y-2">
