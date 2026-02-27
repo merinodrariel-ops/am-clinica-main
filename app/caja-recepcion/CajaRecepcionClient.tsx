@@ -195,6 +195,8 @@ const PAYMENT_DATA: Record<string, PaymentMethod> = {
     },
 };
 
+const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
+
 import { Suspense } from 'react';
 
 function CajaRecepcionContent() {
@@ -1635,6 +1637,30 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                             >
                                                 &quot;Te paso los datos para realizar la transferencia. Por favor enviá el comprobante luego del pago.&quot;
                                                 {copiedKey === 'msg' && <CheckCircle size={14} className="inline ml-2 text-green-500" />}
+                                            </div>
+
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4 mb-2">Links útiles (copiar y pegar):</p>
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
+                                                <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Referencia Google</p>
+                                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 break-all">{GOOGLE_REVIEW_LINK}</p>
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => copyToClipboard('google_review_link', GOOGLE_REVIEW_LINK)}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                    >
+                                                        {copiedKey === 'google_review_link' ? <CheckCircle size={13} className="text-green-500" /> : <Copy size={13} />}
+                                                        {copiedKey === 'google_review_link' ? 'Copiado' : 'Copiar link'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => window.open(getWhatsappLink(`Gracias por confiar en AM Clinica Dental. Tu experiencia es muy importante para nosotros. Si querés, podés dejarnos tu referencia acá: ${GOOGLE_REVIEW_LINK}`), '_blank')}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                                                    >
+                                                        <MessageCircle size={13} />
+                                                        Compartir por WhatsApp
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </motion.div>
