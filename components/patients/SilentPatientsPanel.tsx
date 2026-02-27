@@ -2,13 +2,15 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { getSilentPatients, type SilentPatient } from '@/app/actions/silent-patients';
+import Link from 'next/link'; // Added Link import
 import { AlertTriangle, MessageCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 function normalizePhone(tel: string): string {
     const d = tel.replace(/\D/g, '');
     if (d.startsWith('549')) return d;
-    if (d.startsWith('54'))  return '549' + d.slice(2);
-    if (d.startsWith('0'))   return '549' + d.slice(1);
+    if (d.startsWith('54')) return '549' + d.slice(2);
+    if (d.startsWith('0')) return '549' + d.slice(1);
     return '549' + d;
 }
 
@@ -21,8 +23,8 @@ function waLink(telefono: string, nombre: string, workflow: string): string {
 function DaysBadge({ days }: { days: number }) {
     const color =
         days >= 120 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-        days >= 90  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+            days >= 90 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
     return (
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${color}`}>
             {days}d sin turno
@@ -31,6 +33,7 @@ function DaysBadge({ days }: { days: number }) {
 }
 
 export default function SilentPatientsPanel() {
+    const router = useRouter();
     const [patients, setPatients] = useState<SilentPatient[]>([]);
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(true);
@@ -96,12 +99,13 @@ export default function SilentPatientsPanel() {
             {open && (
                 <div className="px-4 pb-4 space-y-2">
                     {patients.map(p => (
-                        <div
+                        <Link
                             key={p.patientId}
-                            className="flex items-center gap-3 bg-white dark:bg-gray-900 rounded-xl px-3 py-2.5 border border-amber-100 dark:border-amber-800/30"
+                            href={`/patients/${p.patientId}`}
+                            className="flex items-center gap-3 bg-white dark:bg-gray-900 rounded-xl px-3 py-2.5 border border-amber-100 dark:border-amber-800/30 hover:border-amber-400/50 transition-all group cursor-pointer no-underline block"
                         >
                             {/* Iniciales */}
-                            <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-800/30 flex items-center justify-center flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-800/30 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors">
                                 <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
                                     {(p.nombre.charAt(0) + p.apellido.charAt(0)).toUpperCase()}
                                 </span>
@@ -109,7 +113,7 @@ export default function SilentPatientsPanel() {
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight truncate">
+                                <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
                                     {p.fullName}
                                 </p>
                                 <p className="text-xs text-gray-400 truncate leading-tight">
@@ -122,17 +126,20 @@ export default function SilentPatientsPanel() {
 
                             {/* WhatsApp */}
                             {p.telefono && (
-                                <a
-                                    href={waLink(p.telefono, p.nombre, p.workflowName)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                <div
+                                    role="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        window.open(waLink(p.telefono!, p.nombre, p.workflowName), '_blank');
+                                    }}
                                     className="flex-shrink-0 p-1.5 rounded-lg bg-green-100 hover:bg-green-200 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 transition-colors"
                                     title="Enviar WhatsApp de re-enganche"
                                 >
                                     <MessageCircle size={14} />
-                                </a>
+                                </div>
                             )}
-                        </div>
+                        </Link>
                     ))}
                 </div>
             )}

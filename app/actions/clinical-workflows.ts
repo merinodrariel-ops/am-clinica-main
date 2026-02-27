@@ -756,7 +756,7 @@ async function ensurePatientDriveFolder(treatmentId: string) {
             id,
             metadata,
             patient:pacientes(id_paciente, nombre, apellido, link_historia_clinica),
-            workflow:clinical_workflows(name)
+            workflow:clinical_workflows(name, type)
         `)
         .eq('id', treatmentId)
         .single();
@@ -770,6 +770,11 @@ async function ensurePatientDriveFolder(treatmentId: string) {
     // 3. Determine workflow type and folder suffix
     const workflowData = treatment.workflow as any;
     const workflowName = Array.isArray(workflowData) ? workflowData[0]?.name : workflowData?.name;
+    const workflowType = Array.isArray(workflowData) ? workflowData[0]?.type : workflowData?.type;
+
+    // Skip folder creation for recurrent/maintenance workflows (Control Carillas, Limpieza, etc.)
+    if (workflowType === 'recurrent') return;
+
     const lowerName = (workflowName || '').toLowerCase();
 
     let suffix = (workflowName || 'TRATAMIENTO').toUpperCase();

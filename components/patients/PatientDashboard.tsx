@@ -25,11 +25,13 @@ import {
     Sparkles,
     Send,
     Loader2,
+    FolderOpen,
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
 import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
+const PatientDriveTab = dynamic(() => import('@/components/patients/drive/PatientDriveTab'), { ssr: false });
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -76,6 +78,7 @@ const TABS = [
     { id: 'historia', label: 'Historia Clínica', icon: FileText },
     { id: 'finanzas', label: 'Finanzas', icon: TrendingUp },
     { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
+    { id: 'archivos', label: 'Archivos', icon: FolderOpen },
     { id: 'smile_design', label: 'Smile Design ✨', icon: Sparkles },
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
 ];
@@ -910,6 +913,17 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     patientId={patient.id_paciente}
                                     patientName={`${patient.nombre} ${patient.apellido}`}
                                     onSaved={() => setActiveTab('portal')}
+                                />
+                            </div>
+                        )}
+
+                        {/* Tab: Archivos (Google Drive) */}
+                        {activeTab === 'archivos' && (
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
+                                <PatientDriveTab
+                                    patientId={patient.id_paciente}
+                                    patientName={`${patient.apellido}, ${patient.nombre}`}
+                                    motherFolderUrl={patient.link_historia_clinica}
                                 />
                             </div>
                         )}

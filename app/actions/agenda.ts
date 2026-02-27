@@ -25,7 +25,7 @@ export async function getAppointments(start: string, end: string) {
         .from('agenda_appointments')
         .select(`
             *,
-            patient:patient_id (full_name, phone),
+            patient:patient_id (nombre, apellido, telefono),
             doctor:doctor_id (full_name)
         `)
         .gte('start_time', start)

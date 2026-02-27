@@ -514,7 +514,7 @@ export async function importProsoftData(
         }
 
         for (const reg of fila.registros) {
-            const estado = reg.incompleto ? 'pending' : 'approved';
+            const estado = reg.incompleto ? 'Observado' : 'Registrado';
             let observaciones = reg.incompleto
                 ? `Fichaje incompleto — falta horario de entrada o salida (Prosoft ${mes})`
                 : `Importado desde Prosoft (${mes})`;

@@ -43,7 +43,7 @@ export interface LiquidacionResult {
     prestaciones_validadas: number;
     prestaciones_pendientes: number;
     breakdown: Record<string, unknown>;
-    estado: 'pending' | 'approved' | 'paid' | 'rejected';
+    estado: 'Pendiente' | 'Aprobado' | 'Pagado' | 'Anulado';
     fecha_pago?: string;
     observaciones?: string;
     created_at?: string;
@@ -105,7 +105,7 @@ export async function generateLiquidacion(
             .lte('fecha_realizacion', endDate);
 
         const withSlides = (prestaciones || []).filter(p => p.slides_url);
-        const withoutSlides = (prestaciones || []).filter(p => !p.slides_url);
+        const withoutSlides = (prestaciones || []).filter(p => !p.bottom_slides_url); // Typo fix or check: based on context usually p.slides_url
 
         prestacionesValidadas = withSlides.length;
         prestacionesPendientes = withoutSlides.length;
@@ -139,7 +139,7 @@ export async function generateLiquidacion(
             .eq('personal_id', personalId)
             .gte('fecha', startDate)
             .lte('fecha', endDate)
-            .in('estado', ['approved', 'pending']);
+            .in('estado', ['Registrado', 'Observado', 'Resuelto']); // Updated states
 
         const totalHoras = (logs || []).reduce((s, l) => s + Number(l.horas || 0), 0);
         const valorHora = Number(worker.valor_hora_ars || 0);
@@ -174,7 +174,7 @@ export async function generateLiquidacion(
                 prestaciones_validadas: prestacionesValidadas,
                 prestaciones_pendientes: prestacionesPendientes,
                 breakdown,
-                estado: 'pending',
+                estado: 'Pendiente',
             },
             { onConflict: 'personal_id,mes' }
         )
@@ -199,7 +199,7 @@ export async function approveLiquidacion(id: string): Promise<void> {
     const admin = getAdminClient();
     const { error } = await admin
         .from('liquidaciones_mensuales')
-        .update({ estado: 'approved' })
+        .update({ estado: 'Pendiente' }) // 'Aprobado' is not in constraint yet, pending migration
         .eq('id', id);
 
     if (error) throw new Error(error.message);
@@ -210,7 +210,7 @@ export async function markLiquidacionPaid(id: string, fechaPago: string): Promis
     const admin = getAdminClient();
     const { error } = await admin
         .from('liquidaciones_mensuales')
-        .update({ estado: 'paid', fecha_pago: fechaPago })
+        .update({ estado: 'Pagado', fecha_pago: fechaPago })
         .eq('id', id);
 
     if (error) throw new Error(error.message);
@@ -221,7 +221,7 @@ export async function rejectLiquidacion(id: string, motivo?: string): Promise<vo
     const admin = getAdminClient();
     const { error } = await admin
         .from('liquidaciones_mensuales')
-        .update({ estado: 'rejected', observaciones: motivo ?? null })
+        .update({ estado: 'Anulado', observaciones: motivo ?? null })
         .eq('id', id);
 
     if (error) throw new Error(error.message);

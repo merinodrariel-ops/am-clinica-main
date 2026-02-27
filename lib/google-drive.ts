@@ -87,6 +87,10 @@ function getDrive() {
     return google.drive({ version: 'v3', auth });
 }
 
+export function getDriveClient() {
+    return getDrive();
+}
+
 export interface UploadResult {
     success: boolean;
     fileId?: string;
@@ -446,14 +450,14 @@ export async function ensurePatientPresentationFolder(
 /**
  * List files in any folder by its ID
  */
-export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string }[]; error?: string }> {
+export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string; thumbnailLink?: string; size?: string }[]; error?: string }> {
     try {
         const drive = getDrive();
         const response = await drive.files.list({
             q: `'${folderId}' in parents and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
-            fields: 'files(id, name, webViewLink, mimeType, createdTime)',
+            fields: 'files(id, name, webViewLink, mimeType, createdTime, thumbnailLink, size)',
             orderBy: 'createdTime desc',
         });
 
@@ -464,6 +468,8 @@ export async function listFolderFiles(folderId: string): Promise<{ files?: { id:
                 webViewLink: f.webViewLink!,
                 mimeType: f.mimeType!,
                 createdTime: f.createdTime!,
+                thumbnailLink: f.thumbnailLink || undefined,
+                size: f.size || undefined,
             })) || [],
         };
     } catch (error) {

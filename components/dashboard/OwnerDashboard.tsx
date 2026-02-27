@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { getOwnerDashboardStats, type OwnerDashboardStats } from '@/lib/dashboard';
 import PredictiveInsights from './PredictiveInsights';
+import Link from 'next/link';
 
 const STORAGE_KEY = 'owner-dashboard-layout';
 
@@ -394,12 +395,17 @@ function NewPatientsTrendDetail({
                             </p>
                         ) : (
                             selectedPatients.slice(0, 8).map((p, i) => (
-                                <div key={`${p.monthKey}-${p.nombre}-${p.apellido}-${i}`} className="flex items-center gap-2 text-xs" style={{ color: 'hsl(210 20% 80%)' }}>
-                                    <span className="font-medium">{p.nombre} {p.apellido}</span>
+                                <Link
+                                    key={`${p.monthKey}-${p.nombre}-${p.apellido}-${i}`}
+                                    href={`/patients/${p.id_paciente}`}
+                                    className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group"
+                                    style={{ color: 'hsl(210 20% 80%)' }}
+                                >
+                                    <span className="font-medium group-hover:underline">{p.nombre} {p.apellido}</span>
                                     <span style={{ color: 'hsl(230 10% 40%)' }}>
                                         {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                                     </span>
-                                </div>
+                                </Link>
                             ))
                         )}
                     </div>
@@ -426,12 +432,17 @@ function NewPatientsTrendDetail({
                                 </p>
                             ) : (
                                 januaryPatients.slice(0, 8).map((p, i) => (
-                                    <div key={`enero-${p.monthKey}-${p.nombre}-${p.apellido}-${i}`} className="flex items-center gap-2 text-xs" style={{ color: 'hsl(210 20% 80%)' }}>
-                                        <span className="font-medium">{p.nombre} {p.apellido}</span>
+                                    <Link
+                                        key={`enero-${p.monthKey}-${p.nombre}-${p.apellido}-${i}`}
+                                        href={`/patients/${p.id_paciente}`}
+                                        className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group"
+                                        style={{ color: 'hsl(210 20% 80%)' }}
+                                    >
+                                        <span className="font-medium group-hover:underline">{p.nombre} {p.apellido}</span>
                                         <span style={{ color: 'hsl(230 10% 40%)' }}>
                                             {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                                         </span>
-                                    </div>
+                                    </Link>
                                 ))
                             )}
                         </div>

@@ -1,5 +1,7 @@
-import { getCurrentWorkerProfile, getWorkerLiquidations } from '@/app/actions/worker-portal';
-import { DollarSign, TrendingUp, Calendar, CheckCircle2, Clock, ArrowDown } from 'lucide-react';
+import { getCurrentWorkerProfile, getWorkerLiquidations, getWorkerLogs } from '@/app/actions/worker-portal';
+import { DollarSign, TrendingUp, Calendar, CheckCircle2, Clock, ArrowDown, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const STATUS_CONFIG = {
     paid: { label: 'Pagado', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
@@ -13,6 +15,7 @@ export default async function LiquidationPage() {
     if (!worker) return <div className="p-12 text-center text-slate-500">Perfil no encontrado.</div>;
 
     const liquidations = await getWorkerLiquidations(worker.id);
+    const workerLogs = await getWorkerLogs(worker.id);
 
     const totalEarned = liquidations.filter(l => l.estado === 'paid').reduce((s, l) => s + (l.total_ars || 0), 0);
     const totalHours = liquidations.reduce((s, l) => s + (l.total_horas || 0), 0);
@@ -42,6 +45,84 @@ export default async function LiquidationPage() {
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Valor/Hora</p>
                     <p className="text-2xl font-black text-white">${(worker.valor_hora_ars || 0).toLocaleString()}</p>
                     <p className="text-slate-600 text-[11px] mt-1">Tarifa actual</p>
+                </div>
+            </div>
+
+            {/* Daily Breakdown */}
+            <div className="mt-8">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Clock className="text-teal-400" size={20} />
+                        Detalle Diario
+                    </h2>
+                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Últimos Registros</span>
+                </div>
+
+                <div className="grid gap-3">
+                    {workerLogs.length === 0 ? (
+                        <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-8 text-center">
+                            <Clock size={32} className="mx-auto text-slate-700 mb-3 opacity-20" />
+                            <p className="text-slate-500 text-sm">No se encontraron registros diarios para este período.</p>
+                        </div>
+                    ) : (
+                        workerLogs.map((log: any, idx: number) => {
+                            const dailyEarning = worker?.valor_hora_ars ? log.horas * worker.valor_hora_ars : 0;
+                            return (
+                                <div key={idx} className="group relative overflow-hidden bg-slate-900/40 hover:bg-slate-800/40 border border-slate-800/60 rounded-xl p-4 transition-all duration-300">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex flex-col items-center justify-center text-white">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">{format(new Date(log.fecha), 'EEE', { locale: es })}</span>
+                                                <span className="text-lg font-bold leading-none">{format(new Date(log.fecha), 'dd')}</span>
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-white font-bold">{format(new Date(log.fecha), 'MMMM yyyy', { locale: es })}</span>
+                                                    {log.estado === 'Registrado' && (
+                                                        <span className="px-1.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[9px] font-bold uppercase">Validado</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-sm">
+                                                    <div className="flex items-center gap-1 text-slate-400">
+                                                        <ArrowRight size={12} className="text-teal-500" />
+                                                        <span>{log.entrada}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-slate-400">
+                                                        <ArrowLeft size={12} className="text-rose-500" />
+                                                        <span>{log.salida}</span>
+                                                    </div>
+                                                    <div className="w-px h-3 bg-slate-700 mx-1" />
+                                                    <span className="text-slate-300 font-medium">{log.horas} horas</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-6 text-right sm:pr-2">
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5 tracking-tighter">Ganancia Estimada</p>
+                                                <p className="text-lg font-black text-white">
+                                                    {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(dailyEarning)}
+                                                </p>
+                                            </div>
+                                            <div className="text-teal-400/20 group-hover:text-teal-400/40 transition-colors">
+                                                <Sparkles size={24} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Subtly highlight incomplete logs */}
+                                    {log.horas === 0 && (
+                                        <div className="absolute top-0 right-0 p-1">
+                                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
+
+                    <p className="text-center text-[10px] text-slate-600 mt-2 uppercase tracking-[0.2em]">
+                        * Las ganancias son estimadas en base al valor hora configurado.
+                    </p>
                 </div>
             </div>
 

@@ -125,9 +125,9 @@ export async function getReferralStats(): Promise<ReferralStat[]> {
 export interface OwnerDashboardStats {
     totalPacientes: number;
     primeraVezMes: number;
-    listaPrimeraVez: Array<{ nombre: string; apellido: string; primera_consulta_fecha: string }>;
+    listaPrimeraVez: Array<{ id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha: string }>;
     primeraVezMensual: Array<{ key: string; label: string; shortLabel: string; count: number }>;
-    primerasConsultasRecientes: Array<{ nombre: string; apellido: string; primera_consulta_fecha: string; monthKey: string }>;
+    primerasConsultasRecientes: Array<{ id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha: string; monthKey: string }>;
     ingresosMesUsd: number;
     egresosMesUsd: number;
     personasEnFinanciacion: number;
@@ -173,7 +173,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
         // 2. First-time patients (last months window, based on actual first consultation date)
         const { data: primeraVezData } = await supabase
             .from('pacientes')
-            .select('nombre, apellido, primera_consulta_fecha', { count: 'exact' })
+            .select('id_paciente, nombre, apellido, primera_consulta_fecha', { count: 'exact' })
             .eq('is_deleted', false)
             .gte('primera_consulta_fecha', comparisonMonthStart)
             .lt('primera_consulta_fecha', nextMonthStart)
@@ -191,6 +191,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
                 monthlyCounts[monthKey] += 1;
             }
             return {
+                id_paciente: p.id_paciente,
                 nombre: p.nombre,
                 apellido: p.apellido,
                 primera_consulta_fecha: p.primera_consulta_fecha,
@@ -206,6 +207,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
         const listaPrimeraVez = primerasConsultasRecientes
             .filter((p) => p.monthKey === currentMonthKey)
             .map((p) => ({
+                id_paciente: p.id_paciente,
                 nombre: p.nombre,
                 apellido: p.apellido,
                 primera_consulta_fecha: p.primera_consulta_fecha,
