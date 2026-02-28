@@ -46,7 +46,7 @@ Respuesta JSON:`;
             model: "gemini-1.5-flash",
             contents: prompt
         });
-        const text = result.text;
+        const text = result.text || "";
 
         // Limpiar posibles bloques de código markdown
         const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();

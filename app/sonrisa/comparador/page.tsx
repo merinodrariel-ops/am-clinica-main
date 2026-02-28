@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MessageCircle, Sparkles, Star } from 'lucide-react';
 import { ImageComparator } from '@/components/patients/ImageComparator';
 
 const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
 
-export default function SmileComparisonPage() {
+function SmileComparisonContent() {
     const searchParams = useSearchParams();
     const before = searchParams.get('before') || '';
     const after = searchParams.get('after') || '';
@@ -73,5 +73,13 @@ export default function SmileComparisonPage() {
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function SmileComparisonPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">Cargando...</div>}>
+            <SmileComparisonContent />
+        </Suspense>
     );
 }

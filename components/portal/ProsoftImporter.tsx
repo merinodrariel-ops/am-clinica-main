@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Medal, Star, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -185,7 +185,7 @@ export default function ProsoftImporter() {
             f.registros.forEach(r => {
                 rows.push([
                     f.personalNombre,
-                    `${mes}-${r.dia.padStart(2, '0')}`,
+                    `${mes}-${String(r.dia).padStart(2, '0')}`,
                     r.dia,
                     r.entrada,
                     r.salida,
@@ -198,7 +198,7 @@ export default function ProsoftImporter() {
 
         const csvContent = [
             headers.join(','),
-            ...rows.map(r => r.map(c => `"${c}"`).join(','))
+            ...rows.map(r => r.map((c: any) => `"${c}"`).join(','))
         ].join('\n');
 
         downloadCsv(csvContent, `detalle_diario_horas_${mes}.csv`);
@@ -662,7 +662,7 @@ export default function ProsoftImporter() {
                                             })
                                             .sort((a, b) => b.totalH - a.totalH)
                                             .map(({ f, totalH, dias, horaRango, incompleteCount }) => (
-                                                <React.Fragment key={f.rawName}>
+                                                <Fragment key={f.rawName}>
                                                     <tr
                                                         onClick={() => setExpandedRow(expandedRow === f.rawName ? null : f.rawName)}
                                                         className="hover:bg-slate-800/30 transition-colors cursor-pointer"
@@ -720,7 +720,7 @@ export default function ProsoftImporter() {
                                                             </td>
                                                         </tr>
                                                     )}
-                                                </React.Fragment>
+                                                </Fragment>
                                             ))
                                         }
                                     </tbody>
