@@ -5,6 +5,7 @@ import {
     ensurePatientPresentationFolder,
     extractFolderIdFromUrl,
     listFolderFiles,
+    movePresentationFilesToFolder,
 } from '@/lib/google-drive';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -77,12 +78,47 @@ async function syncPatientPresentationsForPatient(patient: PatientBase): Promise
             .eq('id_paciente', patientId);
     }
 
+    const manualReview: Array<{ reason: string; fileName?: string; fileId?: string }> = [];
+
+    const sourceFolderIds = new Set<string>([folderSetup.motherFolderId]);
+    const motherContents = await listFolderFiles(folderSetup.motherFolderId);
+    if (motherContents.error) {
+        manualReview.push({
+            reason: `No se pudo inspeccionar carpeta madre para consolidar presentaciones: ${motherContents.error}`,
+        });
+    } else {
+        for (const item of motherContents.files || []) {
+            const isFolder = item.mimeType === 'application/vnd.google-apps.folder';
+            if (isFolder && item.id && item.id !== folderSetup.presentationFolderId) {
+                sourceFolderIds.add(item.id);
+            }
+        }
+    }
+
+    for (const sourceFolderId of sourceFolderIds) {
+        const moveResult = await movePresentationFilesToFolder(sourceFolderId, folderSetup.presentationFolderId);
+        if (moveResult.error) {
+            manualReview.push({
+                reason: `No se pudieron consolidar presentaciones desde carpeta ${sourceFolderId}: ${moveResult.error}`,
+            });
+            continue;
+        }
+
+        for (const skipped of moveResult.skipped) {
+            manualReview.push({
+                reason: `No se pudo mover presentación a carpeta PRESENTACION: ${skipped.reason}`,
+                fileName: skipped.name,
+                fileId: skipped.id,
+            });
+        }
+    }
+
     const filesResult = await listFolderFiles(folderSetup.presentationFolderId);
     if (filesResult.error) {
         return {
             success: false,
             syncedCount: 0,
-            manualReview: [{ reason: filesResult.error }],
+            manualReview: [...manualReview, { reason: filesResult.error }],
             folderUrl: folderSetup.presentationFolderUrl,
             error: filesResult.error,
         };
@@ -92,7 +128,6 @@ async function syncPatientPresentationsForPatient(patient: PatientBase): Promise
         (file) => file.mimeType !== 'application/vnd.google-apps.folder'
     );
 
-    const manualReview: Array<{ reason: string; fileName?: string; fileId?: string }> = [];
     let syncedCount = 0;
 
     const fileIdsInFolder = new Set<string>();

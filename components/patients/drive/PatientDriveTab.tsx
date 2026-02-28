@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, type DragEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FolderOpen,
@@ -52,6 +52,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
     const [creating, setCreating] = useState(false);
+    const [uploadTargetFolderId, setUploadTargetFolderId] = useState(() => extractFolderIdFromUrl(motherFolderUrl) || '');
+    const [isGlobalDragging, setIsGlobalDragging] = useState(false);
+    const [globalDropFolderId, setGlobalDropFolderId] = useState('');
+    const globalDragDepthRef = useRef(0);
 
     const fetchFolders = useCallback(async (url: string) => {
         const folderId = extractFolderIdFromUrl(url);
@@ -79,7 +83,9 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
     useEffect(() => {
         if (currentFolderUrl && status === 'idle') {
-            fetchFolders(currentFolderUrl);
+            queueMicrotask(() => {
+                void fetchFolders(currentFolderUrl);
+            });
         }
     }, [currentFolderUrl, status, fetchFolders]);
 
@@ -105,7 +111,9 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
 
         if (result.motherFolderUrl) {
+            const nextMotherFolderId = extractFolderIdFromUrl(result.motherFolderUrl);
             setCurrentFolderUrl(result.motherFolderUrl);
+            if (nextMotherFolderId) setUploadTargetFolderId(nextMotherFolderId);
             setStatus('idle');
             toast.success('Carpeta de Drive creada correctamente');
         }
@@ -119,6 +127,91 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             else next.add(folderId);
             return next;
         });
+    };
+
+    const motherFolderId = extractFolderIdFromUrl(currentFolderUrl);
+    const validUploadTargetIds = new Set([motherFolderId, ...folders.map((folder) => folder.id)].filter(Boolean) as string[]);
+    const effectiveUploadTargetFolderId =
+        uploadTargetFolderId && validUploadTargetIds.has(uploadTargetFolderId)
+            ? uploadTargetFolderId
+            : (motherFolderId || '');
+    const primaryOpenFolderId = folders.find((folder) => openFolders.has(folder.id))?.id || '';
+    const defaultGlobalDropTargetId = primaryOpenFolderId || effectiveUploadTargetFolderId;
+    const effectiveGlobalDropFolderId =
+        globalDropFolderId && validUploadTargetIds.has(globalDropFolderId)
+            ? globalDropFolderId
+            : defaultGlobalDropTargetId;
+    const isRootTargetHighlighted = isGlobalDragging && effectiveGlobalDropFolderId === motherFolderId;
+
+    const getFolderDestinationName = (folderId: string) => {
+        if (!folderId) return 'destino seleccionado';
+        if (folderId === motherFolderId) return 'carpeta raiz';
+        const folder = folders.find((item) => item.id === folderId);
+        return folder?.displayName || 'carpeta seleccionada';
+    };
+
+    const buildUploadSuccessMessage = (folderId: string, count: number) => {
+        const destinationName = getFolderDestinationName(folderId);
+        return `${count} archivo${count > 1 ? 's' : ''} subido${count > 1 ? 's' : ''} a ${destinationName}`;
+    };
+
+    const handleUploadedToFolder = (folderId: string) => {
+        if (!folderId) {
+            handleRefresh();
+            return;
+        }
+
+        setUploadTargetFolderId(folderId);
+        setGlobalDropFolderId(folderId);
+
+        if (motherFolderId && folderId !== motherFolderId) {
+            setOpenFolders((prev) => {
+                const next = new Set(prev);
+                next.add(folderId);
+                return next;
+            });
+        }
+
+        handleRefresh();
+    };
+
+    const isFileDrag = (event: DragEvent<HTMLElement>) =>
+        Array.isArray(event?.dataTransfer?.types)
+            ? event.dataTransfer.types.includes('Files')
+            : Array.from(event?.dataTransfer?.types || []).includes('Files');
+
+    const resetGlobalDrag = () => {
+        globalDragDepthRef.current = 0;
+        setIsGlobalDragging(false);
+    };
+
+    const handleGlobalDragEnter = (event: DragEvent<HTMLElement>) => {
+        if (!canUpload || !isFileDrag(event)) return;
+        event.preventDefault();
+        globalDragDepthRef.current += 1;
+        setIsGlobalDragging(true);
+        if (defaultGlobalDropTargetId) {
+            setGlobalDropFolderId(defaultGlobalDropTargetId);
+        }
+    };
+
+    const handleGlobalDragOver = (event: DragEvent<HTMLElement>) => {
+        if (!canUpload || !isFileDrag(event)) return;
+        event.preventDefault();
+    };
+
+    const handleGlobalDragLeave = (event: DragEvent<HTMLElement>) => {
+        if (!canUpload || !isFileDrag(event)) return;
+        event.preventDefault();
+        globalDragDepthRef.current = Math.max(0, globalDragDepthRef.current - 1);
+        if (globalDragDepthRef.current === 0) {
+            setIsGlobalDragging(false);
+        }
+    };
+
+    const handleGlobalDrop = (event: DragEvent<HTMLElement>) => {
+        if (!canUpload || !isFileDrag(event)) return;
+        resetGlobalDrag();
     };
 
     // Empty state: no Drive folder configured
@@ -180,10 +273,16 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     }
 
     const totalFiles = folders.reduce((acc, f) => acc + f.files.length, 0) + rootFiles.length;
-    const motherFolderId = extractFolderIdFromUrl(currentFolderUrl);
 
     return (
-        <div className="space-y-4">
+        <div
+            className="space-y-4 relative"
+            onDragEnterCapture={handleGlobalDragEnter}
+            onDragOverCapture={handleGlobalDragOver}
+            onDragLeaveCapture={handleGlobalDragLeave}
+            onDrop={handleGlobalDrop}
+            onDragEnd={resetGlobalDrag}
+        >
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -213,6 +312,51 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             </div>
 
             {/* Root files (directly in mother folder) */}
+            {canUpload && motherFolderId && (
+                <motion.div
+                    animate={{
+                        scale: isRootTargetHighlighted ? 1.01 : 1,
+                        y: isRootTargetHighlighted ? -2 : 0,
+                    }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                    className={`rounded-xl border bg-white/50 dark:bg-white/[0.02] p-4 space-y-3 transition-all ${
+                    isRootTargetHighlighted
+                        ? 'border-blue-500 ring-2 ring-blue-500/40'
+                        : 'border-gray-200 dark:border-white/10'
+                }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-white/60 uppercase tracking-wider">
+                            Carga rápida
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 dark:text-white/40">Destino</span>
+                            <select
+                                value={effectiveUploadTargetFolderId}
+                                onChange={(event) => setUploadTargetFolderId(event.target.value)}
+                                className="text-xs rounded-md px-2 py-1 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/15 text-gray-700 dark:text-white"
+                            >
+                                <option value={motherFolderId}>Carpeta raíz del paciente</option>
+                                {folders.map((folder) => (
+                                    <option key={folder.id} value={folder.id}>
+                                        {folder.displayName}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <DriveUploadButton
+                        variant="dropzone"
+                        folderId={effectiveUploadTargetFolderId}
+                        patientId={patientId}
+                        onUploaded={() => handleUploadedToFolder(effectiveUploadTargetFolderId)}
+                        successMessage={(count) => buildUploadSuccessMessage(effectiveUploadTargetFolderId, count)}
+                        dropzoneTitle="Arrastrá archivos o hacé clic para subir"
+                        dropzoneHint="Podés subir varios archivos a la vez"
+                    />
+                </motion.div>
+            )}
+
             {rootFiles.length > 0 && (
                 <div className="space-y-2">
                     <p className="text-xs font-medium text-gray-500 dark:text-white/30 uppercase tracking-wider">
@@ -230,11 +374,21 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             <div className="space-y-2">
                 {folders.map(folder => {
                     const isOpen = openFolders.has(folder.id);
+                    const isDropTarget = isGlobalDragging && effectiveGlobalDropFolderId === folder.id;
 
                     return (
-                        <div
+                        <motion.div
                             key={folder.id}
-                            className="rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden"
+                            animate={{
+                                scale: isDropTarget ? 1.01 : 1,
+                                y: isDropTarget ? -2 : 0,
+                            }}
+                            transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                            className={`rounded-xl border overflow-hidden transition-all ${
+                                isDropTarget
+                                    ? 'border-blue-500 ring-2 ring-blue-500/40'
+                                    : 'border-gray-200 dark:border-white/10'
+                            }`}
                         >
                             {/* Folder header */}
                             <button
@@ -259,7 +413,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                         <DriveUploadButton
                                             folderId={folder.id}
                                             patientId={patientId}
-                                            onUploaded={handleRefresh}
+                                            onUploaded={() => handleUploadedToFolder(folder.id)}
+                                            successMessage={(count) => buildUploadSuccessMessage(folder.id, count)}
                                         />
                                     </span>
                                 )}
@@ -276,6 +431,21 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                         className="overflow-hidden"
                                     >
                                         <div className="px-4 pb-4 pt-1">
+                                            {canUpload && (
+                                                <div className="mb-3">
+                                                    <DriveUploadButton
+                                                        variant="dropzone"
+                                                        folderId={folder.id}
+                                                        patientId={patientId}
+                                                        onUploaded={() => handleUploadedToFolder(folder.id)}
+                                                        successMessage={(count) => buildUploadSuccessMessage(folder.id, count)}
+                                                        dropzoneTitle={`Soltá archivos en ${folder.displayName}`}
+                                                        dropzoneHint="Carga directa en esta carpeta"
+                                                        dropzoneClassName="p-6"
+                                                    />
+                                                </div>
+                                            )}
+
                                             {folder.files.length === 0 ? (
                                                 <p className="text-sm text-gray-400 dark:text-white/20 py-4 text-center">
                                                     Carpeta vacía
@@ -295,20 +465,49 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                     </motion.div>
                                 )}
                             </AnimatePresence>
-                        </div>
+                        </motion.div>
                     );
                 })}
             </div>
 
-            {/* Also upload to mother folder root */}
-            {canUpload && motherFolderId && (
-                <div className="flex justify-center pt-2">
-                    <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-white/30">
-                        <span>Subir a carpeta raíz</span>
+            {canUpload && isGlobalDragging && effectiveGlobalDropFolderId && (
+                <div className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] p-4 sm:p-8">
+                    <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-blue-400/35 bg-slate-950/85 p-4 shadow-2xl">
+                        <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <p className="text-sm font-semibold text-white">
+                                Soltá archivos para subir a Drive
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-300">Destino</span>
+                                <select
+                                    value={effectiveGlobalDropFolderId}
+                                    onChange={(event) => setGlobalDropFolderId(event.target.value)}
+                                    className="text-xs rounded-md px-2 py-1 bg-slate-900 border border-slate-700 text-slate-100"
+                                >
+                                    {motherFolderId && (
+                                        <option value={motherFolderId}>Carpeta raíz del paciente</option>
+                                    )}
+                                    {folders.map((folder) => (
+                                        <option key={folder.id} value={folder.id}>
+                                            {folder.displayName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
                         <DriveUploadButton
-                            folderId={motherFolderId}
+                            variant="dropzone"
+                            folderId={effectiveGlobalDropFolderId}
                             patientId={patientId}
-                            onUploaded={handleRefresh}
+                            successMessage={(count) => buildUploadSuccessMessage(effectiveGlobalDropFolderId, count)}
+                            onUploaded={() => {
+                                resetGlobalDrag();
+                                handleUploadedToFolder(effectiveGlobalDropFolderId);
+                            }}
+                            dropzoneTitle="Soltá archivos en cualquier parte"
+                            dropzoneHint="También podés hacer clic para elegir archivos"
+                            dropzoneClassName="p-10 border-blue-400/70 bg-blue-500/5"
                         />
                     </div>
                 </div>

@@ -62,8 +62,8 @@ export async function getPatientDriveFolders(
         const subfolders = allItems.filter(f => f.mimeType === FOLDER_MIME);
         const rootFiles: DriveFile[] = allItems.filter(f => f.mimeType !== FOLDER_MIME);
 
-        // List contents of each subfolder in parallel (max 8)
-        const foldersToList = subfolders.slice(0, 8);
+        // List contents of each subfolder in parallel
+        const foldersToList = subfolders;
         const folderResults = await Promise.all(
             foldersToList.map(async (folder): Promise<FolderWithFiles> => {
                 const contents = await listFolderFiles(folder.id);
@@ -102,7 +102,15 @@ export async function createPatientDriveFolderAction(
     nombre: string
 ): Promise<{ motherFolderUrl?: string; error?: string }> {
     try {
-        const result = await ensureStandardPatientFolders(apellido, nombre);
+        const { data: patientRow } = await supabase
+            .from('pacientes')
+            .select('link_historia_clinica')
+            .eq('id_paciente', patientId)
+            .single();
+
+        const existingMotherFolderId = extractFolderIdFromUrl(patientRow?.link_historia_clinica || null) || undefined;
+
+        const result = await ensureStandardPatientFolders(apellido, nombre, existingMotherFolderId);
         if (result.error) {
             return { error: result.error };
         }

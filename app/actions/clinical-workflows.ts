@@ -788,7 +788,7 @@ async function ensurePatientDriveFolder(treatmentId: string) {
 
     const patientData = treatment.patient as any;
     const patientRootName = `${(patientData.apellido || '').toUpperCase()}, ${(patientData.nombre || '').charAt(0).toUpperCase() + (patientData.nombre || '').slice(1).toLowerCase()}`.trim();
-    const folderName = `${patientRootName} - ${suffix}`;
+    const folderName = `[${suffix}] ${patientRootName}`;
 
     // 4. Ensure Hierarchy on Google Drive
     const {
@@ -797,7 +797,11 @@ async function ensurePatientDriveFolder(treatmentId: string) {
     } = await import('@/lib/google-drive');
 
     // Step A: Ensure Mother Folder and Admin subfolders exist
-    const hierarchy = await ensureStandardPatientFolders(patientData.apellido, patientData.nombre);
+    const hierarchy = await ensureStandardPatientFolders(
+        patientData.apellido,
+        patientData.nombre,
+        patientData.link_historia_clinica || undefined
+    );
 
     if (hierarchy.error || !hierarchy.motherFolderId) {
         console.error('Error ensuring patient hierarchy:', hierarchy.error);

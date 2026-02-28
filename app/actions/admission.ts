@@ -169,7 +169,11 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         let docResult: PatientDocumentsResult | null = null;
 
         try {
-            const driveResult = await ensureStandardPatientFolders(data.apellido, data.nombre);
+            const driveResult = await ensureStandardPatientFolders(
+                data.apellido,
+                data.nombre,
+                created.link_historia_clinica || undefined
+            );
             if (driveResult.motherFolderId && driveResult.motherFolderUrl) {
                 driveLink = driveResult.motherFolderUrl;
                 triggers.drive = { ok: true, detail: 'Carpeta de paciente creada/validada' };

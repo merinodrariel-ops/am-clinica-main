@@ -227,33 +227,131 @@ export async function createDriveFolder(
     parentFolderId: string,
     folderName: string
 ): Promise<{ folderId?: string; error?: string }> {
-    try {
-        // Check if folder exists
-        const existingFolders = await drive.files.list({
-            q: `name='${folderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-            includeItemsFromAllDrives: true,
-            supportsAllDrives: true,
-            fields: 'files(id, name)',
-        });
+    const inflightKey = `${parentFolderId}::${folderName.normalize('NFC')}`;
+    const inflightExisting = folderCreationInflight.get(inflightKey);
+    if (inflightExisting) return inflightExisting;
 
-        if (existingFolders.data.files && existingFolders.data.files.length > 0) {
-            return { folderId: existingFolders.data.files[0].id! };
+    const inflight = (async (): Promise<{ folderId?: string; error?: string }> => {
+        try {
+            const existingFolders = await listExactFoldersByName(drive, parentFolderId, folderName);
+            const existingCanonical = pickCanonicalFolder(existingFolders);
+            if (existingCanonical?.id) {
+                return { folderId: existingCanonical.id };
+            }
+
+            const newFolder = await drive.files.create({
+                supportsAllDrives: true,
+                requestBody: {
+                    name: folderName,
+                    mimeType: 'application/vnd.google-apps.folder',
+                    parents: [parentFolderId],
+                },
+                fields: 'id',
+            });
+
+            const createdFolderId = newFolder.data.id;
+            if (!createdFolderId) {
+                return { error: 'No se pudo crear carpeta en Google Drive' };
+            }
+
+            const retryDelaysMs = [0, 120, 320, 700];
+            for (const delayMs of retryDelaysMs) {
+                if (delayMs > 0) {
+                    await wait(delayMs);
+                }
+
+                const foldersNow = await listExactFoldersByName(drive, parentFolderId, folderName);
+                const canonicalNow = pickCanonicalFolder(foldersNow);
+                if (!canonicalNow?.id) continue;
+
+                if (canonicalNow.id !== createdFolderId) {
+                    await trashFolderIfEmpty(drive, createdFolderId);
+                }
+
+                return { folderId: canonicalNow.id };
+            }
+
+            return { folderId: createdFolderId };
+        } catch (error) {
+            return { error: error instanceof Error ? error.message : String(error) };
         }
+    })();
 
-        // Create folder
-        const newFolder = await drive.files.create({
-            supportsAllDrives: true,
-            requestBody: {
-                name: folderName,
-                mimeType: 'application/vnd.google-apps.folder',
-                parents: [parentFolderId],
-            },
-            fields: 'id',
-        });
+    folderCreationInflight.set(inflightKey, inflight);
 
-        return { folderId: newFolder.data.id! };
+    try {
+        return await inflight;
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
+    } finally {
+        folderCreationInflight.delete(inflightKey);
+    }
+}
+
+const folderCreationInflight = new Map<string, Promise<{ folderId?: string; error?: string }>>();
+
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function escapeDriveQueryValue(value: string): string {
+    return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+async function listExactFoldersByName(
+    drive: ReturnType<typeof google.drive>,
+    parentFolderId: string,
+    folderName: string
+) {
+    const safeName = escapeDriveQueryValue(folderName);
+    const response = await drive.files.list({
+        q: `name='${safeName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true,
+        fields: 'files(id, name, createdTime)',
+        orderBy: 'createdTime asc',
+        pageSize: 50,
+    });
+
+    return response.data.files || [];
+}
+
+function pickCanonicalFolder(
+    folders: Array<{ id?: string | null; createdTime?: string | null }>
+): { id?: string | null; createdTime?: string | null } | null {
+    if (!folders.length) return null;
+
+    return [...folders]
+        .filter((folder) => Boolean(folder.id))
+        .sort((a, b) => {
+            const aTime = a.createdTime ? new Date(a.createdTime).getTime() : Number.MAX_SAFE_INTEGER;
+            const bTime = b.createdTime ? new Date(b.createdTime).getTime() : Number.MAX_SAFE_INTEGER;
+            if (aTime !== bTime) return aTime - bTime;
+            return String(a.id).localeCompare(String(b.id));
+        })[0] || null;
+}
+
+async function trashFolderIfEmpty(drive: ReturnType<typeof google.drive>, folderId: string): Promise<void> {
+    try {
+        const children = await drive.files.list({
+            q: `'${folderId}' in parents and trashed=false`,
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
+            fields: 'files(id)',
+            pageSize: 1,
+        });
+
+        const hasChildren = (children.data.files || []).length > 0;
+        if (hasChildren) return;
+
+        await drive.files.update({
+            fileId: folderId,
+            supportsAllDrives: true,
+            requestBody: { trashed: true },
+            fields: 'id',
+        });
+    } catch {
+        // best-effort cleanup, ignore failures
     }
 }
 
@@ -310,33 +408,54 @@ export async function createWorkflowFolder(folderName: string, parentId?: string
  *   ├── APELLIDO, Nombre - PRESENTACION
  *   └── APELLIDO, Nombre - PRESUPUESTO
  */
-export async function ensureStandardPatientFolders(apellido: string, nombre: string): Promise<{ motherFolderId?: string; motherFolderUrl?: string; error?: string }> {
+export async function ensureStandardPatientFolders(
+    apellido: string,
+    nombre: string,
+    motherFolderId?: string
+): Promise<{ motherFolderId?: string; motherFolderUrl?: string; error?: string }> {
     try {
         const drive = getDrive();
         const motherFolderName = getPatientFolderName(apellido, nombre);
 
-        // 1. Ensure Mother Folder exists
-        const motherResult = await createDriveFolder(drive, PACIENTES_ROOT_FOLDER_ID, motherFolderName);
-        if (motherResult.error || !motherResult.folderId) return { error: motherResult.error };
+        let resolvedMotherFolderId = motherFolderId;
 
-        const motherFolderId = motherResult.folderId;
+        if (resolvedMotherFolderId) {
+            try {
+                await drive.files.get({
+                    fileId: resolvedMotherFolderId,
+                    supportsAllDrives: true,
+                    fields: 'id',
+                });
+            } catch {
+                resolvedMotherFolderId = undefined;
+            }
+        }
+
+        if (!resolvedMotherFolderId) {
+            // 1. Ensure Mother Folder exists
+            const motherResult = await createDriveFolder(drive, PACIENTES_ROOT_FOLDER_ID, motherFolderName);
+            if (motherResult.error || !motherResult.folderId) return { error: motherResult.error };
+            resolvedMotherFolderId = motherResult.folderId;
+        }
+
+        const finalMotherFolderId = resolvedMotherFolderId;
 
         // 2. Create the 3 standard subfolders
         const subfolders = [
-            `${motherFolderName} - FOTO & VIDEO`,
-            `${motherFolderName} - PRESENTACION`,
-            `${motherFolderName} - PRESUPUESTO`
+            `[FOTO & VIDEO] ${motherFolderName}`,
+            `[PRESENTACION] ${motherFolderName}`,
+            `[PRESUPUESTO] ${motherFolderName}`
         ];
 
         for (const subName of subfolders) {
-            await createDriveFolder(drive, motherFolderId, subName);
+            await createDriveFolder(drive, finalMotherFolderId, subName);
         }
 
         // 3. Get Mother Folder URL
-        const motherUrl = await getFolderWebViewLink(motherFolderId);
+        const motherUrl = await getFolderWebViewLink(finalMotherFolderId);
 
         return {
-            motherFolderId,
+            motherFolderId: finalMotherFolderId,
             motherFolderUrl: motherUrl || undefined
         };
     } catch (error) {
@@ -364,7 +483,7 @@ export async function ensurePatientContractFolder(
     try {
         const drive = getDrive();
         const motherFolderName = getPatientFolderName(apellido, nombre);
-        const contractFolderName = `${motherFolderName} - Contrato`;
+        const contractFolderName = `[CONTRATO] ${motherFolderName}`;
 
         let resolvedMotherFolderId = motherFolderId;
 
@@ -422,7 +541,7 @@ export async function ensurePatientPresentationFolder(
     try {
         const drive = getDrive();
         const motherFolderName = getPatientFolderName(apellido, nombre);
-        const presentationFolderName = `${motherFolderName} - PRESENTACION`;
+        const presentationFolderName = `[PRESENTACION] ${motherFolderName}`;
 
         let resolvedMotherFolderId = motherFolderId;
 
@@ -492,6 +611,102 @@ export async function listFolderFiles(folderId: string): Promise<{ files?: { id:
         };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+const PRESENTATION_MIME_TYPES = new Set([
+    'application/vnd.google-apps.presentation',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-powerpoint',
+]);
+
+export async function movePresentationFilesToFolder(
+    sourceFolderId: string,
+    targetFolderId: string
+): Promise<{
+    movedCount: number;
+    movedFiles: Array<{ id: string; name: string }>;
+    skipped: Array<{ id: string; name: string; reason: string }>;
+    error?: string;
+}> {
+    if (!sourceFolderId || !targetFolderId) {
+        return {
+            movedCount: 0,
+            movedFiles: [],
+            skipped: [],
+            error: 'sourceFolderId y targetFolderId son requeridos',
+        };
+    }
+
+    if (sourceFolderId === targetFolderId) {
+        return { movedCount: 0, movedFiles: [], skipped: [] };
+    }
+
+    try {
+        const drive = getDrive();
+
+        const children = await drive.files.list({
+            q: `'${sourceFolderId}' in parents and trashed=false`,
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
+            fields: 'files(id, name, mimeType, parents)',
+            pageSize: 200,
+        });
+
+        const files = children.data.files || [];
+        const misplacedPresentations = files.filter((file) =>
+            Boolean(file.id) && PRESENTATION_MIME_TYPES.has(file.mimeType || '')
+        );
+
+        const movedFiles: Array<{ id: string; name: string }> = [];
+        const skipped: Array<{ id: string; name: string; reason: string }> = [];
+
+        for (const file of misplacedPresentations) {
+            const fileId = file.id as string;
+            const fileName = file.name || 'Sin nombre';
+            const currentParents = (file.parents || []).join(',');
+
+            if (!currentParents) {
+                skipped.push({
+                    id: fileId,
+                    name: fileName,
+                    reason: 'No se pudieron resolver los padres actuales del archivo',
+                });
+                continue;
+            }
+
+            try {
+                await drive.files.update({
+                    fileId,
+                    supportsAllDrives: true,
+                    enforceSingleParent: true,
+                    addParents: targetFolderId,
+                    removeParents: currentParents,
+                    fields: 'id',
+                });
+
+                movedFiles.push({ id: fileId, name: fileName });
+            } catch (error) {
+                skipped.push({
+                    id: fileId,
+                    name: fileName,
+                    reason: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+
+        return {
+            movedCount: movedFiles.length,
+            movedFiles,
+            skipped,
+        };
+    } catch (error) {
+        return {
+            movedCount: 0,
+            movedFiles: [],
+            skipped: [],
+            error: error instanceof Error ? error.message : String(error),
+        };
     }
 }
 
