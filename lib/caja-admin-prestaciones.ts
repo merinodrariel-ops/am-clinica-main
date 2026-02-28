@@ -125,7 +125,32 @@ export async function generarLiquidacionProfesional(
     mes: string,
     prestaciones: PrestacionRealizada[]
 ): Promise<{ success: boolean; error?: string }> {
+    const [year, month] = mes.split('-').map(Number);
     const startDate = `${mes}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${mes}-${String(lastDay).padStart(2, '0')}`;
+    const criticalThreshold = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    // Block liquidation when there are unresolved critical observed records.
+    const { count: criticalCount, error: criticalErr } = await supabase
+        .from('registro_horas')
+        .select('id', { count: 'exact', head: true })
+        .eq('personal_id', personalId)
+        .in('estado', ['Observado', 'observado'])
+        .gte('fecha', startDate)
+        .lte('fecha', endDateStr)
+        .lt('created_at', criticalThreshold);
+
+    if (criticalErr) {
+        return { success: false, error: `Error validando observados críticos: ${criticalErr.message}` };
+    }
+
+    if ((criticalCount || 0) > 0) {
+        return {
+            success: false,
+            error: `No se puede liquidar: hay ${criticalCount} observado(s) crítico(s) sin resolver en ${mes}.`,
+        };
+    }
 
     // Calculate totals
     const totalArs = prestaciones

@@ -74,6 +74,19 @@ function normalizeEstado(raw: string | null | undefined): LiquidacionResult['est
     return 'pending';
 }
 
+const ESTADO_DB_CANDIDATES: Record<LiquidacionResult['estado'], string[]> = {
+    // Legacy DB in this project currently accepts Spanish states
+    pending: ['Pendiente', 'pending', 'pendiente'],
+    // No explicit "approved" state in legacy check; keep as pending-equivalent
+    approved: ['Pendiente', 'Aprobado', 'approved', 'aprobado'],
+    paid: ['Pagado', 'paid', 'pagado'],
+    rejected: ['Anulado', 'rejected', 'anulado', 'Rechazado', 'rechazado'],
+};
+
+function isEstadoConstraintError(message: string | undefined): boolean {
+    return (message || '').includes('liquidaciones_mensuales_estado_check');
+}
+
 export interface LiquidacionAdminRow {
     personal_id: string;
     nombre: string;
@@ -118,6 +131,8 @@ export async function generateLiquidacion(
     let totalUsd: number | undefined;
     let prestacionesValidadas = 0;
     let prestacionesPendientes = 0;
+    let totalHoras = 0;
+    let valorHoraSnapshot = Number(worker.valor_hora_ars || 0);
     let breakdown: Record<string, unknown> = {};
 
     if (isDoctor) {
@@ -166,8 +181,9 @@ export async function generateLiquidacion(
             .lte('fecha', endDate)
             .in('estado', ['Registrado', 'Observado', 'Resuelto']); // Updated states
 
-        const totalHoras = (logs || []).reduce((s, l) => s + Number(l.horas || 0), 0);
+        totalHoras = (logs || []).reduce((s, l) => s + Number(l.horas || 0), 0);
         const valorHora = Number(worker.valor_hora_ars || 0);
+        valorHoraSnapshot = valorHora;
         totalArs = Math.round(totalHoras * valorHora * 100) / 100;
 
         breakdown = {
@@ -185,29 +201,45 @@ export async function generateLiquidacion(
 
     const mesDate = `${mes}-01`;
 
-    const { data: liq, error: liqError } = await admin
-        .from('liquidaciones_mensuales')
-        .upsert(
-            {
-                personal_id: personalId,
-                mes: mesDate,
-                modelo_pago: modeloPago,
-                total_ars: totalArs,
-                total_usd: totalUsd ?? null,
-                total_horas: isDoctor ? 0 : ((breakdown.total_horas as number) || 0),
-                tc_bna_venta: tcBnaVenta,
-                tc_liquidacion: tcBnaVenta,
-                prestaciones_validadas: prestacionesValidadas,
-                prestaciones_pendientes: prestacionesPendientes,
-                breakdown,
-                estado: 'pending',
-            },
-            { onConflict: 'personal_id,mes' }
-        )
-        .select()
-        .single();
+    const payloadBase = {
+        personal_id: personalId,
+        mes: mesDate,
+        modelo_pago: modeloPago,
+        total_ars: totalArs,
+        total_usd: totalUsd ?? null,
+        total_horas: isDoctor ? 0 : totalHoras,
+        valor_hora_snapshot: valorHoraSnapshot,
+        tc_bna_venta: tcBnaVenta,
+        tc_liquidacion: tcBnaVenta,
+        prestaciones_validadas: prestacionesValidadas,
+        prestaciones_pendientes: prestacionesPendientes,
+        breakdown,
+    };
 
-    if (liqError) throw new Error(liqError.message);
+    let liq: unknown = null;
+    let liqError: { message?: string } | null = null;
+
+    for (const estadoDb of ESTADO_DB_CANDIDATES.pending) {
+        const result = await admin
+            .from('liquidaciones_mensuales')
+            .upsert(
+                {
+                    ...payloadBase,
+                    estado: estadoDb,
+                },
+                { onConflict: 'personal_id,mes' }
+            )
+            .select()
+            .single();
+
+        liq = result.data;
+        liqError = result.error;
+
+        if (!liqError) break;
+        if (!isEstadoConstraintError(liqError.message)) break;
+    }
+
+    if (liqError) throw new Error(liqError.message || 'Error al generar liquidación');
 
     revalidatePath('/admin/liquidaciones');
 
@@ -223,34 +255,70 @@ export async function generateLiquidacion(
 
 export async function approveLiquidacion(id: string): Promise<void> {
     const admin = getAdminClient();
-    const { error } = await admin
-        .from('liquidaciones_mensuales')
-        .update({ estado: 'approved' })
-        .eq('id', id);
 
-    if (error) throw new Error(error.message);
+    let lastError: { message?: string } | null = null;
+    for (const estadoDb of ESTADO_DB_CANDIDATES.approved) {
+        const { error } = await admin
+            .from('liquidaciones_mensuales')
+            .update({ estado: estadoDb })
+            .eq('id', id);
+
+        if (!error) {
+            lastError = null;
+            break;
+        }
+
+        lastError = error;
+        if (!isEstadoConstraintError(error.message)) break;
+    }
+
+    if (lastError) throw new Error(lastError.message || 'Error al aprobar liquidación');
     revalidatePath('/admin/liquidaciones');
 }
 
 export async function markLiquidacionPaid(id: string, fechaPago: string): Promise<void> {
     const admin = getAdminClient();
-    const { error } = await admin
-        .from('liquidaciones_mensuales')
-        .update({ estado: 'paid', fecha_pago: fechaPago })
-        .eq('id', id);
 
-    if (error) throw new Error(error.message);
+    let lastError: { message?: string } | null = null;
+    for (const estadoDb of ESTADO_DB_CANDIDATES.paid) {
+        const { error } = await admin
+            .from('liquidaciones_mensuales')
+            .update({ estado: estadoDb, fecha_pago: fechaPago })
+            .eq('id', id);
+
+        if (!error) {
+            lastError = null;
+            break;
+        }
+
+        lastError = error;
+        if (!isEstadoConstraintError(error.message)) break;
+    }
+
+    if (lastError) throw new Error(lastError.message || 'Error al registrar pago');
     revalidatePath('/admin/liquidaciones');
 }
 
 export async function rejectLiquidacion(id: string, motivo?: string): Promise<void> {
     const admin = getAdminClient();
-    const { error } = await admin
-        .from('liquidaciones_mensuales')
-        .update({ estado: 'rejected', observaciones: motivo ?? null })
-        .eq('id', id);
 
-    if (error) throw new Error(error.message);
+    let lastError: { message?: string } | null = null;
+    for (const estadoDb of ESTADO_DB_CANDIDATES.rejected) {
+        const { error } = await admin
+            .from('liquidaciones_mensuales')
+            .update({ estado: estadoDb, observaciones: motivo ?? null })
+            .eq('id', id);
+
+        if (!error) {
+            lastError = null;
+            break;
+        }
+
+        lastError = error;
+        if (!isEstadoConstraintError(error.message)) break;
+    }
+
+    if (lastError) throw new Error(lastError.message || 'Error al rechazar liquidación');
     revalidatePath('/admin/liquidaciones');
 }
 

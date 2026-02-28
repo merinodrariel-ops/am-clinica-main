@@ -356,6 +356,14 @@ export async function updateGoalProgressByCode(personalId: string, goalCode: str
 // LIQUIDATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
+function normalizeLiquidacionEstado(raw: string | null | undefined): Liquidation['estado'] {
+    const value = (raw || '').toLowerCase();
+    if (value === 'approved' || value === 'aprobado') return 'approved';
+    if (value === 'paid' || value === 'pagado') return 'paid';
+    if (value === 'rejected' || value === 'anulado' || value === 'rechazado') return 'rejected';
+    return 'pending';
+}
+
 export async function getWorkerLiquidations(personalId: string): Promise<Liquidation[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -365,7 +373,11 @@ export async function getWorkerLiquidations(personalId: string): Promise<Liquida
         .order('mes', { ascending: false });
 
     if (error) { console.error('Error fetching liquidations:', error); return []; }
-    return data as Liquidation[];
+
+    return (data || []).map((row: Record<string, unknown>) => ({
+        ...row,
+        estado: normalizeLiquidacionEstado(row.estado as string | null | undefined),
+    })) as Liquidation[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

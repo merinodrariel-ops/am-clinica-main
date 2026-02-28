@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Building2,
@@ -11,9 +12,10 @@ import {
     BarChart3,
     ExternalLink,
     RefreshCw,
-    Settings
+    Settings,
+    AlertTriangle,
 } from 'lucide-react';
-import { getSucursales, type Sucursal } from '@/lib/caja-admin';
+import { getObservadosCriticalLeaders, getObservadosSlaSummary, getSucursales, type Sucursal } from '@/lib/caja-admin';
 import MovimientosTab from '@/components/caja-admin/MovimientosTab';
 import ArqueoTab from '@/components/caja-admin/ArqueoTab';
 import ProfesionalesTab from '@/components/caja-admin/ProfesionalesTab';
@@ -33,17 +35,51 @@ const TABS = [
 
 type TabId = typeof TABS[number]['id'];
 
+function currentMes() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export default function CajaAdminPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [sucursales, setSucursales] = useState<Sucursal[]>([]);
     const [selectedSucursal, setSelectedSucursal] = useState<Sucursal | null>(null);
     const [activeTab, setActiveTab] = useState<TabId>('movimientos');
     const [tcBna, setTcBna] = useState<number | null>(null);
     const [tcLoading, setTcLoading] = useState(false);
     const [tcError, setTcError] = useState<string | null>(null);
+    const [observadosSummary, setObservadosSummary] = useState<{ total: number; warn: number; critical: number }>({
+        total: 0,
+        warn: 0,
+        critical: 0,
+    });
+    const [observadosCriticalLeaders, setObservadosCriticalLeaders] = useState<Array<{
+        personal_id: string;
+        nombre: string;
+        apellido: string;
+        critical_count: number;
+    }>>([]);
 
     useEffect(() => {
         loadSucursales();
+        loadObservadosSummary();
     }, []);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            loadObservadosSummary();
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        const requestedTab = searchParams.get('tab');
+        if (requestedTab && TABS.some((tab) => tab.id === requestedTab)) {
+            setActiveTab(requestedTab as TabId);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         if (selectedSucursal?.moneda_local === 'ARS') {
@@ -79,8 +115,23 @@ export default function CajaAdminPage() {
         }
     }
 
+    async function loadObservadosSummary() {
+        const mes = currentMes();
+        const [summary, leaders] = await Promise.all([
+            getObservadosSlaSummary(mes),
+            getObservadosCriticalLeaders(mes, 3),
+        ]);
+        setObservadosSummary(summary);
+        setObservadosCriticalLeaders(leaders);
+    }
+
     function renderTab() {
         if (!selectedSucursal) return null;
+
+        const requestedSubTab = searchParams.get('subtab');
+        const initialSubTab = requestedSubTab === 'observados'
+            ? 'observados'
+            : undefined;
 
         switch (activeTab) {
             case 'movimientos':
@@ -90,7 +141,7 @@ export default function CajaAdminPage() {
             case 'profesionales':
                 return <ProfesionalesTab sucursal={selectedSucursal} tcBna={tcBna} />;
             case 'personal':
-                return <PersonalTab sucursal={selectedSucursal} tcBna={tcBna} />;
+                return <PersonalTab sucursal={selectedSucursal} tcBna={tcBna} initialTab={initialSubTab} />;
             case 'reportes':
                 return <ReportesTab sucursal={selectedSucursal} />;
             case 'configuracion':
@@ -98,6 +149,26 @@ export default function CajaAdminPage() {
             default:
                 return null;
         }
+    }
+
+    function handleTabChange(tabId: TabId) {
+        setActiveTab(tabId);
+
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', tabId);
+        if (tabId !== 'personal') {
+            params.delete('subtab');
+        }
+
+        router.replace(`/caja-admin?${params.toString()}`, { scroll: false });
+    }
+
+    function openObservadosTab() {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', 'personal');
+        params.set('subtab', 'observados');
+        setActiveTab('personal');
+        router.replace(`/caja-admin?${params.toString()}`, { scroll: false });
     }
 
     return (
@@ -168,6 +239,42 @@ export default function CajaAdminPage() {
                         </div>
                     </div>
 
+                    {observadosSummary.critical > 0 && (
+                        <div className="mb-6 rounded-2xl border border-red-300/70 dark:border-red-800 bg-gradient-to-r from-red-50 to-amber-50 dark:from-red-950/50 dark:to-amber-950/30 p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                                            Hay {observadosSummary.critical} observado(s) crítico(s) sin resolver este mes
+                                        </p>
+                                        <p className="text-xs text-red-600/90 dark:text-red-300/90 mt-0.5">
+                                            También hay {observadosSummary.warn} en ventana 24h+ y {observadosSummary.total} observados totales.
+                                        </p>
+                                        {observadosCriticalLeaders.length > 0 && (
+                                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                {observadosCriticalLeaders.map((leader) => (
+                                                    <span
+                                                        key={leader.personal_id}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                                                    >
+                                                        {`${leader.nombre} ${leader.apellido}`.trim()}: {leader.critical_count}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={openObservadosTab}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium"
+                                >
+                                    Ir a Observados
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Tab Navigation */}
                     <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-lg border border-slate-200/50 dark:border-slate-700/50 mb-6 overflow-hidden">
                         <div className="flex overflow-x-auto">
@@ -177,7 +284,7 @@ export default function CajaAdminPage() {
                                 return (
                                     <button
                                         key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
+                                        onClick={() => handleTabChange(tab.id)}
                                         className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-all relative whitespace-nowrap ${isActive
                                             ? 'text-indigo-600 dark:text-indigo-400'
                                             : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'

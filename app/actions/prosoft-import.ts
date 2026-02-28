@@ -2,7 +2,7 @@
 
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { parseImplicitHours } from '@/lib/gemini';
-import { addDays, format, parse, differenceInMinutes } from 'date-fns';
+import { addDays, parse, differenceInMinutes } from 'date-fns';
 
 function getAdminClient() {
     return createAdminClient(
@@ -24,12 +24,17 @@ export interface ProsoftRow {
         salida: string;         // HH:MM
         horas: number;
         incompleto?: boolean;   // true when only one time is recorded
+        requiereRevision?: boolean; // true when data is suspicious and needs manual check
+        motivoObservado?: 'FaltaIngreso' | 'FaltaEgreso' | 'HorasExcesivas' | 'MarcacionesImpares' | 'ConflictoDuplicado' | 'Otro';
         observaciones?: string; // AI notes or metadata
     }[];
 }
 
 export interface ProsoftPreview {
     mes: string;
+    periodoDesde: string;
+    periodoHasta: string;
+    periodoDetectado: boolean;
     filas: ProsoftRow[];
     sinMatch: string[];         // Employee names with no personal match
     totalRegistros: number;
@@ -64,7 +69,32 @@ interface ParsedTime {
     salida: string;
     horas: number;
     incompleto?: boolean;
+    requiereRevision?: boolean;
+    motivoObservado?: 'FaltaIngreso' | 'FaltaEgreso' | 'HorasExcesivas' | 'MarcacionesImpares' | 'ConflictoDuplicado' | 'Otro';
     observaciones?: string;
+}
+
+function isValidTimeToken(token: string): boolean {
+    if (!/^\d{1,2}:\d{2}$/.test(token)) return false;
+    const [h, m] = token.split(':').map(Number);
+    return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+}
+
+function computeHours(entrada: string, salida: string): { horas: number; overnight: boolean } {
+    const start = parse(entrada, 'HH:mm', new Date());
+    let end = parse(salida, 'HH:mm', new Date());
+    let overnight = false;
+
+    if (end < start) {
+        end = addDays(end, 1);
+        overnight = true;
+    }
+
+    const diffMinutes = differenceInMinutes(end, start);
+    return {
+        horas: Math.round((diffMinutes / 60) * 100) / 100,
+        overnight,
+    };
 }
 
 async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
@@ -72,46 +102,75 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
     const raw = cell.replace(/\r/g, '').trim();
     if (!raw) return null;
 
-    const timeRe = /^\d{1,2}:\d{2}$/;
+    // Time-like tokens in the cell (covers repeated marks and multi-line cells)
+    const timeTokens = (raw.match(/\b\d{1,2}:\d{2}\b/g) || []).filter(isValidTimeToken).map(padTime);
 
-    // Split on any whitespace (including \n), dash, or "a" as separator
-    // e.g. "08:00 17:00", "8:00-17:00", "08:00\n17:00", "08:00 a 17:00"
-    const parts = raw.split(/[\s\n\-]+|(?:\s*a\s*)/).map(s => s.trim()).filter(Boolean);
+    // --- Case A: exact one mark (missing counterpart)
+    if (timeTokens.length === 1) {
+        const token = timeTokens[0];
+        const lower = raw.toLowerCase();
+        const seemsExit = /salida|egreso|sale/.test(lower);
 
-    // --- Format A: two HH:MM → complete record
-    if (parts.length >= 2) {
-        const [e, s] = parts;
-        if (timeRe.test(e) && timeRe.test(s)) {
-            const entrada = padTime(e);
-            const salida = padTime(s);
-
-            const start = parse(entrada, 'HH:mm', new Date());
-            let end = parse(salida, 'HH:mm', new Date());
-
-            // Handle overnight shifts (e.g. 22:00 to 06:00)
-            if (end < start) {
-                end = addDays(end, 1);
-            }
-
-            const diffMinutes = differenceInMinutes(end, start);
-            const horas = diffMinutes / 60;
-
-            if (horas > 0 && horas <= 24) {
-                return {
-                    entrada,
-                    salida,
-                    horas: Math.round(horas * 100) / 100,
-                    observaciones: end > parse(salida, 'HH:mm', new Date()) ? 'Turno noche (cruza medianoche)' : undefined
-                };
-            }
-            // Something went wrong or too long shift
-            return { entrada, salida, horas: 0, incompleto: true };
-        }
+        return {
+            entrada: seemsExit ? '00:00' : token,
+            salida: seemsExit ? token : '00:00',
+            horas: 0,
+            incompleto: true,
+            requiereRevision: true,
+            motivoObservado: seemsExit ? 'FaltaIngreso' : 'FaltaEgreso',
+            observaciones: 'Solo se detectó una marcación',
+        };
     }
 
-    // --- Format D: single HH:MM → incomplete (only entry or only exit recorded)
-    if (parts.length === 1 && timeRe.test(parts[0])) {
-        return { entrada: padTime(parts[0]), salida: '00:00', horas: 0, incompleto: true };
+    // --- Case B: exact two marks (normal pair)
+    if (timeTokens.length === 2) {
+        const entrada = timeTokens[0];
+        const salida = timeTokens[1];
+        const { horas, overnight } = computeHours(entrada, salida);
+
+        if (horas > 0 && horas <= 24) {
+            const suspiciousLongShift = horas > 14;
+            return {
+                entrada,
+                salida,
+                horas,
+                requiereRevision: suspiciousLongShift,
+                motivoObservado: suspiciousLongShift ? 'HorasExcesivas' : undefined,
+                observaciones: suspiciousLongShift
+                    ? `Jornada inusualmente larga (${horas}h), requiere revisión manual`
+                    : (overnight ? 'Turno noche (cruza medianoche)' : undefined),
+            };
+        }
+
+        return {
+            entrada,
+            salida,
+            horas: 0,
+            incompleto: true,
+            requiereRevision: true,
+            motivoObservado: 'Otro',
+            observaciones: 'Marcación inválida, revisar manualmente',
+        };
+    }
+
+    // --- Case C: repeated marks in the same day (duplicate/conflict)
+    if (timeTokens.length > 2) {
+        const entrada = timeTokens[0];
+        const salida = timeTokens[timeTokens.length - 1];
+        const { horas } = computeHours(entrada, salida);
+        const hasOddCount = timeTokens.length % 2 !== 0;
+
+        return {
+            entrada,
+            salida,
+            horas: horas > 0 && horas <= 24 ? horas : 0,
+            incompleto: hasOddCount,
+            requiereRevision: true,
+            motivoObservado: hasOddCount ? 'MarcacionesImpares' : 'ConflictoDuplicado',
+            observaciones: hasOddCount
+                ? `Se detectaron ${timeTokens.length} marcaciones (cantidad impar)`
+                : `Se detectaron ${timeTokens.length} marcaciones (posible doble fichada)`,
+        };
     }
 
     // --- Format B: single number = total hours worked (e.g. "8", "7.5", "8,5")
@@ -240,6 +299,39 @@ function parseCsvText(text: string): string[][] {
     if (cells.some(c => c !== '')) rows.push(cells);
 
     return rows;
+}
+
+function toIsoFromArDate(dateAr: string): string | null {
+    const m = dateAr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function extractPeriodFromCsv(rows: string[][]): { desde: string; hasta: string; mes: string } | null {
+    for (const row of rows.slice(0, 12)) {
+        const joined = row.join(' ').replace(/\s+/g, ' ').trim();
+        const match = joined.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[~\-]\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+        if (!match) continue;
+
+        const desde = toIsoFromArDate(match[1]);
+        const hasta = toIsoFromArDate(match[2]);
+        if (!desde || !hasta) continue;
+
+        return {
+            desde,
+            hasta,
+            mes: desde.slice(0, 7),
+        };
+    }
+
+    return null;
 }
 
 async function fetchCsv(csvUrl: string): Promise<string[][]> {
@@ -493,7 +585,7 @@ export async function getProsoftMappings(): Promise<
 
 export async function previewProsoftImport(
     sheetUrl: string,
-    mes: string // 'YYYY-MM'
+    mesOverride?: string // optional manual override: 'YYYY-MM'
 ): Promise<ProsoftPreview> {
     const csvUrl = getCsvUrlFromSheetUrl(sheetUrl);
     if (!csvUrl) {
@@ -503,6 +595,15 @@ export async function previewProsoftImport(
     }
 
     const csvRows = await fetchCsv(csvUrl);
+    const detectedPeriod = extractPeriodFromCsv(csvRows);
+    const mes = mesOverride || detectedPeriod?.mes;
+
+    if (!mes) {
+        throw new Error(
+            'No se pudo detectar el período automáticamente desde la planilla. Verificá que Prosoft incluya "Periodo: dd/mm/aaaa ~ dd/mm/aaaa".'
+        );
+    }
+
     const { employeeRows } = parseProsoftMatrix(csvRows, mes);
 
     const [year, month] = mes.split('-').map(Number);
@@ -538,17 +639,28 @@ export async function previewProsoftImport(
         };
     }));
 
-    return { mes, filas, sinMatch, totalRegistros };
+    const [retYear, retMonth] = mes.split('-').map(Number);
+    const lastDay = new Date(retYear, retMonth, 0).getDate();
+
+    return {
+        mes,
+        periodoDesde: detectedPeriod?.desde || `${mes}-01`,
+        periodoHasta: detectedPeriod?.hasta || `${mes}-${String(lastDay).padStart(2, '0')}`,
+        periodoDetectado: Boolean(detectedPeriod),
+        filas,
+        sinMatch,
+        totalRegistros,
+    };
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────
 
 export async function importProsoftData(
     sheetUrl: string,
-    mes: string,
+    mesOverride?: string,
     onlyMatched = true
 ): Promise<ImportResult> {
-    const preview = await previewProsoftImport(sheetUrl, mes);
+    const preview = await previewProsoftImport(sheetUrl, mesOverride);
     const admin = getAdminClient();
 
     let inserted = 0;
@@ -566,10 +678,13 @@ export async function importProsoftData(
         }
 
         for (const reg of fila.registros) {
-            const estado = reg.incompleto ? 'Observado' : 'Registrado';
-            let observaciones = reg.incompleto
-                ? `Fichaje incompleto — falta horario de entrada o salida (Prosoft ${mes})`
-                : `Importado desde Prosoft (${mes})`;
+            const requiereRevision = Boolean(reg.incompleto || reg.requiereRevision);
+            const estado = requiereRevision ? 'Observado' : 'Registrado';
+            const motivoObservado = requiereRevision ? (reg.motivoObservado || 'Otro') : null;
+
+            let observaciones = requiereRevision
+                ? `Registro observado por control automático (${motivoObservado}) — Prosoft ${preview.mes}`
+                : `Importado desde Prosoft (${preview.mes})`;
 
             if (reg.observaciones) {
                 observaciones += ` | ${reg.observaciones}`;
@@ -585,14 +700,23 @@ export async function importProsoftData(
 
             if (existing) {
                 // Skip if the existing record has real hours (could be manually corrected)
-                if (Number(existing.horas) > 0 && !reg.incompleto) {
+                if (Number(existing.horas) > 0 && !requiereRevision) {
                     skipped++;
                     continue;
                 }
                 // Update if existing record had 0h (bad previous import) or if new data is complete
                 const { error } = await admin
                     .from('registro_horas')
-                    .update({ horas: reg.horas, hora_ingreso: reg.entrada, hora_egreso: reg.salida, estado, observaciones })
+                    .update({
+                        horas: reg.horas,
+                        hora_ingreso: reg.entrada,
+                        hora_egreso: reg.salida,
+                        estado,
+                        motivo_observado: motivoObservado,
+                        original_hora_ingreso: reg.entrada,
+                        original_hora_egreso: reg.salida,
+                        observaciones,
+                    })
                     .eq('id', existing.id);
                 if (error) errors.push(`${fila.rawName} ${reg.fecha}: ${error.message}`);
                 else inserted++;
@@ -606,6 +730,9 @@ export async function importProsoftData(
                 hora_ingreso: reg.entrada,
                 hora_egreso: reg.salida,
                 estado,
+                motivo_observado: motivoObservado,
+                original_hora_ingreso: reg.entrada,
+                original_hora_egreso: reg.salida,
                 observaciones,
             });
 

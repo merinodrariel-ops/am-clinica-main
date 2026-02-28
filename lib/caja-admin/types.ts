@@ -164,6 +164,7 @@ export interface RegistroHoras {
     id: string;
     personal_id: string;
     fecha: string;
+    created_at?: string;
     horas: number;
     observaciones?: string;
     // Estado y observación

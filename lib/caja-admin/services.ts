@@ -782,6 +782,33 @@ export async function generarLiquidacion(
     mes: string,
     tcBna?: number
 ): Promise<{ data: LiquidacionMensual | null; error: Error | null }> {
+    const [year, month] = mes.split('-').map(Number);
+    const startDate = `${mes}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${mes}-${String(lastDay).padStart(2, '0')}`;
+    const criticalThreshold = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    // Block liquidation if there are unresolved critical observed records.
+    const { count: criticalCount, error: criticalErr } = await getSupabase()
+        .from('registro_horas')
+        .select('id', { count: 'exact', head: true })
+        .eq('personal_id', personalId)
+        .in('estado', ['Observado', 'observado'])
+        .gte('fecha', startDate)
+        .lte('fecha', endDateStr)
+        .lt('created_at', criticalThreshold);
+
+    if (criticalErr) {
+        return { data: null, error: new Error(`Error validando observados críticos: ${criticalErr.message}`) };
+    }
+
+    if ((criticalCount || 0) > 0) {
+        return {
+            data: null,
+            error: new Error(`No se puede liquidar: hay ${criticalCount} observado(s) crítico(s) sin resolver en ${mes}.`)
+        };
+    }
+
     // Get personal info
     const { data: personal } = await getSupabase()
         .from('personal')
@@ -794,15 +821,12 @@ export async function generarLiquidacion(
     }
 
     // Get total hours for the month
-    const startDate = `${mes}-01`;
-    const endDate = new Date(parseInt(mes.split('-')[0]), parseInt(mes.split('-')[1]), 0);
-
     const { data: horas } = await getSupabase()
         .from('registro_horas')
         .select('horas')
         .eq('personal_id', personalId)
         .gte('fecha', startDate)
-        .lte('fecha', `${mes}-${endDate.getDate()}`);
+        .lte('fecha', endDateStr);
 
     const totalHoras = horas?.reduce((sum: number, h: { horas: number }) => sum + h.horas, 0) || 0;
     const totalArs = totalHoras * personal.valor_hora_ars;
@@ -1011,6 +1035,111 @@ export async function countObservadosPendientes(mes?: string): Promise<number> {
     return count || 0;
 }
 
+export async function getObservadosSlaSummary(mes?: string): Promise<{ total: number; warn: number; critical: number }> {
+    let query = getSupabase()
+        .from('registro_horas')
+        .select('id, created_at, fecha')
+        .in('estado', ['Observado', 'observado']);
+
+    if (mes) {
+        const startDate = `${mes}-01`;
+        const [year, month] = mes.split('-').map(Number);
+        const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
+        query = query.gte('fecha', startDate).lt('fecha', firstDayNextMonth);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+        if (error) console.error('Error fetching observados SLA summary:', error);
+        return { total: 0, warn: 0, critical: 0 };
+    }
+
+    const now = Date.now();
+    const warnThreshold = now - 24 * 60 * 60 * 1000;
+    const criticalThreshold = now - 48 * 60 * 60 * 1000;
+
+    let warn = 0;
+    let critical = 0;
+
+    data.forEach((row) => {
+        const parsed = new Date((row as { created_at?: string; fecha: string }).created_at || (row as { fecha: string }).fecha);
+        const createdAtMs = Number.isNaN(parsed.getTime())
+            ? new Date(`${(row as { fecha: string }).fecha}T00:00:00`).getTime()
+            : parsed.getTime();
+
+        if (createdAtMs <= criticalThreshold) {
+            critical += 1;
+            return;
+        }
+
+        if (createdAtMs <= warnThreshold) {
+            warn += 1;
+        }
+    });
+
+    return { total: data.length, warn, critical };
+}
+
+export async function getObservadosCriticalLeaders(
+    mes?: string,
+    limit = 3
+): Promise<Array<{ personal_id: string; nombre: string; apellido: string; critical_count: number }>> {
+    let query = getSupabase()
+        .from('registro_horas')
+        .select('personal_id, created_at, fecha, personal(nombre, apellido)')
+        .in('estado', ['Observado', 'observado']);
+
+    if (mes) {
+        const startDate = `${mes}-01`;
+        const [year, month] = mes.split('-').map(Number);
+        const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
+        query = query.gte('fecha', startDate).lt('fecha', firstDayNextMonth);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+        if (error) console.error('Error fetching observados critical leaders:', error);
+        return [];
+    }
+
+    const criticalThreshold = Date.now() - 48 * 60 * 60 * 1000;
+    const grouped = new Map<string, { personal_id: string; nombre: string; apellido: string; critical_count: number }>();
+
+    data.forEach((row) => {
+        const typed = row as {
+            personal_id: string;
+            created_at?: string;
+            fecha: string;
+            personal?: { nombre?: string; apellido?: string | null } | Array<{ nombre?: string; apellido?: string | null }>;
+        };
+
+        const parsed = new Date(typed.created_at || typed.fecha);
+        const createdAtMs = Number.isNaN(parsed.getTime())
+            ? new Date(`${typed.fecha}T00:00:00`).getTime()
+            : parsed.getTime();
+
+        if (createdAtMs > criticalThreshold) return;
+
+        const person = Array.isArray(typed.personal) ? typed.personal[0] : typed.personal;
+        const current = grouped.get(typed.personal_id);
+        if (current) {
+            current.critical_count += 1;
+            return;
+        }
+
+        grouped.set(typed.personal_id, {
+            personal_id: typed.personal_id,
+            nombre: person?.nombre || 'Sin nombre',
+            apellido: person?.apellido || '',
+            critical_count: 1,
+        });
+    });
+
+    return Array.from(grouped.values())
+        .sort((a, b) => b.critical_count - a.critical_count)
+        .slice(0, Math.max(1, limit));
+}
+
 export async function resolverRegistro(
     registroId: string,
     data: ResolucionData
@@ -1184,8 +1313,6 @@ export async function updateMovimientoAdminWithLines(
     lines: MovimientoLinea[],
     usdTotalOverride?: number
 ): Promise<{ success: boolean; error?: string }> {
-    const supabase = createClient();
-
     const normalizeLine = (line: MovimientoLinea) => {
         const importe = Number(line.importe || 0);
         const moneda = (line.moneda || '').toUpperCase();
@@ -1440,7 +1567,7 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
                     }
 
                     if (multiplier !== 0) {
-                        m.caja_admin_movimiento_lineas.forEach((l: any) => {
+                        m.caja_admin_movimiento_lineas.forEach((l: { cuenta_id: string; importe?: number | null }) => {
                             const cuenta = efectivoCuentas.find(ec => ec.id === l.cuenta_id);
                             if (cuenta) {
                                 if (cuenta.moneda === 'ARS') totalArs += Number(l.importe || 0) * multiplier;

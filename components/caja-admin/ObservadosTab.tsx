@@ -47,6 +47,39 @@ const METODOS_LABELS: Record<MetodoVerificacion, string> = {
     Otro: 'Otro',
 };
 
+function getSlaInfo(registro: RegistroHoras): {
+    text: string;
+    className: string;
+    level: 'ok' | 'warn' | 'critical';
+} {
+    const sourceDate = registro.created_at || registro.fecha;
+    const parsed = new Date(sourceDate);
+    const createdAt = Number.isNaN(parsed.getTime()) ? new Date(`${registro.fecha}T00:00:00`) : parsed;
+    const ageHours = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60)));
+
+    if (ageHours >= 48) {
+        return {
+            text: `${ageHours}h sin resolver`,
+            level: 'critical',
+            className: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800',
+        };
+    }
+
+    if (ageHours >= 24) {
+        return {
+            text: `${ageHours}h sin resolver`,
+            level: 'warn',
+            className: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
+        };
+    }
+
+    return {
+        text: `${ageHours}h`,
+        level: 'ok',
+        className: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
+    };
+}
+
 export default function ObservadosTab({ mes, onCountChange }: Props) {
     const [registros, setRegistros] = useState<RegistroHoras[]>([]);
     const [personal, setPersonal] = useState<Personal[]>([]);
@@ -78,9 +111,28 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
             }),
             getPersonal(),
         ]);
-        setRegistros(registrosData);
+
+        const sortedRegistros = [...registrosData].sort((a, b) => {
+            const slaA = getSlaInfo(a);
+            const slaB = getSlaInfo(b);
+
+            const priority: Record<'ok' | 'warn' | 'critical', number> = {
+                critical: 3,
+                warn: 2,
+                ok: 1,
+            };
+
+            const byPriority = priority[slaB.level] - priority[slaA.level];
+            if (byPriority !== 0) return byPriority;
+
+            const dateA = new Date(a.created_at || a.fecha).getTime();
+            const dateB = new Date(b.created_at || b.fecha).getTime();
+            return dateA - dateB; // oldest first when same SLA level
+        });
+
+        setRegistros(sortedRegistros);
         setPersonal(personalData);
-        onCountChange?.(registrosData.length);
+        onCountChange?.(sortedRegistros.length);
         setLoading(false);
     }
 
@@ -168,6 +220,9 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
         );
     }
 
+    const pendingCritical = registros.filter((reg) => getSlaInfo(reg).level === 'critical').length;
+    const pendingWarn = registros.filter((reg) => getSlaInfo(reg).level === 'warn').length;
+
     return (
         <div className="space-y-6">
             {/* Filters */}
@@ -215,12 +270,25 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
             ) : (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-amber-50 dark:bg-amber-900/20">
-                        <div className="flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5 text-amber-600" />
-                            <h3 className="font-semibold text-amber-800 dark:text-amber-300">
-                                {registros.length} registros requieren resolución
-                            </h3>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                                <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                                    {registros.length} registros requieren resolución
+                                </h3>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                                <span className="px-2 py-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
+                                    Críticos: {pendingCritical}
+                                </span>
+                                <span className="px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                    24h+: {pendingWarn}
+                                </span>
+                            </div>
                         </div>
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                            Resolvé primero los registros con SLA en rojo para evitar impacto en liquidaciones.
+                        </p>
                     </div>
 
                     <table className="w-full">
@@ -234,7 +302,10 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {registros.map((reg) => (
+                            {registros.map((reg) => {
+                                const sla = getSlaInfo(reg);
+
+                                return (
                                 <tr key={reg.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -248,11 +319,18 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm">
-                                        {new Date(reg.fecha).toLocaleDateString('es-AR', {
-                                            weekday: 'short',
-                                            day: 'numeric',
-                                            month: 'short',
-                                        })}
+                                        <div className="flex flex-col gap-1">
+                                            <span>
+                                                {new Date(reg.fecha).toLocaleDateString('es-AR', {
+                                                    weekday: 'short',
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                })}
+                                            </span>
+                                            <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded-md text-[11px] font-medium ${sla.className}`}>
+                                                SLA: {sla.text}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-medium">
@@ -282,7 +360,8 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
                                         </Button>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

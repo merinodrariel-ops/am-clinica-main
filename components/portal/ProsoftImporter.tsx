@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
-import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Medal, Star, Sparkles } from 'lucide-react';
+import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Star, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     previewProsoftImport, importProsoftData,
@@ -14,11 +14,6 @@ function mesLabel(ym: string) {
     const [y, m] = ym.split('-');
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     return `${meses[parseInt(m) - 1]} ${y}`;
-}
-
-function currentMes() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 interface PersonalOption {
@@ -34,9 +29,11 @@ interface SavedMapping {
     apellido: string | null;
 }
 
+type ProsoftFila = ProsoftPreview['filas'][number];
+type ProsoftRegistro = ProsoftFila['registros'][number];
+
 export default function ProsoftImporter() {
     const [url, setUrl] = useState('');
-    const [mes, setMes] = useState(currentMes());
     const [preview, setPreview] = useState<ProsoftPreview | null>(null);
     const [loading, setLoading] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -52,6 +49,8 @@ export default function ProsoftImporter() {
     const [editingMapping, setEditingMapping] = useState<string | null>(null); // raw_name being edited
     const [editValue, setEditValue] = useState<string>(''); // personalId for edit
 
+    const isObservedRecord = (r: { incompleto?: boolean; requiereRevision?: boolean }) => Boolean(r.incompleto || r.requiereRevision);
+
     useEffect(() => {
         getAllPersonalBasic().then(setAllPersonal).catch(() => { });
         getProsoftMappings().then(setSavedMappings).catch(() => { });
@@ -64,9 +63,9 @@ export default function ProsoftImporter() {
         setResult(null);
         setPendingMaps({});
         try {
-            const data = await previewProsoftImport(url.trim(), mes);
+            const data = await previewProsoftImport(url.trim());
             setPreview(data);
-            toast.success(`${data.totalRegistros} registros encontrados`);
+            toast.success(`${data.totalRegistros} registros encontrados · ${mesLabel(data.mes)}`);
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Error al leer la planilla');
         } finally {
@@ -78,12 +77,20 @@ export default function ProsoftImporter() {
         if (!preview) return;
         setImporting(true);
         try {
-            const res = await importProsoftData(url.trim(), mes, true);
+            const res = await importProsoftData(url.trim(), undefined, true);
             setResult(res);
+            const observed = preview.filas
+                .filter((f) => f.personalId)
+                .reduce((sum, f) => sum + f.registros.filter((r) => isObservedRecord(r)).length, 0);
+
             if (res.inserted > 0) {
                 toast.success(`✓ ${res.inserted} registros importados`);
             } else {
                 toast.info('No se importaron nuevos registros');
+            }
+
+            if (observed > 0) {
+                toast.warning(`${observed} registros quedaron en estado Observado para resolución manual.`);
             }
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Error al importar');
@@ -151,7 +158,7 @@ export default function ProsoftImporter() {
 
         const headers = ["Prestador", "Días", "Total Horas", "Prom/Día", "Horario Típico"];
         const rows = matchedRows.map(f => {
-            const complete = f.registros.filter(r => !r.incompleto);
+            const complete = f.registros.filter(r => !isObservedRecord(r));
             const totalH = complete.reduce((s, r) => s + r.horas, 0);
             const dias = f.registros.length;
             const ingresos = complete.filter(r => r.entrada !== '00:00').map(r => r.entrada).sort();
@@ -172,25 +179,25 @@ export default function ProsoftImporter() {
             ...rows.map(r => r.map(c => `"${c}"`).join(','))
         ].join('\n');
 
-        downloadCsv(csvContent, `resumen_horas_${mes}.csv`);
+        downloadCsv(csvContent, `resumen_horas_${preview.mes}.csv`);
     }
 
     function exportDetailedCsv() {
         if (!preview) return;
 
         const headers = ["Prestador", "Fecha", "Día", "Entrada", "Salida", "Horas", "Estado", "Notas"];
-        const rows: any[] = [];
+        const rows: Array<Array<string | number>> = [];
 
         matchedRows.forEach(f => {
             f.registros.forEach(r => {
                 rows.push([
                     f.personalNombre,
-                    `${mes}-${String(r.dia).padStart(2, '0')}`,
+                    `${preview.mes}-${String(r.dia).padStart(2, '0')}`,
                     r.dia,
                     r.entrada,
                     r.salida,
                     r.horas,
-                    r.incompleto ? 'Incompleto' : 'Ok',
+                    isObservedRecord(r) ? 'Observado' : 'Ok',
                     r.observaciones || ''
                 ]);
             });
@@ -198,10 +205,10 @@ export default function ProsoftImporter() {
 
         const csvContent = [
             headers.join(','),
-            ...rows.map(r => r.map((c: any) => `"${c}"`).join(','))
+            ...rows.map(r => r.map((c) => `"${c}"`).join(','))
         ].join('\n');
 
-        downloadCsv(csvContent, `detalle_diario_horas_${mes}.csv`);
+        downloadCsv(csvContent, `detalle_diario_horas_${preview.mes}.csv`);
     }
 
     function downloadCsv(content: string, filename: string) {
@@ -215,11 +222,11 @@ export default function ProsoftImporter() {
         document.body.removeChild(link);
     }
 
-    function getBadges(f: any) {
-        const badges = [];
-        const complete = f.registros.filter((r: any) => !r.incompleto);
-        const totalH = complete.reduce((s: number, r: any) => s + r.horas, 0);
-        const hasIncomplete = f.registros.some((r: any) => r.incompleto);
+    function getBadges(f: ProsoftFila) {
+        const badges: Array<{ icon: React.JSX.Element; label: string; bg: string }> = [];
+        const complete = f.registros.filter((r) => !isObservedRecord(r));
+        const totalH = complete.reduce((s, r) => s + r.horas, 0);
+        const hasIncomplete = f.registros.some((r) => isObservedRecord(r));
         const daysWorked = f.registros.length;
 
         // Merit-based criteria:
@@ -252,6 +259,10 @@ export default function ProsoftImporter() {
 
     const matchedRows = preview?.filas.filter(f => f.personalId) ?? [];
     const unmatchedRows = preview?.filas.filter(f => !f.personalId) ?? [];
+    const observedCount = matchedRows.reduce(
+        (sum, f) => sum + f.registros.filter((r) => isObservedRecord(r)).length,
+        0
+    );
 
     return (
         <div className="space-y-5">
@@ -343,19 +354,13 @@ export default function ProsoftImporter() {
             )}
 
             {/* Inputs */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
                 <input
                     type="url"
                     value={url}
                     onChange={e => setUrl(e.target.value)}
                     placeholder="https://docs.google.com/spreadsheets/d/..."
                     className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
-                />
-                <input
-                    type="month"
-                    value={mes}
-                    onChange={e => setMes(e.target.value)}
-                    className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500 transition-colors"
                 />
                 <button
                     onClick={handlePreview}
@@ -369,6 +374,22 @@ export default function ProsoftImporter() {
                     Vista previa
                 </button>
             </div>
+
+            {preview && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="px-2.5 py-1 rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-300 font-medium">
+                        Período detectado: {mesLabel(preview.mes)}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300">
+                        {preview.periodoDesde} → {preview.periodoHasta}
+                    </span>
+                    {!preview.periodoDetectado && (
+                        <span className="px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300">
+                            Período inferido por estructura (sin cabecera Prosoft)
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Preview */}
             {preview && !result && (
@@ -390,6 +411,24 @@ export default function ProsoftImporter() {
                             <p className="text-xs text-slate-400">Sin coincidencia</p>
                         </div>
                     </div>
+
+                    {observedCount > 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+                            <p className="text-xs text-amber-200 font-medium flex items-center gap-2">
+                                <AlertTriangle size={13} className="text-amber-400" />
+                                Se detectaron {observedCount} fichajes con conflicto o faltantes. Se importarán como <strong className="text-amber-300">Observado</strong> para corrección manual.
+                            </p>
+                            <p className="text-[11px] text-amber-300/90 mt-1">
+                                Luego resolvelos en Caja Administración → Personal → Observados (dejando evidencia y motivo en cada ajuste).
+                            </p>
+                            <a
+                                href="/caja-admin?tab=personal&subtab=observados"
+                                className="inline-flex items-center gap-1.5 mt-2 text-xs font-medium text-amber-200 hover:text-amber-100 underline underline-offset-2"
+                            >
+                                Abrir Observados ahora
+                            </a>
+                        </div>
+                    )}
 
                     {/* Manual mapping for unmatched */}
                     {unmatchedRows.length > 0 && (
@@ -441,7 +480,7 @@ export default function ProsoftImporter() {
                     {/* Employee list */}
                     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden max-h-80 overflow-y-auto">
                         {matchedRows.map((fila) => {
-                            const incomplete = fila.registros.filter(r => r.incompleto).length;
+                            const incomplete = fila.registros.filter(r => isObservedRecord(r)).length;
                             return (
                                 <div key={fila.rawName} className="border-b border-slate-800/50 last:border-0">
                                     <button
@@ -500,7 +539,7 @@ export default function ProsoftImporter() {
                                                                         <div className="flex items-center gap-2">
                                                                             <span className="w-5 text-slate-500 font-mono text-center">{r.dia}</span>
                                                                             <p className="text-slate-300 font-medium">
-                                                                                {r.incompleto && <Clock size={10} className="text-amber-400 inline mr-1" />}
+                                                                                {isObservedRecord(r) && <Clock size={10} className="text-amber-400 inline mr-1" />}
                                                                                 Día {r.dia}
                                                                             </p>
                                                                         </div>
@@ -509,7 +548,7 @@ export default function ProsoftImporter() {
                                                                         {r.entrada !== '00:00' ? r.entrada : '??:??'} – {r.salida !== '00:00' ? r.salida : '??:??'}
                                                                     </td>
                                                                     <td className="px-3 py-2 text-right font-medium text-slate-300">
-                                                                        {r.incompleto ? (
+                                                                        {isObservedRecord(r) ? (
                                                                             <span className="text-amber-500/80">pendiente</span>
                                                                         ) : (
                                                                             <span className="text-teal-400">{r.horas.toFixed(1)}h</span>
@@ -539,7 +578,7 @@ export default function ProsoftImporter() {
                     {/* Import button */}
                     <div className="flex items-center justify-between">
                         <p className="text-xs text-slate-400">
-                            Se importarán los registros de <strong className="text-white">{matchedRows.length}</strong> prestadores para <strong className="text-white">{mesLabel(mes)}</strong>
+                            Se importarán los registros de <strong className="text-white">{matchedRows.length}</strong> prestadores para <strong className="text-white">{mesLabel(preview.mes)}</strong>
                         </p>
                         <button
                             onClick={handleImport}
@@ -563,7 +602,7 @@ export default function ProsoftImporter() {
                     <div className="space-y-4">
                         {/* Status bar */}
                         {(() => {
-                            const totalIncomplete = matchedRows.reduce((s, f) => s + f.registros.filter(r => r.incompleto).length, 0);
+                            const totalIncomplete = matchedRows.reduce((s, f) => s + f.registros.filter(r => isObservedRecord(r)).length, 0);
                             return (
                                 <div className={`flex items-center gap-3 p-4 rounded-xl border ${result.inserted > 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-slate-700'}`}>
                                     {result.inserted > 0
@@ -571,11 +610,11 @@ export default function ProsoftImporter() {
                                         : <XCircle size={18} className="text-slate-400 flex-shrink-0" />
                                     }
                                     <div className="flex-1">
-                                        <p className="text-sm font-semibold text-white">Importación completada — {mesLabel(mes)}</p>
+                                        <p className="text-sm font-semibold text-white">Importación completada — {mesLabel(preview.mes)}</p>
                                         <p className="text-xs text-slate-400 mt-0.5">
                                             <span className="text-emerald-400 font-medium">{result.inserted} registros insertados</span>
                                             {result.skipped > 0 && <> · <span className="text-slate-300">{result.skipped} omitidos (ya existían)</span></>}
-                                            {totalIncomplete > 0 && <> · <span className="text-amber-400">{totalIncomplete} fichajes incompletos (quedan como pendiente)</span></>}
+                                            {totalIncomplete > 0 && <> · <span className="text-amber-400">{totalIncomplete} fichajes observados (requieren resolución manual)</span></>}
                                             {result.errors.length > 0 && <> · <span className="text-red-400">{result.errors.length} errores</span></>}
                                         </p>
                                     </div>
@@ -631,9 +670,9 @@ export default function ProsoftImporter() {
                                     >
                                         Imprimir
                                     </button>
-                                    <p className="text-xs text-slate-500">{mesLabel(mes)}</p>
+                                    <p className="text-xs text-slate-500">{mesLabel(preview.mes)}</p>
                                 </div>
-                                <p className="hidden print:block text-xs text-slate-600">{mesLabel(mes)}</p>
+                                <p className="hidden print:block text-xs text-slate-600">{mesLabel(preview.mes)}</p>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs">
@@ -649,8 +688,8 @@ export default function ProsoftImporter() {
                                     <tbody className="divide-y divide-slate-800/50">
                                         {matchedRows
                                             .map(f => {
-                                                const complete = f.registros.filter(r => !r.incompleto);
-                                                const incomplete = f.registros.filter(r => r.incompleto);
+                                                const complete = f.registros.filter(r => !isObservedRecord(r));
+                                                const incomplete = f.registros.filter(r => isObservedRecord(r));
                                                 const totalH = complete.reduce((s, r) => s + r.horas, 0);
                                                 const dias = f.registros.length;
                                                 const ingresos = complete.filter(r => r.entrada !== '00:00').map(r => r.entrada).sort();
@@ -688,7 +727,7 @@ export default function ProsoftImporter() {
                                                         <td className="px-3 py-2.5 text-center text-slate-300">
                                                             {dias}
                                                             {incompleteCount > 0 && (
-                                                                <span className="ml-1 text-amber-400" title={`${incompleteCount} fichajes incompletos`}>
+                                                                <span className="ml-1 text-amber-400" title={`${incompleteCount} fichajes observados`}>
                                                                     ({incompleteCount} pend.)
                                                                 </span>
                                                             )}
@@ -703,11 +742,11 @@ export default function ProsoftImporter() {
                                                                 <div className="bg-slate-900/50 rounded-lg border border-slate-800 p-2 overflow-hidden shadow-inner">
                                                                     <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Registros diarios importados</p>
                                                                     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5">
-                                                                        {f.registros.map((r: any, idx: number) => (
-                                                                            <div key={idx} className={`p-1.5 rounded-md border text-[10px] ${r.incompleto ? 'bg-amber-500/5 border-amber-500/20' : 'bg-slate-800/40 border-slate-800'}`}>
+                                                                        {f.registros.map((r: ProsoftRegistro, idx: number) => (
+                                                                            <div key={idx} className={`p-1.5 rounded-md border text-[10px] ${isObservedRecord(r) ? 'bg-amber-500/5 border-amber-500/20' : 'bg-slate-800/40 border-slate-800'}`}>
                                                                                 <div className="flex justify-between items-center mb-1">
                                                                                     <span className="text-slate-500 font-bold">Día {r.dia}</span>
-                                                                                    {r.incompleto ? <Clock size={8} className="text-amber-500" /> : <span className="text-teal-500 font-bold">{r.horas}h</span>}
+                                                                                    {isObservedRecord(r) ? <Clock size={8} className="text-amber-500" /> : <span className="text-teal-500 font-bold">{r.horas}h</span>}
                                                                                 </div>
                                                                                 <div className="text-slate-400 flex flex-col gap-0.5">
                                                                                     <span>E: {r.entrada}</span>

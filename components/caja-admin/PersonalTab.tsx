@@ -61,6 +61,7 @@ import SensitiveValue from '@/components/ui/SensitiveValue';
 interface Props {
     sucursal: Sucursal;
     tcBna: number | null;
+    initialTab?: MainTab;
 }
 
 type MainTab = 'equipo' | 'profesionales' | 'registros' | 'observados';
@@ -72,8 +73,8 @@ const CONDICION_AFIP_OPTIONS = [
     { value: 'otro', label: 'Otro' },
 ];
 
-export default function PersonalTab({ tcBna }: Props) {
-    const [activeTab, setActiveTab] = useState<MainTab>('equipo');
+export default function PersonalTab({ tcBna, initialTab }: Props) {
+    const [activeTab, setActiveTab] = useState<MainTab>(initialTab || 'equipo');
     const [observadosCount, setObservadosCount] = useState(0);
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [personalAreas, setPersonalAreas] = useState<PersonalArea[]>([]);
@@ -158,6 +159,11 @@ export default function PersonalTab({ tcBna }: Props) {
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mesActual]);
+
+    useEffect(() => {
+        if (!initialTab) return;
+        setActiveTab(initialTab);
+    }, [initialTab]);
 
     function openNewPersonalForm(tipo: 'prestador' | 'profesional') {
         setEditingPersonal(null);
@@ -303,7 +309,30 @@ export default function PersonalTab({ tcBna }: Props) {
         setSubmitting(false);
     }
 
+    function getCriticalObservadosCount(personalId: string): number {
+        const criticalThreshold = Date.now() - 48 * 60 * 60 * 1000;
+
+        return registros.filter((reg) => {
+            if (reg.personal_id !== personalId) return false;
+            if (String(reg.estado || '').toLowerCase() !== 'observado') return false;
+
+            const parsed = new Date(reg.created_at || reg.fecha);
+            const createdAtMs = Number.isNaN(parsed.getTime())
+                ? new Date(`${reg.fecha}T00:00:00`).getTime()
+                : parsed.getTime();
+
+            return createdAtMs <= criticalThreshold;
+        }).length;
+    }
+
     async function handleGenerarLiquidacion(personalId: string) {
+        const criticalCount = getCriticalObservadosCount(personalId);
+        if (criticalCount > 0) {
+            alert(`No se puede generar la liquidación: hay ${criticalCount} observado(s) crítico(s) sin resolver.`);
+            setActiveTab('observados');
+            return;
+        }
+
         setSubmitting(true);
         const p = personal.find(pers => pers.id === personalId);
 
@@ -1199,6 +1228,8 @@ export default function PersonalTab({ tcBna }: Props) {
                                 const totalPrestaciones = prestacionesProfe.reduce((acc, pr) => acc + pr.valor_cobrado, 0);
                                 const totalHonorarios = prestacionesProfe.reduce((acc, pr) => acc + (pr.monto_honorarios || 0), 0);
                                 const isProfesional = p.tipo === 'profesional';
+                                const criticalObservadosCount = getCriticalObservadosCount(p.id);
+                                const hasCriticalObservados = criticalObservadosCount > 0;
 
                                 return (
                                     <div
@@ -1289,14 +1320,21 @@ export default function PersonalTab({ tcBna }: Props) {
                                                 </span>
                                             </div>
                                         ) : (
-                                            <Button
-                                                onClick={() => handleGenerarLiquidacion(p.id)}
-                                                disabled={submitting || (isProfesional ? totalHonorarios === 0 : totalHoras === 0)}
-                                                className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-200 h-auto"
-                                            >
-                                                <DollarSign className="w-4 h-4" />
-                                                Generar Liquidación
-                                            </Button>
+                                            <div className="space-y-2">
+                                                <Button
+                                                    onClick={() => handleGenerarLiquidacion(p.id)}
+                                                    disabled={submitting || hasCriticalObservados || (isProfesional ? totalHonorarios === 0 : totalHoras === 0)}
+                                                    className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-200 h-auto"
+                                                >
+                                                    <DollarSign className="w-4 h-4" />
+                                                    Generar Liquidación
+                                                </Button>
+                                                {hasCriticalObservados && (
+                                                    <p className="text-[11px] text-red-600 dark:text-red-400 font-medium text-center">
+                                                        Bloqueado: {criticalObservadosCount} observado(s) crítico(s) sin resolver.
+                                                    </p>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 );
