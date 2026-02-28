@@ -1319,7 +1319,15 @@ export default function LiquidacionesPage() {
 
     const quickTargetsGenerate = filteredRows.filter((row) => !row.liquidacion);
     const quickTargetsApprove = filteredRows.filter((row) => row.liquidacion?.estado === 'pending');
+    const quickTargetsApproveClean = filteredRows.filter((row) => row.liquidacion?.estado === 'pending' && !row.tiene_pendientes);
     const quickTargetsPay = filteredRows.filter((row) => row.liquidacion?.estado === 'approved');
+
+    const pipelineCounts = {
+        sinGenerar: filteredRows.filter((row) => !row.liquidacion).length,
+        pendiente: filteredRows.filter((row) => row.liquidacion?.estado === 'pending').length,
+        aprobada: filteredRows.filter((row) => row.liquidacion?.estado === 'approved').length,
+        pagada: filteredRows.filter((row) => row.liquidacion?.estado === 'paid').length,
+    };
 
     // ── Actions ──────────────────────────────────────────────────────────────
     async function handleGenerate(personalId: string) {
@@ -1438,6 +1446,97 @@ export default function LiquidacionesPage() {
         setQuickActionBusy(null);
         await load();
         toast.success(`Pago masivo finalizado: ${ok} ok${fail ? `, ${fail} con error` : ''}.`);
+    }
+
+    async function handleCloseMonthAssisted() {
+        if (quickActionBusy) return;
+
+        const confirmStart = window.confirm(
+            `Cierre asistido para ${mesLabel(mes)}:\n` +
+            `1) Generar sin liquidación\n` +
+            `2) Aprobar pendientes sin alertas\n` +
+            `3) Opcionalmente marcar pagadas\n\n` +
+            `¿Continuar?`
+        );
+        if (!confirmStart) return;
+
+        setQuickActionBusy('close');
+
+        let generatedOk = 0;
+        let generatedFail = 0;
+        let approvedOk = 0;
+        let approvedFail = 0;
+        let paidOk = 0;
+        let paidFail = 0;
+
+        // Step 1: generate missing
+        for (const row of quickTargetsGenerate) {
+            try {
+                await generateLiquidacion(row.personal_id, mes);
+                generatedOk += 1;
+            } catch {
+                generatedFail += 1;
+            }
+        }
+
+        // Re-fetch after generation
+        let latestRows = rows;
+        try {
+            latestRows = await getLiquidacionesAdmin(mes);
+            setRows(latestRows);
+        } catch {
+            // continue with current rows
+        }
+
+        // Step 2: approve only clean pending (no alertas)
+        const approveCandidates = latestRows.filter((row) => row.liquidacion?.estado === 'pending' && !row.tiene_pendientes);
+        for (const row of approveCandidates) {
+            if (!row.liquidacion) continue;
+            try {
+                await approveLiquidacion(row.liquidacion.id);
+                approvedOk += 1;
+            } catch {
+                approvedFail += 1;
+            }
+        }
+
+        // Re-fetch after approvals
+        try {
+            latestRows = await getLiquidacionesAdmin(mes);
+            setRows(latestRows);
+        } catch {
+            // continue
+        }
+
+        // Step 3: optional pay all approved
+        const approvedCandidates = latestRows.filter((row) => row.liquidacion?.estado === 'approved');
+        if (approvedCandidates.length > 0) {
+            const shouldPay = window.confirm(`Hay ${approvedCandidates.length} liquidaciones aprobadas. ¿Querés marcarlas pagadas ahora?`);
+            if (shouldPay) {
+                const defaultDate = new Date().toISOString().split('T')[0];
+                const fechaPago = window.prompt('Fecha de pago para todas (YYYY-MM-DD)', defaultDate);
+                if (fechaPago) {
+                    for (const row of approvedCandidates) {
+                        if (!row.liquidacion) continue;
+                        try {
+                            await markLiquidacionPaid(row.liquidacion.id, fechaPago);
+                            paidOk += 1;
+                        } catch {
+                            paidFail += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        setQuickActionBusy(null);
+        await load();
+
+        toast.success(
+            `Cierre asistido listo · Gen ${generatedOk}/${generatedOk + generatedFail}, ` +
+            `Apr ${approvedOk}/${approvedOk + approvedFail}, ` +
+            `Pag ${paidOk}/${paidOk + paidFail}`
+        );
     }
 
     function getEstadoEmpresaMember(member: LiquidacionAdminRow): string {
@@ -1855,6 +1954,37 @@ export default function LiquidacionesPage() {
                                     Aprobar visibles
                                 </button>
                                 <button
+                                    onClick={async () => {
+                                        if (quickTargetsApproveClean.length === 0) {
+                                            toast.info('No hay pendientes limpias para aprobar en la vista actual.');
+                                            return;
+                                        }
+
+                                        setQuickActionBusy('approve-clean');
+                                        let ok = 0;
+                                        let fail = 0;
+
+                                        for (const row of quickTargetsApproveClean) {
+                                            if (!row.liquidacion) continue;
+                                            try {
+                                                await approveLiquidacion(row.liquidacion.id);
+                                                ok += 1;
+                                            } catch {
+                                                fail += 1;
+                                            }
+                                        }
+
+                                        setQuickActionBusy(null);
+                                        await load();
+                                        toast.success(`Aprobación limpia finalizada: ${ok} ok${fail ? `, ${fail} con error` : ''}.`);
+                                    }}
+                                    disabled={Boolean(quickActionBusy) || quickTargetsApproveClean.length === 0}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-800 disabled:opacity-50 text-emerald-100 text-xs"
+                                >
+                                    {quickActionBusy === 'approve-clean' ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                                    Aprobar limpias
+                                </button>
+                                <button
                                     onClick={handleQuickPayVisible}
                                     disabled={Boolean(quickActionBusy) || quickTargetsPay.length === 0}
                                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs"
@@ -1869,6 +1999,33 @@ export default function LiquidacionesPage() {
                                     <FileSpreadsheet size={11} />
                                     Cargar prestación
                                 </a>
+                                <button
+                                    onClick={handleCloseMonthAssisted}
+                                    disabled={Boolean(quickActionBusy)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-medium"
+                                >
+                                    {quickActionBusy === 'close' ? <RefreshCw size={11} className="animate-spin" /> : <Wallet size={11} />}
+                                    Cierre asistido
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                            <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-2">
+                                <p className="text-[11px] text-slate-400">Sin generar</p>
+                                <p className="text-sm font-semibold text-white">{pipelineCounts.sinGenerar}</p>
+                            </div>
+                            <div className="rounded-lg border border-amber-800/50 bg-amber-950/20 p-2">
+                                <p className="text-[11px] text-amber-300/80">Pendiente</p>
+                                <p className="text-sm font-semibold text-amber-300">{pipelineCounts.pendiente}</p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/20 p-2">
+                                <p className="text-[11px] text-emerald-300/80">Aprobada</p>
+                                <p className="text-sm font-semibold text-emerald-300">{pipelineCounts.aprobada}</p>
+                            </div>
+                            <div className="rounded-lg border border-blue-800/50 bg-blue-950/20 p-2">
+                                <p className="text-[11px] text-blue-300/80">Pagada</p>
+                                <p className="text-sm font-semibold text-blue-300">{pipelineCounts.pagada}</p>
                             </div>
                         </div>
                     </div>

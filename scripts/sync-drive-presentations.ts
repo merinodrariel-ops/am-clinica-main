@@ -154,7 +154,7 @@ async function run() {
     let pageToken: string | undefined;
 
     do {
-        const res: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
+        const res: any = await drive.files.list({
             q: `'${PACIENTES_ROOT}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
@@ -229,7 +229,7 @@ async function run() {
         if (!motherFolderId) continue;
 
         try {
-            const subRes = await drive.files.list({
+            const subRes: any = await drive.files.list({
                 q: `'${motherFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
                 includeItemsFromAllDrives: true,
                 supportsAllDrives: true,
@@ -242,7 +242,7 @@ async function run() {
 
             if (!presentationFolder?.id) continue;
 
-            const filesRes = await drive.files.list({
+            const filesRes: any = await drive.files.list({
                 q: `'${presentationFolder.id}' in parents and trashed=false`,
                 includeItemsFromAllDrives: true,
                 supportsAllDrives: true,
@@ -282,7 +282,7 @@ async function run() {
     pageToken = undefined;
 
     do {
-        const res: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
+        const res: any = await drive.files.list({
             q: `'${PACIENTES_ROOT}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
@@ -318,7 +318,7 @@ async function run() {
         if (!motherFolderId) continue;
 
         try {
-            const subRes = await drive.files.list({
+            const subRes: any = await drive.files.list({
                 q: `'${motherFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
                 includeItemsFromAllDrives: true,
                 supportsAllDrives: true,

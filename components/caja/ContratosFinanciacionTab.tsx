@@ -150,6 +150,8 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
         return `${selectedPatient.apellido}, ${selectedPatient.nombre}`;
     }, [selectedPatient]);
 
+    const pendingActionCount = inboxItems.length;
+
     const handleOpenInboxItem = async (item: RecentFinancingSelectionRecord) => {
         setOpeningInboxSimulationId(item.simulationId);
         try {
@@ -179,9 +181,21 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
             <div className="glass-card rounded-2xl p-5" style={{ background: 'hsla(230, 15%, 12%, 0.6)' }}>
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div>
-                        <h3 className="text-sm font-bold" style={{ color: 'hsl(210 20% 90%)' }}>
-                            ContratoMaker financiero
-                        </h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-bold" style={{ color: 'hsl(210 20% 90%)' }}>
+                                ContratoMaker financiero
+                            </h3>
+                            <span
+                                className="rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                                style={{
+                                    borderColor: 'hsla(195, 95%, 68%, 0.35)',
+                                    background: 'hsla(200, 100%, 55%, 0.14)',
+                                    color: 'hsl(195, 95%, 68%)',
+                                }}
+                            >
+                                Acciones pendientes: {pendingActionCount}
+                            </span>
+                        </div>
                         <p className="text-xs mt-1" style={{ color: 'hsl(230 10% 45%)' }}>
                             Selecciona paciente, comparte simulaciones y luego genera contrato legal en carpeta de Drive.
                         </p>
@@ -284,7 +298,19 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                         <p className="inline-flex items-center gap-2 text-xs font-semibold text-cyan-100">
                             <BellDot size={14} /> Inbox de acciones (ultimas 24h)
                         </p>
-                        {loadingInbox && <Loader2 size={12} className="animate-spin" style={{ color: 'hsl(195 95% 68%)' }} />}
+                        <div className="flex items-center gap-2">
+                            <span
+                                className="rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                                style={{
+                                    borderColor: 'hsla(195, 95%, 68%, 0.35)',
+                                    background: 'hsla(200, 100%, 55%, 0.14)',
+                                    color: 'hsl(195, 95%, 68%)',
+                                }}
+                            >
+                                {pendingActionCount}
+                            </span>
+                            {loadingInbox && <Loader2 size={12} className="animate-spin" style={{ color: 'hsl(195 95% 68%)' }} />}
+                        </div>
                     </div>
 
                     {inboxItems.length === 0 ? (

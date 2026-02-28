@@ -20,8 +20,10 @@ import {
     Rows3,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getAllWorkers, sendAccessInvite, updateWorkerProfileAdmin } from '@/app/actions/worker-portal';
+import { getStaffUiPreferences, saveStaffUiPreferences } from '@/app/actions/staff-ui-preferences';
 import { WorkerProfile, WorkerRole } from '@/types/worker-portal';
 import NewWorkerModal from '@/components/admin/NewWorkerModal';
 import { toast } from 'sonner';
@@ -117,6 +119,7 @@ const ACCESS_BADGE: Record<AccessStatus, { label: string; className: string }> =
 const STAFF_VIEW_KEY = 'am.staff.view-mode';
 const STAFF_ROLE_ORDER_KEY = 'am.staff.role-order';
 const STAFF_GROUP_KEY = 'am.staff.group-mode';
+const STAFF_DENSE_KEY = 'am.staff.dense-mode';
 
 type GroupMode = 'role' | 'company' | 'access' | 'compliance';
 
@@ -141,6 +144,8 @@ export default function StaffListPage() {
     const [viewMode, setViewMode] = useState<'board' | 'table'>('board');
     const [roleOrderPreference, setRoleOrderPreference] = useState<string[]>([]);
     const [groupMode, setGroupMode] = useState<GroupMode>('role');
+    const [denseMode, setDenseMode] = useState(false);
+    const [prefsReady, setPrefsReady] = useState(false);
     const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>({});
     const [savingInlineId, setSavingInlineId] = useState<string | null>(null);
 
@@ -185,6 +190,33 @@ export default function StaffListPage() {
         if (savedGroup === 'role' || savedGroup === 'company' || savedGroup === 'access' || savedGroup === 'compliance') {
             setGroupMode(savedGroup);
         }
+
+        const savedDense = window.localStorage.getItem(STAFF_DENSE_KEY);
+        if (savedDense === 'true' || savedDense === 'false') {
+            setDenseMode(savedDense === 'true');
+        }
+
+        let alive = true;
+        (async () => {
+            try {
+                const prefs = await getStaffUiPreferences();
+                if (!alive || !prefs) return;
+
+                setViewMode(prefs.viewMode);
+                setGroupMode(prefs.groupMode);
+                setOnlyActive(prefs.onlyActive);
+                setDenseMode(prefs.denseMode);
+                setRoleOrderPreference(prefs.roleOrder);
+            } catch {
+                // keep local fallback silently
+            } finally {
+                if (alive) setPrefsReady(true);
+            }
+        })();
+
+        return () => {
+            alive = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -201,6 +233,29 @@ export default function StaffListPage() {
         if (typeof window === 'undefined') return;
         window.localStorage.setItem(STAFF_GROUP_KEY, groupMode);
     }, [groupMode]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem(STAFF_DENSE_KEY, String(denseMode));
+    }, [denseMode]);
+
+    useEffect(() => {
+        if (!prefsReady) return;
+
+        const timeout = window.setTimeout(() => {
+            saveStaffUiPreferences({
+                viewMode,
+                groupMode,
+                onlyActive,
+                denseMode,
+                roleOrder: roleOrderPreference,
+            }).catch(() => {
+                // best-effort persistence, local storage already acts as fallback
+            });
+        }, 450);
+
+        return () => window.clearTimeout(timeout);
+    }, [denseMode, groupMode, onlyActive, prefsReady, roleOrderPreference, viewMode]);
 
     useEffect(() => {
         const next: Record<string, InlineDraft> = {};
@@ -617,6 +672,16 @@ export default function StaffListPage() {
                             </button>
                         ))}
                     </div>
+                    <button
+                        onClick={() => setDenseMode((v) => !v)}
+                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                            denseMode
+                                ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                                : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
+                        }`}
+                    >
+                        {denseMode ? 'Compacto ON' : 'Compacto OFF'}
+                    </button>
                     <div className="text-xs text-slate-500 lg:ml-auto">
                         {filteredWorkers.length} resultados · {groupMode === 'role' ? 'Drag de tarjetas/columnas habilitado' : 'Drag disponible al agrupar por rol'}
                     </div>

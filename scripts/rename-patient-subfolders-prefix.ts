@@ -47,7 +47,7 @@ async function run() {
         let renamed = 0;
 
         do {
-            const res: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
+            const res: any = await drive.files.list({
                 q: `'${PACIENTES_ROOT}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
                 includeItemsFromAllDrives: true,
                 supportsAllDrives: true,
@@ -62,7 +62,7 @@ async function run() {
                 if (!patientFolder.id || !patientFolder.name) continue;
 
                 // Get all subfolders of this patient folder
-                const subRes: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
+                const subRes: any = await drive.files.list({
                     q: `'${patientFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
                     includeItemsFromAllDrives: true,
                     supportsAllDrives: true,

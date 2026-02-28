@@ -184,6 +184,10 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
         return simulations[0] || null;
     }, [simulations]);
 
+    const pendingSharedCount = useMemo(() => {
+        return simulations.filter((simulation) => simulation.status === 'shared').length;
+    }, [simulations]);
+
     const displayedSimulations = useMemo(() => {
         if (!pendingOnly) return simulations;
         return simulations.filter((simulation) => simulation.status === 'shared');
@@ -427,6 +431,38 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
         }
     }, [loadSimulations, patient.id_paciente]);
 
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (target) {
+                const tag = target.tagName.toLowerCase();
+                if (tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable) {
+                    return;
+                }
+            }
+
+            if (event.key === 'Enter' && latestSimulation) {
+                event.preventDefault();
+                openWhatsapp({
+                    treatment: latestSimulation.treatment,
+                    shareUrl: latestSimulation.shareUrl,
+                    expiresAt: latestSimulation.expiresAt,
+                });
+                return;
+            }
+
+            if ((event.key === 'g' || event.key === 'G') && latestSelectedSimulation) {
+                event.preventDefault();
+                void handleGenerateContractNow(latestSelectedSimulation);
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => {
+            window.removeEventListener('keydown', onKeyDown);
+        };
+    }, [handleGenerateContractNow, latestSelectedSimulation, latestSimulation, openWhatsapp]);
+
     return (
         <div className="space-y-5 rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-5 text-slate-100">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -465,6 +501,10 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
             </div>
 
             <p className="text-[11px] text-slate-500">Estado de simulaciones con auto-refresh cada 30s.</p>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                <span className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1">Pendientes: {pendingSharedCount}</span>
+                <span>Atajos: Enter reenvia WhatsApp · G genera contrato del seleccionado</span>
+            </div>
 
             {latestSelectedSimulation && (
                 <div className="rounded-xl border border-cyan-300/30 bg-cyan-400/10 p-3 text-xs text-cyan-100">

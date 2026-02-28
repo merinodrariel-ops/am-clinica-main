@@ -77,7 +77,7 @@ export default function StatsGrid() {
             {cards.map((card, i) => {
                 const Icon = card.icon;
                 return (
-                    <div key={i} className="glass-card glass-card-hover rounded-2xl p-6">
+                    <div key={i} className="glass-card glass-card-hover rounded-2xl p-6 overflow-hidden">
                         <div className="flex items-center gap-4">
                             <div
                                 className="h-12 w-12 rounded-xl flex items-center justify-center"
@@ -85,11 +85,11 @@ export default function StatsGrid() {
                             >
                                 <Icon size={24} style={{ color: card.iconColor }} />
                             </div>
-                            <div>
+                            <div className="min-w-0 flex-1">
                                 <p className="text-sm" style={{ color: 'hsl(230 10% 50%)' }}>{card.label}</p>
                                 {card.isDouble ? (
                                     <div className="flex flex-col">
-                                        <span className="text-lg font-bold" style={{ color: 'hsl(210 20% 95%)' }}>
+                                        <span className="text-lg font-bold truncate block" style={{ color: 'hsl(210 20% 95%)' }}>
                                             {card.valueUsd}
                                         </span>
                                         <span className="text-sm font-medium" style={{ color: 'hsl(230 10% 50%)' }}>
@@ -99,7 +99,7 @@ export default function StatsGrid() {
                                 ) : (
                                     <div className="flex flex-col">
                                         <div className="flex items-baseline gap-2">
-                                            <p className="text-2xl font-bold" style={{ color: 'hsl(210 20% 95%)' }}>
+                                            <p className="text-2xl font-bold truncate" style={{ color: 'hsl(210 20% 95%)' }}>
                                                 {card.value}
                                             </p>
                                             {card.label === 'Pacientes' && (

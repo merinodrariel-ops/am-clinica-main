@@ -989,7 +989,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4 mb-8">
                         {[
                             { label: 'Ingresos Hoy', value: stats?.totalDiaUsd, icon: DollarSign, color: 'teal', sub: 'Hoy', privacy: true },
                             { label: 'Ingresos Mes', value: stats?.totalMesUsd, icon: TrendingUp, color: 'blue', sub: 'Mes', privacy: true },
@@ -998,10 +998,10 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             { label: 'Operaciones', value: stats?.movimientosHoy, icon: CreditCard, color: 'indigo', sub: 'Hoy', privacy: false },
                             { label: 'Pendientes', value: stats?.pendientes, icon: Clock, color: 'amber', sub: 'Action', privacy: false, alert: (stats?.pendientes || 0) > 0 }
                         ].map((card, i) => (
-                            <div key={i} className="glass-card p-6 rounded-3xl border-white/5 hover:border-white/10 transition-all group">
+                            <div key={i} className="glass-card p-6 rounded-3xl border-white/5 hover:border-white/10 transition-all group overflow-hidden">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className={clsx(
-                                        "h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110",
+                                        "h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shrink-0",
                                         card.color === 'teal' ? "bg-teal-500/10 text-teal-400" :
                                             card.color === 'blue' ? "bg-blue-500/10 text-blue-400" :
                                                 card.color === 'indigo' ? "bg-indigo-500/10 text-indigo-400" :
@@ -1016,8 +1016,8 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{card.label}</p>
-                                <p className="text-3xl font-black text-white">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 truncate">{card.label}</p>
+                                <p className="text-2xl sm:text-3xl font-black text-white truncate" title={String(card.value || 0)}>
                                     {card.privacy
                                         ? formatPrivacy(formatCurrency(Number(card.value) || 0, 'USD'))
                                         : card.value || 0
