@@ -19,6 +19,9 @@ import {
     Box,
     Image as ImageIcon,
     Lock,
+    Eye,
+    Receipt,
+    ChevronDown,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { format, parseISO } from 'date-fns';
@@ -64,10 +67,12 @@ interface PortalData {
     payments: {
         id: string;
         fecha_hora: string;
+        fecha_movimiento?: string;
         concepto_nombre: string;
         monto: number;
         moneda: string;
         estado: string;
+        metodo_pago?: string;
         cuota_nro: number | null;
         cuotas_total: number | null;
         comprobante_url: string | null;
@@ -235,6 +240,18 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
     const paidCuotas = payments.filter(p => p.cuota_nro !== null && p.cuota_nro > 0).length;
     const totalCuotas = payments.find(p => p.cuotas_total)?.cuotas_total || 0;
     const totalPaid = payments.reduce((s, p) => s + p.monto, 0);
+    const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
+    const [receiptViewUrl, setReceiptViewUrl] = useState<string | null>(null);
+
+    const getPaymentIcon = (method?: string) => {
+        switch (method) {
+            case 'Efectivo': return '💵';
+            case 'Transferencia': return '🏦';
+            case 'MercadoPago': return '📱';
+            case 'Cripto': return '₿';
+            default: return '💳';
+        }
+    };
 
     return (
         <div className="min-h-screen bg-[#0A0A0F] text-white">
@@ -539,52 +556,177 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                                 </div>
                             )}
 
-                            {/* Payment list */}
+                            {/* Payment list — Apple Wallet style */}
                             {payments.length > 0 && (
                                 <div className="space-y-2">
-                                    <p className="text-white/40 text-xs uppercase tracking-widest mb-3">Historial</p>
-                                    {payments.map((p, i) => (
-                                        <motion.div
-                                            key={p.id}
-                                            initial={{ opacity: 0, x: -16 }}
-                                            whileInView={{ opacity: 1, x: 0 }}
-                                            viewport={{ once: true }}
-                                            transition={{ delay: i * 0.05 }}
-                                            className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0"
-                                        >
-                                            <div className="h-8 w-8 rounded-xl bg-green-900/20 flex items-center justify-center flex-shrink-0">
-                                                <CheckCircle2 size={14} className="text-green-400" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-white/80 text-sm truncate">{p.concepto_nombre}</p>
-                                                <p className="text-white/30 text-xs">
-                                                    {format(parseISO(p.fecha_hora), 'd MMM yyyy', { locale: es })}
-                                                    {p.cuota_nro && ` · Cuota ${p.cuota_nro}/${p.cuotas_total}`}
-                                                </p>
-                                            </div>
-                                            <div className="text-right flex-shrink-0">
-                                                <p className="text-white text-sm font-semibold">
-                                                    {p.moneda === 'USD' ? 'U$D' : p.moneda === 'ARS' ? '$' : p.moneda} {p.monto.toLocaleString('es-AR')}
-                                                </p>
-                                                {p.comprobante_url && (
-                                                    <a
-                                                        href={p.comprobante_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-[#C9A96E] text-[10px] flex items-center gap-0.5 justify-end mt-0.5 hover:underline"
-                                                    >
-                                                        <Download size={9} />
-                                                        Comprobante
-                                                    </a>
+                                    <p className="text-white/40 text-xs uppercase tracking-widest mb-3">Historial de Pagos</p>
+                                    {payments.map((p, i) => {
+                                        const isExpanded = expandedPaymentId === p.id;
+                                        const displayDate = p.fecha_movimiento || p.fecha_hora;
+                                        return (
+                                            <motion.div
+                                                key={p.id}
+                                                initial={{ opacity: 0, x: -16 }}
+                                                whileInView={{ opacity: 1, x: 0 }}
+                                                viewport={{ once: true }}
+                                                transition={{ delay: i * 0.05 }}
+                                                className={clsx(
+                                                    'rounded-2xl border transition-all duration-300 overflow-hidden',
+                                                    isExpanded
+                                                        ? 'border-[#C9A96E]/30 bg-[#C9A96E]/5'
+                                                        : 'border-white/5 bg-white/[0.02] hover:border-white/10'
                                                 )}
-                                            </div>
-                                        </motion.div>
-                                    ))}
+                                            >
+                                                {/* Payment row header */}
+                                                <button
+                                                    onClick={() => setExpandedPaymentId(isExpanded ? null : p.id)}
+                                                    className="w-full flex items-center gap-3 p-4 text-left"
+                                                >
+                                                    {/* Payment method icon */}
+                                                    <div className={clsx(
+                                                        'h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg',
+                                                        p.comprobante_url
+                                                            ? 'bg-green-900/30'
+                                                            : 'bg-white/5'
+                                                    )}>
+                                                        {getPaymentIcon(p.metodo_pago)}
+                                                    </div>
+
+                                                    {/* Payment info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-white/90 text-sm font-medium truncate">{p.concepto_nombre}</p>
+                                                        <p className="text-white/30 text-xs">
+                                                            {format(parseISO(displayDate), 'd MMM yyyy', { locale: es })}
+                                                            {p.cuota_nro && ` · Cuota ${p.cuota_nro}/${p.cuotas_total}`}
+                                                            {p.metodo_pago && ` · ${p.metodo_pago}`}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Amount + expand */}
+                                                    <div className="text-right flex items-center gap-2 flex-shrink-0">
+                                                        <div>
+                                                            <p className="text-white text-sm font-semibold">
+                                                                {p.moneda === 'USD' ? 'U$D' : p.moneda === 'ARS' ? '$' : p.moneda} {p.monto.toLocaleString('es-AR')}
+                                                            </p>
+                                                            {p.comprobante_url && (
+                                                                <span className="text-[10px] text-green-400 flex items-center gap-0.5 justify-end">
+                                                                    <Receipt size={9} />
+                                                                    Comprobante
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <ChevronDown size={14} className={clsx(
+                                                            'text-white/20 transition-transform duration-300',
+                                                            isExpanded && 'rotate-180'
+                                                        )} />
+                                                    </div>
+                                                </button>
+
+                                                {/* Expanded content */}
+                                                <AnimatePresence>
+                                                    {isExpanded && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                                            className="overflow-hidden"
+                                                        >
+                                                            <div className="px-4 pb-4 pt-1 border-t border-white/5">
+                                                                {/* Receipt thumbnail */}
+                                                                {p.comprobante_url ? (
+                                                                    <div className="space-y-3">
+                                                                        <div
+                                                                            className="relative group cursor-pointer rounded-xl overflow-hidden border border-white/10 bg-white/5"
+                                                                            onClick={() => setReceiptViewUrl(p.comprobante_url)}
+                                                                        >
+                                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                            <img
+                                                                                src={p.comprobante_url}
+                                                                                alt={`Comprobante ${p.concepto_nombre}`}
+                                                                                className="w-full max-h-[300px] object-contain"
+                                                                                loading="lazy"
+                                                                            />
+                                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                                                                                    <Eye size={20} className="text-white" />
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex gap-2">
+                                                                            <a
+                                                                                href={p.comprobante_url}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#C9A96E]/10 border border-[#C9A96E]/20 text-[#C9A96E] text-xs font-semibold hover:bg-[#C9A96E]/20 transition-colors"
+                                                                            >
+                                                                                <Download size={12} />
+                                                                                Descargar
+                                                                            </a>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-2 py-3 text-white/20 text-xs">
+                                                                        <Receipt size={14} />
+                                                                        <span>Comprobante no disponible para este pago</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </motion.div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
                     </FadeIn>
                 )}
+
+                {/* Receipt fullscreen viewer */}
+                <AnimatePresence>
+                    {receiptViewUrl && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6"
+                            onClick={() => setReceiptViewUrl(null)}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.85 }}
+                                animate={{ scale: 1 }}
+                                exit={{ scale: 0.85 }}
+                                transition={{ type: 'spring', damping: 25 }}
+                                className="max-w-lg w-full max-h-[85vh] relative"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={receiptViewUrl}
+                                    alt="Comprobante"
+                                    className="w-full h-auto rounded-2xl shadow-2xl"
+                                />
+                                <button
+                                    onClick={() => setReceiptViewUrl(null)}
+                                    className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                                >
+                                    ✕
+                                </button>
+                                <a
+                                    href={receiptViewUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="absolute bottom-4 right-4 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#C9A96E] text-black text-xs font-bold hover:bg-[#E8D5A3] transition-colors"
+                                >
+                                    <Download size={12} />
+                                    Descargar
+                                </a>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* ── Documents ── */}
                 {docFiles.length > 0 && (

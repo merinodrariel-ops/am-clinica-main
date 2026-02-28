@@ -36,6 +36,14 @@ export interface PrestacionRealizada {
     profesional?: Personal;
 }
 
+export interface CreatePrestacionListaInput {
+    nombre: string;
+    area_nombre?: string;
+    precio_base: number;
+    moneda: 'ARS' | 'USD';
+    terminos?: string;
+}
+
 export async function getPrestacionesLista(areaId?: string): Promise<PrestacionLista[]> {
     let query = supabase
         .from('prestaciones_lista')
@@ -66,6 +74,33 @@ export async function registrarPrestacionRealizada(input: Omit<PrestacionRealiza
         return { success: false, error: error.message };
     }
     return { success: true };
+}
+
+export async function createPrestacionListaItem(input: CreatePrestacionListaInput): Promise<{ success: boolean; data?: PrestacionLista; error?: string }> {
+    const payload = {
+        nombre: input.nombre.trim(),
+        area_nombre: input.area_nombre?.trim() || null,
+        precio_base: Number(input.precio_base || 0),
+        moneda: input.moneda,
+        terminos: input.terminos?.trim() || null,
+        activo: true,
+    };
+
+    if (!payload.nombre) {
+        return { success: false, error: 'Nombre de prestación obligatorio' };
+    }
+
+    const { data, error } = await supabase
+        .from('prestaciones_lista')
+        .insert(payload)
+        .select('*')
+        .single();
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data as PrestacionLista };
 }
 
 export async function getPrestacionesRealizadas(options: {

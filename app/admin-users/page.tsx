@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { resendUserAccessEmail, inviteUser, setUserPassword, updateUser } from '@/app/actions/user-management';
+import { resendUserAccessEmail, inviteUser, setUserPassword, updateUser, deleteUserAccount } from '@/app/actions/user-management';
 import RoleGuard from '@/components/auth/RoleGuard';
 import {
     Mail,
@@ -14,7 +14,8 @@ import {
     Key,
     Lock,
     Edit2,
-    Search
+    Search,
+    Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,6 +25,7 @@ interface Profile {
     full_name: string;
     role: string;
     telefono?: string;
+    estado?: string;
     is_active: boolean;
     created_at: string;
 }
@@ -72,8 +74,9 @@ export default function UserManagementPage() {
     // Edit User State
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedUserForEdit, setSelectedUserForEdit] = useState<Profile | null>(null);
-    const [editData, setEditData] = useState({ fullName: '', role: '', telefono: '' });
+    const [editData, setEditData] = useState({ fullName: '', role: '', telefono: '', email: '', estado: '', isActive: true });
     const [editStatus, setEditStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'success_refresh'>('idle');
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Password Reset Manual State
     const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -176,7 +179,10 @@ export default function UserManagementPage() {
         setEditData({
             fullName: user.full_name || '',
             role: user.role || 'partner_viewer',
-            telefono: user.telefono || ''
+            telefono: user.telefono || '',
+            email: user.email || '',
+            estado: user.estado || (user.is_active ? 'activo' : 'inactivo'),
+            isActive: user.is_active,
         });
         setEditStatus('idle');
         setErrorMessage('');
@@ -193,7 +199,10 @@ export default function UserManagementPage() {
             const result = await updateUser(selectedUserForEdit.id, {
                 full_name: editData.fullName,
                 role: editData.role,
-                telefono: editData.telefono
+                telefono: editData.telefono,
+                email: editData.email,
+                estado: editData.estado,
+                is_active: editData.isActive,
             });
 
             if (result.success) {
@@ -213,6 +222,28 @@ export default function UserManagementPage() {
             setErrorMessage('Error inesperado.');
         } finally {
             setTimeout(() => setActionMessage(null), 4000);
+        }
+    }
+
+    async function handleDeleteUser(user: Profile) {
+        if (!session?.user?.id) return;
+        const ok = window.confirm(`¿Eliminar permanentemente a ${user.full_name || user.email}? Esta acción no se puede deshacer.`);
+        if (!ok) return;
+
+        setDeletingId(user.id);
+        try {
+            const result = await deleteUserAccount(user.id, session.user.id);
+            if (result.success) {
+                setActionMessage({ type: 'success', text: 'Usuario eliminado correctamente.' });
+                await loadUsers();
+            } else {
+                setActionMessage({ type: 'error', text: result.error || 'No se pudo eliminar el usuario.' });
+            }
+        } catch {
+            setActionMessage({ type: 'error', text: 'Error inesperado al eliminar usuario.' });
+        } finally {
+            setDeletingId(null);
+            setTimeout(() => setActionMessage(null), 5000);
         }
     }
 
@@ -393,6 +424,15 @@ export default function UserManagementPage() {
                                                         title="Establecer contraseña manualmente"
                                                     >
                                                         <Key size={16} />
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleDeleteUser(user)}
+                                                        disabled={deletingId === user.id || session?.user?.id === user.id}
+                                                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-lg transition-colors disabled:opacity-50"
+                                                        title={session?.user?.id === user.id ? 'No podés eliminar tu propio usuario' : 'Eliminar usuario'}
+                                                    >
+                                                        {deletingId === user.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                                                     </button>
                                                 </div>
                                             </td>
@@ -588,6 +628,15 @@ export default function UserManagementPage() {
                                     />
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                                    <input
+                                        type="email"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={editData.email}
+                                        onChange={e => setEditData({ ...editData, email: e.target.value })}
+                                    />
+                                </div>
+                                <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rol</label>
                                     <select
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -598,6 +647,29 @@ export default function UserManagementPage() {
                                             <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={editData.estado}
+                                        onChange={e => setEditData({ ...editData, estado: e.target.value })}
+                                    >
+                                        <option value="activo">Activo</option>
+                                        <option value="invitado">Invitado</option>
+                                        <option value="suspendido">Suspendido</option>
+                                        <option value="inactivo">Inactivo</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">Usuario activo en sistema</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditData(prev => ({ ...prev, isActive: !prev.isActive }))}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editData.isActive ? 'bg-emerald-600' : 'bg-gray-400'}`}
+                                    >
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editData.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </button>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>

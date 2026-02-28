@@ -27,6 +27,7 @@ import { formatIsoDateEsAr, getContractSchedule } from '@/lib/contract-dates';
 interface CalculadoraFinancieraProps {
     patient: Paciente;
     initialPreset?: FinancingSimulationPreset | null;
+    singleCtaMode?: boolean;
 }
 
 const TOP_TREATMENT_OPTIONS = [
@@ -46,7 +47,11 @@ function clampAnticipo(value: number): number {
     return Math.min(MAX_CUSTOM_ANTICIPO, Math.max(MIN_CUSTOM_ANTICIPO, Math.round(value)));
 }
 
-export default function CalculadoraFinanciera({ patient, initialPreset }: CalculadoraFinancieraProps) {
+export default function CalculadoraFinanciera({
+    patient,
+    initialPreset,
+    singleCtaMode = false,
+}: CalculadoraFinancieraProps) {
     const [selectedTreatment, setSelectedTreatment] = useState<string>('Alineadores invisibles AM');
     const [customTreatment, setCustomTreatment] = useState('');
     const [totalUsd, setTotalUsd] = useState(
@@ -561,22 +566,26 @@ export default function CalculadoraFinanciera({ patient, initialPreset }: Calcul
                             <FileSignature size={14} />
                             {creatingDriveContract ? 'Generando...' : 'Generar contrato legal en Drive'}
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => void handleCopyContract()}
-                            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
-                        >
-                            <Copy size={14} />
-                            Copiar
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleDownloadContract}
-                            className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/40 bg-cyan-400/20 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/30"
-                        >
-                            <Download size={14} />
-                            Descargar .md
-                        </button>
+                        {!singleCtaMode && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => void handleCopyContract()}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+                                >
+                                    <Copy size={14} />
+                                    Copiar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadContract}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/40 bg-cyan-400/20 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/30"
+                                >
+                                    <Download size={14} />
+                                    Descargar .md
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -601,28 +610,30 @@ export default function CalculadoraFinanciera({ patient, initialPreset }: Calcul
                 </pre>
             </div>
 
-            <div className="mt-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <p className="text-sm font-semibold text-white">Presentacion HTML para presupuesto</p>
-                        <p className="text-xs text-slate-400">
-                            Bloque visual listo para pegar en propuesta comercial con opciones de financiacion.
-                        </p>
+            {!singleCtaMode && (
+                <div className="mt-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-semibold text-white">Presentacion HTML para presupuesto</p>
+                            <p className="text-xs text-slate-400">
+                                Bloque visual listo para pegar en propuesta comercial con opciones de financiacion.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => void handleCopyOfferHtml()}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+                        >
+                            <Copy size={14} />
+                            Copiar HTML
+                        </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => void handleCopyOfferHtml()}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
-                    >
-                        <Copy size={14} />
-                        Copiar HTML
-                    </button>
-                </div>
 
-                <pre className="max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 text-[11px] leading-relaxed text-slate-200 whitespace-pre-wrap">
-                    {financingOfferHtml}
-                </pre>
-            </div>
+                    <pre className="max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 text-[11px] leading-relaxed text-slate-200 whitespace-pre-wrap">
+                        {financingOfferHtml}
+                    </pre>
+                </div>
+            )}
         </div>
     );
 }

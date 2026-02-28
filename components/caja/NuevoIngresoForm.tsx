@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon } from 'lucide-react';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,9 @@ import { formatCurrency } from '@/lib/bna';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerWorkflowFromSenaPayment } from '@/app/actions/clinical-workflows';
 import { getLocalISODate } from '@/lib/local-date';
+import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
+import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
+import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
 
 interface Paciente {
     id_paciente: string;
@@ -100,6 +103,7 @@ const METODOS_PAGO = [
 export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }: NuevoIngresoFormProps) {
     const [step, setStep] = useState(1);
     const [saving, setSaving] = useState(false);
+    const receiptCanvasRef = useRef<HTMLCanvasElement>(null);
 
     // Patient search
     const [searchQuery, setSearchQuery] = useState('');
@@ -344,6 +348,39 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
 
             if (error) throw error;
 
+            // Auto-generate receipt in background (never blocks payment flow)
+            if (insertedMovement?.id) {
+                try {
+                    const canvas = receiptCanvasRef.current;
+                    if (canvas) {
+                        const receiptNumber = generateReciboNumber();
+                        const cuotaInfo = formData.es_cuota
+                            ? `${formData.cuota_nro}/${formData.cuotas_total}`
+                            : undefined;
+                        const imageDataUrl = drawReceiptOnCanvas(canvas, {
+                            numero: receiptNumber,
+                            fecha: new Date(),
+                            paciente: formData.paciente_nombre,
+                            concepto: conceptoFinal,
+                            monto: formData.monto,
+                            moneda: formData.moneda,
+                            metodoPago: formData.metodo_pago,
+                            atendidoPor: 'AM Clínica',
+                            cuotaInfo,
+                        });
+                        const base64Data = imageDataUrl.split(',')[1];
+                        // Fire and forget — don't await
+                        saveReceiptAndLinkToMovement(
+                            insertedMovement.id,
+                            receiptNumber,
+                            base64Data
+                        ).catch(err => console.error('Auto-receipt generation failed:', err));
+                    }
+                } catch (receiptError) {
+                    console.error('Auto-receipt generation failed:', receiptError);
+                }
+            }
+
             if (formData.es_sena && formData.sena_tipo) {
                 try {
                     const workflowResult = await triggerWorkflowFromSenaPayment({
@@ -408,6 +445,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            {/* Hidden canvas for auto-receipt generation */}
+            <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
             <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-xl">
                 {/* Header */}
                 <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">

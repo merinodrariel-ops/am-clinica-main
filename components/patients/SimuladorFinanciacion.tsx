@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, ExternalLink, Loader2, RefreshCw, Send } from 'lucide-react';
+import { CheckCircle2, Copy, ExternalLink, Loader2, MessageCircle, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { Input } from '@/components/ui/Input';
@@ -26,6 +26,7 @@ const TOP_TREATMENT_OPTIONS = [
 const OTHER_TREATMENT_OPTION = '__other__';
 const INSTALLMENT_OPTIONS = [3, 6, 12] as const;
 const UPFRONT_OPTIONS = [30, 40, 50] as const;
+type WhatsappMessageMode = 'short' | 'formal';
 
 interface SimuladorFinanciacionProps {
     patient: Paciente;
@@ -40,6 +41,78 @@ function formatSimulationDate(iso: string): string {
         hour: '2-digit',
         minute: '2-digit',
     });
+}
+
+function sanitizePhone(raw: string | null | undefined): string {
+    return (raw || '').replace(/\D/g, '');
+}
+
+function buildWhatsappUrl(params: {
+    phone?: string | null;
+    patientName: string;
+    treatment: string;
+    shareUrl: string;
+    expiresAt: string;
+    mode?: WhatsappMessageMode;
+}): string {
+    const expires = new Date(params.expiresAt).toLocaleDateString('es-AR');
+    const mode = params.mode || 'short';
+
+    const text = mode === 'formal'
+        ? [
+            `Hola ${params.patientName || ''}`.trim(),
+            '',
+            `Desde AM Clinica Dental le compartimos su simulacion de financiacion para ${params.treatment}.`,
+            'Puede seleccionar anticipo y cuotas en el siguiente enlace:',
+            params.shareUrl,
+            '',
+            `El enlace estara vigente hasta ${expires}.`,
+            'Quedamos a disposicion para cualquier consulta.',
+            'AM Clinica Dental',
+        ].join('\n')
+        : [
+            `Hola ${params.patientName || ''}`.trim(),
+            '',
+            `Tu simulacion de ${params.treatment}:`,
+            params.shareUrl,
+            `Vigencia: ${expires}`,
+            'AM Clinica Dental',
+        ].join('\n');
+
+    const encoded = encodeURIComponent(text);
+    const cleanPhone = sanitizePhone(params.phone);
+    if (cleanPhone.length >= 8) {
+        return `https://wa.me/${cleanPhone}?text=${encoded}`;
+    }
+    return `https://wa.me/?text=${encoded}`;
+}
+
+function getStatusBadgeStyle(status: FinancingSimulationRecord['status']): {
+    className: string;
+    label: string;
+} {
+    switch (status) {
+        case 'contracted':
+            return {
+                className: 'border-emerald-300/25 bg-emerald-400/10 text-emerald-200',
+                label: 'Contrato listo',
+            };
+        case 'selected':
+            return {
+                className: 'border-cyan-300/25 bg-cyan-400/10 text-cyan-200',
+                label: 'Paciente eligio',
+            };
+        case 'expired':
+            return {
+                className: 'border-amber-300/25 bg-amber-400/10 text-amber-200',
+                label: 'Expirada',
+            };
+        default:
+            return {
+                className: 'border-slate-300/25 bg-slate-400/10 text-slate-200',
+                label: 'Link enviado',
+            };
+    }
 }
 
 export default function SimuladorFinanciacion({ patient, onUseInContract }: SimuladorFinanciacionProps) {
@@ -59,6 +132,7 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
     const [allowedUpfronts, setAllowedUpfronts] = useState<number[]>([30, 40, 50]);
     const [simulations, setSimulations] = useState<FinancingSimulationRecord[]>([]);
     const [latestShareUrl, setLatestShareUrl] = useState<string | null>(null);
+    const [messageMode, setMessageMode] = useState<WhatsappMessageMode>('short');
 
     const tratamiento = useMemo(() => {
         if (selectedTreatment === OTHER_TREATMENT_OPTION) {
@@ -67,7 +141,19 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
         return selectedTreatment;
     }, [selectedTreatment, customTreatment]);
 
+    const patientName = useMemo(() => {
+        return `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'paciente';
+    }, [patient.apellido, patient.nombre]);
+
     const bnaVenta = manualRate > 0 ? manualRate : rateData?.venta || 0;
+
+    const latestSelectedSimulation = useMemo(() => {
+        return simulations.find((simulation) => simulation.status === 'selected') || null;
+    }, [simulations]);
+
+    const latestSimulation = useMemo(() => {
+        return simulations[0] || null;
+    }, [simulations]);
 
     const loadRate = useCallback(async () => {
         try {
@@ -81,18 +167,24 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
         }
     }, []);
 
-    const loadSimulations = useCallback(async () => {
+    const loadSimulations = useCallback(async (silent = false) => {
         if (!patient.id_paciente) return;
-        setLoadingList(true);
+        if (!silent) {
+            setLoadingList(true);
+        }
         try {
             const result = await listFinancingSimulationsByPatientAction(patient.id_paciente);
             if (!result.success) {
-                toast.error(result.error || 'No se pudieron cargar las simulaciones.');
+                if (!silent) {
+                    toast.error(result.error || 'No se pudieron cargar las simulaciones.');
+                }
                 return;
             }
             setSimulations(result.simulations);
         } finally {
-            setLoadingList(false);
+            if (!silent) {
+                setLoadingList(false);
+            }
         }
     }, [patient.id_paciente]);
 
@@ -104,6 +196,32 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
         setLatestShareUrl(null);
         void loadSimulations();
     }, [loadSimulations]);
+
+    useEffect(() => {
+        if (!patient.id_paciente) return;
+        const intervalId = window.setInterval(() => {
+            void loadSimulations(true);
+        }, 30000);
+
+        return () => window.clearInterval(intervalId);
+    }, [patient.id_paciente, loadSimulations]);
+
+    const openWhatsapp = useCallback((payload: {
+        treatment: string;
+        shareUrl: string;
+        expiresAt: string;
+        mode?: WhatsappMessageMode;
+    }) => {
+        const whatsappUrl = buildWhatsappUrl({
+            phone: patient.telefono,
+            patientName,
+            treatment: payload.treatment,
+            shareUrl: payload.shareUrl,
+            expiresAt: payload.expiresAt,
+            mode: payload.mode || messageMode,
+        });
+        window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    }, [messageMode, patient.telefono, patientName]);
 
     const toggleInstallment = useCallback((value: number) => {
         setAllowedInstallments((current) => {
@@ -160,10 +278,25 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
             setLatestShareUrl(result.simulation.shareUrl);
             setSimulations((current) => [result.simulation!, ...current]);
             toast.success('Simulacion creada y lista para enviar al paciente.');
+
+            openWhatsapp({
+                treatment: result.simulation.treatment,
+                shareUrl: result.simulation.shareUrl,
+                expiresAt: result.simulation.expiresAt,
+            });
         } finally {
             setCreating(false);
         }
-    }, [patient.id_paciente, tratamiento, totalUsd, bnaVenta, allowedInstallments, allowedUpfronts, expiresInDays]);
+    }, [
+        patient.id_paciente,
+        tratamiento,
+        totalUsd,
+        bnaVenta,
+        allowedInstallments,
+        allowedUpfronts,
+        expiresInDays,
+        openWhatsapp,
+    ]);
 
     const handleCopyLink = useCallback(async (url: string) => {
         try {
@@ -197,18 +330,56 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                     <h3 className="text-lg font-semibold text-white">Simulador compartible</h3>
                     <p className="text-xs text-slate-400">Crea un link para que el paciente elija anticipo y cuotas.</p>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => {
-                        void loadRate();
-                        void loadSimulations();
-                    }}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-700"
-                >
-                    <RefreshCw size={14} />
-                    Actualizar
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    {latestSimulation && (
+                        <button
+                            type="button"
+                            onClick={() => openWhatsapp({
+                                treatment: latestSimulation.treatment,
+                                shareUrl: latestSimulation.shareUrl,
+                                expiresAt: latestSimulation.expiresAt,
+                            })}
+                            className="inline-flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/30"
+                        >
+                            <MessageCircle size={14} />
+                            Reenviar ultimo link
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            void loadRate();
+                            void loadSimulations();
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-700"
+                    >
+                        <RefreshCw size={14} />
+                        Actualizar
+                    </button>
+                </div>
             </div>
+
+            <p className="text-[11px] text-slate-500">Estado de simulaciones con auto-refresh cada 30s.</p>
+
+            {latestSelectedSimulation && (
+                <div className="rounded-xl border border-cyan-300/30 bg-cyan-400/10 p-3 text-xs text-cyan-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="inline-flex items-center gap-2">
+                            <CheckCircle2 size={14} />
+                            El paciente ya eligio una opcion. Continua directo con ContractMaker.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => void handleUseInContract(latestSelectedSimulation.id)}
+                            disabled={usingSimulationId === latestSelectedSimulation.id}
+                            className="inline-flex items-center gap-1 rounded-md border border-cyan-200/35 bg-cyan-400/20 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-100 disabled:opacity-60"
+                        >
+                            {usingSimulationId === latestSelectedSimulation.id ? <Loader2 size={11} className="animate-spin" /> : null}
+                            Continuar a ContractMaker
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-4 rounded-xl border border-slate-700 bg-white/5 p-4">
@@ -311,6 +482,34 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                     </div>
 
                     <div>
+                        <Label className="text-xs text-slate-300">Formato de mensaje WhatsApp</Label>
+                        <div className="mt-2 flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setMessageMode('short')}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    messageMode === 'short'
+                                        ? 'bg-cyan-400 text-slate-900'
+                                        : 'border border-slate-600 bg-slate-800 text-slate-200'
+                                }`}
+                            >
+                                Rapido
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMessageMode('formal')}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    messageMode === 'formal'
+                                        ? 'bg-cyan-400 text-slate-900'
+                                        : 'border border-slate-600 bg-slate-800 text-slate-200'
+                                }`}
+                            >
+                                Formal
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
                         <Label htmlFor="sim-expire" className="text-xs text-slate-300">Vencimiento del link</Label>
                         <select
                             id="sim-expire"
@@ -332,8 +531,11 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                         className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/40 bg-cyan-400/20 px-4 py-2.5 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/30 disabled:opacity-60"
                     >
                         {creating ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                        {creating ? 'Generando link...' : 'Crear simulacion compartible'}
+                        {creating ? 'Generando link...' : 'Crear y enviar por WhatsApp'}
                     </button>
+                    <p className="text-[11px] text-slate-400">
+                        CTA principal: al crear se abre WhatsApp con mensaje {messageMode === 'formal' ? 'formal' : 'rapido'} y link.
+                    </p>
                 </div>
             </div>
 
@@ -342,6 +544,34 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <span>Link listo para enviar por WhatsApp o email.</span>
                         <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    openWhatsapp({
+                                        treatment: latestSimulation?.treatment || tratamiento || 'tratamiento odontologico',
+                                        shareUrl: latestShareUrl,
+                                        expiresAt: latestSimulation?.expiresAt || new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString(),
+                                        mode: 'short',
+                                    });
+                                }}
+                                className="inline-flex items-center gap-1 rounded-md border border-emerald-200/30 px-2 py-1"
+                            >
+                                <MessageCircle size={12} /> WA rapido
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    openWhatsapp({
+                                        treatment: latestSimulation?.treatment || tratamiento || 'tratamiento odontologico',
+                                        shareUrl: latestShareUrl,
+                                        expiresAt: latestSimulation?.expiresAt || new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString(),
+                                        mode: 'formal',
+                                    });
+                                }}
+                                className="inline-flex items-center gap-1 rounded-md border border-emerald-200/30 px-2 py-1"
+                            >
+                                <MessageCircle size={12} /> WA formal
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => void handleCopyLink(latestShareUrl)}
@@ -368,48 +598,52 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                     <p className="text-xs text-slate-400">Todavia no hay simulaciones compartidas para este paciente.</p>
                 ) : (
                     <div className="space-y-2">
-                        {simulations.map((simulation) => (
-                            <div key={simulation.id} className="rounded-lg border border-slate-700 bg-slate-950/60 p-3">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-100">{simulation.treatment}</p>
-                                        <p className="text-[11px] text-slate-400">
-                                            {formatUsd(simulation.totalUsd)} · {formatArs(simulation.bnaVentaArs)} · creada {formatSimulationDate(simulation.createdAt)}
-                                        </p>
-                                    </div>
-                                    <span className="rounded-md border border-cyan-300/25 bg-cyan-400/10 px-2 py-1 text-[10px] uppercase tracking-wider text-cyan-200">
-                                        {simulation.status}
-                                    </span>
-                                </div>
+                        {simulations.map((simulation) => {
+                            const statusMeta = getStatusBadgeStyle(simulation.status);
 
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => void handleCopyLink(simulation.shareUrl)}
-                                        className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] text-slate-100"
-                                    >
-                                        <Copy size={11} /> Copiar link
-                                    </button>
-                                    <a
-                                        href={simulation.shareUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] text-slate-100"
-                                    >
-                                        <ExternalLink size={11} /> Ver
-                                    </a>
-                                    <button
-                                        type="button"
-                                        onClick={() => void handleUseInContract(simulation.id)}
-                                        disabled={usingSimulationId === simulation.id}
-                                        className="inline-flex items-center gap-1 rounded-md border border-cyan-300/30 bg-cyan-400/20 px-2 py-1 text-[11px] font-medium text-cyan-100 disabled:opacity-60"
-                                    >
-                                        {usingSimulationId === simulation.id ? <Loader2 size={11} className="animate-spin" /> : null}
-                                        Usar en ContractMaker
-                                    </button>
+                            return (
+                                <div key={simulation.id} className="rounded-lg border border-slate-700 bg-slate-950/60 p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-100">{simulation.treatment}</p>
+                                            <p className="text-[11px] text-slate-400">
+                                                {formatUsd(simulation.totalUsd)} · {formatArs(simulation.bnaVentaArs)} · creada {formatSimulationDate(simulation.createdAt)}
+                                            </p>
+                                        </div>
+                                        <span className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider ${statusMeta.className}`}>
+                                            {statusMeta.label}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleCopyLink(simulation.shareUrl)}
+                                            className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] text-slate-100"
+                                        >
+                                            <Copy size={11} /> Copiar link
+                                        </button>
+                                        <a
+                                            href={simulation.shareUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] text-slate-100"
+                                        >
+                                            <ExternalLink size={11} /> Ver
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleUseInContract(simulation.id)}
+                                            disabled={usingSimulationId === simulation.id}
+                                            className="inline-flex items-center gap-1 rounded-md border border-cyan-300/30 bg-cyan-400/20 px-2 py-1 text-[11px] font-medium text-cyan-100 disabled:opacity-60"
+                                        >
+                                            {usingSimulationId === simulation.id ? <Loader2 size={11} className="animate-spin" /> : null}
+                                            {simulation.status === 'selected' ? 'Continuar a ContractMaker' : 'Usar en ContractMaker'}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

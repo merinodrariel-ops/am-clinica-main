@@ -51,7 +51,7 @@ export async function GET(
 
         supabase
             .from('caja_recepcion_movimientos')
-            .select('id, fecha_hora, concepto_nombre, monto, moneda, estado, cuota_nro, cuotas_total, comprobante_url')
+            .select('id, fecha_hora, fecha_movimiento, concepto_nombre, monto, moneda, estado, metodo_pago, cuota_nro, cuotas_total, comprobante_url')
             .eq('paciente_id', patientId)
             .eq('estado_registro', 'activo')
             .neq('estado', 'anulado')
@@ -160,9 +160,49 @@ export async function GET(
         allStages = allStagesRes.data || null;
     }
 
+    // 4. Resolve receipt signed URLs for payments
+    const payments = paymentsRes.data || [];
+    const resolvedPayments = await Promise.all(
+        payments.map(async (p: Record<string, unknown>) => {
+            if (!p.comprobante_url || typeof p.comprobante_url !== 'string') return p;
+
+            try {
+                const url = p.comprobante_url as string;
+
+                // New format: "storage:caja-recepcion:2026-02/recibo-xxx.jpg"
+                if (url.startsWith('storage:')) {
+                    const parts = url.split(':');
+                    if (parts.length >= 3) {
+                        const bucket = parts[1];
+                        const path = parts.slice(2).join(':');
+                        const { data: signedData } = await supabase.storage
+                            .from(bucket)
+                            .createSignedUrl(path, 60 * 60 * 2); // 2 hours
+                        return { ...p, comprobante_url: signedData?.signedUrl || url };
+                    }
+                }
+
+                // Legacy: already a URL — try to refresh if it's a Supabase signed URL  
+                if (url.startsWith('https://') && url.includes('/object/sign/')) {
+                    const match = new URL(url).pathname.match(/\/object\/sign\/([^/]+)\/(.+)/);
+                    if (match) {
+                        const { data: signedData } = await supabase.storage
+                            .from(match[1])
+                            .createSignedUrl(match[2], 60 * 60 * 2);
+                        if (signedData?.signedUrl) return { ...p, comprobante_url: signedData.signedUrl };
+                    }
+                }
+
+                return p;
+            } catch {
+                return p; // Return original on any error
+            }
+        })
+    );
+
     return NextResponse.json({
         patient: patientRes.data,
-        payments: paymentsRes.data || [],
+        payments: resolvedPayments,
         treatment,
         allStages,
         plan: planRes.data?.[0] || null,

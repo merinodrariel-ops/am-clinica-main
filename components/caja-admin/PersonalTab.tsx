@@ -52,6 +52,7 @@ import {
     type PrestacionRealizada,
     getPrestacionesLista,
     registrarPrestacionRealizada,
+    createPrestacionListaItem,
     getPrestacionesRealizadas,
     generarLiquidacionProfesional
 } from '@/lib/caja-admin-prestaciones';
@@ -98,10 +99,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [selectedProfesionalId, setSelectedProfesionalId] = useState<string | null>(null);
     const [prestacionForm, setPrestacionForm] = useState({
         prestacion_id: '',
+        prestacion_nombre_manual: '',
         paciente_nombre: '',
         valor_cobrado: 0,
         moneda: 'ARS' as 'ARS' | 'USD',
-        notas: ''
+        notas: '',
+        guardar_en_tarifario: false,
     });
 
     // Form state for new/edit personal
@@ -212,9 +215,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setPrestacionForm({
             paciente_nombre: '',
             prestacion_id: '',
+            prestacion_nombre_manual: '',
             valor_cobrado: 0,
             moneda: 'ARS',
-            notas: ''
+            notas: '',
+            guardar_en_tarifario: prestacionesLista.length === 0,
         });
         setShowPrestacionForm(true);
     }
@@ -265,26 +270,41 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     }
 
     async function handleRegistrarPrestacion() {
-        if (!selectedProfesionalId || !prestacionForm.prestacion_id) return;
+        if (!selectedProfesionalId) return;
+
+        const hasCatalogSelection = Boolean(prestacionForm.prestacion_id);
+        const manualName = prestacionForm.prestacion_nombre_manual.trim();
+        if (!hasCatalogSelection && !manualName) {
+            alert('Seleccioná una prestación del tarifario o cargá el nombre manual.');
+            return;
+        }
+
+        if (prestacionForm.valor_cobrado <= 0) {
+            alert('Ingresá un valor cobrado mayor a 0.');
+            return;
+        }
 
         setSubmitting(true);
 
-        const prestacion = prestacionesLista.find(p => p.id === prestacionForm.prestacion_id);
+        const prestacion = hasCatalogSelection
+            ? prestacionesLista.find(p => p.id === prestacionForm.prestacion_id)
+            : null;
         const profesional = personal.find(p => p.id === selectedProfesionalId);
 
-        if (!prestacion || !profesional) {
+        if (!profesional) {
             setSubmitting(false);
             return;
         }
 
         const porcentaje = profesional.porcentaje_honorarios || 0;
         const honorarios = (prestacionForm.valor_cobrado * porcentaje) / 100;
+        const finalPrestacionNombre = prestacion?.nombre || manualName;
 
         const { error } = await registrarPrestacionRealizada({
             profesional_id: selectedProfesionalId,
             paciente_nombre: prestacionForm.paciente_nombre,
-            prestacion_id: prestacionForm.prestacion_id,
-            prestacion_nombre: prestacion.nombre,
+            prestacion_id: hasCatalogSelection ? prestacionForm.prestacion_id : undefined,
+            prestacion_nombre: finalPrestacionNombre,
             fecha_realizacion: new Date().toISOString(),
             valor_cobrado: prestacionForm.valor_cobrado,
             moneda_cobro: prestacionForm.moneda,
@@ -297,13 +317,37 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         if (error) {
             alert('Error: ' + error);
         } else {
+            if (!hasCatalogSelection && prestacionForm.guardar_en_tarifario) {
+                const areaNombre = profesional.area || 'General';
+                const alreadyExists = prestacionesLista.some((item) =>
+                    item.nombre.trim().toLowerCase() === finalPrestacionNombre.trim().toLowerCase()
+                    && (item.area_nombre || '').trim().toLowerCase() === areaNombre.trim().toLowerCase()
+                    && item.moneda === prestacionForm.moneda
+                );
+
+                if (!alreadyExists) {
+                    const created = await createPrestacionListaItem({
+                        nombre: finalPrestacionNombre,
+                        area_nombre: areaNombre,
+                        precio_base: prestacionForm.valor_cobrado,
+                        moneda: prestacionForm.moneda,
+                    });
+
+                    if (created.success && created.data) {
+                        setPrestacionesLista((prev) => [...prev, created.data!]);
+                    }
+                }
+            }
+
             setShowPrestacionForm(false);
             setPrestacionForm({
                 paciente_nombre: '',
                 prestacion_id: '',
+                prestacion_nombre_manual: '',
                 valor_cobrado: 0,
                 moneda: 'ARS',
-                notas: ''
+                notas: '',
+                guardar_en_tarifario: false,
             });
             loadData();
         }
@@ -369,6 +413,19 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         p.apellido?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.especialidad?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const selectedProfesional = selectedProfesionalId
+        ? personal.find((p) => p.id === selectedProfesionalId)
+        : null;
+
+    const recentPrestaciones = selectedProfesionalId
+        ? Array.from(new Set(
+            prestacionesMes
+                .filter((pr) => pr.profesional_id === selectedProfesionalId)
+                .map((pr) => pr.prestacion_nombre)
+                .filter(Boolean)
+        )).slice(0, 8)
+        : [];
 
     // Get areas by type for form
     const areasForType = personalAreas.filter(a =>
@@ -843,31 +900,67 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Prestación</label>
-                                    <select
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
-                                        value={prestacionForm.prestacion_id}
-                                        onChange={e => {
-                                            const p = prestacionesLista.find(pl => pl.id === e.target.value);
-                                            if (p) {
-                                                setPrestacionForm({
-                                                    ...prestacionForm,
-                                                    prestacion_id: p.id,
-                                                    valor_cobrado: p.precio_base,
-                                                    moneda: p.moneda
-                                                });
-                                            }
-                                        }}
-                                    >
-                                        <option value="">Seleccionar prestación...</option>
-                                        {prestacionesLista.map(p => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.area_nombre} - {p.nombre} ({p.moneda} {p.precio_base})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Prestación</label>
+                                        <select
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                            value={prestacionForm.prestacion_id}
+                                            onChange={e => {
+                                                const p = prestacionesLista.find(pl => pl.id === e.target.value);
+                                                if (p) {
+                                                    setPrestacionForm({
+                                                        ...prestacionForm,
+                                                        prestacion_id: p.id,
+                                                        prestacion_nombre_manual: p.nombre,
+                                                        valor_cobrado: p.precio_base,
+                                                        moneda: p.moneda
+                                                    });
+                                                } else {
+                                                    setPrestacionForm({
+                                                        ...prestacionForm,
+                                                        prestacion_id: '',
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <option value="">Seleccionar prestación...</option>
+                                            {prestacionesLista.map(p => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.area_nombre} - {p.nombre} ({p.moneda} {p.precio_base})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {prestacionesLista.length === 0 && (
+                                            <p className="text-xs text-amber-500 mt-1">
+                                                No hay tarifario cargado. Podés registrar prestación manual abajo.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Nombre de prestación (manual)</label>
+                                        <Input
+                                            type="text"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                            value={prestacionForm.prestacion_nombre_manual}
+                                            onChange={e => setPrestacionForm({ ...prestacionForm, prestacion_nombre_manual: e.target.value })}
+                                            placeholder="Ej: Consulta control, Limpieza, etc."
+                                        />
+                                        {recentPrestaciones.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                {recentPrestaciones.map((name) => (
+                                                    <button
+                                                        type="button"
+                                                        key={name}
+                                                        onClick={() => setPrestacionForm({ ...prestacionForm, prestacion_nombre_manual: name, prestacion_id: '' })}
+                                                        className="px-2 py-1 text-[11px] rounded-md border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                                    >
+                                                        {name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <MoneyInput
@@ -899,6 +992,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         onChange={e => setPrestacionForm({ ...prestacionForm, notas: e.target.value })}
                                     />
                                 </div>
+
+                                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={prestacionForm.guardar_en_tarifario}
+                                        onChange={(e) => setPrestacionForm({ ...prestacionForm, guardar_en_tarifario: e.target.checked })}
+                                        className="rounded border-slate-300 dark:border-slate-600"
+                                    />
+                                    Guardar esta prestación en tarifario para próximas cargas
+                                    {selectedProfesional?.area ? ` (${selectedProfesional.area})` : ''}
+                                </label>
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4">

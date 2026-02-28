@@ -14,7 +14,7 @@ interface ContratosFinanciacionTabProps {
 
 type ContractPatient = Pick<
     Paciente,
-    'id_paciente' | 'nombre' | 'apellido' | 'documento' | 'cuit' | 'fecha_nacimiento' | 'email' | 'direccion' | 'presupuesto_total'
+    'id_paciente' | 'nombre' | 'apellido' | 'documento' | 'cuit' | 'fecha_nacimiento' | 'email' | 'telefono' | 'direccion' | 'presupuesto_total'
 >;
 
 export default function ContratosFinanciacionTab({ initialPatientId }: ContratosFinanciacionTabProps) {
@@ -25,6 +25,14 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     const [selectedPatient, setSelectedPatient] = useState<ContractPatient | null>(null);
     const [activePreset, setActivePreset] = useState<FinancingSimulationPreset | null>(null);
 
+    const wizardStep = !selectedPatient ? 1 : !activePreset ? 2 : 3;
+
+    useEffect(() => {
+        if (wizardStep < 3 && activeFlow !== 'simulador') {
+            setActiveFlow('simulador');
+        }
+    }, [wizardStep, activeFlow]);
+
     useEffect(() => {
         if (!initialPatientId) return;
 
@@ -33,7 +41,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
         async function loadInitialPatient() {
             const { data } = await supabase
                 .from('pacientes')
-                .select('id_paciente, nombre, apellido, documento, cuit, fecha_nacimiento, email, direccion, presupuesto_total')
+                .select('id_paciente, nombre, apellido, documento, cuit, fecha_nacimiento, email, telefono, direccion, presupuesto_total')
                 .eq('id_paciente', initialPatientId)
                 .eq('is_deleted', false)
                 .single();
@@ -61,7 +69,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
             try {
                 const { data, error } = await supabase
                     .from('pacientes')
-                    .select('id_paciente, nombre, apellido, documento, cuit, fecha_nacimiento, email, direccion, presupuesto_total')
+                    .select('id_paciente, nombre, apellido, documento, cuit, fecha_nacimiento, email, telefono, direccion, presupuesto_total')
                     .eq('is_deleted', false)
                     .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%,documento.ilike.%${query}%`)
                     .order('apellido', { ascending: true })
@@ -104,6 +112,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                             onClick={() => {
                                 setSelectedPatient(null);
                                 setActivePreset(null);
+                                setActiveFlow('simulador');
                                 setSearchQuery('');
                                 setPatients([]);
                             }}
@@ -161,6 +170,8 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                                         type="button"
                                         onClick={() => {
                                             setSelectedPatient(patient);
+                                            setActivePreset(null);
+                                            setActiveFlow('simulador');
                                             setSearchQuery(`${patient.apellido}, ${patient.nombre}`);
                                             setPatients([]);
                                         }}
@@ -212,6 +223,43 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
             {selectedPatient && (
                 <div className="glass-card rounded-2xl p-2" style={{ background: 'hsla(230, 15%, 12%, 0.4)' }}>
+                    <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                        {[
+                            { id: 1, label: '1. Paciente' },
+                            { id: 2, label: '2. Simulacion' },
+                            { id: 3, label: '3. Contrato' },
+                        ].map((step) => {
+                            const isDone = wizardStep > step.id;
+                            const isCurrent = wizardStep === step.id;
+
+                            return (
+                                <div
+                                    key={step.id}
+                                    className="rounded-lg px-2.5 py-1 text-[11px] font-semibold"
+                                    style={isCurrent
+                                        ? {
+                                            background: 'hsla(200, 100%, 55%, 0.14)',
+                                            color: 'hsl(195, 95%, 68%)',
+                                            border: '1px solid hsla(200, 100%, 55%, 0.24)',
+                                        }
+                                        : isDone
+                                            ? {
+                                                background: 'hsla(165, 100%, 42%, 0.12)',
+                                                color: 'hsl(165, 85%, 50%)',
+                                                border: '1px solid hsla(165, 100%, 42%, 0.22)',
+                                            }
+                                            : {
+                                                background: 'hsla(230, 15%, 10%, 0.8)',
+                                                color: 'hsl(230 10% 50%)',
+                                                border: '1px solid hsla(230, 15%, 22%, 0.7)',
+                                            }}
+                                >
+                                    {step.label}
+                                </div>
+                            );
+                        })}
+                    </div>
+
                     <div className="flex flex-wrap gap-2">
                         <button
                             type="button"
@@ -234,6 +282,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                         <button
                             type="button"
                             onClick={() => setActiveFlow('contractmaker')}
+                            disabled={!activePreset}
                             className="rounded-lg px-3 py-2 text-xs font-semibold transition-all"
                             style={activeFlow === 'contractmaker'
                                 ? {
@@ -247,7 +296,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                                     border: '1px solid hsla(230, 15%, 22%, 0.7)',
                                 }}
                         >
-                            ContractMaker
+                            {activePreset ? 'ContractMaker' : 'ContractMaker (esperando eleccion)'}
                         </button>
                         {activePreset && (
                             <button
@@ -277,7 +326,11 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                         }}
                     />
                 ) : (
-                    <CalculadoraFinanciera patient={selectedPatient as Paciente} initialPreset={activePreset} />
+                    <CalculadoraFinanciera
+                        patient={selectedPatient as Paciente}
+                        initialPreset={activePreset}
+                        singleCtaMode
+                    />
                 )
             ) : (
                 <div className="rounded-2xl p-10 text-center" style={{ background: 'hsla(230, 15%, 12%, 0.45)', border: '1px dashed hsla(230, 15%, 24%, 0.9)' }}>

@@ -24,6 +24,8 @@ const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
                 listUsers: () => Promise.resolve({ data: { users: [] }, error: null }),
                 inviteUserByEmail: () => Promise.resolve({ data: { user: null }, error: 'Build time mock' }),
                 updateUserById: () => Promise.resolve({ error: null }),
+                deleteUser: () => Promise.resolve({ error: null }),
+                getUserById: () => Promise.resolve({ data: { user: null }, error: null }),
                 resetPasswordForEmail: () => Promise.resolve({ error: null }),
             }
         },
@@ -196,34 +198,133 @@ interface UpdateUserData {
     full_name?: string;
     telefono?: string;
     role?: string;
+    email?: string;
+    estado?: string;
+    is_active?: boolean;
 }
 
 export async function updateUser(userId: string, data: UpdateUserData) {
     try {
+        const profilePatch: Record<string, unknown> = {
+            full_name: data.full_name,
+            telefono: data.telefono,
+            role: data.role,
+        };
+
+        if (typeof data.estado === 'string') {
+            profilePatch.estado = data.estado;
+        }
+
+        if (typeof data.is_active === 'boolean') {
+            profilePatch.is_active = data.is_active;
+        }
+
+        if (typeof data.email === 'string' && data.email.trim()) {
+            profilePatch.email = data.email.trim().toLowerCase();
+        }
+
         // Update Profile
         const { error } = await supabaseAdmin
             .from('profiles')
-            .update({
-                full_name: data.full_name,
-                telefono: data.telefono,
-                role: data.role,
-                // Support status update manually
-            })
+            .update(profilePatch)
             .eq('id', userId);
 
         if (error) throw error;
 
         // Also update Auth Metadata if needed for consistency
+        const authPatch: Record<string, unknown> = {};
+
         if (data.role || data.full_name) {
-            await supabaseAdmin.auth.admin.updateUserById(userId, {
-                user_metadata: {
-                    role: data.role,
-                    full_name: data.full_name
-                }
-            });
+            authPatch.user_metadata = {
+                role: data.role,
+                full_name: data.full_name
+            };
+        }
+
+        if (typeof data.email === 'string' && data.email.trim()) {
+            authPatch.email = data.email.trim().toLowerCase();
+        }
+
+        if (Object.keys(authPatch).length > 0) {
+            const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, authPatch);
+            if (authError) throw authError;
         }
 
         revalidatePath('/admin-users');
+        revalidatePath('/admin/users');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
+export async function deleteUserAccount(targetUserId: string, requesterId: string) {
+    try {
+        if (!targetUserId || !requesterId) {
+            throw new Error('Datos inválidos para eliminar usuario');
+        }
+
+        if (targetUserId === requesterId) {
+            throw new Error('No podés eliminar tu propio usuario desde esta pantalla');
+        }
+
+        const { data: requestorProfile, error: reqError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, email, role')
+            .eq('id', requesterId)
+            .single();
+
+        if (reqError || !requestorProfile || !['owner', 'admin'].includes(requestorProfile.role)) {
+            throw new Error('No autorizado para eliminar usuarios');
+        }
+
+        const { data: targetProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('id, role, email')
+            .eq('id', targetUserId)
+            .single();
+
+        if (targetProfile?.role === 'owner' && requestorProfile.role !== 'owner') {
+            throw new Error('Solo un dueño puede eliminar otro usuario dueño');
+        }
+
+        if (targetProfile?.role === 'owner') {
+            const { count: ownersCount, error: ownersError } = await supabaseAdmin
+                .from('profiles')
+                .select('id', { count: 'exact', head: true })
+                .eq('role', 'owner');
+
+            if (ownersError) throw ownersError;
+            if ((ownersCount || 0) <= 1) {
+                throw new Error('No se puede eliminar el último usuario dueño');
+            }
+        }
+
+        // Detach staff linkage to avoid foreign key blocks if present.
+        await supabaseAdmin
+            .from('personal')
+            .update({ user_id: null })
+            .eq('user_id', targetUserId);
+
+        const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
+        if (deleteError) throw deleteError;
+
+        await supabaseAdmin.from('audit_logs').insert({
+            user_id: requesterId,
+            user_email: requestorProfile.email,
+            role: requestorProfile.role,
+            action: 'delete_user_account',
+            table_name: 'auth.users',
+            record_id: targetUserId,
+            metadata: {
+                target_role: targetProfile?.role || null,
+                target_email: targetProfile?.email || null,
+                deleted_at: new Date().toISOString(),
+            },
+        });
+
+        revalidatePath('/admin-users');
+        revalidatePath('/admin/users');
         return { success: true };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
