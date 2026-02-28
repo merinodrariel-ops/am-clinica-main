@@ -14,6 +14,8 @@ export interface WorkerProfile {
     id: string;
     user_id?: string;
     app_role?: string;
+    empresa_prestadora_id?: string | null;
+    empresa_prestadora_nombre?: string | null;
     nombre: string;
     apellido?: string;
     rol: string;
@@ -57,6 +59,14 @@ export interface WorkerProfile {
 
     created_at?: string;
     updated_at?: string;
+}
+
+export interface EmpresaPrestadora {
+    id: string;
+    nombre: string;
+    descripcion?: string | null;
+    area_default?: string | null;
+    activo: boolean;
 }
 
 export interface WorkLog {

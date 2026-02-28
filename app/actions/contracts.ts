@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes } from 'crypto';
 import {
     extractFolderIdFromUrl,
     createContractFromTemplate,
@@ -37,6 +38,106 @@ export interface AutomatedContractInput {
     anticipoPct: number;
     cuotas: number;
     bnaVenta: number;
+    simulationId?: string;
+}
+
+export type FinancingSimulationStatus = 'shared' | 'selected' | 'contracted' | 'expired';
+
+export interface FinancingSimulationRecord {
+    id: string;
+    patientId: string;
+    treatment: string;
+    totalUsd: number;
+    bnaVentaArs: number;
+    monthlyInterestPct: number;
+    baseInstallments: number;
+    allowedInstallmentOptions: number[];
+    allowedUpfrontOptions: number[];
+    status: FinancingSimulationStatus;
+    selectedInstallments: number | null;
+    selectedUpfrontPct: number | null;
+    selectedAt: string | null;
+    shareToken: string;
+    shareUrl: string;
+    expiresAt: string;
+    createdAt: string;
+}
+
+export interface FinancingSimulationPreset {
+    simulationId: string;
+    treatment: string;
+    totalUsd: number;
+    bnaVentaArs: number;
+    installments: number;
+    upfrontPct: number;
+    status: FinancingSimulationStatus;
+    shareUrl: string;
+    expiresAt: string;
+}
+
+export interface CreateFinancingSimulationInput {
+    patientId: string;
+    treatment: string;
+    totalUsd: number;
+    bnaVentaArs: number;
+    baseInstallments: number;
+    allowedInstallmentOptions?: number[];
+    allowedUpfrontOptions?: number[];
+    expiresInDays?: number;
+}
+
+function getPublicAppUrl(): string {
+    const fromEnv = process.env.NEXT_PUBLIC_APP_URL;
+    if (fromEnv && !fromEnv.includes('localhost')) {
+        return fromEnv.replace(/\/$/, '');
+    }
+    if (process.env.VERCEL_URL) {
+        return `https://${process.env.VERCEL_URL}`;
+    }
+    return 'https://am-clinica-main.vercel.app';
+}
+
+function clampInstallments(value: number): number {
+    const safe = Math.round(value);
+    if ([3, 6, 12].includes(safe)) return safe;
+    return 12;
+}
+
+function normalizeSimulationOptions(raw: unknown, fallback: number[]): number[] {
+    if (!Array.isArray(raw)) return [...fallback];
+    const parsed = raw
+        .map((item) => Number(item))
+        .filter((value) => Number.isFinite(value))
+        .map((value) => Math.round(value));
+
+    const unique = Array.from(new Set(parsed));
+    return unique.length > 0 ? unique : [...fallback];
+}
+
+function buildSimulationShareUrl(token: string): string {
+    return `${getPublicAppUrl()}/simulador/${token}`;
+}
+
+function mapSimulationRow(row: any): FinancingSimulationRecord {
+    return {
+        id: row.id,
+        patientId: row.patient_id,
+        treatment: row.treatment,
+        totalUsd: Number(row.total_usd || 0),
+        bnaVentaArs: Number(row.bna_venta_ars || 0),
+        monthlyInterestPct: Number(row.monthly_interest_pct || DEFAULT_MONTHLY_INTEREST_PCT),
+        baseInstallments: Number(row.base_installments || 12),
+        allowedInstallmentOptions: normalizeSimulationOptions(row.allowed_installment_options, [3, 6, 12]),
+        allowedUpfrontOptions: normalizeSimulationOptions(row.allowed_upfront_options, [30, 40, 50]),
+        status: (row.status || 'shared') as FinancingSimulationStatus,
+        selectedInstallments: row.selected_installments ? Number(row.selected_installments) : null,
+        selectedUpfrontPct: row.selected_upfront_pct ? Number(row.selected_upfront_pct) : null,
+        selectedAt: row.selected_at || null,
+        shareToken: row.share_token,
+        shareUrl: buildSimulationShareUrl(row.share_token),
+        expiresAt: row.expires_at,
+        createdAt: row.created_at,
+    };
 }
 
 export interface ContractMakerReadinessInput {
@@ -317,6 +418,17 @@ export async function generateAutomatedContractToDriveAction(input: AutomatedCon
                 .eq('id_paciente', input.patientId);
         }
 
+        if (input.simulationId) {
+            await supabase
+                .from('financing_simulations')
+                .update({
+                    status: 'contracted',
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', input.simulationId)
+                .eq('patient_id', input.patientId);
+        }
+
         return {
             success: true,
             url: finalUrl,
@@ -336,6 +448,179 @@ export async function generateAutomatedContractToDriveAction(input: AutomatedCon
         return {
             success: false,
             error: message,
+        };
+    }
+}
+
+export async function createFinancingSimulationAction(input: CreateFinancingSimulationInput): Promise<{
+    success: boolean;
+    simulation?: FinancingSimulationRecord;
+    error?: string;
+}> {
+    try {
+        if (!input.patientId) {
+            throw new Error('Falta seleccionar paciente');
+        }
+        if (!input.treatment?.trim()) {
+            throw new Error('El tratamiento es requerido');
+        }
+        if (!Number.isFinite(input.totalUsd) || input.totalUsd <= 0) {
+            throw new Error('Monto total USD inválido');
+        }
+        if (!Number.isFinite(input.bnaVentaArs) || input.bnaVentaArs <= 0) {
+            throw new Error('Cotización BNA inválida');
+        }
+
+        const baseInstallments = clampInstallments(input.baseInstallments);
+        const allowedInstallmentOptions = normalizeSimulationOptions(input.allowedInstallmentOptions, [3, 6, 12])
+            .filter((value) => [3, 6, 12].includes(value));
+        const allowedUpfrontOptions = normalizeSimulationOptions(input.allowedUpfrontOptions, [30, 40, 50])
+            .filter((value) => value >= 30 && value <= 90);
+
+        const expiresInDays = Math.min(30, Math.max(1, Math.floor(Number(input.expiresInDays || 14))));
+        const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: patient, error: patientError } = await supabase
+            .from('pacientes')
+            .select('id_paciente')
+            .eq('id_paciente', input.patientId)
+            .single();
+
+        if (patientError || !patient) {
+            throw new Error('Paciente no encontrado');
+        }
+
+        let insertedRow: any = null;
+        let lastError: any = null;
+
+        for (let i = 0; i < 3; i++) {
+            const shareToken = randomBytes(18).toString('base64url');
+            const { data, error } = await supabase
+                .from('financing_simulations')
+                .insert({
+                    patient_id: input.patientId,
+                    treatment: input.treatment.trim(),
+                    total_usd: input.totalUsd,
+                    bna_venta_ars: input.bnaVentaArs,
+                    monthly_interest_pct: DEFAULT_MONTHLY_INTEREST_PCT,
+                    base_installments: baseInstallments,
+                    allowed_installment_options: allowedInstallmentOptions,
+                    allowed_upfront_options: allowedUpfrontOptions,
+                    status: 'shared',
+                    share_token: shareToken,
+                    expires_at: expiresAt,
+                    shared_at: new Date().toISOString(),
+                })
+                .select('*')
+                .single();
+
+            if (!error && data) {
+                insertedRow = data;
+                break;
+            }
+
+            lastError = error;
+            if (!error?.message?.toLowerCase().includes('duplicate')) {
+                break;
+            }
+        }
+
+        if (!insertedRow) {
+            throw new Error(lastError?.message || 'No se pudo crear la simulación compartible');
+        }
+
+        return {
+            success: true,
+            simulation: mapSimulationRow(insertedRow),
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Error desconocido',
+        };
+    }
+}
+
+export async function listFinancingSimulationsByPatientAction(patientId: string): Promise<{
+    success: boolean;
+    simulations: FinancingSimulationRecord[];
+    error?: string;
+}> {
+    try {
+        if (!patientId) {
+            return { success: true, simulations: [] };
+        }
+
+        const { data, error } = await supabase
+            .from('financing_simulations')
+            .select('*')
+            .eq('patient_id', patientId)
+            .order('created_at', { ascending: false })
+            .limit(40);
+
+        if (error) {
+            throw new Error(error.message);
+        }
+
+        return {
+            success: true,
+            simulations: (data || []).map(mapSimulationRow),
+        };
+    } catch (error) {
+        return {
+            success: false,
+            simulations: [],
+            error: error instanceof Error ? error.message : 'Error desconocido',
+        };
+    }
+}
+
+export async function getFinancingSimulationPresetAction(
+    patientId: string,
+    simulationId: string
+): Promise<{
+    success: boolean;
+    preset?: FinancingSimulationPreset;
+    error?: string;
+}> {
+    try {
+        if (!patientId || !simulationId) {
+            throw new Error('Faltan datos para cargar simulación');
+        }
+
+        const { data, error } = await supabase
+            .from('financing_simulations')
+            .select('*')
+            .eq('id', simulationId)
+            .eq('patient_id', patientId)
+            .single();
+
+        if (error || !data) {
+            throw new Error('Simulación no encontrada');
+        }
+
+        const mapped = mapSimulationRow(data);
+        const upfrontPct = mapped.selectedUpfrontPct || mapped.allowedUpfrontOptions[0] || 30;
+        const installments = mapped.selectedInstallments || mapped.baseInstallments || 12;
+
+        return {
+            success: true,
+            preset: {
+                simulationId: mapped.id,
+                treatment: mapped.treatment,
+                totalUsd: mapped.totalUsd,
+                bnaVentaArs: mapped.bnaVentaArs,
+                installments,
+                upfrontPct,
+                status: mapped.status,
+                shareUrl: mapped.shareUrl,
+                expiresAt: mapped.expiresAt,
+            },
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Error desconocido',
         };
     }
 }

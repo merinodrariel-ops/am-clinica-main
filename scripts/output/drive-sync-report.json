@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-02-28T07:17:22.331Z",
+  "dry_run": false,
+  "stats": {
+    "slidesLinkedFromSubfolders": 13,
+    "slidesLinkedFromStrayFiles": 0,
+    "strayFilesMoved": 0,
+    "foldersLinked": 0,
+    "errors": 0
+  }
+}

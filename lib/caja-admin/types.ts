@@ -111,6 +111,8 @@ export interface Prestacion {
 export interface Personal {
     id: string;
     user_id?: string | null;  // Linked auth user (null if not yet linked)
+    empresa_prestadora_id?: string | null;
+    empresa_prestadora?: EmpresaPrestadora | null;
     nombre: string;
     apellido?: string;
     tipo: 'prestador' | 'profesional';
@@ -140,6 +142,16 @@ export interface Personal {
     consentimientos_urls?: string[];
     sanciones_notas?: string;
     porcentaje_honorarios?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface EmpresaPrestadora {
+    id: string;
+    nombre: string;
+    descripcion?: string;
+    area_default?: string;
+    activo: boolean;
     created_at?: string;
     updated_at?: string;
 }
@@ -247,6 +259,7 @@ export interface CreatePersonalInput {
     barrio_localidad?: string;
     condicion_afip?: 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro';
     valor_hora_ars?: number;
+    empresa_prestadora_id?: string;
     descripcion?: string;
     fecha_ingreso?: string;
     // Professional fields

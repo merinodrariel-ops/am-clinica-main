@@ -294,9 +294,9 @@ async function main() {
 
             // Create standard subfolders
             const subfolders = [
-                `${folderName} - FOTO & VIDEO`,
-                `${folderName} - PRESENTACION`,
-                `${folderName} - PRESUPUESTO`,
+                `[FOTO & VIDEO] ${folderName}`,
+                `[PRESENTACION] ${folderName}`,
+                `[PRESUPUESTO] ${folderName}`,
             ];
 
             let presentationFolderId: string | null = null;

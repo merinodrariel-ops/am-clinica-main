@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { X, UserPlus, Save, Send, Lock } from 'lucide-react';
-import { createWorkerNoAccess, createWorkerWithInvite, type CreateWorkerInput } from '@/app/actions/worker-portal';
+import { useEffect, useState } from 'react';
+import { X, UserPlus, Save } from 'lucide-react';
+import { createProviderCompany, createWorkerWithInvite, getProviderCompanies, type CreateWorkerInput } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 
 const AREAS = [
@@ -24,8 +24,10 @@ interface Props {
 
 export default function NewWorkerModal({ onClose, onCreated }: Props) {
     const [saving, setSaving] = useState(false);
-    const [giveAccess, setGiveAccess] = useState(false);
     const [tipo, setTipo] = useState<'prestador' | 'profesional'>('prestador');
+    const [companies, setCompanies] = useState<Array<{ id: string; nombre: string; area_default?: string | null }>>([]);
+    const [newCompanyName, setNewCompanyName] = useState('');
+    const [creatingCompany, setCreatingCompany] = useState(false);
 
     const [form, setForm] = useState<CreateWorkerInput>({
         nombre: '',
@@ -41,27 +43,49 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
         porcentaje_honorarios: 0,
         fecha_ingreso: new Date().toISOString().split('T')[0],
         especialidad: '',
+        empresa_prestadora_id: '',
     });
+
+    useEffect(() => {
+        getProviderCompanies().then(setCompanies).catch(() => setCompanies([]));
+    }, []);
 
     function setField<K extends keyof CreateWorkerInput>(key: K, val: CreateWorkerInput[K]) {
         setForm(prev => ({ ...prev, [key]: val }));
     }
 
+    async function handleCreateCompany() {
+        const nombre = newCompanyName.trim();
+        if (!nombre) return;
+
+        setCreatingCompany(true);
+        try {
+            const empresa = await createProviderCompany({
+                nombre,
+                area_default: form.area || undefined,
+            });
+
+            setCompanies(prev => [...prev, empresa].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })));
+            setField('empresa_prestadora_id', empresa.id);
+            setNewCompanyName('');
+            toast.success('Empresa prestadora creada');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'No se pudo crear la empresa');
+        } finally {
+            setCreatingCompany(false);
+        }
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
-        if (giveAccess && !form.email?.trim()) { toast.error('Email requerido para dar acceso al portal'); return; }
+        if (!form.email?.trim()) { toast.error('Email obligatorio: todo prestador/profesional tiene acceso al portal'); return; }
 
         setSaving(true);
         try {
             const payload: CreateWorkerInput = { ...form, tipo };
-            if (giveAccess && form.email) {
-                await createWorkerWithInvite(payload);
-                toast.success('Prestador creado e invitación enviada');
-            } else {
-                await createWorkerNoAccess(payload);
-                toast.success('Prestador creado correctamente');
-            }
+            await createWorkerWithInvite(payload);
+            toast.success('Prestador creado e invitación enviada');
             onCreated();
             onClose();
         } catch (err: unknown) {
@@ -156,6 +180,16 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     className={inputClass}
                                 />
                             </Field>
+                            <Field label="Empresa Prestadora">
+                                <select
+                                    value={form.empresa_prestadora_id || ''}
+                                    onChange={e => setField('empresa_prestadora_id', e.target.value)}
+                                    className={inputClass}
+                                >
+                                    <option value="">Sin empresa (liquidación individual)</option>
+                                    {companies.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                </select>
+                            </Field>
                             {tipo === 'profesional' && (
                                 <Field label="Especialidad">
                                     <input
@@ -176,6 +210,24 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                 />
                             </Field>
                         </div>
+
+                        <div className="mt-3 flex gap-2">
+                            <input
+                                type="text"
+                                value={newCompanyName}
+                                onChange={(e) => setNewCompanyName(e.target.value)}
+                                placeholder="Crear nueva empresa prestadora..."
+                                className={`${inputClass} flex-1`}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleCreateCompany}
+                                disabled={creatingCompany || !newCompanyName.trim()}
+                                className="px-3 py-2 rounded-xl border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 disabled:opacity-50 text-xs font-bold"
+                            >
+                                {creatingCompany ? 'Creando...' : 'Crear empresa'}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Contact & Legal */}
@@ -188,6 +240,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     value={form.email}
                                     onChange={e => setField('email', e.target.value)}
                                     placeholder="ana@ejemplo.com"
+                                    required
                                     className={inputClass}
                                 />
                             </Field>
@@ -254,41 +307,11 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                         </div>
                     </div>
 
-                    {/* Portal access toggle */}
-                    <div className={`rounded-2xl border p-4 transition-colors ${giveAccess
-                            ? 'bg-indigo-900/20 border-indigo-500/30'
-                            : 'bg-slate-900/40 border-slate-800'
-                        }`}>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Send size={18} className={giveAccess ? 'text-indigo-400' : 'text-slate-600'} />
-                                <div>
-                                    <p className="text-sm font-bold text-white">Dar acceso al portal</p>
-                                    <p className="text-xs text-slate-500">
-                                        {form.email
-                                            ? `Se enviará invitación a ${form.email}`
-                                            : 'Ingresá un email para habilitar esta opción'}
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => form.email && setGiveAccess(v => !v)}
-                                disabled={!form.email}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${giveAccess ? 'bg-indigo-600' : 'bg-slate-700'
-                                    } disabled:opacity-40 disabled:cursor-not-allowed`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${giveAccess ? 'translate-x-6' : 'translate-x-1'
-                                    }`} />
-                            </button>
-                        </div>
-                        {giveAccess && (
-                            <p className="mt-3 text-xs text-indigo-300/80 flex items-center gap-1.5">
-                                <Lock size={11} />
-                                El prestador recibirá un email con su link de acceso único.
-                                Podrá ver sus horas, prestaciones y liquidaciones.
-                            </p>
-                        )}
+                    <div className="rounded-2xl border p-4 bg-indigo-900/20 border-indigo-500/30">
+                        <p className="text-sm font-bold text-white">Acceso al portal obligatorio</p>
+                        <p className="mt-1 text-xs text-indigo-300/90">
+                            Todo prestador/profesional se crea con usuario de portal. Se enviará invitación a <strong>{form.email || 'su email'}</strong>.
+                        </p>
                     </div>
 
                     {/* Actions */}
@@ -310,7 +333,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                             ) : (
                                 <>
                                     <Save size={16} />
-                                    {giveAccess ? 'Crear y enviar invitación' : 'Crear prestador'}
+                                    Crear y enviar invitación
                                 </>
                             )}
                         </button>

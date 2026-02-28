@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { WorkerProfile, WorkerRole } from '@/types/worker-portal';
-import { updateWorkerProfileAdmin, getAppUsers } from '@/app/actions/worker-portal';
+import { updateWorkerProfileAdmin, getAppUsers, getProviderCompanies, createProviderCompany } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 import { Save, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2 } from 'lucide-react';
 
@@ -16,19 +16,34 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     const [isSaving, setIsSaving] = useState(false);
     const [appUsers, setAppUsers] = useState<{ id: string, full_name: string, email: string, role: string }[]>([]);
     const [linkedUserId, setLinkedUserId] = useState(worker.user_id || '');
-    const [appRole, setAppRole] = useState('');
+    const [providerCompanyId, setProviderCompanyId] = useState(worker.empresa_prestadora_id || '');
+    const [companies, setCompanies] = useState<Array<{ id: string; nombre: string }>>([]);
+    const [newCompanyName, setNewCompanyName] = useState('');
+    const [creatingCompany, setCreatingCompany] = useState(false);
+
+    const APP_ROLE_LABELS: Record<string, string> = {
+        partner_viewer: 'Solo lectura',
+        reception: 'Recepción',
+        recaptacion: 'Recaptación',
+        laboratorio: 'Laboratorio',
+        asistente: 'Asistente',
+        odontologo: 'Odontólogo',
+        pricing_manager: 'Gestor de Precios',
+        developer: 'Desarrollador',
+        admin: 'Administrador',
+        owner: 'Dueño',
+    };
 
     useEffect(() => {
         getAppUsers().then(setAppUsers).catch(console.error);
+        getProviderCompanies().then(setCompanies).catch(() => setCompanies([]));
     }, []);
 
-    useEffect(() => {
-        if (!linkedUserId || appUsers.length === 0) return;
-        const selected = appUsers.find((u) => u.id === linkedUserId);
-        if (selected) {
-            setAppRole(selected.role || 'partner_viewer');
-        }
-    }, [linkedUserId, appUsers]);
+    const selectedLinkedUser = linkedUserId
+        ? appUsers.find((u) => u.id === linkedUserId)
+        : null;
+    const linkedAppRole = selectedLinkedUser?.role;
+    const linkedAppRoleLabel = linkedAppRole ? (APP_ROLE_LABELS[linkedAppRole] || linkedAppRole) : 'Sin rol de app';
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -50,7 +65,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             activo: fd.get('activo') === 'on',
             matricula_provincial: fd.get('matricula_provincial') as string,
             user_id: linkedUserId || undefined,
-            app_role: appRole || undefined,
+            empresa_prestadora_id: providerCompanyId || undefined,
         };
 
         try {
@@ -65,18 +80,24 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     };
 
     const ROLES: WorkerRole[] = ['dentist', 'assistant', 'technician', 'cleaning', 'admin', 'reception', 'lab', 'marketing', 'other'];
-    const APP_ROLE_OPTIONS = [
-        { value: 'partner_viewer', label: 'Partner Viewer (Solo Lectura)' },
-        { value: 'reception', label: 'Recepción' },
-        { value: 'recaptacion', label: 'Recaptación' },
-        { value: 'laboratorio', label: 'Laboratorio' },
-        { value: 'asistente', label: 'Asistente' },
-        { value: 'odontologo', label: 'Odontólogo' },
-        { value: 'pricing_manager', label: 'Pricing Manager' },
-        { value: 'developer', label: 'Developer' },
-        { value: 'admin', label: 'Administrador' },
-        { value: 'owner', label: 'Owner (Dueño)' },
-    ];
+
+    async function handleCreateCompany() {
+        const nombre = newCompanyName.trim();
+        if (!nombre) return;
+
+        setCreatingCompany(true);
+        try {
+            const empresa = await createProviderCompany({ nombre });
+            setCompanies((prev) => [...prev, empresa].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })));
+            setProviderCompanyId(empresa.id);
+            setNewCompanyName('');
+            toast.success('Empresa prestadora creada');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'No se pudo crear la empresa');
+        } finally {
+            setCreatingCompany(false);
+        }
+    }
 
     return (
         <form onSubmit={handleSubmit} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 md:space-y-8 animate-in fade-in zoom-in duration-300">
@@ -179,6 +200,37 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                         </div>
                     </div>
 
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase ml-1">Empresa Prestadora (para liquidación agrupada)</label>
+                        <select
+                            value={providerCompanyId}
+                            onChange={(e) => setProviderCompanyId(e.target.value)}
+                            className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-white outline-none transition-all appearance-none"
+                        >
+                            <option value="">Sin empresa (liquidación individual)</option>
+                            {companies.map((company) => (
+                                <option key={company.id} value={company.id}>{company.nombre}</option>
+                            ))}
+                        </select>
+                        <div className="flex gap-2 mt-2">
+                            <input
+                                type="text"
+                                value={newCompanyName}
+                                onChange={(e) => setNewCompanyName(e.target.value)}
+                                placeholder="Nueva empresa prestadora..."
+                                className="flex-1 bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2 text-white outline-none transition-all"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleCreateCompany}
+                                disabled={creatingCompany || !newCompanyName.trim()}
+                                className="px-3 py-2 rounded-xl border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 disabled:opacity-50 text-xs font-bold"
+                            >
+                                {creatingCompany ? 'Creando...' : 'Crear'}
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="flex items-center gap-3 p-4 bg-slate-800/30 border border-slate-800 rounded-2xl">
                         <div className="flex-1">
                             <p className="text-sm font-bold text-white">Estado del Prestador</p>
@@ -240,12 +292,6 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                                 onChange={(e) => {
                                     const nextUserId = e.target.value;
                                     setLinkedUserId(nextUserId);
-                                    if (!nextUserId) {
-                                        setAppRole('');
-                                        return;
-                                    }
-                                    const selected = appUsers.find((u) => u.id === nextUserId);
-                                    setAppRole(selected?.role || 'partner_viewer');
                                 }}
                                 className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-white outline-none transition-all appearance-none"
                             >
@@ -263,23 +309,15 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
 
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-500 uppercase ml-1">Rol de App (permisos reales)</label>
-                            <select
-                                name="app_role"
-                                value={appRole}
-                                onChange={(e) => setAppRole(e.target.value)}
-                                disabled={!linkedUserId}
-                                className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-white outline-none transition-all appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <option value="">Sin cambios</option>
-                                {APP_ROLE_OPTIONS.map((roleOption) => (
-                                    <option key={roleOption.value} value={roleOption.value}>
-                                        {roleOption.label}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-white">
+                                {linkedUserId ? linkedAppRoleLabel : 'Sin usuario vinculado'}
+                            </div>
                             <p className="text-[10px] text-slate-500 mt-1 italic">
-                                Este campo define permisos del sistema (agenda, pacientes, cajas, admin). No depende del campo &quot;Rol en Clínica&quot;.
+                                Para evitar inconsistencias, el rol de app se edita solo en Gestión de Usuarios.
                             </p>
+                            <a href="/admin-users" className="inline-flex text-[11px] text-indigo-400 hover:text-indigo-300 underline underline-offset-2">
+                                Ir a Gestión de Usuarios
+                            </a>
                         </div>
                     </div>
                 </div>

@@ -28,6 +28,23 @@ interface Profile {
     created_at: string;
 }
 
+const APP_ROLE_OPTIONS = [
+    { value: 'partner_viewer', label: 'Solo Lectura' },
+    { value: 'reception', label: 'Recepción' },
+    { value: 'recaptacion', label: 'Recaptación' },
+    { value: 'laboratorio', label: 'Laboratorio' },
+    { value: 'asistente', label: 'Asistente' },
+    { value: 'odontologo', label: 'Odontólogo' },
+    { value: 'admin', label: 'Administrador' },
+    { value: 'pricing_manager', label: 'Gestor de Precios' },
+    { value: 'owner', label: 'Dueño' },
+    { value: 'developer', label: 'Desarrollador' },
+];
+
+function roleLabel(role: string) {
+    return APP_ROLE_OPTIONS.find((option) => option.value === role)?.label || role.replace('_', ' ');
+}
+
 export default function UserManagementPage() {
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -327,7 +344,7 @@ export default function UserManagementPage() {
                                                 ${user.role === 'owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
                                                         user.role === 'admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
                                                             'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}`}>
-                                                    {user.role.replace('_', ' ')}
+                                                    {roleLabel(user.role)}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
@@ -420,16 +437,9 @@ export default function UserManagementPage() {
                                         value={formData.role}
                                         onChange={e => setFormData({ ...formData, role: e.target.value })}
                                     >
-                                        <option value="partner_viewer">Partner Viewer (Solo Lectura)</option>
-                                        <option value="reception">Recepción</option>
-                                        <option value="recaptacion">Recaptación</option>
-                                        <option value="laboratorio">Laboratorio</option>
-                                        <option value="asistente">Asistente</option>
-                                        <option value="odontologo">Odontólogo</option>
-                                        <option value="admin">Administrador</option>
-                                        <option value="pricing_manager">Pricing Manager</option>
-                                        <option value="owner">Owner (Dueño)</option>
-                                        <option value="developer">Developer</option>
+                                        {APP_ROLE_OPTIONS.map((roleOption) => (
+                                            <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
@@ -584,16 +594,9 @@ export default function UserManagementPage() {
                                         value={editData.role}
                                         onChange={e => setEditData({ ...editData, role: e.target.value })}
                                     >
-                                        <option value="partner_viewer">Partner Viewer (Solo Lectura)</option>
-                                        <option value="reception">Recepción</option>
-                                        <option value="recaptacion">Recaptación</option>
-                                        <option value="laboratorio">Laboratorio</option>
-                                        <option value="asistente">Asistente</option>
-                                        <option value="odontologo">Odontólogo</option>
-                                        <option value="admin">Administrador</option>
-                                        <option value="pricing_manager">Pricing Manager</option>
-                                        <option value="owner">Owner (Dueño)</option>
-                                        <option value="developer">Developer</option>
+                                        {APP_ROLE_OPTIONS.map((roleOption) => (
+                                            <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>

@@ -101,7 +101,7 @@ async function backfill() {
     for (const t of pending) {
         const p = t.patient as any;
         const patientRootName = getPatientFolderName(p.apellido, p.nombre);
-        const treatmentFolderName = `${patientRootName} - AM ALINEADORES`;
+        const treatmentFolderName = `[AM ALINEADORES] ${patientRootName}`;
 
         console.log(`\nProcessing: ${patientRootName}`);
 

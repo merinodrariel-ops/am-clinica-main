@@ -5,6 +5,8 @@ import { Loader2, Search, UserRound, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Paciente } from '@/lib/patients';
 import CalculadoraFinanciera from '@/components/patients/CalculadoraFinanciera';
+import SimuladorFinanciacion from '@/components/patients/SimuladorFinanciacion';
+import type { FinancingSimulationPreset } from '@/app/actions/contracts';
 
 interface ContratosFinanciacionTabProps {
     initialPatientId?: string;
@@ -16,10 +18,12 @@ type ContractPatient = Pick<
 >;
 
 export default function ContratosFinanciacionTab({ initialPatientId }: ContratosFinanciacionTabProps) {
+    const [activeFlow, setActiveFlow] = useState<'simulador' | 'contractmaker'>('simulador');
     const [searchQuery, setSearchQuery] = useState('');
     const [patients, setPatients] = useState<ContractPatient[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState<ContractPatient | null>(null);
+    const [activePreset, setActivePreset] = useState<FinancingSimulationPreset | null>(null);
 
     useEffect(() => {
         if (!initialPatientId) return;
@@ -90,7 +94,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                             ContratoMaker financiero
                         </h3>
                         <p className="text-xs mt-1" style={{ color: 'hsl(230 10% 45%)' }}>
-                            Selecciona paciente, calcula opciones y genera contrato legal en carpeta de Drive.
+                            Selecciona paciente, comparte simulaciones y luego genera contrato legal en carpeta de Drive.
                         </p>
                     </div>
 
@@ -99,6 +103,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                             type="button"
                             onClick={() => {
                                 setSelectedPatient(null);
+                                setActivePreset(null);
                                 setSearchQuery('');
                                 setPatients([]);
                             }}
@@ -205,8 +210,75 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                 )}
             </div>
 
+            {selectedPatient && (
+                <div className="glass-card rounded-2xl p-2" style={{ background: 'hsla(230, 15%, 12%, 0.4)' }}>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setActiveFlow('simulador')}
+                            className="rounded-lg px-3 py-2 text-xs font-semibold transition-all"
+                            style={activeFlow === 'simulador'
+                                ? {
+                                    background: 'hsla(200, 100%, 55%, 0.14)',
+                                    color: 'hsl(195, 95%, 68%)',
+                                    border: '1px solid hsla(200, 100%, 55%, 0.24)',
+                                }
+                                : {
+                                    background: 'hsla(230, 15%, 10%, 0.8)',
+                                    color: 'hsl(230 10% 50%)',
+                                    border: '1px solid hsla(230, 15%, 22%, 0.7)',
+                                }}
+                        >
+                            Simulador compartible
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveFlow('contractmaker')}
+                            className="rounded-lg px-3 py-2 text-xs font-semibold transition-all"
+                            style={activeFlow === 'contractmaker'
+                                ? {
+                                    background: 'hsla(165, 100%, 42%, 0.12)',
+                                    color: 'hsl(165, 85%, 50%)',
+                                    border: '1px solid hsla(165, 100%, 42%, 0.22)',
+                                }
+                                : {
+                                    background: 'hsla(230, 15%, 10%, 0.8)',
+                                    color: 'hsl(230 10% 50%)',
+                                    border: '1px solid hsla(230, 15%, 22%, 0.7)',
+                                }}
+                        >
+                            ContractMaker
+                        </button>
+                        {activePreset && (
+                            <button
+                                type="button"
+                                onClick={() => setActivePreset(null)}
+                                className="rounded-lg px-3 py-2 text-xs font-semibold"
+                                style={{
+                                    background: 'hsla(35, 95%, 55%, 0.1)',
+                                    color: 'hsl(35 95% 62%)',
+                                    border: '1px solid hsla(35, 95%, 55%, 0.25)',
+                                }}
+                            >
+                                Limpiar simulacion precargada
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {selectedPatient ? (
-                <CalculadoraFinanciera patient={selectedPatient as Paciente} />
+                activeFlow === 'simulador' ? (
+                    <SimuladorFinanciacion
+                        patient={selectedPatient as Paciente}
+                        onUseInContract={(preset) => {
+                            setActivePreset(preset);
+                            setActiveFlow('contractmaker');
+                        }}
+                    />
+                ) : (
+                    <CalculadoraFinanciera patient={selectedPatient as Paciente} initialPreset={activePreset} />
+                )
             ) : (
                 <div className="rounded-2xl p-10 text-center" style={{ background: 'hsla(230, 15%, 12%, 0.45)', border: '1px dashed hsla(230, 15%, 24%, 0.9)' }}>
                     <p className="text-sm font-medium" style={{ color: 'hsl(230 10% 50%)' }}>

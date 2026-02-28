@@ -158,7 +158,7 @@ async function main() {
             missingDetected += 1;
 
             const baseName = getPatientFolderName(patient.apellido || '', patient.nombre || '');
-            const presentationFolderName = `${baseName} - PRESENTACION`;
+            const presentationFolderName = `[PRESENTACION] ${baseName}`;
 
             let createdId: string | undefined;
             if (!DRY_RUN) {

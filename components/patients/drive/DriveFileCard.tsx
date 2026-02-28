@@ -17,13 +17,13 @@ interface DriveFileCardProps {
     onPreview: (file: DriveFile) => void;
 }
 
-function getFileCategory(file: DriveFile): 'image' | 'video' | 'stl' | 'pdf' | 'google-doc' | 'other' {
+function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'other' {
     const mime = file.mimeType.toLowerCase();
     const name = file.name.toLowerCase();
 
     if (mime.startsWith('image/')) return 'image';
     if (mime.startsWith('video/')) return 'video';
-    if (name.endsWith('.stl') || mime === 'application/sla' || mime === 'model/stl') return 'stl';
+    if (name.endsWith('.stl') || name.endsWith('.ply') || mime === 'application/sla' || mime === 'model/stl') return '3d';
     if (mime === 'application/pdf') return 'pdf';
     if (mime.startsWith('application/vnd.google-apps.')) return 'google-doc';
     return 'other';
@@ -56,7 +56,7 @@ function formatRelativeDate(dateStr: string): string {
 const ICON_MAP = {
     image: ImageIcon,
     video: Video,
-    stl: Box,
+    '3d': Box,
     pdf: FileText,
     'google-doc': FileText,
     other: File,
@@ -65,7 +65,7 @@ const ICON_MAP = {
 const COLOR_MAP = {
     image: 'text-blue-400 bg-blue-400/10',
     video: 'text-purple-400 bg-purple-400/10',
-    stl: 'text-[#C9A96E] bg-[#C9A96E]/10',
+    '3d': 'text-[#C9A96E] bg-[#C9A96E]/10',
     pdf: 'text-red-400 bg-red-400/10',
     'google-doc': 'text-green-400 bg-green-400/10',
     other: 'text-gray-400 bg-gray-400/10',
@@ -75,7 +75,7 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
     const category = getFileCategory(file);
     const Icon = ICON_MAP[category];
     const colorClass = COLOR_MAP[category];
-    const canPreview = category === 'image' || category === 'video' || category === 'stl';
+    const canPreview = category === 'image' || category === 'video' || category === '3d';
     const size = formatFileSize(file.size);
 
     const handleClick = () => {

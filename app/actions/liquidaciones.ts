@@ -94,6 +94,8 @@ export interface LiquidacionAdminRow {
     foto_url?: string;
     area?: string;
     app_role?: string;
+    empresa_prestadora_id?: string | null;
+    empresa_prestadora_nombre?: string | null;
     tipo: string;
     modelo_pago: 'hora_ars' | 'prestacion_usd';
     liquidacion?: LiquidacionResult;
@@ -409,19 +411,58 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
         ? `${mes}-01`
         : `${new Date().toISOString().slice(0, 7)}-01`;
 
-    const [workersRes, liqRes] = await Promise.all([
-        admin
+    const workersExtendedRes = await admin
+        .from('personal')
+        .select('id, nombre, apellido, foto_url, area, tipo, user_id, empresa_prestadora_id, empresas_prestadoras:empresa_prestadora_id(nombre)')
+        .eq('activo', true)
+        .order('nombre');
+
+    let workersData: Array<{
+        id: string;
+        nombre: string;
+        apellido?: string;
+        foto_url?: string;
+        area?: string;
+        tipo?: string;
+        user_id?: string | null;
+        empresa_prestadora_id?: string | null;
+        empresas_prestadoras?: { nombre?: string } | Array<{ nombre?: string }> | null;
+    }> = [];
+
+    if (workersExtendedRes.error) {
+        console.warn('Extended liquidaciones workers query failed, using fallback:', workersExtendedRes.error.message);
+
+        const workersFallbackRes = await admin
             .from('personal')
             .select('id, nombre, apellido, foto_url, area, tipo, user_id')
             .eq('activo', true)
-            .order('nombre'),
-        admin
-            .from('liquidaciones_mensuales')
-            .select('*')
-            .eq('mes', mesDate),
-    ]);
+            .order('nombre');
 
-    const userIds = (workersRes.data || [])
+        if (workersFallbackRes.error) {
+            console.error('Error loading workers for liquidaciones:', workersFallbackRes.error);
+            return [];
+        }
+
+        workersData = (workersFallbackRes.data || []).map((w) => ({
+            ...w,
+            empresa_prestadora_id: null,
+            empresas_prestadoras: null,
+        }));
+    } else {
+        workersData = workersExtendedRes.data || [];
+    }
+
+    const { data: liquidacionesData, error: liqError } = await admin
+        .from('liquidaciones_mensuales')
+        .select('*')
+        .eq('mes', mesDate);
+
+    if (liqError) {
+        console.error('Error loading liquidaciones:', liqError);
+        return [];
+    }
+
+    const userIds = workersData
         .map((w) => w.user_id)
         .filter((id): id is string => Boolean(id));
 
@@ -438,9 +479,9 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
 
     const roleByUserId = new Map((profileRoles.data || []).map((p) => [p.id, p.role]));
 
-    const liqMap = new Map((liqRes.data || []).map(l => [l.personal_id, l]));
+    const liqMap = new Map((liquidacionesData || []).map(l => [l.personal_id, l]));
 
-    return (workersRes.data || []).map(w => {
+    return workersData.map(w => {
         const liq = liqMap.get(w.id);
         const liquidacionNormalizada = liq
             ? ({
@@ -456,6 +497,10 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             foto_url: w.foto_url,
             area: w.area,
             app_role: w.user_id ? roleByUserId.get(w.user_id) || undefined : undefined,
+            empresa_prestadora_id: w.empresa_prestadora_id || null,
+            empresa_prestadora_nombre: Array.isArray(w.empresas_prestadoras)
+                ? (w.empresas_prestadoras[0]?.nombre || null)
+                : (w.empresas_prestadoras?.nombre || null),
             tipo: w.tipo || 'prestador',
             modelo_pago: isDoctor ? 'prestacion_usd' : 'hora_ars',
             liquidacion: liquidacionNormalizada,
@@ -464,6 +509,61 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             ),
         };
     });
+}
+
+export async function generateLiquidacionesEmpresa(empresaId: string, mes: string): Promise<{ generated: number; skipped: number }> {
+    const admin = getAdminClient();
+
+    const { data: workers, error } = await admin
+        .from('personal')
+        .select('id')
+        .eq('activo', true)
+        .eq('empresa_prestadora_id', empresaId);
+
+    if (error) throw new Error(error.message);
+
+    let generated = 0;
+    let skipped = 0;
+
+    for (const worker of workers || []) {
+        try {
+            await generateLiquidacion(worker.id, mes);
+            generated += 1;
+        } catch {
+            skipped += 1;
+        }
+    }
+
+    revalidatePath('/admin/liquidaciones');
+    return { generated, skipped };
+}
+
+export async function markLiquidacionesEmpresaPaid(empresaId: string, mes: string, fechaPago: string): Promise<{ updated: number; skipped: number }> {
+    const admin = getAdminClient();
+    const mesDate = `${mes}-01`;
+
+    const { data: liquidaciones, error } = await admin
+        .from('liquidaciones_mensuales')
+        .select('id, estado, personal!inner(empresa_prestadora_id)')
+        .eq('mes', mesDate)
+        .eq('personal.empresa_prestadora_id', empresaId);
+
+    if (error) throw new Error(error.message);
+
+    let updated = 0;
+    let skipped = 0;
+
+    for (const liq of liquidaciones || []) {
+        if (normalizeEstado(liq.estado) === 'paid') {
+            skipped += 1;
+            continue;
+        }
+        await markLiquidacionPaid(liq.id, fechaPago);
+        updated += 1;
+    }
+
+    revalidatePath('/admin/liquidaciones');
+    return { updated, skipped };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

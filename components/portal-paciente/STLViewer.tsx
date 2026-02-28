@@ -5,9 +5,10 @@ import { Loader2, Box, Download, RotateCcw } from 'lucide-react';
 
 interface STLViewerProps {
     url: string;
+    format?: 'stl' | 'ply';
 }
 
-export default function STLViewer({ url }: STLViewerProps) {
+export default function STLViewer({ url, format = 'stl' }: STLViewerProps) {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<{
         renderer: unknown;
@@ -86,52 +87,110 @@ export default function STLViewer({ url }: STLViewerProps) {
                 controls.minDistance = 20;
                 controls.maxDistance = 500;
 
-                // ── Load STL ──
-                const loader = new STLLoader();
-                loader.load(
-                    url,
+                // ── Load 3D model ──
+                if (format === 'ply') {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (geometry: any) => {
-                        geometry.computeBoundingBox();
-                        geometry.center();
-                        geometry.computeVertexNormals();
+                    const { PLYLoader } = await import('three/examples/jsm/loaders/PLYLoader.js' as any);
+                    const loader = new PLYLoader();
+                    loader.load(
+                        url,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (geometry: any) => {
+                            geometry.computeBoundingBox();
+                            geometry.center();
+                            geometry.computeVertexNormals();
 
-                        // Scale to fit view
-                        const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
-                        const size = box.getSize(new THREE.Vector3());
-                        const maxDim = Math.max(size.x, size.y, size.z);
-                        const scale = 80 / maxDim;
+                            const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
+                            const size = box.getSize(new THREE.Vector3());
+                            const maxDim = Math.max(size.x, size.y, size.z);
+                            const scale = 80 / maxDim;
 
-                        const material = new THREE.MeshPhysicalMaterial({
-                            color: 0xF7F3EE,        // Clean, bright tooth-white
-                            roughness: 0.18,        // Slightly smoother for a polished look
-                            metalness: 0.02,
-                            reflectivity: 0.8,      // Higher reflectivity for "glaze" feel
-                            clearcoat: 0.5,         // More clearcoat for that glossy finish
-                            clearcoatRoughness: 0.05,
-                            transmission: 0.1,      // Subtle translucency 
-                            thickness: 0.5,
-                        });
+                            // PLY can have vertex colors
+                            const hasColors = geometry.attributes.color != null;
 
-                        const mesh = new THREE.Mesh(geometry, material);
-                        mesh.scale.setScalar(scale);
-                        mesh.castShadow = true;
-                        mesh.receiveShadow = true;
-                        scene.add(mesh);
+                            const material = hasColors
+                                ? new THREE.MeshStandardMaterial({
+                                    vertexColors: true,
+                                    roughness: 0.4,
+                                    metalness: 0.05,
+                                })
+                                : new THREE.MeshPhysicalMaterial({
+                                    color: 0xF7F3EE,
+                                    roughness: 0.18,
+                                    metalness: 0.02,
+                                    reflectivity: 0.8,
+                                    clearcoat: 0.5,
+                                    clearcoatRoughness: 0.05,
+                                    transmission: 0.1,
+                                    thickness: 0.5,
+                                });
 
-                        setStatus('ready');
-                    },
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (event: any) => {
-                        if (event.total > 0) {
-                            setLoadingPct(Math.round((event.loaded / event.total) * 100));
+                            const mesh = new THREE.Mesh(geometry, material);
+                            mesh.scale.setScalar(scale);
+                            mesh.castShadow = true;
+                            mesh.receiveShadow = true;
+                            scene.add(mesh);
+
+                            setStatus('ready');
+                        },
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (event: any) => {
+                            if (event.total > 0) {
+                                setLoadingPct(Math.round((event.loaded / event.total) * 100));
+                            }
+                        },
+                        (err: unknown) => {
+                            console.error('[3DViewer] PLY load error:', err);
+                            setStatus('error');
                         }
-                    },
-                    (err: unknown) => {
-                        console.error('[STLViewer] load error:', err);
-                        setStatus('error');
-                    }
-                );
+                    );
+                } else {
+                    // STL
+                    const loader = new STLLoader();
+                    loader.load(
+                        url,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (geometry: any) => {
+                            geometry.computeBoundingBox();
+                            geometry.center();
+                            geometry.computeVertexNormals();
+
+                            const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
+                            const size = box.getSize(new THREE.Vector3());
+                            const maxDim = Math.max(size.x, size.y, size.z);
+                            const scale = 80 / maxDim;
+
+                            const material = new THREE.MeshPhysicalMaterial({
+                                color: 0xF7F3EE,
+                                roughness: 0.18,
+                                metalness: 0.02,
+                                reflectivity: 0.8,
+                                clearcoat: 0.5,
+                                clearcoatRoughness: 0.05,
+                                transmission: 0.1,
+                                thickness: 0.5,
+                            });
+
+                            const mesh = new THREE.Mesh(geometry, material);
+                            mesh.scale.setScalar(scale);
+                            mesh.castShadow = true;
+                            mesh.receiveShadow = true;
+                            scene.add(mesh);
+
+                            setStatus('ready');
+                        },
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (event: any) => {
+                            if (event.total > 0) {
+                                setLoadingPct(Math.round((event.loaded / event.total) * 100));
+                            }
+                        },
+                        (err: unknown) => {
+                            console.error('[3DViewer] STL load error:', err);
+                            setStatus('error');
+                        }
+                    );
+                }
 
                 // ── Animation loop ──
                 function animate() {
@@ -173,7 +232,7 @@ export default function STLViewer({ url }: STLViewerProps) {
                 cancelAnimationFrame(sceneRef.current.animId);
             }
         };
-    }, [url]);
+    }, [url, format]);
 
     function resetView() {
         // Trigger re-mount by changing key (handled by parent)
@@ -220,7 +279,7 @@ export default function STLViewer({ url }: STLViewerProps) {
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C9A96E]/10 border border-[#C9A96E]/20 text-[#C9A96E] text-sm font-medium hover:bg-[#C9A96E]/15 transition-colors"
                     >
                         <Download size={15} />
-                        Descargar archivo STL
+                        Descargar archivo 3D
                     </a>
                 </div>
             )}
@@ -235,7 +294,7 @@ export default function STLViewer({ url }: STLViewerProps) {
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white text-sm border border-white/10"
                     >
                         <Download size={14} />
-                        Descargar STL
+                        Descargar modelo 3D
                     </a>
                 </div>
             )}

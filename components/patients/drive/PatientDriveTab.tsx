@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import {
     getPatientDriveFolders,
     createPatientDriveFolderAction,
+    loadFolderFiles,
 } from '@/app/actions/patient-files-drive';
 import type { DriveFile, FolderWithFiles } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
@@ -76,8 +77,9 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
         setFolders(result.folders);
         setRootFiles(result.rootFiles);
-        // Auto-open folders that have files
-        setOpenFolders(new Set(result.folders.filter(f => f.files.length > 0).map(f => f.id)));
+        // Don't auto-open — files are lazy loaded now
+        setOpenFolders(new Set());
+        setLoadingFolders(new Set());
         setStatus('loaded');
     }, []);
 
@@ -120,13 +122,40 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         setCreating(false);
     };
 
-    const toggleFolder = (folderId: string) => {
-        setOpenFolders(prev => {
-            const next = new Set(prev);
-            if (next.has(folderId)) next.delete(folderId);
-            else next.add(folderId);
-            return next;
-        });
+    const [loadingFolders, setLoadingFolders] = useState<Set<string>>(new Set());
+
+    const toggleFolder = async (folderId: string) => {
+        if (openFolders.has(folderId)) {
+            // Collapse
+            setOpenFolders(prev => {
+                const next = new Set(prev);
+                next.delete(folderId);
+                return next;
+            });
+            return;
+        }
+
+        // Expand — lazy load files if not loaded yet
+        const folder = folders.find(f => f.id === folderId);
+        if (folder && !folder.loaded) {
+            setLoadingFolders(prev => new Set(prev).add(folderId));
+
+            const result = await loadFolderFiles(folderId);
+
+            setFolders(prev => prev.map(f =>
+                f.id === folderId
+                    ? { ...f, files: result.files, loaded: true }
+                    : f
+            ));
+            setLoadingFolders(prev => {
+                const next = new Set(prev);
+                next.delete(folderId);
+                return next;
+            });
+        }
+
+        // Open the folder
+        setOpenFolders(prev => new Set(prev).add(folderId));
     };
 
     const motherFolderId = extractFolderIdFromUrl(currentFolderUrl);
@@ -155,7 +184,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         return `${count} archivo${count > 1 ? 's' : ''} subido${count > 1 ? 's' : ''} a ${destinationName}`;
     };
 
-    const handleUploadedToFolder = (folderId: string) => {
+    const handleUploadedToFolder = async (folderId: string) => {
         if (!folderId) {
             handleRefresh();
             return;
@@ -172,7 +201,17 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             });
         }
 
-        handleRefresh();
+        // Reload only this folder's files instead of full refresh
+        if (folderId !== motherFolderId) {
+            const result = await loadFolderFiles(folderId);
+            setFolders(prev => prev.map(f =>
+                f.id === folderId
+                    ? { ...f, files: result.files, loaded: true }
+                    : f
+            ));
+        } else {
+            handleRefresh();
+        }
     };
 
     const isFileDrag = (event: DragEvent<HTMLElement>) =>
@@ -272,7 +311,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         );
     }
 
-    const totalFiles = folders.reduce((acc, f) => acc + f.files.length, 0) + rootFiles.length;
+    const loadedFiles = folders.reduce((acc, f) => acc + f.files.length, 0) + rootFiles.length;
+    const allFoldersLoaded = folders.every(f => f.loaded);
 
     return (
         <div
@@ -288,7 +328,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 <div className="flex items-center gap-2">
                     <FolderOpen size={18} className="text-blue-500" />
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {totalFiles} archivo{totalFiles !== 1 ? 's' : ''} en {folders.length} carpeta{folders.length !== 1 ? 's' : ''}
+                        {allFoldersLoaded
+                            ? `${loadedFiles} archivo${loadedFiles !== 1 ? 's' : ''} en `
+                            : ''
+                        }{folders.length} carpeta{folders.length !== 1 ? 's' : ''}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -319,11 +362,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         y: isRootTargetHighlighted ? -2 : 0,
                     }}
                     transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-                    className={`rounded-xl border bg-white/50 dark:bg-white/[0.02] p-4 space-y-3 transition-all ${
-                    isRootTargetHighlighted
+                    className={`rounded-xl border bg-white/50 dark:bg-white/[0.02] p-4 space-y-3 transition-all ${isRootTargetHighlighted
                         ? 'border-blue-500 ring-2 ring-blue-500/40'
                         : 'border-gray-200 dark:border-white/10'
-                }`}>
+                        }`}>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <p className="text-xs font-semibold text-gray-600 dark:text-white/60 uppercase tracking-wider">
                             Carga rápida
@@ -375,6 +417,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 {folders.map(folder => {
                     const isOpen = openFolders.has(folder.id);
                     const isDropTarget = isGlobalDragging && effectiveGlobalDropFolderId === folder.id;
+                    const isLoading = loadingFolders.has(folder.id);
 
                     return (
                         <motion.div
@@ -384,29 +427,38 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                 y: isDropTarget ? -2 : 0,
                             }}
                             transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-                            className={`rounded-xl border overflow-hidden transition-all ${
-                                isDropTarget
-                                    ? 'border-blue-500 ring-2 ring-blue-500/40'
-                                    : 'border-gray-200 dark:border-white/10'
-                            }`}
+                            className={`rounded-xl border overflow-hidden transition-all ${isDropTarget
+                                ? 'border-blue-500 ring-2 ring-blue-500/40'
+                                : 'border-gray-200 dark:border-white/10'
+                                }`}
                         >
                             {/* Folder header */}
                             <button
                                 onClick={() => toggleFolder(folder.id)}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                                disabled={isLoading}
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors disabled:opacity-70"
                             >
-                                <motion.div
-                                    animate={{ rotate: isOpen ? 180 : 0 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <ChevronDown size={16} className="text-gray-400" />
-                                </motion.div>
+                                {isLoading ? (
+                                    <Loader2 size={16} className="text-blue-400 animate-spin" />
+                                ) : (
+                                    <motion.div
+                                        animate={{ rotate: isOpen ? 180 : 0 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        <ChevronDown size={16} className="text-gray-400" />
+                                    </motion.div>
+                                )}
                                 <FolderOpen size={16} className="text-yellow-500" />
                                 <span className="text-sm font-medium text-gray-900 dark:text-white flex-1 text-left">
                                     {folder.displayName}
                                 </span>
                                 <span className="text-xs text-gray-400 dark:text-white/30 mr-2">
-                                    {folder.files.length} archivo{folder.files.length !== 1 ? 's' : ''}
+                                    {isLoading
+                                        ? 'Cargando...'
+                                        : folder.loaded
+                                            ? `${folder.files.length} archivo${folder.files.length !== 1 ? 's' : ''}`
+                                            : 'Clic para ver'
+                                    }
                                 </span>
                                 {canUpload && (
                                     <span onClick={e => e.stopPropagation()}>

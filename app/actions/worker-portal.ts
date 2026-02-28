@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { WorkerProfile, WorkLog, Achievement, WorkerAchievement, ProviderGoal, GoalProgress, Liquidation } from '@/types/worker-portal';
+import { WorkerProfile, WorkLog, Achievement, WorkerAchievement, ProviderGoal, GoalProgress, Liquidation, EmpresaPrestadora } from '@/types/worker-portal';
 import { revalidatePath } from 'next/cache';
 import { sendInvitationEmail } from '@/lib/emailjs';
 
@@ -80,13 +80,34 @@ export async function getAllWorkers(): Promise<WorkerProfile[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from(TableNames.Profiles)
-        .select('*')
+        .select('*, empresa_prestadora:empresa_prestadora_id(nombre)')
         .order('nombre');
 
-    if (error) { console.error('Error fetching workers:', error); return []; }
+    let rows: Array<WorkerProfile & { empresa_prestadora?: { nombre?: string } | Array<{ nombre?: string }> | null }> = [];
 
-    return (data as WorkerProfile[]).map(p => ({
+    if (error) {
+        console.warn('Extended workers query failed, falling back without company relation:', error.message);
+
+        const fallback = await supabase
+            .from(TableNames.Profiles)
+            .select('*')
+            .order('nombre');
+
+        if (fallback.error) {
+            console.error('Error fetching workers:', fallback.error);
+            return [];
+        }
+
+        rows = (fallback.data || []) as Array<WorkerProfile & { empresa_prestadora?: { nombre?: string } | Array<{ nombre?: string }> | null }>;
+    } else {
+        rows = (data || []) as Array<WorkerProfile & { empresa_prestadora?: { nombre?: string } | Array<{ nombre?: string }> | null }>;
+    }
+
+    return rows.map(p => ({
         ...p,
+        empresa_prestadora_nombre: Array.isArray(p.empresa_prestadora)
+            ? (p.empresa_prestadora[0]?.nombre || null)
+            : (p.empresa_prestadora?.nombre || null),
         full_name: `${p.nombre} ${p.apellido || ''}`.trim()
     }));
 }
@@ -95,12 +116,33 @@ export async function getWorkerById(id: string): Promise<WorkerProfile | null> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from(TableNames.Profiles)
-        .select('*')
+        .select('*, empresa_prestadora:empresa_prestadora_id(nombre)')
         .eq('id', id)
         .single();
 
-    if (error) return null;
-    return data as WorkerProfile;
+    let typed: WorkerProfile & { empresa_prestadora?: { nombre?: string } | Array<{ nombre?: string }> | null };
+
+    if (error) {
+        console.warn('Extended worker-by-id query failed, falling back without company relation:', error.message);
+
+        const fallback = await supabase
+            .from(TableNames.Profiles)
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fallback.error) return null;
+        typed = fallback.data as WorkerProfile & { empresa_prestadora?: { nombre?: string } | Array<{ nombre?: string }> | null };
+    } else {
+        typed = data as WorkerProfile & { empresa_prestadora?: { nombre?: string } | Array<{ nombre?: string }> | null };
+    }
+
+    return {
+        ...typed,
+        empresa_prestadora_nombre: Array.isArray(typed.empresa_prestadora)
+            ? (typed.empresa_prestadora[0]?.nombre || null)
+            : (typed.empresa_prestadora?.nombre || null),
+    } as WorkerProfile;
 }
 
 export async function upsertWorkerProfile(profile: Partial<WorkerProfile>) {
@@ -424,37 +466,14 @@ export interface CreateWorkerInput {
     porcentaje_honorarios?: number;
     fecha_ingreso?: string;
     especialidad?: string;
+    empresa_prestadora_id?: string;
 }
 
 /** Create personal record only — no app access */
-export async function createWorkerNoAccess(data: CreateWorkerInput): Promise<WorkerProfile> {
-    const admin = getAdminClient();
-    // DB CHECK constraint only allows 'empleado' | 'profesional'; map 'prestador' → 'empleado'
-    const dbTipo = data.tipo === 'profesional' ? 'profesional' : 'empleado';
-    const { data: record, error } = await admin
-        .from('personal')
-        .insert({
-            nombre: data.nombre,
-            apellido: data.apellido || null,
-            rol: data.rol,
-            area: data.area || 'general',
-            tipo: dbTipo,
-            email: data.email || null,
-            whatsapp: data.whatsapp || null,
-            documento: data.documento || null,
-            condicion_afip: data.condicion_afip || null,
-            valor_hora_ars: data.valor_hora_ars || 0,
-            porcentaje_honorarios: data.porcentaje_honorarios || 0,
-            fecha_ingreso: data.fecha_ingreso || new Date().toISOString().split('T')[0],
-            especialidad: data.especialidad || null,
-            activo: true,
-        })
-        .select()
-        .single();
-
-    if (error) throw new Error(error.message);
-    revalidatePath('/admin/staff');
-    return record as WorkerProfile;
+export async function createWorkerNoAccess(_data: CreateWorkerInput): Promise<WorkerProfile> {
+    throw new Error(
+        `Creación sin portal deshabilitada por política operativa. Use createWorkerWithInvite para alta con acceso.`
+    );
 }
 
 /** Create personal record AND send an invite email via Supabase auth */
@@ -526,6 +545,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
             porcentaje_honorarios: data.porcentaje_honorarios || 0,
             fecha_ingreso: data.fecha_ingreso || new Date().toISOString().split('T')[0],
             especialidad: data.especialidad || null,
+            empresa_prestadora_id: data.empresa_prestadora_id || null,
             activo: true,
         })
         .select()
@@ -534,6 +554,60 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
     if (personalError) throw new Error(personalError.message);
     revalidatePath('/admin/staff');
     return record as WorkerProfile;
+}
+
+export async function getProviderCompanies(): Promise<EmpresaPrestadora[]> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('empresas_prestadoras')
+        .select('id, nombre, descripcion, area_default, activo')
+        .eq('activo', true)
+        .order('nombre');
+
+    if (error) {
+        console.error('Error fetching provider companies:', error);
+        return [];
+    }
+
+    return (data || []) as EmpresaPrestadora[];
+}
+
+export async function createProviderCompany(input: {
+    nombre: string;
+    descripcion?: string;
+    area_default?: string;
+}): Promise<EmpresaPrestadora> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile || !['owner', 'admin'].includes(profile.role || '')) {
+        throw new Error('Acceso denegado: solo admin/owner pueden crear empresas prestadoras');
+    }
+
+    const name = input.nombre.trim();
+    if (!name) throw new Error('Nombre obligatorio');
+
+    const admin = getAdminClient();
+    const { data, error } = await admin
+        .from('empresas_prestadoras')
+        .insert({
+            nombre: name,
+            descripcion: input.descripcion?.trim() || null,
+            area_default: input.area_default?.trim() || null,
+            activo: true,
+        })
+        .select('id, nombre, descripcion, area_default, activo')
+        .single();
+
+    if (error) throw new Error(error.message);
+    return data as EmpresaPrestadora;
 }
 
 /** Send (or resend) portal access invite to an existing personal record */

@@ -22,17 +22,21 @@ interface User {
 }
 
 const APP_ROLE_OPTIONS = [
-    { value: 'partner_viewer', label: 'Partner Viewer (Solo Lectura)' },
+    { value: 'partner_viewer', label: 'Solo Lectura' },
     { value: 'reception', label: 'Recepción' },
     { value: 'recaptacion', label: 'Recaptación' },
     { value: 'laboratorio', label: 'Laboratorio' },
     { value: 'asistente', label: 'Asistente' },
     { value: 'odontologo', label: 'Odontólogo' },
-    { value: 'pricing_manager', label: 'Pricing Manager' },
-    { value: 'developer', label: 'Developer' },
+    { value: 'pricing_manager', label: 'Gestor de Precios' },
+    { value: 'developer', label: 'Desarrollador' },
     { value: 'admin', label: 'Administrador' },
-    { value: 'owner', label: 'Owner (Dueño)' },
+    { value: 'owner', label: 'Dueño' },
 ];
+
+function roleLabel(role: string) {
+    return APP_ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
+}
 
 export default function UserManagementClient({ initialUsers }: { initialUsers: User[] }) {
     const [users, setUsers] = useState<User[]>(initialUsers);
@@ -167,7 +171,7 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                                         ${user.role === 'owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
                                             user.role === 'admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
                                                 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
-                                        {user.role}
+                                        {roleLabel(user.role)}
                                     </span>
                                 </td>
                                 <td className="p-4">

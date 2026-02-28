@@ -12,8 +12,10 @@ import { toast } from 'sonner';
 import {
     getLiquidacionesAdmin,
     generateLiquidacion,
+    generateLiquidacionesEmpresa,
     approveLiquidacion,
     markLiquidacionPaid,
+    markLiquidacionesEmpresaPaid,
     rejectLiquidacion,
     updateLiquidacionManual,
     LiquidacionAdminRow,
@@ -54,6 +56,24 @@ function formatUSD(n: number) {
     return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 }
 
+function safeFileName(value: string) {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .toLowerCase();
+}
+
+function escapeHtml(value: string) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function roleLabel(role?: string) {
     const labels: Record<string, string> = {
         owner: 'Owner',
@@ -70,6 +90,20 @@ function roleLabel(role?: string) {
     if (!role) return '';
     return labels[role] || role;
 }
+
+type CompanySummary = {
+    empresaId: string;
+    empresaNombre: string;
+    members: LiquidacionAdminRow[];
+    generated: number;
+    without: number;
+    pending: number;
+    approved: number;
+    paid: number;
+    totalArs: number;
+    totalUsd: number;
+    hasAlerts: boolean;
+};
 
 const ESTADO_CONFIG: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
     pending:  { label: 'Pendiente', icon: <Clock size={12} />, cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
@@ -1189,6 +1223,8 @@ export default function LiquidacionesPage() {
     const [detalleHorasLoading, setDetalleHorasLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid' | 'sin_generar'>('all');
+    const [viewMode, setViewMode] = useState<'individual' | 'empresa'>('individual');
+    const [generatingCompany, setGeneratingCompany] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -1228,7 +1264,56 @@ export default function LiquidacionesPage() {
         if (!searchQuery) return true;
         const fullName = `${r.nombre} ${r.apellido || ''}`.toLowerCase();
         const area = (r.area || '').toLowerCase();
-        return fullName.includes(searchQuery) || area.includes(searchQuery);
+        const company = (r.empresa_prestadora_nombre || '').toLowerCase();
+        return fullName.includes(searchQuery) || area.includes(searchQuery) || company.includes(searchQuery);
+    });
+
+    const companyGroups = rows
+        .reduce((acc, row) => {
+            const key = row.empresa_prestadora_id || '__sin_empresa__';
+            const companyName = row.empresa_prestadora_nombre || 'Sin empresa asignada';
+            if (!acc[key]) {
+                acc[key] = {
+                    empresaId: key,
+                    empresaNombre: companyName,
+                    members: [] as LiquidacionAdminRow[],
+                };
+            }
+            acc[key].members.push(row);
+            return acc;
+        }, {} as Record<string, { empresaId: string; empresaNombre: string; members: LiquidacionAdminRow[] }>);
+
+    const companySummaries: CompanySummary[] = Object.values(companyGroups).map((group) => {
+        const generated = group.members.filter((m) => Boolean(m.liquidacion)).length;
+        const without = group.members.length - generated;
+        const pending = group.members.filter((m) => m.liquidacion?.estado === 'pending').length;
+        const approved = group.members.filter((m) => m.liquidacion?.estado === 'approved').length;
+        const paid = group.members.filter((m) => m.liquidacion?.estado === 'paid').length;
+
+        return {
+            ...group,
+            generated,
+            without,
+            pending,
+            approved,
+            paid,
+            totalArs: group.members.reduce((sum, member) => sum + Number(member.liquidacion?.total_ars || 0), 0),
+            totalUsd: group.members.reduce((sum, member) => sum + Number(member.liquidacion?.total_usd || 0), 0),
+            hasAlerts: group.members.some((m) => m.tiene_pendientes),
+        };
+    });
+
+    const filteredCompanySummaries = companySummaries.filter((group) => {
+        const companyName = group.empresaNombre.toLowerCase();
+        const membersText = group.members.map((m) => `${m.nombre} ${m.apellido || ''}`).join(' ').toLowerCase();
+
+        if (filter === 'sin_generar' && group.without === 0) return false;
+        if (filter === 'pending' && group.pending === 0) return false;
+        if (filter === 'approved' && group.approved === 0) return false;
+        if (filter === 'paid' && group.paid !== group.members.length) return false;
+
+        if (!searchQuery) return true;
+        return companyName.includes(searchQuery) || membersText.includes(searchQuery);
     });
 
     // ── Actions ──────────────────────────────────────────────────────────────
@@ -1243,6 +1328,144 @@ export default function LiquidacionesPage() {
         } finally {
             setGenerating(null);
         }
+    }
+
+    async function handleGenerateCompany(empresaId: string) {
+        setGeneratingCompany(empresaId);
+        try {
+            const result = await generateLiquidacionesEmpresa(empresaId, mes);
+            toast.success(`Liquidación agrupada actualizada: ${result.generated} generadas${result.skipped ? `, ${result.skipped} con error` : ''}`);
+            load();
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'Error al generar liquidaciones de la empresa');
+        } finally {
+            setGeneratingCompany(null);
+        }
+    }
+
+    async function handleMarkCompanyPaid(empresaId: string) {
+        const defaultDate = new Date().toISOString().split('T')[0];
+        const selectedDate = window.prompt('Fecha de pago (YYYY-MM-DD)', defaultDate);
+        if (!selectedDate) return;
+
+        try {
+            const result = await markLiquidacionesEmpresaPaid(empresaId, mes, selectedDate);
+            toast.success(`Pagos registrados para empresa: ${result.updated} actualizadas${result.skipped ? `, ${result.skipped} ya pagadas` : ''}`);
+            load();
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'Error al marcar pagos de empresa');
+        }
+    }
+
+    function getEstadoEmpresaMember(member: LiquidacionAdminRow): string {
+        if (!member.liquidacion) return 'Sin generar';
+        const estado = member.liquidacion.estado;
+        if (estado === 'pending') return 'Pendiente';
+        if (estado === 'approved') return 'Aprobada';
+        if (estado === 'paid') return 'Pagada';
+        if (estado === 'rejected') return 'Rechazada';
+        return estado;
+    }
+
+    async function handleExportCompanyExcel(group: CompanySummary) {
+        try {
+            const XLSX = await import('xlsx');
+            const wb = XLSX.utils.book_new();
+
+            const resumen = [{
+                Empresa: group.empresaNombre,
+                Mes: mesLabel(mes),
+                Miembros: group.members.length,
+                Generadas: group.generated,
+                SinGenerar: group.without,
+                Pendientes: group.pending,
+                Aprobadas: group.approved,
+                Pagadas: group.paid,
+                TotalARS: Number(group.totalArs.toFixed(2)),
+                TotalUSD: Number(group.totalUsd.toFixed(2)),
+            }];
+
+            const detalle = group.members.map((member) => ({
+                Prestador: `${member.nombre} ${member.apellido || ''}`.trim(),
+                Area: member.area || '',
+                RolApp: roleLabel(member.app_role),
+                Estado: getEstadoEmpresaMember(member),
+                Modelo: member.liquidacion?.modelo_pago || member.modelo_pago,
+                TotalARS: Number(member.liquidacion?.total_ars || 0),
+                TotalUSD: Number(member.liquidacion?.total_usd || 0),
+                PendSlides: member.liquidacion?.prestaciones_pendientes || 0,
+            }));
+
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), 'Resumen empresa');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), 'Detalle miembros');
+
+            XLSX.writeFile(wb, `liquidacion_empresa_${safeFileName(group.empresaNombre)}_${mes}.xlsx`);
+            toast.success('Excel de empresa exportado');
+        } catch {
+            toast.error('No se pudo exportar el Excel de empresa');
+        }
+    }
+
+    function handleExportCompanyPdf(group: CompanySummary) {
+        const popup = window.open('', '_blank');
+        if (!popup) {
+            toast.error('El navegador bloqueó la ventana de impresión');
+            return;
+        }
+
+        const rowsHtml = group.members.map((member) => {
+            const totalArsMember = Number(member.liquidacion?.total_ars || 0).toFixed(2);
+            const totalUsdMember = Number(member.liquidacion?.total_usd || 0).toFixed(2);
+            return `
+                <tr>
+                    <td>${escapeHtml(`${member.nombre} ${member.apellido || ''}`.trim())}</td>
+                    <td>${escapeHtml(member.area || '')}</td>
+                    <td>${escapeHtml(roleLabel(member.app_role))}</td>
+                    <td>${escapeHtml(getEstadoEmpresaMember(member))}</td>
+                    <td style="text-align:right;">${totalArsMember}</td>
+                    <td style="text-align:right;">${totalUsdMember}</td>
+                </tr>
+            `;
+        }).join('');
+
+        popup.document.write(`
+            <html>
+                <head>
+                    <title>Liquidación empresa - ${escapeHtml(group.empresaNombre)}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+                        h1 { margin: 0 0 6px 0; font-size: 20px; }
+                        .meta { margin: 0 0 14px 0; color: #555; font-size: 12px; }
+                        .kpi { margin: 0 0 16px 0; font-size: 12px; }
+                        table { width: 100%; border-collapse: collapse; }
+                        th, td { border: 1px solid #ddd; padding: 6px; font-size: 11px; text-align: left; }
+                        th { background: #f5f5f5; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Liquidación agrupada por empresa</h1>
+                    <p class="meta">Empresa: ${escapeHtml(group.empresaNombre)} · Período: ${escapeHtml(mesLabel(mes))}</p>
+                    <p class="kpi">Miembros: ${group.members.length} · Total ARS: ${group.totalArs.toLocaleString('es-AR', { maximumFractionDigits: 2 })} · Total USD: ${group.totalUsd.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Prestador</th>
+                                <th>Área</th>
+                                <th>Rol app</th>
+                                <th>Estado</th>
+                                <th>Total ARS</th>
+                                <th>Total USD</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </body>
+            </html>
+        `);
+
+        popup.document.close();
+        popup.focus();
+        setTimeout(() => popup.print(), 200);
     }
 
     async function handleApprove(liqId: string) {
@@ -1495,8 +1718,31 @@ export default function LiquidacionesPage() {
                     </button>
                 ))}
                     <span className="ml-auto text-xs text-slate-500 self-center">
-                        {filteredRows.length} resultados
+                        {viewMode === 'empresa' ? filteredCompanySummaries.length : filteredRows.length} resultados
                     </span>
+                </div>
+
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setViewMode('individual')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                            viewMode === 'individual'
+                                ? 'bg-indigo-600 border-indigo-500 text-white'
+                                : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                        }`}
+                    >
+                        Vista individual
+                    </button>
+                    <button
+                        onClick={() => setViewMode('empresa')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                            viewMode === 'empresa'
+                                ? 'bg-indigo-600 border-indigo-500 text-white'
+                                : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                        }`}
+                    >
+                        Vista por empresa
+                    </button>
                 </div>
             </div>
 
@@ -1507,6 +1753,115 @@ export default function LiquidacionesPage() {
                         <RefreshCw size={20} className="animate-spin mr-2" />
                         Cargando...
                     </div>
+                ) : viewMode === 'empresa' ? (
+                    filteredCompanySummaries.length === 0 ? (
+                        <div className="text-center py-16 text-slate-500 text-sm">
+                            No hay empresas prestadoras que coincidan con el filtro.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-slate-800">
+                                        <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Empresa</th>
+                                        <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Miembros</th>
+                                        <th className="text-right px-4 py-3 text-xs text-slate-400 font-medium">Total</th>
+                                        <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Estado</th>
+                                        <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                    {filteredCompanySummaries.map((group) => {
+                                        const allPaid = group.paid === group.members.length && group.members.length > 0;
+                                        const allGenerated = group.generated === group.members.length && group.members.length > 0;
+                                        const companyGenerating = generatingCompany === group.empresaId;
+                                        const isUnassignedGroup = group.empresaId === '__sin_empresa__';
+
+                                        return (
+                                            <tr key={group.empresaId} className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-4 py-3">
+                                                    <p className="font-medium text-white text-xs">{group.empresaNombre}</p>
+                                                    <p className="text-xs text-slate-500 mt-1">{group.members.length} personas vinculadas</p>
+                                                    {isUnassignedGroup && (
+                                                        <p className="text-[11px] text-amber-400 mt-1">
+                                                            Tip: asignales empresa desde Staff para liquidación agrupada real.
+                                                        </p>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <p className="text-xs text-slate-300">
+                                                        {group.members.map((m) => `${m.nombre} ${m.apellido || ''}`.trim()).join(', ')}
+                                                    </p>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <p className="font-semibold text-white">{formatARS(group.totalArs)}</p>
+                                                    {group.totalUsd > 0 && (
+                                                        <p className="text-xs text-slate-400">{formatUSD(group.totalUsd)}</p>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {allPaid ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-blue-500/10 text-blue-400 border-blue-500/30">
+                                                            <Banknote size={12} /> Pagada
+                                                        </span>
+                                                    ) : allGenerated ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                                                            <CheckCircle2 size={12} /> Generada
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                                            <Clock size={12} /> Pendiente
+                                                        </span>
+                                                    )}
+                                                    {group.without > 0 && (
+                                                        <p className="text-[11px] text-amber-400 mt-1">{group.without} sin generar</p>
+                                                    )}
+                                                    {group.hasAlerts && (
+                                                        <p className="text-[11px] text-amber-400 mt-1">Con alertas de slides</p>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                                                        <button
+                                                            onClick={() => handleGenerateCompany(group.empresaId)}
+                                                            disabled={companyGenerating || isUnassignedGroup}
+                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
+                                                        >
+                                                            {companyGenerating ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
+                                                            Generar grupo
+                                                        </button>
+                                                        {allGenerated && !allPaid && !isUnassignedGroup && (
+                                                            <button
+                                                                onClick={() => handleMarkCompanyPaid(group.empresaId)}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
+                                                            >
+                                                                <Banknote size={11} />
+                                                                Marcar pagada
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleExportCompanyExcel(group)}
+                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs transition-colors"
+                                                        >
+                                                            <Download size={11} />
+                                                            Excel
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleExportCompanyPdf(group)}
+                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs transition-colors"
+                                                        >
+                                                            <Printer size={11} />
+                                                            PDF
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
                 ) : filteredRows.length === 0 ? (
                     <div className="text-center py-16 text-slate-500 text-sm">
                         No hay liquidaciones que coincidan con el filtro.
@@ -1573,6 +1928,11 @@ export default function LiquidacionesPage() {
                                                                 {row.app_role ? roleLabel(row.app_role) : (row.area || '—')}
                                                                 {row.app_role && row.area ? ` · ${row.area}` : ''}
                                                             </p>
+                                                            {row.empresa_prestadora_nombre && (
+                                                                <p className="text-[11px] text-amber-400">
+                                                                    Empresa: {row.empresa_prestadora_nombre}
+                                                                </p>
+                                                            )}
                                                             <button
                                                                 onClick={() => openDetalleHoras(row)}
                                                                 className="text-[11px] text-violet-300 hover:text-violet-200 mt-0.5 transition-colors"

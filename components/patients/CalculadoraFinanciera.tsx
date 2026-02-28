@@ -19,12 +19,14 @@ import {
     checkContractMakerReadinessAction,
     generateAutomatedContractToDriveAction,
     type ContractMakerReadinessResult,
+    type FinancingSimulationPreset,
 } from '@/app/actions/contracts';
 import { buildFinancingOfferHtml } from '@/lib/financing-offer-template';
 import { formatIsoDateEsAr, getContractSchedule } from '@/lib/contract-dates';
 
 interface CalculadoraFinancieraProps {
     patient: Paciente;
+    initialPreset?: FinancingSimulationPreset | null;
 }
 
 const TOP_TREATMENT_OPTIONS = [
@@ -44,7 +46,7 @@ function clampAnticipo(value: number): number {
     return Math.min(MAX_CUSTOM_ANTICIPO, Math.max(MIN_CUSTOM_ANTICIPO, Math.round(value)));
 }
 
-export default function CalculadoraFinanciera({ patient }: CalculadoraFinancieraProps) {
+export default function CalculadoraFinanciera({ patient, initialPreset }: CalculadoraFinancieraProps) {
     const [selectedTreatment, setSelectedTreatment] = useState<string>('Alineadores invisibles AM');
     const [customTreatment, setCustomTreatment] = useState('');
     const [totalUsd, setTotalUsd] = useState(
@@ -60,6 +62,29 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
     const [driveContractUrl, setDriveContractUrl] = useState<string | null>(null);
     const [checkingReadiness, setCheckingReadiness] = useState(false);
     const [readiness, setReadiness] = useState<ContractMakerReadinessResult | null>(null);
+    const [currentSimulationId, setCurrentSimulationId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!initialPreset) {
+            setCurrentSimulationId(null);
+            return;
+        }
+
+        const normalizedTreatment = (initialPreset.treatment || '').trim();
+        if (normalizedTreatment && TOP_TREATMENT_OPTIONS.includes(normalizedTreatment as (typeof TOP_TREATMENT_OPTIONS)[number])) {
+            setSelectedTreatment(normalizedTreatment);
+            setCustomTreatment('');
+        } else {
+            setSelectedTreatment(OTHER_TREATMENT_OPTION);
+            setCustomTreatment(normalizedTreatment);
+        }
+
+        setTotalUsd(initialPreset.totalUsd > 0 ? initialPreset.totalUsd : 5000);
+        setAnticipoPct(clampAnticipo(initialPreset.upfrontPct));
+        setCuotas([3, 6, 12].includes(initialPreset.installments) ? initialPreset.installments : 12);
+        setManualRate(initialPreset.bnaVentaArs > 0 ? initialPreset.bnaVentaArs : 0);
+        setCurrentSimulationId(initialPreset.simulationId);
+    }, [initialPreset]);
 
     const tratamiento = useMemo(() => {
         if (selectedTreatment === OTHER_TREATMENT_OPTION) {
@@ -231,6 +256,7 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
                 anticipoPct,
                 cuotas,
                 bnaVenta,
+                simulationId: currentSimulationId || undefined,
             });
 
             if (!result.success) {
@@ -243,7 +269,7 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
         } finally {
             setCreatingDriveContract(false);
         }
-    }, [patient.id_paciente, tratamiento, bnaVenta, totalUsd, anticipoPct, cuotas, runReadinessCheck]);
+    }, [patient.id_paciente, tratamiento, bnaVenta, totalUsd, anticipoPct, cuotas, runReadinessCheck, currentSimulationId]);
 
     const readinessChecks = readiness?.checks;
     const readinessRows = readinessChecks
@@ -267,6 +293,24 @@ export default function CalculadoraFinanciera({ patient }: CalculadoraFinanciera
                     <p className="font-mono text-cyan-300">BNA Venta: {bnaVenta > 0 ? formatArs(bnaVenta) : 'Sin cotizacion'}</p>
                 </div>
             </div>
+
+            {initialPreset && (
+                <div className="mb-5 rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-4 py-3 text-xs text-cyan-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p>
+                            Simulacion precargada: <span className="font-semibold">{initialPreset.treatment}</span> · estado <span className="font-semibold uppercase">{initialPreset.status}</span>
+                        </p>
+                        <a
+                            href={initialPreset.shareUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 underline"
+                        >
+                            Ver link compartido <ExternalLink size={12} />
+                        </a>
+                    </div>
+                </div>
+            )}
 
             <div className="mb-6 rounded-xl border border-slate-700 bg-white/5 p-4 backdrop-blur-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">

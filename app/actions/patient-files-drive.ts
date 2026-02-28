@@ -27,6 +27,8 @@ export interface FolderWithFiles {
     name: string;
     displayName: string;
     files: DriveFile[];
+    /** Whether files have been loaded yet (for lazy loading) */
+    loaded: boolean;
 }
 
 export interface PatientDriveFoldersResult {
@@ -39,7 +41,12 @@ export interface PatientDriveFoldersResult {
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
 function getFolderDisplayName(folderName: string): string {
-    // "APELLIDO, Nombre - FOTO & VIDEO" → "FOTO & VIDEO"
+    // New convention: "[PRESENTACION] APELLIDO, Nombre" → "PRESENTACION"
+    const bracketMatch = folderName.match(/^\[(.+?)\]/);
+    if (bracketMatch) {
+        return bracketMatch[1];
+    }
+    // Old convention: "APELLIDO, Nombre - FOTO & VIDEO" → "FOTO & VIDEO"
     const dashIndex = folderName.lastIndexOf(' - ');
     if (dashIndex >= 0) {
         return folderName.substring(dashIndex + 3);
@@ -47,6 +54,47 @@ function getFolderDisplayName(folderName: string): string {
     return folderName;
 }
 
+/**
+ * Recursively collect all non-folder files from a folder and its subfolders.
+ */
+async function listFilesRecursive(
+    folderId: string,
+    depth: number = 0,
+    maxDepth: number = 3
+): Promise<DriveFile[]> {
+    if (depth > maxDepth) return [];
+
+    const result = await listFolderFiles(folderId);
+    if (result.error || !result.files) return [];
+
+    const files: DriveFile[] = [];
+    const subfolders: { id: string }[] = [];
+
+    for (const item of result.files) {
+        if (item.mimeType === FOLDER_MIME) {
+            subfolders.push({ id: item.id });
+        } else {
+            files.push(item as DriveFile);
+        }
+    }
+
+    // Recurse into subfolders
+    if (subfolders.length > 0 && depth < maxDepth) {
+        const nestedResults = await Promise.all(
+            subfolders.map(sf => listFilesRecursive(sf.id, depth + 1, maxDepth))
+        );
+        for (const nested of nestedResults) {
+            files.push(...nested);
+        }
+    }
+
+    return files;
+}
+
+/**
+ * Fast initial load: only list top-level subfolders (no recursive file listing).
+ * Files for each folder are loaded lazily via loadFolderFiles().
+ */
 export async function getPatientDriveFolders(
     motherFolderIdOrUrl: string
 ): Promise<PatientDriveFoldersResult> {
@@ -62,26 +110,17 @@ export async function getPatientDriveFolders(
         const subfolders = allItems.filter(f => f.mimeType === FOLDER_MIME);
         const rootFiles: DriveFile[] = allItems.filter(f => f.mimeType !== FOLDER_MIME);
 
-        // List contents of each subfolder in parallel
-        const foldersToList = subfolders;
-        const folderResults = await Promise.all(
-            foldersToList.map(async (folder): Promise<FolderWithFiles> => {
-                const contents = await listFolderFiles(folder.id);
-                return {
-                    id: folder.id,
-                    name: folder.name,
-                    displayName: getFolderDisplayName(folder.name),
-                    files: (contents.files || []).filter(f => f.mimeType !== FOLDER_MIME) as DriveFile[],
-                };
-            })
-        );
+        // Only create folder stubs — DO NOT fetch files yet (lazy loaded on expand)
+        const folderResults: FolderWithFiles[] = subfolders.map(folder => ({
+            id: folder.id,
+            name: folder.name,
+            displayName: getFolderDisplayName(folder.name),
+            files: [],
+            loaded: false,
+        }));
 
-        // Sort: folders with files first, then alphabetical
-        folderResults.sort((a, b) => {
-            if (a.files.length && !b.files.length) return -1;
-            if (!a.files.length && b.files.length) return 1;
-            return a.displayName.localeCompare(b.displayName);
-        });
+        // Sort alphabetically
+        folderResults.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
         return {
             folders: folderResults,
@@ -91,6 +130,24 @@ export async function getPatientDriveFolders(
         return {
             folders: [],
             rootFiles: [],
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
+/**
+ * Load files for a single folder (called lazily when user expands a folder).
+ * Recursively finds files in sub-subfolders.
+ */
+export async function loadFolderFiles(
+    folderId: string
+): Promise<{ files: DriveFile[]; error?: string }> {
+    try {
+        const files = await listFilesRecursive(folderId, 0, 3);
+        return { files };
+    } catch (error) {
+        return {
+            files: [],
             error: error instanceof Error ? error.message : String(error),
         };
     }

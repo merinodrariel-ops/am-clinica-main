@@ -1,0 +1,418 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Copy, ExternalLink, Loader2, RefreshCw, Send } from 'lucide-react';
+import { toast } from 'sonner';
+import MoneyInput from '@/components/ui/MoneyInput';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import type { Paciente } from '@/lib/patients';
+import { fetchDolarOficialRate, type DolarOficialRate } from '@/lib/dolar-oficial';
+import {
+    createFinancingSimulationAction,
+    getFinancingSimulationPresetAction,
+    listFinancingSimulationsByPatientAction,
+    type FinancingSimulationPreset,
+    type FinancingSimulationRecord,
+} from '@/app/actions/contracts';
+import { formatArs, formatUsd } from '@/lib/financial-engine';
+
+const TOP_TREATMENT_OPTIONS = [
+    'Diseno de sonrisa',
+    'Rehabilitacion full ceramica',
+    'Alineadores invisibles AM',
+] as const;
+
+const OTHER_TREATMENT_OPTION = '__other__';
+const INSTALLMENT_OPTIONS = [3, 6, 12] as const;
+const UPFRONT_OPTIONS = [30, 40, 50] as const;
+
+interface SimuladorFinanciacionProps {
+    patient: Paciente;
+    onUseInContract: (preset: FinancingSimulationPreset) => void;
+}
+
+function formatSimulationDate(iso: string): string {
+    return new Date(iso).toLocaleString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+export default function SimuladorFinanciacion({ patient, onUseInContract }: SimuladorFinanciacionProps) {
+    const [selectedTreatment, setSelectedTreatment] = useState<string>('Alineadores invisibles AM');
+    const [customTreatment, setCustomTreatment] = useState('');
+    const [totalUsd, setTotalUsd] = useState(
+        patient.presupuesto_total && patient.presupuesto_total > 0 ? patient.presupuesto_total : 5000
+    );
+    const [manualRate, setManualRate] = useState(0);
+    const [rateData, setRateData] = useState<DolarOficialRate | null>(null);
+    const [loadingRate, setLoadingRate] = useState(true);
+    const [creating, setCreating] = useState(false);
+    const [loadingList, setLoadingList] = useState(false);
+    const [usingSimulationId, setUsingSimulationId] = useState<string | null>(null);
+    const [expiresInDays, setExpiresInDays] = useState(14);
+    const [allowedInstallments, setAllowedInstallments] = useState<number[]>([3, 6, 12]);
+    const [allowedUpfronts, setAllowedUpfronts] = useState<number[]>([30, 40, 50]);
+    const [simulations, setSimulations] = useState<FinancingSimulationRecord[]>([]);
+    const [latestShareUrl, setLatestShareUrl] = useState<string | null>(null);
+
+    const tratamiento = useMemo(() => {
+        if (selectedTreatment === OTHER_TREATMENT_OPTION) {
+            return customTreatment.trim();
+        }
+        return selectedTreatment;
+    }, [selectedTreatment, customTreatment]);
+
+    const bnaVenta = manualRate > 0 ? manualRate : rateData?.venta || 0;
+
+    const loadRate = useCallback(async () => {
+        try {
+            setLoadingRate(true);
+            const data = await fetchDolarOficialRate();
+            setRateData(data);
+        } catch {
+            toast.error('No se pudo cargar la cotizacion oficial.');
+        } finally {
+            setLoadingRate(false);
+        }
+    }, []);
+
+    const loadSimulations = useCallback(async () => {
+        if (!patient.id_paciente) return;
+        setLoadingList(true);
+        try {
+            const result = await listFinancingSimulationsByPatientAction(patient.id_paciente);
+            if (!result.success) {
+                toast.error(result.error || 'No se pudieron cargar las simulaciones.');
+                return;
+            }
+            setSimulations(result.simulations);
+        } finally {
+            setLoadingList(false);
+        }
+    }, [patient.id_paciente]);
+
+    useEffect(() => {
+        void loadRate();
+    }, [loadRate]);
+
+    useEffect(() => {
+        setLatestShareUrl(null);
+        void loadSimulations();
+    }, [loadSimulations]);
+
+    const toggleInstallment = useCallback((value: number) => {
+        setAllowedInstallments((current) => {
+            if (current.includes(value)) {
+                const next = current.filter((entry) => entry !== value);
+                return next.length > 0 ? next : current;
+            }
+            return [...current, value].sort((a, b) => a - b);
+        });
+    }, []);
+
+    const toggleUpfront = useCallback((value: number) => {
+        setAllowedUpfronts((current) => {
+            if (current.includes(value)) {
+                const next = current.filter((entry) => entry !== value);
+                return next.length > 0 ? next : current;
+            }
+            return [...current, value].sort((a, b) => a - b);
+        });
+    }, []);
+
+    const handleCreateSimulation = useCallback(async () => {
+        if (!tratamiento) {
+            toast.error('Completa el tratamiento para compartir la simulacion.');
+            return;
+        }
+        if (!Number.isFinite(totalUsd) || totalUsd <= 0) {
+            toast.error('El monto total USD debe ser mayor a 0.');
+            return;
+        }
+        if (!Number.isFinite(bnaVenta) || bnaVenta <= 0) {
+            toast.error('No hay cotizacion BNA valida para compartir.');
+            return;
+        }
+
+        setCreating(true);
+        try {
+            const result = await createFinancingSimulationAction({
+                patientId: patient.id_paciente,
+                treatment: tratamiento,
+                totalUsd,
+                bnaVentaArs: bnaVenta,
+                baseInstallments: allowedInstallments[allowedInstallments.length - 1] || 12,
+                allowedInstallmentOptions: allowedInstallments,
+                allowedUpfrontOptions: allowedUpfronts,
+                expiresInDays,
+            });
+
+            if (!result.success || !result.simulation) {
+                toast.error(result.error || 'No se pudo generar la simulacion compartible.');
+                return;
+            }
+
+            setLatestShareUrl(result.simulation.shareUrl);
+            setSimulations((current) => [result.simulation!, ...current]);
+            toast.success('Simulacion creada y lista para enviar al paciente.');
+        } finally {
+            setCreating(false);
+        }
+    }, [patient.id_paciente, tratamiento, totalUsd, bnaVenta, allowedInstallments, allowedUpfronts, expiresInDays]);
+
+    const handleCopyLink = useCallback(async (url: string) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            toast.success('Link copiado al portapapeles.');
+        } catch {
+            toast.error('No se pudo copiar el link.');
+        }
+    }, []);
+
+    const handleUseInContract = useCallback(async (simulationId: string) => {
+        setUsingSimulationId(simulationId);
+        try {
+            const result = await getFinancingSimulationPresetAction(patient.id_paciente, simulationId);
+            if (!result.success || !result.preset) {
+                toast.error(result.error || 'No se pudo cargar la simulacion para contrato.');
+                return;
+            }
+            onUseInContract(result.preset);
+            toast.success('Simulacion cargada en ContractMaker.');
+        } finally {
+            setUsingSimulationId(null);
+        }
+    }, [onUseInContract, patient.id_paciente]);
+
+    return (
+        <div className="space-y-5 rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-5 text-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Flujo Paciente</p>
+                    <h3 className="text-lg font-semibold text-white">Simulador compartible</h3>
+                    <p className="text-xs text-slate-400">Crea un link para que el paciente elija anticipo y cuotas.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        void loadRate();
+                        void loadSimulations();
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-700"
+                >
+                    <RefreshCw size={14} />
+                    Actualizar
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="space-y-4 rounded-xl border border-slate-700 bg-white/5 p-4">
+                    <div>
+                        <Label htmlFor="sim-treatment" className="text-xs text-slate-300">Tratamiento</Label>
+                        <select
+                            id="sim-treatment"
+                            value={selectedTreatment}
+                            onChange={(event) => setSelectedTreatment(event.target.value)}
+                            className="mt-1 flex h-10 w-full rounded-md border border-slate-600 bg-slate-800/70 px-3 py-2 text-sm text-slate-100"
+                        >
+                            {TOP_TREATMENT_OPTIONS.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                            ))}
+                            <option value={OTHER_TREATMENT_OPTION}>Otros (especificar)</option>
+                        </select>
+                        {selectedTreatment === OTHER_TREATMENT_OPTION && (
+                            <Input
+                                value={customTreatment}
+                                onChange={(event) => setCustomTreatment(event.target.value)}
+                                className="mt-2 border-slate-600 bg-slate-800/70 text-slate-100"
+                                placeholder="Ej: Rehabilitacion integral"
+                            />
+                        )}
+                    </div>
+
+                    <div>
+                        <Label className="text-xs text-slate-300">Monto total (USD)</Label>
+                        <MoneyInput
+                            value={totalUsd}
+                            onChange={setTotalUsd}
+                            currency="USD"
+                            className="mt-1 border-slate-600 bg-slate-800/70 text-slate-100"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <Label className="text-xs text-slate-300">BNA Venta</Label>
+                            <p className="mt-1 font-mono text-white">{bnaVenta > 0 ? formatArs(bnaVenta) : 'Sin cotizacion'}</p>
+                            <p className="text-[11px] text-slate-500">
+                                {loadingRate ? 'Consultando API...' : rateData ? `Fuente: ${rateData.source}` : 'Carga manual requerida'}
+                            </p>
+                        </div>
+                        <div>
+                            <Label htmlFor="sim-manual-rate" className="text-xs text-slate-300">Override manual</Label>
+                            <Input
+                                id="sim-manual-rate"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={manualRate || ''}
+                                onChange={(event) => setManualRate(Number(event.target.value) || 0)}
+                                className="mt-1 border-slate-600 bg-slate-800/70 text-slate-100"
+                                placeholder="Ej: 1234.50"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4 rounded-xl border border-slate-700 bg-white/5 p-4">
+                    <div>
+                        <Label className="text-xs text-slate-300">Opciones de anticipo para paciente</Label>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {UPFRONT_OPTIONS.map((value) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => toggleUpfront(value)}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                        allowedUpfronts.includes(value)
+                                            ? 'bg-cyan-400 text-slate-900'
+                                            : 'border border-slate-600 bg-slate-800 text-slate-200'
+                                    }`}
+                                >
+                                    {value}%
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label className="text-xs text-slate-300">Opciones de cuotas para paciente</Label>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {INSTALLMENT_OPTIONS.map((value) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => toggleInstallment(value)}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                        allowedInstallments.includes(value)
+                                            ? 'bg-cyan-400 text-slate-900'
+                                            : 'border border-slate-600 bg-slate-800 text-slate-200'
+                                    }`}
+                                >
+                                    {value} cuotas
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="sim-expire" className="text-xs text-slate-300">Vencimiento del link</Label>
+                        <select
+                            id="sim-expire"
+                            value={expiresInDays}
+                            onChange={(event) => setExpiresInDays(Number(event.target.value) || 14)}
+                            className="mt-1 h-10 w-full rounded-md border border-slate-600 bg-slate-800/70 px-3 py-2 text-sm text-slate-100"
+                        >
+                            <option value={7}>7 dias</option>
+                            <option value={14}>14 dias</option>
+                            <option value={21}>21 dias</option>
+                            <option value={30}>30 dias</option>
+                        </select>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => void handleCreateSimulation()}
+                        disabled={creating}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/40 bg-cyan-400/20 px-4 py-2.5 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/30 disabled:opacity-60"
+                    >
+                        {creating ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                        {creating ? 'Generando link...' : 'Crear simulacion compartible'}
+                    </button>
+                </div>
+            </div>
+
+            {latestShareUrl && (
+                <div className="rounded-xl border border-emerald-300/30 bg-emerald-400/10 p-3 text-xs text-emerald-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>Link listo para enviar por WhatsApp o email.</span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => void handleCopyLink(latestShareUrl)}
+                                className="inline-flex items-center gap-1 rounded-md border border-emerald-200/30 px-2 py-1"
+                            >
+                                <Copy size={12} /> Copiar
+                            </button>
+                            <a href={latestShareUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">
+                                Abrir <ExternalLink size={12} />
+                            </a>
+                        </div>
+                    </div>
+                    <p className="mt-1 break-all font-mono text-[11px] text-emerald-200/90">{latestShareUrl}</p>
+                </div>
+            )}
+
+            <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-white">Simulaciones del paciente</p>
+                    {loadingList && <Loader2 size={14} className="animate-spin text-slate-300" />}
+                </div>
+
+                {simulations.length === 0 ? (
+                    <p className="text-xs text-slate-400">Todavia no hay simulaciones compartidas para este paciente.</p>
+                ) : (
+                    <div className="space-y-2">
+                        {simulations.map((simulation) => (
+                            <div key={simulation.id} className="rounded-lg border border-slate-700 bg-slate-950/60 p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-100">{simulation.treatment}</p>
+                                        <p className="text-[11px] text-slate-400">
+                                            {formatUsd(simulation.totalUsd)} · {formatArs(simulation.bnaVentaArs)} · creada {formatSimulationDate(simulation.createdAt)}
+                                        </p>
+                                    </div>
+                                    <span className="rounded-md border border-cyan-300/25 bg-cyan-400/10 px-2 py-1 text-[10px] uppercase tracking-wider text-cyan-200">
+                                        {simulation.status}
+                                    </span>
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleCopyLink(simulation.shareUrl)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] text-slate-100"
+                                    >
+                                        <Copy size={11} /> Copiar link
+                                    </button>
+                                    <a
+                                        href={simulation.shareUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] text-slate-100"
+                                    >
+                                        <ExternalLink size={11} /> Ver
+                                    </a>
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleUseInContract(simulation.id)}
+                                        disabled={usingSimulationId === simulation.id}
+                                        className="inline-flex items-center gap-1 rounded-md border border-cyan-300/30 bg-cyan-400/20 px-2 py-1 text-[11px] font-medium text-cyan-100 disabled:opacity-60"
+                                    >
+                                        {usingSimulationId === simulation.id ? <Loader2 size={11} className="animate-spin" /> : null}
+                                        Usar en ContractMaker
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

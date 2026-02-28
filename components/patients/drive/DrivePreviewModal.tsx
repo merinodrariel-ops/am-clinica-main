@@ -19,14 +19,18 @@ interface DrivePreviewModalProps {
     onClose: () => void;
 }
 
-function getPreviewType(file: DriveFile): 'image' | 'video' | 'stl' | null {
+function getPreviewType(file: DriveFile): 'image' | 'video' | '3d' | null {
     const mime = file.mimeType.toLowerCase();
     const name = file.name.toLowerCase();
 
     if (mime.startsWith('image/')) return 'image';
     if (mime.startsWith('video/')) return 'video';
-    if (name.endsWith('.stl') || mime === 'application/sla' || mime === 'model/stl') return 'stl';
+    if (name.endsWith('.stl') || name.endsWith('.ply') || mime === 'application/sla' || mime === 'model/stl') return '3d';
     return null;
+}
+
+function get3DFormat(file: DriveFile): 'stl' | 'ply' {
+    return file.name.toLowerCase().endsWith('.ply') ? 'ply' : 'stl';
 }
 
 export default function DrivePreviewModal({ file, onClose }: DrivePreviewModalProps) {
@@ -52,7 +56,7 @@ export default function DrivePreviewModal({ file, onClose }: DrivePreviewModalPr
                     >
                         <div className="min-w-0 flex-1 mr-4">
                             <p className="text-white font-semibold truncate">{file.name}</p>
-                            {previewType === 'stl' && (
+                            {previewType === '3d' && (
                                 <p className="text-white/40 text-xs mt-0.5">
                                     Arrastrá para rotar · Scroll para zoom
                                 </p>
@@ -68,7 +72,7 @@ export default function DrivePreviewModal({ file, onClose }: DrivePreviewModalPr
                                 <ExternalLink size={14} />
                                 <span className="hidden sm:inline">Abrir en Drive</span>
                             </a>
-                            {previewType !== 'stl' && (
+                            {previewType !== '3d' && (
                                 <a
                                     href={proxyUrl}
                                     download={file.name}
@@ -113,8 +117,8 @@ export default function DrivePreviewModal({ file, onClose }: DrivePreviewModalPr
                             </div>
                         )}
 
-                        {previewType === 'stl' && (
-                            <STLViewer url={proxyUrl} />
+                        {previewType === '3d' && (
+                            <STLViewer url={proxyUrl} format={get3DFormat(file)} />
                         )}
                     </div>
                 </motion.div>

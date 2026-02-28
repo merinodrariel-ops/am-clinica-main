@@ -30,7 +30,7 @@ function getRoleIcon(rol: string) {
     return <Users size={18} className="text-slate-400" />;
 }
 
-function getDocCompliance(docs: any): number {
+function getDocCompliance(docs: unknown): number {
     if (!docs || typeof docs !== 'object') return 0;
     const required = ['dni_frente', 'dni_dorso', 'licencia', 'poliza'];
     const filled = required.filter(k => docs[k]?.url).length;
@@ -181,6 +181,11 @@ export default function StaffListPage() {
                                                     <p className="text-[10px] md:text-[11px] text-indigo-400 font-bold uppercase tracking-widest truncate">
                                                         {worker.especialidad || worker.rol}
                                                     </p>
+                                                    {worker.empresa_prestadora_nombre && (
+                                                        <p className="text-[10px] text-amber-400 truncate">
+                                                            Empresa: {worker.empresa_prestadora_nombre}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className={`flex items-center gap-1.5 px-2 py-0.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold uppercase border shrink-0 ${worker.activo !== false
