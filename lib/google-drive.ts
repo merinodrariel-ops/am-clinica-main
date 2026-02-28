@@ -265,6 +265,12 @@ export async function createDriveFolder(
                 if (!canonicalNow?.id) continue;
 
                 if (canonicalNow.id !== createdFolderId) {
+                    console.warn('[drive-folder-idempotency] duplicate folder detected, keeping canonical', {
+                        parentFolderId,
+                        folderName,
+                        canonicalFolderId: canonicalNow.id,
+                        createdFolderId,
+                    });
                     await trashFolderIfEmpty(drive, createdFolderId);
                 }
 

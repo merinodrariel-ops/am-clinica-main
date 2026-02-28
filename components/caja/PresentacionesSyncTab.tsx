@@ -12,6 +12,11 @@ import {
     type SyncAllPresentacionesResult,
     type SyncedPresentation,
 } from '@/app/actions/presentaciones';
+import {
+    getLatestDriveHealthChecksAction,
+    runDriveHealthCheckAction,
+    type StoredDriveHealthRow,
+} from '@/app/actions/drive-health';
 
 interface PresentacionesSyncTabProps {
     initialPatientId?: string;
@@ -35,6 +40,9 @@ export default function PresentacionesSyncTab({ initialPatientId }: Presentacion
     const [presentationsFolderUrl, setPresentationsFolderUrl] = useState<string | null>(null);
     const [manualReviewItems, setManualReviewItems] = useState<Array<{ reason: string; fileName?: string; fileId?: string }>>([]);
     const [syncAllReport, setSyncAllReport] = useState<SyncAllPresentacionesResult | null>(null);
+    const [driveHealth, setDriveHealth] = useState<StoredDriveHealthRow | null>(null);
+    const [driveHealthLoading, setDriveHealthLoading] = useState(false);
+    const [runningDriveHealth, setRunningDriveHealth] = useState(false);
 
     useEffect(() => {
         if (!initialPatientId) return;
@@ -95,6 +103,24 @@ export default function PresentacionesSyncTab({ initialPatientId }: Presentacion
         if (!selectedPatient) return '';
         return `${selectedPatient.apellido}, ${selectedPatient.nombre}`;
     }, [selectedPatient]);
+
+    const loadDriveHealth = useCallback(async () => {
+        setDriveHealthLoading(true);
+        try {
+            const result = await getLatestDriveHealthChecksAction(1);
+            if (!result.success) {
+                console.error('Error loading drive health checks:', result.error);
+                return;
+            }
+            setDriveHealth(result.data[0] || null);
+        } finally {
+            setDriveHealthLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadDriveHealth();
+    }, [loadDriveHealth]);
 
     const loadPresentations = useCallback(async (patientId: string) => {
         const result = await getPatientPresentationsAction(patientId);
@@ -169,6 +195,30 @@ export default function PresentacionesSyncTab({ initialPatientId }: Presentacion
             }
         } finally {
             setSyncingAllPresentations(false);
+        }
+    };
+
+    const handleRunDriveHealth = async () => {
+        try {
+            setRunningDriveHealth(true);
+            const result = await runDriveHealthCheckAction({
+                sampleLimit: 20,
+                persist: true,
+                source: 'manual-ui',
+            });
+
+            if (!result.success) {
+                toast.error(result.error || 'No se pudo ejecutar el chequeo de Drive.');
+                return;
+            }
+
+            toast.success(
+                `Health check listo: ${result.data.summary.duplicateGroups} grupos duplicados, ${result.data.summary.safeCandidateExtraFolders} extras candidatos.`
+            );
+
+            await loadDriveHealth();
+        } finally {
+            setRunningDriveHealth(false);
         }
     };
 
@@ -310,6 +360,63 @@ export default function PresentacionesSyncTab({ initialPatientId }: Presentacion
                         )}
                     </div>
                 )}
+
+                <div className="mt-3 rounded-xl p-3" style={{ background: 'hsla(230, 15%, 8%, 0.6)', border: '1px solid hsla(230, 15%, 20%, 0.8)' }}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold" style={{ color: 'hsl(210 20% 85%)' }}>
+                            Drive Health
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => void handleRunDriveHealth()}
+                            disabled={runningDriveHealth}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
+                            style={{
+                                background: 'hsla(165, 100%, 42%, 0.14)',
+                                color: 'hsl(165 85% 50%)',
+                                border: '1px solid hsla(165, 100%, 42%, 0.25)',
+                                opacity: runningDriveHealth ? 0.7 : 1,
+                            }}
+                        >
+                            <RefreshCw size={11} className={runningDriveHealth ? 'animate-spin' : ''} />
+                            {runningDriveHealth ? 'Corriendo...' : 'Correr health check'}
+                        </button>
+                    </div>
+
+                    {driveHealthLoading ? (
+                        <p className="text-xs mt-2" style={{ color: 'hsl(230 10% 45%)' }}>
+                            Cargando último snapshot...
+                        </p>
+                    ) : driveHealth ? (
+                        <>
+                            <p className="text-[11px] mt-1" style={{ color: 'hsl(230 10% 50%)' }}>
+                                Último check: {new Date(driveHealth.created_at).toLocaleString('es-AR')} · origen: {driveHealth.source}
+                            </p>
+                            <div className="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-2">
+                                <div className="rounded-md px-2 py-1" style={{ background: 'hsla(210, 100%, 60%, 0.08)' }}>
+                                    <p className="text-[10px] uppercase" style={{ color: 'hsl(230 10% 55%)' }}>Duplicados</p>
+                                    <p className="text-sm font-semibold" style={{ color: 'hsl(210 90% 72%)' }}>{driveHealth.summary.duplicateGroups}</p>
+                                </div>
+                                <div className="rounded-md px-2 py-1" style={{ background: 'hsla(38, 92%, 50%, 0.1)' }}>
+                                    <p className="text-[10px] uppercase" style={{ color: 'hsl(230 10% 55%)' }}>Extras candidatos</p>
+                                    <p className="text-sm font-semibold" style={{ color: 'hsl(38 90% 65%)' }}>{driveHealth.summary.safeCandidateExtraFolders}</p>
+                                </div>
+                                <div className="rounded-md px-2 py-1" style={{ background: 'hsla(0, 70%, 50%, 0.1)' }}>
+                                    <p className="text-[10px] uppercase" style={{ color: 'hsl(230 10% 55%)' }}>Links fuera root</p>
+                                    <p className="text-sm font-semibold" style={{ color: 'hsl(0 75% 65%)' }}>{driveHealth.summary.linkedFoldersOutsideRoot}</p>
+                                </div>
+                                <div className="rounded-md px-2 py-1" style={{ background: 'hsla(230, 15%, 20%, 0.35)' }}>
+                                    <p className="text-[10px] uppercase" style={{ color: 'hsl(230 10% 55%)' }}>Salteados</p>
+                                    <p className="text-sm font-semibold" style={{ color: 'hsl(210 20% 85%)' }}>{driveHealth.summary.skippedGroups}</p>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <p className="text-xs mt-2" style={{ color: 'hsl(230 10% 45%)' }}>
+                            Todavía no hay snapshot de salud de Drive.
+                        </p>
+                    )}
+                </div>
 
                 {!selectedPatient && (
                     <div className="mt-4 relative">
