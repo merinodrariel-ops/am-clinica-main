@@ -75,6 +75,28 @@ export interface FinancingSimulationPreset {
     expiresAt: string;
 }
 
+export interface RecentFinancingSelectionPatient {
+    id_paciente: string;
+    nombre: string | null;
+    apellido: string | null;
+    documento: string | null;
+    cuit: string | null;
+    fecha_nacimiento: string | null;
+    email: string | null;
+    telefono: string | null;
+    direccion: string | null;
+    presupuesto_total: number | null;
+}
+
+export interface RecentFinancingSelectionRecord {
+    simulationId: string;
+    patientId: string;
+    treatment: string;
+    selectedAt: string;
+    shareUrl: string;
+    patient: RecentFinancingSelectionPatient;
+}
+
 export interface CreateFinancingSimulationInput {
     patientId: string;
     treatment: string;
@@ -118,11 +140,11 @@ function buildSimulationShareUrl(token: string): string {
     return `${getPublicAppUrl()}/simulador/${token}`;
 }
 
-function mapSimulationRow(row: any): FinancingSimulationRecord {
+function mapSimulationRow(row: Record<string, unknown>): FinancingSimulationRecord {
     return {
-        id: row.id,
-        patientId: row.patient_id,
-        treatment: row.treatment,
+        id: String(row.id || ''),
+        patientId: String(row.patient_id || ''),
+        treatment: String(row.treatment || ''),
         totalUsd: Number(row.total_usd || 0),
         bnaVentaArs: Number(row.bna_venta_ars || 0),
         monthlyInterestPct: Number(row.monthly_interest_pct || DEFAULT_MONTHLY_INTEREST_PCT),
@@ -132,11 +154,11 @@ function mapSimulationRow(row: any): FinancingSimulationRecord {
         status: (row.status || 'shared') as FinancingSimulationStatus,
         selectedInstallments: row.selected_installments ? Number(row.selected_installments) : null,
         selectedUpfrontPct: row.selected_upfront_pct ? Number(row.selected_upfront_pct) : null,
-        selectedAt: row.selected_at || null,
-        shareToken: row.share_token,
-        shareUrl: buildSimulationShareUrl(row.share_token),
-        expiresAt: row.expires_at,
-        createdAt: row.created_at,
+        selectedAt: row.selected_at ? String(row.selected_at) : null,
+        shareToken: String(row.share_token || ''),
+        shareUrl: buildSimulationShareUrl(String(row.share_token || '')),
+        expiresAt: String(row.expires_at || ''),
+        createdAt: String(row.created_at || ''),
     };
 }
 
@@ -490,8 +512,8 @@ export async function createFinancingSimulationAction(input: CreateFinancingSimu
             throw new Error('Paciente no encontrado');
         }
 
-        let insertedRow: any = null;
-        let lastError: any = null;
+        let insertedRow: Record<string, unknown> | null = null;
+        let lastErrorMessage = '';
 
         for (let i = 0; i < 3; i++) {
             const shareToken = randomBytes(18).toString('base64url');
@@ -515,18 +537,18 @@ export async function createFinancingSimulationAction(input: CreateFinancingSimu
                 .single();
 
             if (!error && data) {
-                insertedRow = data;
+                insertedRow = data as Record<string, unknown>;
                 break;
             }
 
-            lastError = error;
-            if (!error?.message?.toLowerCase().includes('duplicate')) {
+            lastErrorMessage = String(error?.message || '');
+            if (!lastErrorMessage.toLowerCase().includes('duplicate')) {
                 break;
             }
         }
 
         if (!insertedRow) {
-            throw new Error(lastError?.message || 'No se pudo crear la simulación compartible');
+            throw new Error(lastErrorMessage || 'No se pudo crear la simulación compartible');
         }
 
         return {
@@ -570,6 +592,93 @@ export async function listFinancingSimulationsByPatientAction(patientId: string)
         return {
             success: false,
             simulations: [],
+            error: error instanceof Error ? error.message : 'Error desconocido',
+        };
+    }
+}
+
+export async function listRecentFinancingSelectionsAction(input?: {
+    hours?: number;
+    limit?: number;
+}): Promise<{
+    success: boolean;
+    items: RecentFinancingSelectionRecord[];
+    error?: string;
+}> {
+    try {
+        const hours = Math.max(1, Math.min(168, Math.floor(Number(input?.hours || 24))));
+        const limit = Math.max(1, Math.min(30, Math.floor(Number(input?.limit || 12))));
+        const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+        const { data: selections, error: selectionError } = await supabase
+            .from('financing_simulations')
+            .select('id, patient_id, treatment, selected_at, share_token, status')
+            .eq('status', 'selected')
+            .gte('selected_at', since)
+            .order('selected_at', { ascending: false })
+            .limit(limit);
+
+        if (selectionError) {
+            throw new Error(selectionError.message);
+        }
+
+        if (!selections || selections.length === 0) {
+            return { success: true, items: [] };
+        }
+
+        const patientIds = Array.from(new Set(selections.map((row) => String(row.patient_id)).filter(Boolean)));
+
+        const { data: patients, error: patientError } = await supabase
+            .from('pacientes')
+            .select('id_paciente, nombre, apellido, documento, cuit, fecha_nacimiento, email, telefono, direccion, presupuesto_total, is_deleted')
+            .in('id_paciente', patientIds)
+            .eq('is_deleted', false);
+
+        if (patientError) {
+            throw new Error(patientError.message);
+        }
+
+        const patientById = new Map<string, RecentFinancingSelectionPatient>();
+        for (const patient of patients || []) {
+            patientById.set(String(patient.id_paciente), {
+                id_paciente: String(patient.id_paciente),
+                nombre: patient.nombre || null,
+                apellido: patient.apellido || null,
+                documento: patient.documento || null,
+                cuit: patient.cuit || null,
+                fecha_nacimiento: patient.fecha_nacimiento || null,
+                email: patient.email || null,
+                telefono: patient.telefono || null,
+                direccion: patient.direccion || null,
+                presupuesto_total: patient.presupuesto_total ? Number(patient.presupuesto_total) : null,
+            });
+        }
+
+        const items: RecentFinancingSelectionRecord[] = (selections || [])
+            .map((row) => {
+                const patientId = String(row.patient_id || '');
+                const patient = patientById.get(patientId);
+                if (!patient || !row.selected_at) return null;
+
+                return {
+                    simulationId: String(row.id),
+                    patientId,
+                    treatment: String(row.treatment || ''),
+                    selectedAt: String(row.selected_at),
+                    shareUrl: buildSimulationShareUrl(String(row.share_token || '')),
+                    patient,
+                };
+            })
+            .filter((item): item is RecentFinancingSelectionRecord => item !== null);
+
+        return {
+            success: true,
+            items,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            items: [],
             error: error instanceof Error ? error.message : 'Error desconocido',
         };
     }

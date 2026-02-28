@@ -1,12 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, UserRound, X } from 'lucide-react';
+import { BellDot, Loader2, Search, UserRound, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import type { Paciente } from '@/lib/patients';
 import CalculadoraFinanciera from '@/components/patients/CalculadoraFinanciera';
 import SimuladorFinanciacion from '@/components/patients/SimuladorFinanciacion';
-import type { FinancingSimulationPreset } from '@/app/actions/contracts';
+import {
+    getFinancingSimulationPresetAction,
+    listRecentFinancingSelectionsAction,
+    type FinancingSimulationPreset,
+    type RecentFinancingSelectionRecord,
+} from '@/app/actions/contracts';
 
 interface ContratosFinanciacionTabProps {
     initialPatientId?: string;
@@ -17,6 +23,15 @@ type ContractPatient = Pick<
     'id_paciente' | 'nombre' | 'apellido' | 'documento' | 'cuit' | 'fecha_nacimiento' | 'email' | 'telefono' | 'direccion' | 'presupuesto_total'
 >;
 
+function formatInboxDate(iso: string): string {
+    return new Date(iso).toLocaleString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
 export default function ContratosFinanciacionTab({ initialPatientId }: ContratosFinanciacionTabProps) {
     const [activeFlow, setActiveFlow] = useState<'simulador' | 'contractmaker'>('simulador');
     const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +39,9 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     const [searchLoading, setSearchLoading] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState<ContractPatient | null>(null);
     const [activePreset, setActivePreset] = useState<FinancingSimulationPreset | null>(null);
+    const [inboxItems, setInboxItems] = useState<RecentFinancingSelectionRecord[]>([]);
+    const [loadingInbox, setLoadingInbox] = useState(false);
+    const [openingInboxSimulationId, setOpeningInboxSimulationId] = useState<string | null>(null);
 
     const wizardStep = !selectedPatient ? 1 : !activePreset ? 2 : 3;
 
@@ -32,6 +50,45 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
             setActiveFlow('simulador');
         }
     }, [wizardStep, activeFlow]);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadInbox = async (silent = false) => {
+            if (!silent) {
+                setLoadingInbox(true);
+            }
+
+            const result = await listRecentFinancingSelectionsAction({ hours: 24, limit: 8 });
+
+            if (!mounted) return;
+
+            if (!result.success) {
+                if (!silent) {
+                    toast.error(result.error || 'No se pudo cargar el inbox de acciones.');
+                }
+                if (!silent) {
+                    setLoadingInbox(false);
+                }
+                return;
+            }
+
+            setInboxItems(result.items);
+            if (!silent) {
+                setLoadingInbox(false);
+            }
+        };
+
+        void loadInbox();
+        const intervalId = window.setInterval(() => {
+            void loadInbox(true);
+        }, 30000);
+
+        return () => {
+            mounted = false;
+            window.clearInterval(intervalId);
+        };
+    }, []);
 
     useEffect(() => {
         if (!initialPatientId) return;
@@ -92,6 +149,30 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
         if (!selectedPatient) return '';
         return `${selectedPatient.apellido}, ${selectedPatient.nombre}`;
     }, [selectedPatient]);
+
+    const handleOpenInboxItem = async (item: RecentFinancingSelectionRecord) => {
+        setOpeningInboxSimulationId(item.simulationId);
+        try {
+            const patient = item.patient as ContractPatient;
+            setSelectedPatient(patient);
+            setSearchQuery(`${patient.apellido || ''}, ${patient.nombre || ''}`.replace(/^,\s*/, '').trim());
+            setPatients([]);
+
+            const presetResult = await getFinancingSimulationPresetAction(item.patientId, item.simulationId);
+            if (!presetResult.success || !presetResult.preset) {
+                setActivePreset(null);
+                setActiveFlow('simulador');
+                toast.error(presetResult.error || 'No se pudo abrir la seleccion reciente.');
+                return;
+            }
+
+            setActivePreset(presetResult.preset);
+            setActiveFlow('contractmaker');
+            toast.success('Seleccion reciente abierta en ContractMaker.');
+        } finally {
+            setOpeningInboxSimulationId(null);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -197,6 +278,67 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                         )}
                     </div>
                 )}
+
+                <div className="mt-4 rounded-xl border border-cyan-300/20 bg-cyan-400/5 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                        <p className="inline-flex items-center gap-2 text-xs font-semibold text-cyan-100">
+                            <BellDot size={14} /> Inbox de acciones (ultimas 24h)
+                        </p>
+                        {loadingInbox && <Loader2 size={12} className="animate-spin" style={{ color: 'hsl(195 95% 68%)' }} />}
+                    </div>
+
+                    {inboxItems.length === 0 ? (
+                        <p className="text-xs" style={{ color: 'hsl(230 10% 50%)' }}>
+                            Sin nuevas elecciones pendientes de contrato.
+                        </p>
+                    ) : (
+                        <div className="space-y-2">
+                            {inboxItems.map((item) => {
+                                const fullName = `${item.patient.apellido || ''}, ${item.patient.nombre || ''}`.replace(/^,\s*/, '').trim();
+                                const isCurrent = selectedPatient?.id_paciente === item.patientId;
+
+                                return (
+                                    <div
+                                        key={item.simulationId}
+                                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2.5 py-2"
+                                        style={isCurrent
+                                            ? {
+                                                borderColor: 'hsla(165, 100%, 42%, 0.35)',
+                                                background: 'hsla(165, 100%, 42%, 0.08)',
+                                            }
+                                            : {
+                                                borderColor: 'hsla(230, 15%, 25%, 0.8)',
+                                                background: 'hsla(230, 15%, 10%, 0.5)',
+                                            }}
+                                    >
+                                        <div>
+                                            <p className="text-xs font-medium" style={{ color: 'hsl(210 20% 88%)' }}>
+                                                {fullName || 'Paciente'} · {item.treatment}
+                                            </p>
+                                            <p className="text-[11px]" style={{ color: 'hsl(230 10% 48%)' }}>
+                                                Eligio plan: {formatInboxDate(item.selectedAt)}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleOpenInboxItem(item)}
+                                            disabled={openingInboxSimulationId === item.simulationId}
+                                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition"
+                                            style={{
+                                                borderColor: 'hsla(165, 100%, 42%, 0.35)',
+                                                background: 'hsla(165, 100%, 42%, 0.16)',
+                                                color: 'hsl(165, 85%, 50%)',
+                                            }}
+                                        >
+                                            {openingInboxSimulationId === item.simulationId ? <Loader2 size={11} className="animate-spin" /> : null}
+                                            Abrir contrato
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
 
                 {selectedPatient && (
                     <div

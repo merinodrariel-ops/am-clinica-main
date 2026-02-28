@@ -129,8 +129,9 @@ function CajaAdminContent() {
         if (!selectedSucursal) return null;
 
         const requestedSubTab = searchParams.get('subtab');
-        const initialSubTab = requestedSubTab === 'observados'
-            ? 'observados'
+        const validPersonalSubTabs = new Set(['equipo', 'profesionales', 'registros', 'observados']);
+        const initialSubTab = requestedSubTab && validPersonalSubTabs.has(requestedSubTab)
+            ? requestedSubTab as 'equipo' | 'profesionales' | 'registros' | 'observados'
             : undefined;
         const initialObservedPersonalId = requestedSubTab === 'observados'
             ? (searchParams.get('observado_personal_id') || undefined)

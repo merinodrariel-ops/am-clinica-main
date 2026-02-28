@@ -105,6 +105,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         moneda: 'ARS' as 'ARS' | 'USD',
         notas: '',
         guardar_en_tarifario: false,
+        recalcular_liquidacion: true,
     });
 
     // Form state for new/edit personal
@@ -220,6 +221,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             moneda: 'ARS',
             notas: '',
             guardar_en_tarifario: prestacionesLista.length === 0,
+            recalcular_liquidacion: true,
         });
         setShowPrestacionForm(true);
     }
@@ -339,6 +341,23 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 }
             }
 
+            if (prestacionForm.recalcular_liquidacion) {
+                const prestacionesActualizadas = await getPrestacionesRealizadas({
+                    profesionalId: selectedProfesionalId,
+                    mes: mesActual,
+                });
+
+                const liqResult = await generarLiquidacionProfesional(
+                    selectedProfesionalId,
+                    mesActual,
+                    prestacionesActualizadas
+                );
+
+                if (!liqResult.success) {
+                    alert(`Prestación guardada, pero no se pudo recalcular liquidación: ${liqResult.error || 'error desconocido'}`);
+                }
+            }
+
             setShowPrestacionForm(false);
             setPrestacionForm({
                 paciente_nombre: '',
@@ -348,6 +367,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 moneda: 'ARS',
                 notas: '',
                 guardar_en_tarifario: false,
+                recalcular_liquidacion: true,
             });
             loadData();
         }
@@ -1002,6 +1022,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     />
                                     Guardar esta prestación en tarifario para próximas cargas
                                     {selectedProfesional?.area ? ` (${selectedProfesional.area})` : ''}
+                                </label>
+
+                                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={prestacionForm.recalcular_liquidacion}
+                                        onChange={(e) => setPrestacionForm({ ...prestacionForm, recalcular_liquidacion: e.target.checked })}
+                                        className="rounded border-slate-300 dark:border-slate-600"
+                                    />
+                                    Recalcular liquidación del profesional automáticamente
                                 </label>
                             </div>
 

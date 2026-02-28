@@ -1225,6 +1225,7 @@ export default function LiquidacionesPage() {
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid' | 'sin_generar'>('all');
     const [viewMode, setViewMode] = useState<'individual' | 'empresa'>('individual');
     const [generatingCompany, setGeneratingCompany] = useState<string | null>(null);
+    const [quickActionBusy, setQuickActionBusy] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -1316,6 +1317,10 @@ export default function LiquidacionesPage() {
         return companyName.includes(searchQuery) || membersText.includes(searchQuery);
     });
 
+    const quickTargetsGenerate = filteredRows.filter((row) => !row.liquidacion);
+    const quickTargetsApprove = filteredRows.filter((row) => row.liquidacion?.estado === 'pending');
+    const quickTargetsPay = filteredRows.filter((row) => row.liquidacion?.estado === 'approved');
+
     // ── Actions ──────────────────────────────────────────────────────────────
     async function handleGenerate(personalId: string) {
         setGenerating(personalId);
@@ -1355,6 +1360,84 @@ export default function LiquidacionesPage() {
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Error al marcar pagos de empresa');
         }
+    }
+
+    async function handleQuickGenerateVisible() {
+        if (quickTargetsGenerate.length === 0) {
+            toast.info('No hay liquidaciones pendientes de generar en la vista actual.');
+            return;
+        }
+
+        setQuickActionBusy('generate');
+        let ok = 0;
+        let fail = 0;
+
+        for (const row of quickTargetsGenerate) {
+            try {
+                await generateLiquidacion(row.personal_id, mes);
+                ok += 1;
+            } catch {
+                fail += 1;
+            }
+        }
+
+        setQuickActionBusy(null);
+        await load();
+        toast.success(`Generación masiva finalizada: ${ok} ok${fail ? `, ${fail} con error` : ''}.`);
+    }
+
+    async function handleQuickApproveVisible() {
+        if (quickTargetsApprove.length === 0) {
+            toast.info('No hay liquidaciones pendientes para aprobar en la vista actual.');
+            return;
+        }
+
+        setQuickActionBusy('approve');
+        let ok = 0;
+        let fail = 0;
+
+        for (const row of quickTargetsApprove) {
+            if (!row.liquidacion) continue;
+            try {
+                await approveLiquidacion(row.liquidacion.id);
+                ok += 1;
+            } catch {
+                fail += 1;
+            }
+        }
+
+        setQuickActionBusy(null);
+        await load();
+        toast.success(`Aprobación masiva finalizada: ${ok} ok${fail ? `, ${fail} con error` : ''}.`);
+    }
+
+    async function handleQuickPayVisible() {
+        if (quickTargetsPay.length === 0) {
+            toast.info('No hay liquidaciones aprobadas para pagar en la vista actual.');
+            return;
+        }
+
+        const defaultDate = new Date().toISOString().split('T')[0];
+        const fechaPago = window.prompt('Fecha de pago para todas (YYYY-MM-DD)', defaultDate);
+        if (!fechaPago) return;
+
+        setQuickActionBusy('pay');
+        let ok = 0;
+        let fail = 0;
+
+        for (const row of quickTargetsPay) {
+            if (!row.liquidacion) continue;
+            try {
+                await markLiquidacionPaid(row.liquidacion.id, fechaPago);
+                ok += 1;
+            } catch {
+                fail += 1;
+            }
+        }
+
+        setQuickActionBusy(null);
+        await load();
+        toast.success(`Pago masivo finalizado: ${ok} ok${fail ? `, ${fail} con error` : ''}.`);
     }
 
     function getEstadoEmpresaMember(member: LiquidacionAdminRow): string {
@@ -1744,6 +1827,52 @@ export default function LiquidacionesPage() {
                         Vista por empresa
                     </button>
                 </div>
+
+                {viewMode === 'individual' && (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-xs text-slate-400">
+                                Acciones rápidas (vista actual):
+                                <span className="ml-2 text-slate-300">{quickTargetsGenerate.length} sin generar</span>
+                                <span className="ml-2 text-amber-300">{quickTargetsApprove.length} pendientes</span>
+                                <span className="ml-2 text-emerald-300">{quickTargetsPay.length} aprobadas</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    onClick={handleQuickGenerateVisible}
+                                    disabled={Boolean(quickActionBusy) || quickTargetsGenerate.length === 0}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs"
+                                >
+                                    {quickActionBusy === 'generate' ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
+                                    Generar visibles
+                                </button>
+                                <button
+                                    onClick={handleQuickApproveVisible}
+                                    disabled={Boolean(quickActionBusy) || quickTargetsApprove.length === 0}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs"
+                                >
+                                    {quickActionBusy === 'approve' ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                                    Aprobar visibles
+                                </button>
+                                <button
+                                    onClick={handleQuickPayVisible}
+                                    disabled={Boolean(quickActionBusy) || quickTargetsPay.length === 0}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs"
+                                >
+                                    {quickActionBusy === 'pay' ? <RefreshCw size={11} className="animate-spin" /> : <Banknote size={11} />}
+                                    Pagar visibles
+                                </button>
+                                <a
+                                    href="/caja-admin?tab=personal&subtab=profesionales"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-xs"
+                                >
+                                    <FileSpreadsheet size={11} />
+                                    Cargar prestación
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Table */}

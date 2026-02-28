@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Copy, ExternalLink, Loader2, MessageCircle, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import MoneyInput from '@/components/ui/MoneyInput';
@@ -10,6 +10,7 @@ import type { Paciente } from '@/lib/patients';
 import { fetchDolarOficialRate, type DolarOficialRate } from '@/lib/dolar-oficial';
 import {
     createFinancingSimulationAction,
+    generateAutomatedContractToDriveAction,
     getFinancingSimulationPresetAction,
     listFinancingSimulationsByPatientAction,
     type FinancingSimulationPreset,
@@ -115,6 +116,31 @@ function getStatusBadgeStyle(status: FinancingSimulationRecord['status']): {
     }
 }
 
+function playNotificationTone() {
+    try {
+        const audioContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(980, audioContext.currentTime);
+        gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.16, audioContext.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.22);
+
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.23);
+
+        window.setTimeout(() => {
+            void audioContext.close();
+        }, 300);
+    } catch {
+        // Non-blocking: some browsers can deny auto audio.
+    }
+}
+
 export default function SimuladorFinanciacion({ patient, onUseInContract }: SimuladorFinanciacionProps) {
     const [selectedTreatment, setSelectedTreatment] = useState<string>('Alineadores invisibles AM');
     const [customTreatment, setCustomTreatment] = useState('');
@@ -133,6 +159,9 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
     const [simulations, setSimulations] = useState<FinancingSimulationRecord[]>([]);
     const [latestShareUrl, setLatestShareUrl] = useState<string | null>(null);
     const [messageMode, setMessageMode] = useState<WhatsappMessageMode>('short');
+    const [pendingOnly, setPendingOnly] = useState(false);
+    const [generatingContractSimulationId, setGeneratingContractSimulationId] = useState<string | null>(null);
+    const previousStatusRef = useRef<Record<string, FinancingSimulationRecord['status']>>({});
 
     const tratamiento = useMemo(() => {
         if (selectedTreatment === OTHER_TREATMENT_OPTION) {
@@ -154,6 +183,11 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
     const latestSimulation = useMemo(() => {
         return simulations[0] || null;
     }, [simulations]);
+
+    const displayedSimulations = useMemo(() => {
+        if (!pendingOnly) return simulations;
+        return simulations.filter((simulation) => simulation.status === 'shared');
+    }, [pendingOnly, simulations]);
 
     const loadRate = useCallback(async () => {
         try {
@@ -180,7 +214,25 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                 }
                 return;
             }
+
+            const previousMap = previousStatusRef.current;
+            const nextMap: Record<string, FinancingSimulationRecord['status']> = {};
+            const newlySelected = result.simulations.filter((simulation) => {
+                nextMap[simulation.id] = simulation.status;
+                return previousMap[simulation.id] && previousMap[simulation.id] !== 'selected' && simulation.status === 'selected';
+            });
+
             setSimulations(result.simulations);
+            previousStatusRef.current = nextMap;
+
+            if (newlySelected.length > 0) {
+                const latest = newlySelected[0];
+                playNotificationTone();
+                toast.success(`Paciente eligio una opcion: ${latest.treatment}`, {
+                    description: 'Ya puedes continuar directo con ContractMaker.',
+                    duration: 6000,
+                });
+            }
         } finally {
             if (!silent) {
                 setLoadingList(false);
@@ -222,6 +274,21 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
         });
         window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     }, [messageMode, patient.telefono, patientName]);
+
+    const handleCopyAndOpenWhatsapp = useCallback(async (simulation: FinancingSimulationRecord) => {
+        try {
+            await navigator.clipboard.writeText(simulation.shareUrl);
+            toast.success('Link copiado y WhatsApp abierto.');
+        } catch {
+            toast.error('No se pudo copiar el link, pero abrimos WhatsApp igual.');
+        } finally {
+            openWhatsapp({
+                treatment: simulation.treatment,
+                shareUrl: simulation.shareUrl,
+                expiresAt: simulation.expiresAt,
+            });
+        }
+    }, [openWhatsapp]);
 
     const toggleInstallment = useCallback((value: number) => {
         setAllowedInstallments((current) => {
@@ -321,6 +388,44 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
             setUsingSimulationId(null);
         }
     }, [onUseInContract, patient.id_paciente]);
+
+    const handleGenerateContractNow = useCallback(async (simulation: FinancingSimulationRecord) => {
+        if (simulation.status !== 'selected') return;
+
+        setGeneratingContractSimulationId(simulation.id);
+        try {
+            const presetResult = await getFinancingSimulationPresetAction(patient.id_paciente, simulation.id);
+            if (!presetResult.success || !presetResult.preset) {
+                toast.error(presetResult.error || 'No se pudo preparar el contrato.');
+                return;
+            }
+
+            const preset = presetResult.preset;
+            const result = await generateAutomatedContractToDriveAction({
+                patientId: patient.id_paciente,
+                tratamiento: preset.treatment,
+                totalUsd: preset.totalUsd,
+                anticipoPct: preset.upfrontPct,
+                cuotas: preset.installments,
+                bnaVenta: preset.bnaVentaArs,
+                simulationId: preset.simulationId,
+            });
+
+            if (!result.success) {
+                toast.error(result.error || 'No se pudo generar el contrato en Drive.');
+                return;
+            }
+
+            toast.success('Contrato generado en Drive.');
+            if (result.url) {
+                window.open(result.url, '_blank', 'noopener,noreferrer');
+            }
+
+            await loadSimulations(true);
+        } finally {
+            setGeneratingContractSimulationId(null);
+        }
+    }, [loadSimulations, patient.id_paciente]);
 
     return (
         <div className="space-y-5 rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-5 text-slate-100">
@@ -591,14 +696,31 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
             <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
                 <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-white">Simulaciones del paciente</p>
-                    {loadingList && <Loader2 size={14} className="animate-spin text-slate-300" />}
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setPendingOnly((current) => !current)}
+                            className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
+                                pendingOnly
+                                    ? 'border-cyan-300/30 bg-cyan-400/20 text-cyan-100'
+                                    : 'border-slate-600 bg-slate-800 text-slate-200'
+                            }`}
+                        >
+                            {pendingOnly ? 'Solo pendientes: ON' : 'Solo pendientes: OFF'}
+                        </button>
+                        {loadingList && <Loader2 size={14} className="animate-spin text-slate-300" />}
+                    </div>
                 </div>
 
-                {simulations.length === 0 ? (
-                    <p className="text-xs text-slate-400">Todavia no hay simulaciones compartidas para este paciente.</p>
+                {displayedSimulations.length === 0 ? (
+                    <p className="text-xs text-slate-400">
+                        {pendingOnly
+                            ? 'No hay simulaciones pendientes de eleccion.'
+                            : 'Todavia no hay simulaciones compartidas para este paciente.'}
+                    </p>
                 ) : (
                     <div className="space-y-2">
-                        {simulations.map((simulation) => {
+                        {displayedSimulations.map((simulation) => {
                             const statusMeta = getStatusBadgeStyle(simulation.status);
 
                             return (
@@ -623,6 +745,13 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                                         >
                                             <Copy size={11} /> Copiar link
                                         </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleCopyAndOpenWhatsapp(simulation)}
+                                            className="inline-flex items-center gap-1 rounded-md border border-emerald-300/30 bg-emerald-400/15 px-2 py-1 text-[11px] font-medium text-emerald-100"
+                                        >
+                                            <MessageCircle size={11} /> Copiar + WhatsApp
+                                        </button>
                                         <a
                                             href={simulation.shareUrl}
                                             target="_blank"
@@ -640,6 +769,17 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
                                             {usingSimulationId === simulation.id ? <Loader2 size={11} className="animate-spin" /> : null}
                                             {simulation.status === 'selected' ? 'Continuar a ContractMaker' : 'Usar en ContractMaker'}
                                         </button>
+                                        {simulation.status === 'selected' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleGenerateContractNow(simulation)}
+                                                disabled={generatingContractSimulationId === simulation.id}
+                                                className="inline-flex items-center gap-1 rounded-md border border-emerald-300/30 bg-emerald-400/20 px-2 py-1 text-[11px] font-semibold text-emerald-100 disabled:opacity-60"
+                                            >
+                                                {generatingContractSimulationId === simulation.id ? <Loader2 size={11} className="animate-spin" /> : null}
+                                                Generar contrato ahora
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );
