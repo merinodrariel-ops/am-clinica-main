@@ -13,7 +13,8 @@
  *   npx ts-node --transpile-only scripts/sync-drive-presentations.ts --run    # apply changes
  */
 
-import { google } from 'googleapis';
+import { google, drive_v3 } from 'googleapis';
+import type { GaxiosResponse } from 'gaxios';
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
@@ -153,7 +154,7 @@ async function run() {
     let pageToken: string | undefined;
 
     do {
-        const res = await drive.files.list({
+        const res: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
             q: `'${PACIENTES_ROOT}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
@@ -265,7 +266,7 @@ async function run() {
                 patient.link_google_slides = slides[0].webViewLink!;
                 stats.slidesLinkedFromSubfolders++;
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             stats.errors++;
         }
     }
@@ -281,7 +282,7 @@ async function run() {
     pageToken = undefined;
 
     do {
-        const res = await drive.files.list({
+        const res: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
             q: `'${PACIENTES_ROOT}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
@@ -353,7 +354,7 @@ async function run() {
                 stats.strayFilesMoved++;
                 if (!matchedPatient.link_google_slides) stats.slidesLinkedFromStrayFiles++;
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             stats.errors++;
         }
     }

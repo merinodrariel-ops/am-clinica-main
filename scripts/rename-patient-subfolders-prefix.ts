@@ -1,4 +1,5 @@
-import { google } from 'googleapis';
+import { google, drive_v3 } from 'googleapis';
+import type { GaxiosResponse } from 'gaxios';
 import * as dotenv from 'dotenv';
 import path from 'path';
 
@@ -46,13 +47,13 @@ async function run() {
         let renamed = 0;
 
         do {
-            const res = await drive.files.list({
+            const res: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
                 q: `'${PACIENTES_ROOT}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
                 includeItemsFromAllDrives: true,
                 supportsAllDrives: true,
                 fields: 'nextPageToken, files(id, name)',
                 pageToken: pageToken,
-                pageSize: 100, // Process patients in batches
+                pageSize: 100,
             });
 
             const patients = res.data.files || [];
@@ -61,7 +62,7 @@ async function run() {
                 if (!patientFolder.id || !patientFolder.name) continue;
 
                 // Get all subfolders of this patient folder
-                const subRes = await drive.files.list({
+                const subRes: GaxiosResponse<drive_v3.Schema$FileList> = await drive.files.list({
                     q: `'${patientFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
                     includeItemsFromAllDrives: true,
                     supportsAllDrives: true,
@@ -93,8 +94,9 @@ async function run() {
                                         requestBody: { name: newName }
                                     });
                                     renamed++;
-                                } catch (e: any) {
-                                    console.error(`Failed to rename ${sub.name}:`, e.message);
+                                } catch (e: unknown) {
+                                    const msg = e instanceof Error ? e.message : String(e);
+                                    console.error(`Failed to rename ${sub.name}:`, msg);
                                 }
                             }
                         }
