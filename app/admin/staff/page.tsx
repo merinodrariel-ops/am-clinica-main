@@ -19,6 +19,7 @@ import {
     LayoutGrid,
     Rows3,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { getAllWorkers, sendAccessInvite, updateWorkerProfileAdmin } from '@/app/actions/worker-portal';
 import { WorkerProfile, WorkerRole } from '@/types/worker-portal';
@@ -82,11 +83,20 @@ function getRoleIcon(rol: string) {
     return ROLE_ICONS[key] || <Users size={16} className="text-slate-400" />;
 }
 
+interface DocEntry {
+    url?: string;
+}
+
+type DocMap = Record<string, DocEntry | undefined>;
+
 function getDocCompliance(docs: unknown): number {
     if (!docs || typeof docs !== 'object') return 0;
-    const docMap = docs as Record<string, { url?: string } | undefined>;
-    const required = ['dni_frente', 'dni_dorso', 'licencia', 'poliza'];
-    const filled = required.filter((k) => Boolean(docMap[k]?.url)).length;
+    const docMap: DocMap = docs as DocMap;
+    const required: (keyof DocMap)[] = ['dni_frente', 'dni_dorso', 'licencia', 'poliza'];
+    const filled = required.filter((k) => {
+        const entry = docMap[k];
+        return entry != null && Boolean(entry.url);
+    }).length;
     return Math.round((filled / required.length) * 100);
 }
 
@@ -106,6 +116,15 @@ const ACCESS_BADGE: Record<AccessStatus, { label: string; className: string }> =
 
 const STAFF_VIEW_KEY = 'am.staff.view-mode';
 const STAFF_ROLE_ORDER_KEY = 'am.staff.role-order';
+const STAFF_GROUP_KEY = 'am.staff.group-mode';
+
+type GroupMode = 'role' | 'company' | 'access' | 'compliance';
+
+type InlineDraft = {
+    email: string;
+    rol: string;
+    activo: boolean;
+};
 
 export default function StaffListPage() {
     const [workers, setWorkers] = useState<WorkerProfile[]>([]);
@@ -121,6 +140,9 @@ export default function StaffListPage() {
     const [onlyActive, setOnlyActive] = useState(false);
     const [viewMode, setViewMode] = useState<'board' | 'table'>('board');
     const [roleOrderPreference, setRoleOrderPreference] = useState<string[]>([]);
+    const [groupMode, setGroupMode] = useState<GroupMode>('role');
+    const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>({});
+    const [savingInlineId, setSavingInlineId] = useState<string | null>(null);
 
     const loadWorkers = useCallback(async () => {
         setLoading(true);
@@ -158,6 +180,11 @@ export default function StaffListPage() {
                 // ignore malformed persisted preference
             }
         }
+
+        const savedGroup = window.localStorage.getItem(STAFF_GROUP_KEY);
+        if (savedGroup === 'role' || savedGroup === 'company' || savedGroup === 'access' || savedGroup === 'compliance') {
+            setGroupMode(savedGroup);
+        }
     }, []);
 
     useEffect(() => {
@@ -169,6 +196,23 @@ export default function StaffListPage() {
         if (typeof window === 'undefined') return;
         window.localStorage.setItem(STAFF_ROLE_ORDER_KEY, JSON.stringify(roleOrderPreference));
     }, [roleOrderPreference]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem(STAFF_GROUP_KEY, groupMode);
+    }, [groupMode]);
+
+    useEffect(() => {
+        const next: Record<string, InlineDraft> = {};
+        workers.forEach((worker) => {
+            next[worker.id] = {
+                email: worker.email || '',
+                rol: normalizeRole(worker.rol),
+                activo: worker.activo !== false,
+            };
+        });
+        setInlineDrafts(next);
+    }, [workers]);
 
     async function handleSendInvite(e: React.MouseEvent, workerId: string) {
         e.preventDefault();
@@ -209,17 +253,19 @@ export default function StaffListPage() {
     const withAccess = workers.filter((w) => w.user_id).length;
 
     const groupedByRole = useMemo(() => {
-        const grouped: Record<string, WorkerProfile[]> = {};
+        const gMap = new Map<string, WorkerProfile[]>();
 
         filteredWorkers.forEach((worker) => {
             const roleKey = normalizeRole(worker.rol);
-            if (!grouped[roleKey]) grouped[roleKey] = [];
-            grouped[roleKey].push(worker);
+            if (!gMap.has(roleKey)) gMap.set(roleKey, []);
+            gMap.get(roleKey)!.push(worker);
         });
+
+        const grouped: Record<string, WorkerProfile[]> = Object.fromEntries(gMap);
 
         return {
             grouped,
-            dynamicRoles: Object.keys(grouped).sort(),
+            dynamicRoles: Array.from(gMap.keys()).sort(),
         };
     }, [filteredWorkers]);
 
@@ -342,6 +388,130 @@ export default function StaffListPage() {
         }
     }
 
+    function getComplianceBucket(worker: WorkerProfile): string {
+        const c = getDocCompliance(worker.documents);
+        if (c >= 100) return 'complete';
+        if (c >= 50) return 'mid';
+        if (c > 0) return 'low';
+        return 'none';
+    }
+
+    const roleOptions = useMemo(() => {
+        const next = new Set<string>([...ROLE_ORDER, ...groupedByRole.dynamicRoles]);
+        return Array.from(next);
+    }, [groupedByRole.dynamicRoles]);
+
+    const boardColumns = useMemo(() => {
+        if (groupMode === 'role') {
+            return orderedRoles.map((role) => ({
+                key: role,
+                label: getRoleLabel(role),
+                icon: getRoleIcon(role),
+                workers: groupedByRole.grouped[role] || [],
+                isRoleColumn: true,
+            }));
+        }
+
+        if (groupMode === 'company') {
+            const companyMap = new Map<string, WorkerProfile[]>();
+            filteredWorkers.forEach((worker) => {
+                const key = (worker.empresa_prestadora_nombre || 'Sin empresa').trim();
+                if (!companyMap.has(key)) companyMap.set(key, []);
+                companyMap.get(key)!.push(worker);
+            });
+            return Array.from(companyMap.keys())
+                .sort((a, b) => a.localeCompare(b))
+                .map((key) => ({
+                    key,
+                    label: key,
+                    icon: <Building2 size={16} className="text-cyan-300" />,
+                    workers: companyMap.get(key) ?? [],
+                    isRoleColumn: false,
+                }));
+        }
+
+        if (groupMode === 'access') {
+            const order: AccessStatus[] = ['activo', 'invitado', 'sin_email'];
+            return order.map((status) => ({
+                key: status,
+                label: ACCESS_BADGE[status].label,
+                icon: <Users size={16} className="text-indigo-300" />,
+                workers: filteredWorkers.filter((worker) => getAccessStatus(worker) === status),
+                isRoleColumn: false,
+            }));
+        }
+
+        const complianceOrder = ['complete', 'mid', 'low', 'none'];
+        const complianceLabel: Record<string, string> = {
+            complete: 'Docs completos',
+            mid: 'Docs intermedios',
+            low: 'Docs bajos',
+            none: 'Sin documentos',
+        };
+        return complianceOrder.map((bucket) => ({
+            key: bucket,
+            label: complianceLabel[bucket],
+            icon: <CheckCircle2 size={16} className="text-emerald-300" />,
+            workers: filteredWorkers.filter((worker) => getComplianceBucket(worker) === bucket),
+            isRoleColumn: false,
+        }));
+    }, [filteredWorkers, groupMode, groupedByRole.grouped, orderedRoles]);
+
+    function setInlineDraft(workerId: string, patch: Partial<InlineDraft>) {
+        setInlineDrafts((prev) => ({
+            ...prev,
+            [workerId]: {
+                email: prev[workerId]?.email || '',
+                rol: prev[workerId]?.rol || 'other',
+                activo: prev[workerId]?.activo ?? true,
+                ...patch,
+            },
+        }));
+    }
+
+    function isInlineDirty(worker: WorkerProfile, draft: InlineDraft | undefined): boolean {
+        if (!draft) return false;
+        const sameEmail = draft.email.trim() === (worker.email || '').trim();
+        const sameRole = draft.rol === normalizeRole(worker.rol);
+        const sameActive = draft.activo === (worker.activo !== false);
+        return !(sameEmail && sameRole && sameActive);
+    }
+
+    async function saveInline(worker: WorkerProfile) {
+        const draft = inlineDrafts[worker.id];
+        if (!draft) return;
+
+        if (!isInlineDirty(worker, draft)) return;
+
+        setSavingInlineId(worker.id);
+        try {
+            await updateWorkerProfileAdmin(worker.id, {
+                email: draft.email.trim(),
+                rol: draft.rol,
+                activo: draft.activo,
+            });
+
+            setWorkers((prev) =>
+                prev.map((item) =>
+                    item.id === worker.id
+                        ? {
+                            ...item,
+                            email: draft.email.trim(),
+                            rol: draft.rol,
+                            activo: draft.activo,
+                        }
+                        : item
+                )
+            );
+
+            toast.success('Cambios rápidos guardados');
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : 'No se pudieron guardar los cambios');
+        } finally {
+            setSavingInlineId(null);
+        }
+    }
+
     return (
         <div className="max-w-[1600px] mx-auto space-y-8 pb-16 animate-in fade-in duration-500">
             <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 p-6 md:p-8">
@@ -405,36 +575,50 @@ export default function StaffListPage() {
                     </div>
                     <button
                         onClick={() => setOnlyActive((v) => !v)}
-                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-                            onlyActive
+                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${onlyActive
                                 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                                 : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
-                        }`}
+                            }`}
                     >
                         {onlyActive ? 'Mostrando solo activos' : 'Mostrar solo activos'}
                     </button>
                     <div className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">
                         <button
                             onClick={() => setViewMode('board')}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                                viewMode === 'board' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
-                            }`}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                                }`}
                         >
                             <LayoutGrid size={13} />
                             Board
                         </button>
                         <button
                             onClick={() => setViewMode('table')}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                                viewMode === 'table' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
-                            }`}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${viewMode === 'table' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+                                }`}
                         >
                             <Rows3 size={13} />
                             Tabla
                         </button>
                     </div>
+                    <div className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">
+                        {([
+                            ['role', 'Por rol'],
+                            ['company', 'Por empresa'],
+                            ['access', 'Por acceso'],
+                            ['compliance', 'Por docs'],
+                        ] as const).map(([value, label]) => (
+                            <button
+                                key={value}
+                                onClick={() => setGroupMode(value)}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${groupMode === value ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:text-white'
+                                    }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                     <div className="text-xs text-slate-500 lg:ml-auto">
-                        {filteredWorkers.length} resultados · Drag de tarjetas y columnas habilitado
+                        {filteredWorkers.length} resultados · {groupMode === 'role' ? 'Drag de tarjetas/columnas habilitado' : 'Drag disponible al agrupar por rol'}
                     </div>
                 </div>
             </div>
@@ -461,6 +645,8 @@ export default function StaffListPage() {
                                 <tr>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Prestador</th>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Rol</th>
+                                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Email</th>
+                                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Activo</th>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Portal</th>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Docs</th>
                                     <th className="text-right px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Acciones</th>
@@ -472,7 +658,10 @@ export default function StaffListPage() {
                                     const initials = `${worker.nombre?.[0] || ''}${worker.apellido?.[0] || ''}`.toUpperCase();
                                     const accessStatus = getAccessStatus(worker);
                                     const badge = ACCESS_BADGE[accessStatus];
-                                    const role = normalizeRole(worker.rol);
+                                    const draft = inlineDrafts[worker.id];
+                                    const role = draft?.rol || normalizeRole(worker.rol);
+                                    const dirty = isInlineDirty(worker, draft);
+                                    const isSavingInline = savingInlineId === worker.id;
 
                                     return (
                                         <tr key={worker.id} className="hover:bg-slate-950/50 transition-colors">
@@ -490,10 +679,40 @@ export default function StaffListPage() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-200">
-                                                    {getRoleIcon(role)}
-                                                    {getRoleLabel(role)}
+                                                <div className="inline-flex items-center gap-1.5">
+                                                    <div className="h-7 w-7 rounded-lg border border-slate-700 bg-slate-900 flex items-center justify-center">
+                                                        {getRoleIcon(role)}
+                                                    </div>
+                                                    <select
+                                                        value={role}
+                                                        onChange={(e) => setInlineDraft(worker.id, { rol: e.target.value })}
+                                                        className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200"
+                                                    >
+                                                        {roleOptions.map((option) => (
+                                                            <option key={option} value={option}>{getRoleLabel(option)}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    value={draft?.email || ''}
+                                                    onChange={(e) => setInlineDraft(worker.id, { email: e.target.value })}
+                                                    className="w-48 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200"
+                                                    placeholder="Sin email"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <button
+                                                    onClick={() => setInlineDraft(worker.id, { activo: !(draft?.activo ?? (worker.activo !== false)) })}
+                                                    className={`inline-flex items-center gap-2 px-2 py-1 rounded-full border text-xs font-semibold ${(draft?.activo ?? (worker.activo !== false))
+                                                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                                                        }`}
+                                                >
+                                                    {(draft?.activo ?? (worker.activo !== false)) ? <CheckCircle2 size={12} /> : <Circle size={12} />}
+                                                    {(draft?.activo ?? (worker.activo !== false)) ? 'Activo' : 'Inactivo'}
+                                                </button>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`text-[11px] font-semibold px-2 py-1 rounded-full border ${badge.className}`}>
@@ -531,6 +750,13 @@ export default function StaffListPage() {
                                                             {sendingInvite === worker.id ? 'Enviando...' : 'Invitar'}
                                                         </button>
                                                     )}
+                                                    <button
+                                                        onClick={() => saveInline(worker)}
+                                                        disabled={!dirty || isSavingInline}
+                                                        className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-cyan-500/30 text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 disabled:opacity-40"
+                                                    >
+                                                        {isSavingInline ? 'Guardando...' : 'Guardar'}
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -542,171 +768,184 @@ export default function StaffListPage() {
                 </div>
             ) : (
                 <div className="overflow-x-auto pb-2">
-                    <div className="flex items-start gap-4 min-w-max">
-                        {orderedRoles.map((role) => {
-                            const roleWorkers = groupedByRole.grouped[role] || [];
-                            const isDropTarget = dragOverWorkerRole === role;
-                            const isRoleDropTarget = dragOverRoleColumn === role;
-                            const isRoleDragging = draggingRoleColumn === role;
+                    <motion.div layout className="flex items-start gap-4 min-w-max">
+                        <AnimatePresence initial={false}>
+                            {boardColumns.map((column) => {
+                                const isRoleColumn = groupMode === 'role' && column.isRoleColumn;
+                                const isDropTarget = isRoleColumn && dragOverWorkerRole === column.key;
+                                const isRoleDropTarget = isRoleColumn && dragOverRoleColumn === column.key;
+                                const isRoleDragging = isRoleColumn && draggingRoleColumn === column.key;
 
-                            return (
-                                <div
-                                    key={role}
-                                    draggable
-                                    onDragStart={() => onRoleColumnDragStart(role)}
-                                    onDragEnd={onRoleColumnDragEnd}
-                                    onDragOver={(e) => {
-                                        onRoleColumnDragOver(e, role);
-                                        onDragOverRole(e, role);
-                                    }}
-                                    onDrop={(e) => {
-                                        onRoleColumnDrop(e, role);
-                                        onDropRole(e, role);
-                                    }}
-                                    className={`w-[350px] rounded-2xl border p-3 transition-all ${
-                                        isRoleDragging
-                                            ? 'opacity-40 scale-[0.98]'
-                                            : ''
-                                    } ${
-                                        isDropTarget
-                                            ? 'border-indigo-500 bg-indigo-500/10'
-                                            : isRoleDropTarget
-                                                ? 'border-cyan-500 bg-cyan-500/10'
-                                            : 'border-slate-800 bg-slate-900/50'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2 mb-3 px-1">
-                                        <GripVertical size={14} className="text-slate-600" />
-                                        <div className="h-7 w-7 rounded-lg border border-slate-700 bg-slate-900 flex items-center justify-center">
-                                            {getRoleIcon(role)}
+                                return (
+                                    <motion.div
+                                        layout
+                                        initial={{ opacity: 0, y: 14 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 8 }}
+                                        transition={{ duration: 0.2 }}
+                                        key={column.key}
+                                        draggable={isRoleColumn}
+                                        onDragStart={() => isRoleColumn && onRoleColumnDragStart(column.key)}
+                                        onDragEnd={() => isRoleColumn && onRoleColumnDragEnd()}
+                                        onDragOver={(e) => {
+                                            if (!isRoleColumn) return;
+                                            onRoleColumnDragOver(e, column.key);
+                                            onDragOverRole(e, column.key);
+                                        }}
+                                        onDrop={(e) => {
+                                            if (!isRoleColumn) return;
+                                            onRoleColumnDrop(e, column.key);
+                                            onDropRole(e, column.key);
+                                        }}
+                                        className={`w-[350px] rounded-2xl border p-3 transition-all ${isRoleDragging ? 'opacity-40 scale-[0.98]' : ''
+                                            } ${isDropTarget
+                                                ? 'border-indigo-500 bg-indigo-500/10'
+                                                : isRoleDropTarget
+                                                    ? 'border-cyan-500 bg-cyan-500/10'
+                                                    : 'border-slate-800 bg-slate-900/50'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-3 px-1">
+                                            {isRoleColumn && <GripVertical size={14} className="text-slate-600" />}
+                                            <div className="h-7 w-7 rounded-lg border border-slate-700 bg-slate-900 flex items-center justify-center">
+                                                {column.icon}
+                                            </div>
+                                            <h2 className="text-sm font-bold text-white truncate">{column.label}</h2>
+                                            <span className="ml-auto text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                                                {column.workers.length}
+                                            </span>
                                         </div>
-                                        <h2 className="text-sm font-bold text-white truncate">{getRoleLabel(role)}</h2>
-                                        <span className="ml-auto text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
-                                            {roleWorkers.length}
-                                        </span>
-                                    </div>
 
-                                    <div className="space-y-3 min-h-[140px]">
-                                        {roleWorkers.map((worker) => {
-                                            const compliance = getDocCompliance(worker.documents);
-                                            const initials = `${worker.nombre?.[0] || ''}${worker.apellido?.[0] || ''}`.toUpperCase();
-                                            const accessStatus = getAccessStatus(worker);
-                                            const badge = ACCESS_BADGE[accessStatus];
-                                            const isDragging = draggingWorkerId === worker.id;
-                                            const isUpdating = updatingRole === worker.id;
+                                        <motion.div layout className="space-y-3 min-h-[140px]">
+                                            <AnimatePresence initial={false}>
+                                                {column.workers.map((worker) => {
+                                                    const compliance = getDocCompliance(worker.documents);
+                                                    const initials = `${worker.nombre?.[0] || ''}${worker.apellido?.[0] || ''}`.toUpperCase();
+                                                    const accessStatus = getAccessStatus(worker);
+                                                    const badge = ACCESS_BADGE[accessStatus];
+                                                    const isDragging = draggingWorkerId === worker.id;
+                                                    const isUpdating = updatingRole === worker.id;
 
-                                            return (
-                                                <div
-                                                    key={worker.id}
-                                                    draggable={!isUpdating}
-                                                    onDragStart={(e) => {
-                                                        e.stopPropagation();
-                                                        onDragStart(worker.id);
-                                                    }}
-                                                    onDragEnd={onDragEnd}
-                                                    className={`group rounded-xl border border-slate-800 bg-slate-950/60 p-3 transition ${
-                                                        isDragging ? 'opacity-40 scale-[0.98]' : 'hover:border-slate-700 hover:bg-slate-950'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-white font-black text-sm overflow-hidden shrink-0">
-                                                            {worker.foto_url ? (
-                                                                <img src={worker.foto_url} alt={worker.nombre} className="w-full h-full object-cover" />
-                                                            ) : initials || '?'}
-                                                        </div>
-
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="font-semibold text-sm text-white truncate">
-                                                                    {worker.nombre} {worker.apellido}
-                                                                </p>
-                                                                <GripVertical size={13} className="text-slate-600 shrink-0" />
-                                                            </div>
-                                                            <p className="text-[10px] text-indigo-300 uppercase tracking-[0.14em] font-bold truncate mt-0.5">
-                                                                {worker.especialidad || worker.rol || 'Sin rol'}
-                                                            </p>
-                                                            {worker.email && (
-                                                                <p className="text-[11px] text-slate-500 truncate mt-1 flex items-center gap-1.5">
-                                                                    <Mail size={10} />
-                                                                    {worker.email}
-                                                                </p>
-                                                            )}
-                                                        </div>
-
-                                                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                                                            worker.activo !== false
-                                                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                                                                : 'bg-slate-800 text-slate-500 border-slate-700'
-                                                        }`}>
-                                                            {worker.activo !== false ? <CheckCircle2 size={10} /> : <Circle size={10} />}
-                                                            {worker.activo !== false ? 'Activo' : 'Inactivo'}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mt-3 flex flex-wrap gap-2">
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.className}`}>
-                                                            {badge.label}
-                                                        </span>
-                                                        {worker.documento && (
-                                                            <span className="text-[10px] font-bold text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
-                                                                DNI {worker.documento}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="mt-3 flex justify-between items-center text-[10px] font-bold">
-                                                        <span className="text-slate-600 uppercase tracking-wider">Docs</span>
-                                                        <span className={
-                                                            compliance >= 100
-                                                                ? 'text-emerald-300'
-                                                                : compliance > 0
-                                                                    ? 'text-amber-300'
-                                                                    : 'text-slate-600'
-                                                        }>
-                                                            {compliance}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all ${
-                                                                compliance >= 100 ? 'bg-emerald-500' : 'bg-amber-500'
-                                                            }`}
-                                                            style={{ width: `${compliance}%` }}
-                                                        />
-                                                    </div>
-
-                                                    <div className="mt-3 grid grid-cols-2 gap-2">
-                                                        <Link
-                                                            href={`/admin/staff/${worker.id}`}
-                                                            className="text-center py-1.5 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:text-white hover:border-slate-600 transition-colors"
+                                                    return (
+                                                        <motion.div
+                                                            layout
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 10 }}
+                                                            key={worker.id}
+                                                            draggable={!isUpdating && isRoleColumn}
+                                                            onDragStart={(e) => {
+                                                                if (!isRoleColumn) return;
+                                                                e.stopPropagation();
+                                                                onDragStart(worker.id);
+                                                            }}
+                                                            onDragEnd={onDragEnd}
+                                                            className={`group rounded-xl border border-slate-800 bg-slate-950/60 p-3 transition ${isDragging ? 'opacity-40 scale-[0.98]' : 'hover:border-slate-700 hover:bg-slate-950'
+                                                                }`}
                                                         >
-                                                            Abrir ficha
-                                                        </Link>
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-white font-black text-sm overflow-hidden shrink-0">
+                                                                    {worker.foto_url ? (
+                                                                        <img src={worker.foto_url} alt={worker.nombre} className="w-full h-full object-cover" />
+                                                                    ) : initials || '?'}
+                                                                </div>
 
-                                                        {worker.email && !worker.user_id ? (
-                                                            <button
-                                                                onClick={(e) => handleSendInvite(e, worker.id)}
-                                                                disabled={sendingInvite === worker.id}
-                                                                className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg border border-indigo-500/30 text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 disabled:opacity-50"
-                                                            >
-                                                                {sendingInvite === worker.id
-                                                                    ? <span className="animate-pulse">Enviando</span>
-                                                                    : <><Send size={11} /> Invitar</>}
-                                                            </button>
-                                                        ) : (
-                                                            <span className="inline-flex items-center justify-center py-1.5 text-[11px] font-semibold rounded-lg border border-slate-800 text-slate-500">
-                                                                {isUpdating ? 'Moviendo...' : 'Arrastrá para mover rol'}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="font-semibold text-sm text-white truncate">
+                                                                            {worker.nombre} {worker.apellido}
+                                                                        </p>
+                                                                        {isRoleColumn && <GripVertical size={13} className="text-slate-600 shrink-0" />}
+                                                                    </div>
+                                                                    <p className="text-[10px] text-indigo-300 uppercase tracking-[0.14em] font-bold truncate mt-0.5">
+                                                                        {worker.especialidad || worker.rol || 'Sin rol'}
+                                                                    </p>
+                                                                    {worker.email && (
+                                                                        <p className="text-[11px] text-slate-500 truncate mt-1 flex items-center gap-1.5">
+                                                                            <Mail size={10} />
+                                                                            {worker.email}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${worker.activo !== false
+                                                                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                                                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                                                                    }`}>
+                                                                    {worker.activo !== false ? <CheckCircle2 size={10} /> : <Circle size={10} />}
+                                                                    {worker.activo !== false ? 'Activo' : 'Inactivo'}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.className}`}>
+                                                                    {badge.label}
+                                                                </span>
+                                                                {worker.documento && (
+                                                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                                                                        DNI {worker.documento}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="mt-3 flex justify-between items-center text-[10px] font-bold">
+                                                                <span className="text-slate-600 uppercase tracking-wider">Docs</span>
+                                                                <span className={
+                                                                    compliance >= 100
+                                                                        ? 'text-emerald-300'
+                                                                        : compliance > 0
+                                                                            ? 'text-amber-300'
+                                                                            : 'text-slate-600'
+                                                                }>
+                                                                    {compliance}%
+                                                                </span>
+                                                            </div>
+                                                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all ${compliance >= 100 ? 'bg-emerald-500' : 'bg-amber-500'
+                                                                        }`}
+                                                                    style={{ width: `${compliance}%` }}
+                                                                />
+                                                            </div>
+
+                                                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                                                <Link
+                                                                    href={`/admin/staff/${worker.id}`}
+                                                                    className="text-center py-1.5 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:text-white hover:border-slate-600 transition-colors"
+                                                                >
+                                                                    Abrir ficha
+                                                                </Link>
+
+                                                                {worker.email && !worker.user_id ? (
+                                                                    <button
+                                                                        onClick={(e) => handleSendInvite(e, worker.id)}
+                                                                        disabled={sendingInvite === worker.id}
+                                                                        className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg border border-indigo-500/30 text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 disabled:opacity-50"
+                                                                    >
+                                                                        {sendingInvite === worker.id
+                                                                            ? <span className="animate-pulse">Enviando</span>
+                                                                            : <><Send size={11} /> Invitar</>}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center justify-center py-1.5 text-[11px] font-semibold rounded-lg border border-slate-800 text-slate-500">
+                                                                        {isUpdating
+                                                                            ? 'Moviendo...'
+                                                                            : isRoleColumn
+                                                                                ? 'Arrastrá para mover rol'
+                                                                                : 'Vista agrupada'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </motion.div>
+                                                    );
+                                                })}
+                                            </AnimatePresence>
+                                        </motion.div>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
+                    </motion.div>
                 </div>
             )}
 
