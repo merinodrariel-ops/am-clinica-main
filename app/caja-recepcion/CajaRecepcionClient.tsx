@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users } from 'lucide-react';
+import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users, Wallet } from 'lucide-react';
 import { ComprobanteLink } from '@/components/caja/ComprobanteLink';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -46,7 +46,7 @@ import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
 import { ReciboGenerator, generateReciboNumber } from '@/components/caja/ReciboGenerator';
-import { logMovimientoEdit, deleteMovimiento, getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
+import { logMovimientoEdit, deleteMovimiento, getCurrentBalanceRecepcion, getTransferenciasResumenMes } from '@/lib/caja-recepcion';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
 import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
@@ -58,6 +58,8 @@ import RoleGuard from '@/components/auth/RoleGuard';
 interface Stats {
     totalDiaUsd: number;
     totalMesUsd: number;
+    retirosMesUsd: number;
+    traspasoNetoMesUsd: number;
     porMetodo: Record<string, number>;
     porCategoria: Record<string, number>;
     movimientosHoy: number;
@@ -220,6 +222,7 @@ function CajaRecepcionContent() {
 
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
     const [showTransferencia, setShowTransferencia] = useState(false);
+    const [transferDefaultType, setTransferDefaultType] = useState<'TRASPASO_INTERNO' | 'RETIRO_EFECTIVO'>('TRASPASO_INTERNO');
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
@@ -409,6 +412,7 @@ function CajaRecepcionContent() {
             const totalMesUsd = pagados.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
 
             const pendientes = (movs || []).filter((m) => m.estado === 'pendiente');
+            const transferSummary = await getTransferenciasResumenMes(mesActual);
 
             const { count: totalCount } = await supabase
                 .from('pacientes')
@@ -424,6 +428,8 @@ function CajaRecepcionContent() {
             setStats({
                 totalDiaUsd: Math.round(totalDiaUsd * 100) / 100,
                 totalMesUsd: Math.round(totalMesUsd * 100) / 100,
+                retirosMesUsd: transferSummary.retirosUsd,
+                traspasoNetoMesUsd: transferSummary.traspasoNetoUsd,
                 porMetodo: {},
                 porCategoria: {},
                 movimientosHoy: pagadosHoy.length,
@@ -952,11 +958,24 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
 
                             <div className="flex items-center gap-4">
                                 <button
-                                    onClick={() => setShowTransferencia(true)}
+                                    onClick={() => {
+                                        setTransferDefaultType('TRASPASO_INTERNO');
+                                        setShowTransferencia(true);
+                                    }}
                                     className="flex flex-col items-center justify-center w-24 h-24 rounded-3xl glass-card hover:bg-white/5 border-white/5 transition-all group"
                                 >
                                     <ArrowRightLeft size={24} className="text-orange-400 group-hover:scale-110 transition-transform" />
-                                    <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Giro</span>
+                                    <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Traspaso</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setTransferDefaultType('RETIRO_EFECTIVO');
+                                        setShowTransferencia(true);
+                                    }}
+                                    className="flex flex-col items-center justify-center w-24 h-24 rounded-3xl glass-card hover:bg-orange-500/10 border-white/5 transition-all group"
+                                >
+                                    <Wallet size={24} className="text-orange-300 group-hover:scale-110 transition-transform" />
+                                    <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Retiro</span>
                                 </button>
                                 <button
                                     onClick={() => setShowNuevoGasto(true)}
@@ -970,10 +989,12 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
                         {[
                             { label: 'Ingresos Hoy', value: stats?.totalDiaUsd, icon: DollarSign, color: 'teal', sub: 'Hoy', privacy: true },
                             { label: 'Ingresos Mes', value: stats?.totalMesUsd, icon: TrendingUp, color: 'blue', sub: 'Mes', privacy: true },
+                            { label: 'Retiros Mes', value: stats?.retirosMesUsd, icon: Wallet, color: 'amber', sub: 'No operativo', privacy: true },
+                            { label: 'Traspaso Neto Mes', value: stats?.traspasoNetoMesUsd, icon: ArrowRightLeft, color: 'indigo', sub: 'Entre cajas', privacy: true },
                             { label: 'Operaciones', value: stats?.movimientosHoy, icon: CreditCard, color: 'indigo', sub: 'Hoy', privacy: false },
                             { label: 'Pendientes', value: stats?.pendientes, icon: Clock, color: 'amber', sub: 'Action', privacy: false, alert: (stats?.pendientes || 0) > 0 }
                         ].map((card, i) => (
@@ -1691,6 +1712,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             onClose={() => setShowTransferencia(false)}
                             onSuccess={loadData}
                             bnaRate={bnaRate?.venta || 0}
+                            defaultTipo={transferDefaultType}
                         />
 
                         {/* Historial Ediciones Modal */}

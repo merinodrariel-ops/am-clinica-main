@@ -90,6 +90,10 @@ export interface TransferenciaCaja {
     monto: number;
     tc_bna_venta: number | null;
     usd_equivalente: number | null;
+    tipo_transferencia: 'TRASPASO_INTERNO' | 'RETIRO_EFECTIVO';
+    caja_origen: 'RECEPCION' | 'ADMIN';
+    caja_destino: 'RECEPCION' | 'ADMIN' | null;
+    movimiento_grupo_id: string;
     motivo: string | null;
     observaciones: string | null;
     estado: 'confirmada' | 'anulada';
@@ -162,4 +166,3 @@ export interface Todo {
     created_at: string;
     updated_at: string;
 }
-

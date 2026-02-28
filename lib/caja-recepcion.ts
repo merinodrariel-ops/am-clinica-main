@@ -10,6 +10,39 @@ import { getLocalISODate } from "@/lib/local-date";
 
 const getSupabase = () => createClient();
 
+function parseTransferOperationMeta(row: {
+  tipo_transferencia?: string | null;
+  caja_origen?: string | null;
+  caja_destino?: string | null;
+  motivo?: string | null;
+}) {
+  if (row.tipo_transferencia) {
+    return {
+      tipo: row.tipo_transferencia,
+      origen: row.caja_origen || "RECEPCION",
+      destino: row.caja_destino || "ADMIN",
+    };
+  }
+
+  // Backward compatible metadata for environments without new columns:
+  // [OPS:TRASPASO_INTERNO|RECEPCION|ADMIN] Motivo...
+  const motivo = row.motivo || "";
+  const match = motivo.match(/^\[OPS:(TRASPASO_INTERNO|RETIRO_EFECTIVO)\|(RECEPCION|ADMIN)\|(RECEPCION|ADMIN|EXT)\]/);
+  if (match) {
+    return {
+      tipo: match[1],
+      origen: match[2],
+      destino: match[3] === "EXT" ? null : match[3],
+    };
+  }
+
+  return {
+    tipo: "TRASPASO_INTERNO",
+    origen: "RECEPCION",
+    destino: "ADMIN",
+  };
+}
+
 /**
  * Caja Recepción Business Logic
  */
@@ -353,7 +386,7 @@ export async function cerrarCajaDelDia(
   // For transfers, we look for anything confirmed AFTER the previous close
   let transQuery = getSupabase()
     .from("transferencias_caja")
-    .select("usd_equivalente")
+    .select("*")
     .eq("estado", "confirmada");
 
   if (ultimo?.hora_cierre) {
@@ -366,12 +399,44 @@ export async function cerrarCajaDelDia(
   transQuery = transQuery.lt("fecha_hora", `${fecha}T23:59:59`);
 
   const { data: transferencias } = await transQuery;
-  const totalTransferenciasUsd =
-    transferencias?.reduce(
-      (sum: number, t: { usd_equivalente: number }) =>
-        sum + (t.usd_equivalente || 0),
-      0,
-    ) || 0;
+
+  // Outflows are kept for legacy audit field total_transferencias_admin_usd
+  // Net impact is used for expected cash formula.
+  let totalTransferenciasOutUsd = 0;
+  let netTransferImpactUsd = 0;
+
+  (transferencias || []).forEach(
+    (t: {
+      usd_equivalente: number | null;
+      tipo_transferencia?: string | null;
+      caja_origen?: string | null;
+      caja_destino?: string | null;
+      motivo?: string | null;
+    }) => {
+      const usd = Number(t.usd_equivalente || 0);
+      const meta = parseTransferOperationMeta(t);
+      const tipo = meta.tipo;
+      const origen = meta.origen;
+      const destino = meta.destino || "ADMIN";
+
+      if (tipo === "RETIRO_EFECTIVO") {
+        if (origen === "RECEPCION") {
+          totalTransferenciasOutUsd += usd;
+          netTransferImpactUsd -= usd;
+        }
+        return;
+      }
+
+      // Internal transfer between boxes
+      if (origen === "RECEPCION") {
+        totalTransferenciasOutUsd += usd;
+        netTransferImpactUsd -= usd;
+      }
+      if (destino === "RECEPCION") {
+        netTransferImpactUsd += usd;
+      }
+    },
+  );
 
   // Calculate difference
   const saldoInicialEq =
@@ -379,7 +444,7 @@ export async function cerrarCajaDelDia(
   const saldoFinalEq =
     saldoFinalUsd + (tcBnaVenta > 0 ? saldoFinalArs / tcBnaVenta : 0);
 
-  const esperado = saldoInicialEq + totalIngresosUsd - totalTransferenciasUsd;
+  const esperado = saldoInicialEq + totalIngresosUsd + netTransferImpactUsd;
   const diferenciaUsd = Math.round((saldoFinalEq - esperado) * 100) / 100;
 
   const { data, error } = await getSupabase().rpc("cerrar_caja_recepcion", {
@@ -389,7 +454,8 @@ export async function cerrarCajaDelDia(
     p_saldo_final_ars: saldoFinalArs,
     p_saldo_final_usd_eq: Math.round(saldoFinalEq * 100) / 100, // Added
     p_total_ingresos_usd: Math.round(totalIngresosUsd * 100) / 100,
-    p_total_transferencias_usd: Math.round(totalTransferenciasUsd * 100) / 100,
+    p_total_transferencias_usd:
+      Math.round(totalTransferenciasOutUsd * 100) / 100,
     p_diferencia_usd: diferenciaUsd,
     p_tc_bna: tcBnaVenta,
     p_observaciones: observaciones,
@@ -409,7 +475,20 @@ export async function crearTransferencia(
   tcBnaVenta: number | null,
   usuario: string,
   observaciones?: string,
+  options?: {
+    tipoTransferencia?: "TRASPASO_INTERNO" | "RETIRO_EFECTIVO";
+    cajaOrigen?: "RECEPCION" | "ADMIN";
+    cajaDestino?: "RECEPCION" | "ADMIN" | null;
+    movimientoGrupoId?: string;
+  },
 ): Promise<TransferenciaCaja> {
+  const tipoTransferencia = options?.tipoTransferencia || "TRASPASO_INTERNO";
+  const cajaOrigen = options?.cajaOrigen || "RECEPCION";
+  const cajaDestino =
+    tipoTransferencia === "RETIRO_EFECTIVO"
+      ? null
+      : (options?.cajaDestino || (cajaOrigen === "RECEPCION" ? "ADMIN" : "RECEPCION"));
+
   const usd_equivalente =
     moneda === "USD"
       ? monto
@@ -417,23 +496,142 @@ export async function crearTransferencia(
         ? Math.round((monto / tcBnaVenta) * 100) / 100
         : monto;
 
-  const { data, error } = await getSupabase()
+  const insertPayload: Record<string, unknown> = {
+    moneda,
+    monto,
+    tc_bna_venta: moneda === "ARS" ? tcBnaVenta : null,
+    usd_equivalente,
+    tipo_transferencia: tipoTransferencia,
+    caja_origen: cajaOrigen,
+    caja_destino: cajaDestino,
+    motivo,
+    observaciones,
+    usuario,
+    estado: "confirmada",
+  };
+
+  const opsTag = `[OPS:${tipoTransferencia}|${cajaOrigen}|${tipoTransferencia === "RETIRO_EFECTIVO" ? "EXT" : (cajaDestino || "ADMIN")}]`;
+
+  if (options?.movimientoGrupoId) {
+    insertPayload.movimiento_grupo_id = options.movimientoGrupoId;
+  }
+
+  let { data, error } = await getSupabase()
     .from("transferencias_caja")
-    .insert({
+    .insert(insertPayload)
+    .select()
+    .single();
+
+  if (
+    error &&
+    (error.message.includes("tipo_transferencia") ||
+      error.message.includes("caja_origen") ||
+      error.message.includes("caja_destino"))
+  ) {
+    const fallbackPayload = {
       moneda,
       monto,
       tc_bna_venta: moneda === "ARS" ? tcBnaVenta : null,
       usd_equivalente,
-      motivo,
+      motivo: `${opsTag} ${motivo}`,
       observaciones,
       usuario,
       estado: "confirmada",
-    })
-    .select()
-    .single();
+    };
+
+    const fallback = await getSupabase()
+      .from("transferencias_caja")
+      .insert(fallbackPayload)
+      .select()
+      .single();
+
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   return data;
+}
+
+export interface TransferenciasResumenMes {
+  retirosUsd: number;
+  traspasosOutUsd: number;
+  traspasosInUsd: number;
+  traspasoNetoUsd: number;
+  retirosCount: number;
+  traspasosCount: number;
+}
+
+export async function getTransferenciasResumenMes(
+  mes: string, // YYYY-MM
+): Promise<TransferenciasResumenMes> {
+  const start = `${mes}-01`;
+  const next = new Date(`${mes}-01T12:00:00`);
+  next.setMonth(next.getMonth() + 1);
+  const nextMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`;
+
+  const { data, error } = await getSupabase()
+    .from("transferencias_caja")
+    .select("*")
+    .eq("estado", "confirmada")
+    .gte("fecha_hora", `${start}T00:00:00`)
+    .lt("fecha_hora", `${nextMonth}T00:00:00`);
+
+  if (error) {
+    console.error("Error fetching transfer summary:", error);
+    return {
+      retirosUsd: 0,
+      traspasosOutUsd: 0,
+      traspasosInUsd: 0,
+      traspasoNetoUsd: 0,
+      retirosCount: 0,
+      traspasosCount: 0,
+    };
+  }
+
+  let retirosUsd = 0;
+  let traspasosOutUsd = 0;
+  let traspasosInUsd = 0;
+  let retirosCount = 0;
+  let traspasosCount = 0;
+
+  (data || []).forEach((row: {
+    usd_equivalente: number | null;
+    tipo_transferencia?: string | null;
+    caja_origen?: string | null;
+    caja_destino?: string | null;
+    motivo?: string | null;
+  }) => {
+    const usd = Number(row.usd_equivalente || 0);
+    const meta = parseTransferOperationMeta(row);
+    const tipo = meta.tipo;
+    const origen = meta.origen;
+    const destino = meta.destino || "ADMIN";
+
+    if (tipo === "RETIRO_EFECTIVO") {
+      if (origen === "RECEPCION") {
+        retirosUsd += usd;
+        retirosCount += 1;
+      }
+      return;
+    }
+
+    const afectaRecepcion = origen === "RECEPCION" || destino === "RECEPCION";
+    if (afectaRecepcion) traspasosCount += 1;
+    if (origen === "RECEPCION") traspasosOutUsd += usd;
+    if (destino === "RECEPCION") traspasosInUsd += usd;
+  });
+
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+  return {
+    retirosUsd: round2(retirosUsd),
+    traspasosOutUsd: round2(traspasosOutUsd),
+    traspasosInUsd: round2(traspasosInUsd),
+    traspasoNetoUsd: round2(traspasosInUsd - traspasosOutUsd),
+    retirosCount,
+    traspasosCount,
+  };
 }
 
 // ===================== DASHBOARD =====================
@@ -641,10 +839,10 @@ export async function getCurrentBalanceRecepcion(): Promise<{
     if (m.moneda === "USD") saldoUsd += m.monto;
   });
 
-  // 3. Subtract Transfers (Egresos)
+  // 3. Apply non-operational cash movements (retiros / traspasos)
   const baseTransQuery = getSupabase()
     .from("transferencias_caja")
-    .select("monto, moneda, estado")
+    .select("*")
     .eq("estado", "confirmada");
 
   let transQuery = baseTransQuery;
@@ -658,9 +856,32 @@ export async function getCurrentBalanceRecepcion(): Promise<{
   const { data: transferencias } = await transQuery;
   const trans = transferencias || [];
 
-  trans.forEach((t) => {
-    if (t.moneda === "ARS") saldoArs -= t.monto;
-    if (t.moneda === "USD") saldoUsd -= t.monto;
+  trans.forEach((t: {
+    monto: number;
+    moneda: "ARS" | "USD";
+    tipo_transferencia?: string | null;
+    caja_origen?: string | null;
+    caja_destino?: string | null;
+    motivo?: string | null;
+  }) => {
+    const meta = parseTransferOperationMeta(t);
+    const tipo = meta.tipo;
+    const origen = meta.origen;
+    const destino = meta.destino || "ADMIN";
+
+    const applyDelta = (sign: 1 | -1) => {
+      if (t.moneda === "ARS") saldoArs += sign * Number(t.monto || 0);
+      if (t.moneda === "USD") saldoUsd += sign * Number(t.monto || 0);
+    };
+
+    if (tipo === "RETIRO_EFECTIVO") {
+      if (origen === "RECEPCION") applyDelta(-1);
+      return;
+    }
+
+    // Internal transfer between boxes
+    if (origen === "RECEPCION") applyDelta(-1);
+    if (destino === "RECEPCION") applyDelta(1);
   });
 
   return {

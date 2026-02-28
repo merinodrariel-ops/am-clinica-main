@@ -1,39 +1,90 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowRightLeft, DollarSign, Loader2, X, Send } from 'lucide-react';
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import MoneyInput from "@/components/ui/MoneyInput";
-import { Textarea } from "@/components/ui/Textarea";
+import { useEffect, useState } from 'react';
+import { ArrowRightLeft, Loader2, X, Send, Wallet } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import MoneyInput from '@/components/ui/MoneyInput';
+import { Textarea } from '@/components/ui/Textarea';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
+
+type TransferenciaTipo = 'TRASPASO_INTERNO' | 'RETIRO_EFECTIVO';
+type CajaNodo = 'RECEPCION' | 'ADMIN';
 
 interface TransferenciaAdminProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
     bnaRate: number;
+    defaultTipo?: TransferenciaTipo;
 }
 
-const MOTIVOS = [
-    'Depósito bancario',
-    'Pago a proveedores',
-    'Gastos operativos',
-    'Cierre de caja',
-    'Otro',
-];
+const MOTIVOS: Record<TransferenciaTipo, string[]> = {
+    TRASPASO_INTERNO: [
+        'Traspaso entre cajas',
+        'Reposicion de caja',
+        'Ajuste interno de efectivo',
+        'Otro',
+    ],
+    RETIRO_EFECTIVO: [
+        'Retiro del dueno',
+        'Retiro de encargado',
+        'Reserva de seguridad',
+        'Otro',
+    ],
+};
 
-export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate }: TransferenciaAdminProps) {
+function cajaLabel(value: CajaNodo) {
+    return value === 'RECEPCION' ? 'Caja Recepcion' : 'Caja Administracion';
+}
+
+export default function TransferenciaAdmin({
+    isOpen,
+    onClose,
+    onSuccess,
+    bnaRate,
+    defaultTipo = 'TRASPASO_INTERNO',
+}: TransferenciaAdminProps) {
     const [monto, setMonto] = useState(0);
     const [moneda, setMoneda] = useState<'USD' | 'ARS'>('ARS');
-    const [motivo, setMotivo] = useState('Depósito bancario');
+    const [tipoTransferencia, setTipoTransferencia] = useState<TransferenciaTipo>(defaultTipo);
+    const [cajaOrigen, setCajaOrigen] = useState<CajaNodo>('RECEPCION');
+    const [cajaDestino, setCajaDestino] = useState<CajaNodo>('ADMIN');
+    const [motivo, setMotivo] = useState(MOTIVOS[defaultTipo][0]);
     const [observaciones, setObservaciones] = useState('');
     const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setTipoTransferencia(defaultTipo);
+        setMotivo(MOTIVOS[defaultTipo][0]);
+        if (defaultTipo === 'RETIRO_EFECTIVO') {
+            setCajaOrigen('RECEPCION');
+            setCajaDestino('ADMIN');
+        }
+    }, [defaultTipo, isOpen]);
+
+    useEffect(() => {
+        if (tipoTransferencia === 'RETIRO_EFECTIVO') {
+            setMotivo((prev) => (MOTIVOS.RETIRO_EFECTIVO.includes(prev) ? prev : MOTIVOS.RETIRO_EFECTIVO[0]));
+            return;
+        }
+
+        setMotivo((prev) => (MOTIVOS.TRASPASO_INTERNO.includes(prev) ? prev : MOTIVOS.TRASPASO_INTERNO[0]));
+
+        if (cajaOrigen === cajaDestino) {
+            setCajaDestino(cajaOrigen === 'RECEPCION' ? 'ADMIN' : 'RECEPCION');
+        }
+    }, [tipoTransferencia, cajaDestino, cajaOrigen]);
 
     async function handleSubmit() {
         if (monto <= 0) {
             alert('El monto debe ser mayor a 0');
+            return;
+        }
+
+        if (tipoTransferencia === 'TRASPASO_INTERNO' && cajaOrigen === cajaDestino) {
+            alert('Origen y destino deben ser diferentes en un traspaso interno');
             return;
         }
 
@@ -43,26 +94,53 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                 ? monto
                 : (bnaRate > 0 ? Math.round((monto / bnaRate) * 100) / 100 : monto);
 
-            const { error } = await supabase
+            const opsTag = `[OPS:${tipoTransferencia}|${cajaOrigen}|${tipoTransferencia === 'RETIRO_EFECTIVO' ? 'EXT' : cajaDestino}]`;
+
+            const insertPayload: Record<string, unknown> = {
+                moneda,
+                monto,
+                tc_bna_venta: moneda === 'ARS' ? bnaRate : null,
+                usd_equivalente: usdEquivalente,
+                tipo_transferencia: tipoTransferencia,
+                caja_origen: cajaOrigen,
+                caja_destino: tipoTransferencia === 'RETIRO_EFECTIVO' ? null : cajaDestino,
+                motivo,
+                observaciones: observaciones || null,
+                usuario: 'Recepcion',
+                estado: 'confirmada',
+            };
+
+            let { error } = await supabase
                 .from('transferencias_caja')
-                .insert({
+                .insert(insertPayload);
+
+            if (error && (error.message.includes('tipo_transferencia') || error.message.includes('caja_origen') || error.message.includes('caja_destino'))) {
+                // Backward-compatible insert for environments that do not have the migration yet
+                const fallbackPayload = {
                     moneda,
                     monto,
                     tc_bna_venta: moneda === 'ARS' ? bnaRate : null,
                     usd_equivalente: usdEquivalente,
-                    motivo,
+                    motivo: `${opsTag} ${motivo}`,
                     observaciones: observaciones || null,
-                    usuario: 'Recepción', // TODO: Get from auth
+                    usuario: 'Recepcion',
                     estado: 'confirmada',
-                });
+                };
+
+                const fallbackResult = await supabase
+                    .from('transferencias_caja')
+                    .insert(fallbackPayload);
+
+                error = fallbackResult.error;
+            }
 
             if (error) throw error;
 
             onSuccess();
             handleClose();
         } catch (error) {
-            console.error('Error creating transfer:', error);
-            alert('Error al registrar transferencia');
+            console.error('Error creating transfer operation:', error);
+            alert('Error al registrar el movimiento de efectivo');
         } finally {
             setSaving(false);
         }
@@ -71,7 +149,10 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
     function handleClose() {
         setMonto(0);
         setMoneda('ARS');
-        setMotivo('Depósito bancario');
+        setTipoTransferencia(defaultTipo);
+        setCajaOrigen('RECEPCION');
+        setCajaDestino('ADMIN');
+        setMotivo(MOTIVOS[defaultTipo][0]);
         setObservaciones('');
         onClose();
     }
@@ -82,6 +163,14 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
         return 0;
     }
 
+    const title = tipoTransferencia === 'RETIRO_EFECTIVO'
+        ? 'Retiro de Efectivo'
+        : 'Traspaso entre Cajas';
+
+    const subtitle = tipoTransferencia === 'RETIRO_EFECTIVO'
+        ? 'Salida no operativa de efectivo'
+        : 'Movimiento interno entre cajas';
+
     if (!isOpen) return null;
 
     return (
@@ -90,11 +179,13 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                 <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                            <ArrowRightLeft size={20} className="text-orange-600 dark:text-orange-400" />
+                            {tipoTransferencia === 'RETIRO_EFECTIVO'
+                                ? <Wallet size={20} className="text-orange-600 dark:text-orange-400" />
+                                : <ArrowRightLeft size={20} className="text-orange-600 dark:text-orange-400" />}
                         </div>
                         <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-white">Transferencia a Caja Admin</h3>
-                            <p className="text-xs text-gray-500">Registrar entrega de efectivo</p>
+                            <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+                            <p className="text-xs text-gray-500">{subtitle}</p>
                         </div>
                     </div>
                     <Button
@@ -108,10 +199,69 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                 </div>
 
                 <div className="p-5 space-y-4">
-                    {/* Amount */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Monto a transferir *
+                            Tipo de movimiento
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => setTipoTransferencia('TRASPASO_INTERNO')}
+                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
+                                    tipoTransferencia === 'TRASPASO_INTERNO'
+                                        ? 'bg-indigo-600 text-white border-indigo-500'
+                                        : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                }`}
+                            >
+                                Traspaso interno
+                            </button>
+                            <button
+                                onClick={() => setTipoTransferencia('RETIRO_EFECTIVO')}
+                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
+                                    tipoTransferencia === 'RETIRO_EFECTIVO'
+                                        ? 'bg-orange-600 text-white border-orange-500'
+                                        : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                }`}
+                            >
+                                Retiro efectivo
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Caja origen
+                            </label>
+                            <select
+                                value={cajaOrigen}
+                                onChange={(e) => setCajaOrigen(e.target.value as CajaNodo)}
+                                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                            >
+                                <option value="RECEPCION">Caja Recepcion</option>
+                                <option value="ADMIN">Caja Administracion</option>
+                            </select>
+                        </div>
+
+                        {tipoTransferencia === 'TRASPASO_INTERNO' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Caja destino
+                                </label>
+                                <select
+                                    value={cajaDestino}
+                                    onChange={(e) => setCajaDestino(e.target.value as CajaNodo)}
+                                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                >
+                                    <option value="RECEPCION">Caja Recepcion</option>
+                                    <option value="ADMIN">Caja Administracion</option>
+                                </select>
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Monto *
                         </label>
                         <div className="flex gap-3">
                             <div className="relative flex-1">
@@ -139,7 +289,6 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                         )}
                     </div>
 
-                    {/* Reason */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Motivo *
@@ -149,13 +298,12 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                             onChange={(e) => setMotivo(e.target.value)}
                             className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
                         >
-                            {MOTIVOS.map((m) => (
+                            {MOTIVOS[tipoTransferencia].map((m) => (
                                 <option key={m} value={m}>{m}</option>
                             ))}
                         </select>
                     </div>
 
-                    {/* Notes */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Observaciones
@@ -169,7 +317,6 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                         />
                     </div>
 
-                    {/* Summary */}
                     <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Se registrará:</p>
                         <p className="text-lg font-bold text-gray-900 dark:text-white">
@@ -181,8 +328,11 @@ export default function TransferenciaAdmin({ isOpen, onClose, onSuccess, bnaRate
                             )}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                            Motivo: {motivo}
+                            {tipoTransferencia === 'RETIRO_EFECTIVO'
+                                ? `${cajaLabel(cajaOrigen)} -> Retiro externo`
+                                : `${cajaLabel(cajaOrigen)} -> ${cajaLabel(cajaDestino)}`}
                         </p>
+                        <p className="text-xs text-gray-500 mt-1">Motivo: {motivo}</p>
                     </div>
                 </div>
 
