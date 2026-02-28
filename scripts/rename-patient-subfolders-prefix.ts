@@ -114,7 +114,7 @@ async function run() {
             console.log("Run with --run to actually apply the renames.");
         }
 
-    } catch (e) {
+    } catch (e: unknown) {
         console.error('Error:', e);
     }
 }

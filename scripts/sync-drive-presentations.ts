@@ -177,7 +177,7 @@ async function run() {
         foldersByNormalizedName.set(normalized, folder);
     }
 
-    const patientsWithoutFolder = patients.filter(p => !p.link_historia_clinica);
+    const patientsWithoutFolder = patients.filter((p: any) => !p.link_historia_clinica);
     console.log(`   ${patientsWithoutFolder.length} pacientes sin carpeta Drive.\n`);
 
     for (const patient of patientsWithoutFolder) {
@@ -212,8 +212,8 @@ async function run() {
     // ═══════════════════════════════════════════════════════════════════
     console.log('═══ PASO 2: Escanear subcarpetas [PRESENTACION] existentes ═══\n');
 
-    const patientsWithFolder = patients.filter(p => p.link_historia_clinica);
-    const patientsNeedingSlides = patientsWithFolder.filter(p => !p.link_google_slides);
+    const patientsWithFolder = patients.filter((p: any) => p.link_historia_clinica);
+    const patientsNeedingSlides = patientsWithFolder.filter((p: any) => !p.link_google_slides);
 
     console.log(`   ${patientsWithFolder.length} pacientes con carpeta Drive`);
     console.log(`   ${patientsNeedingSlides.length} necesitan link_google_slides\n`);
@@ -236,7 +236,7 @@ async function run() {
                 fields: 'files(id, name)',
             });
 
-            const presentationFolder = (subRes.data.files || []).find(f =>
+            const presentationFolder = (subRes.data.files || []).find((f: any) =>
                 f.name?.includes('PRESENTACION') || f.name?.startsWith('[PRESENTACION]')
             );
 
@@ -250,7 +250,7 @@ async function run() {
                 orderBy: 'createdTime desc',
             });
 
-            const slides = (filesRes.data.files || []).filter(f =>
+            const slides = (filesRes.data.files || []).filter((f: any) =>
                 PRESENTATION_MIME_TYPES.has(f.mimeType || '')
             );
 
@@ -306,7 +306,7 @@ async function run() {
 
     console.log(`   ${strayFiles.length} archivos sueltos en raíz.\n`);
 
-    const presentationFiles = strayFiles.filter(f => PRESENTATION_MIME_TYPES.has(f.mimeType));
+    const presentationFiles = strayFiles.filter((f: any) => PRESENTATION_MIME_TYPES.has(f.mimeType));
     console.log(`   ${presentationFiles.length} son presentaciones.\n`);
 
     for (const file of presentationFiles) {
@@ -325,7 +325,7 @@ async function run() {
                 fields: 'files(id, name)',
             });
 
-            const presentationFolder = (subRes.data.files || []).find(f =>
+            const presentationFolder = (subRes.data.files || []).find((f: any) =>
                 f.name?.includes('PRESENTACION') || f.name?.startsWith('[PRESENTACION]')
             );
 
