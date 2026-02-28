@@ -93,6 +93,7 @@ export interface LiquidacionAdminRow {
     apellido?: string;
     foto_url?: string;
     area?: string;
+    app_role?: string;
     tipo: string;
     modelo_pago: 'hora_ars' | 'prestacion_usd';
     liquidacion?: LiquidacionResult;
@@ -411,7 +412,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
     const [workersRes, liqRes] = await Promise.all([
         admin
             .from('personal')
-            .select('id, nombre, apellido, foto_url, area, tipo')
+            .select('id, nombre, apellido, foto_url, area, tipo, user_id')
             .eq('activo', true)
             .order('nombre'),
         admin
@@ -419,6 +420,23 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             .select('*')
             .eq('mes', mesDate),
     ]);
+
+    const userIds = (workersRes.data || [])
+        .map((w) => w.user_id)
+        .filter((id): id is string => Boolean(id));
+
+    const profileRoles = userIds.length > 0
+        ? await admin
+            .from('profiles')
+            .select('id, role')
+            .in('id', userIds)
+        : { data: [], error: null };
+
+    if (profileRoles.error) {
+        console.error('Error loading profile roles for liquidaciones:', profileRoles.error);
+    }
+
+    const roleByUserId = new Map((profileRoles.data || []).map((p) => [p.id, p.role]));
 
     const liqMap = new Map((liqRes.data || []).map(l => [l.personal_id, l]));
 
@@ -437,6 +455,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             apellido: w.apellido,
             foto_url: w.foto_url,
             area: w.area,
+            app_role: w.user_id ? roleByUserId.get(w.user_id) || undefined : undefined,
             tipo: w.tipo || 'prestador',
             modelo_pago: isDoctor ? 'prestacion_usd' : 'hora_ars',
             liquidacion: liquidacionNormalizada,

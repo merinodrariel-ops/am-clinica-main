@@ -54,6 +54,23 @@ function formatUSD(n: number) {
     return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 }
 
+function roleLabel(role?: string) {
+    const labels: Record<string, string> = {
+        owner: 'Owner',
+        admin: 'Administrador',
+        reception: 'Recepción',
+        recaptacion: 'Recaptación',
+        asistente: 'Asistente',
+        odontologo: 'Odontólogo',
+        laboratorio: 'Laboratorio',
+        developer: 'Developer',
+        pricing_manager: 'Pricing Manager',
+        partner_viewer: 'Partner Viewer',
+    };
+    if (!role) return '';
+    return labels[role] || role;
+}
+
 const ESTADO_CONFIG: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
     pending:  { label: 'Pendiente', icon: <Clock size={12} />, cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
     approved: { label: 'Aprobada',  icon: <CheckCircle2 size={12} />, cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
@@ -1552,7 +1569,10 @@ export default function LiquidacionesPage() {
                                                             <p className="font-medium text-white text-xs">
                                                                 {row.nombre} {row.apellido}
                                                             </p>
-                                                            <p className="text-xs text-slate-500">{row.area || '—'}</p>
+                                                            <p className="text-xs text-slate-500">
+                                                                {row.app_role ? roleLabel(row.app_role) : (row.area || '—')}
+                                                                {row.app_role && row.area ? ` · ${row.area}` : ''}
+                                                            </p>
                                                             <button
                                                                 onClick={() => openDetalleHoras(row)}
                                                                 className="text-[11px] text-violet-300 hover:text-violet-200 mt-0.5 transition-colors"

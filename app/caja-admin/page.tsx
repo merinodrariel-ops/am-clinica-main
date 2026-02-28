@@ -285,7 +285,7 @@ function CajaAdminContent() {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={openObservadosTab}
+                                    onClick={() => openObservadosTab()}
                                     className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium"
                                 >
                                     Ir a Observados

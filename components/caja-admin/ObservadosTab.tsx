@@ -227,6 +227,9 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
 
     const pendingCritical = registros.filter((reg) => getSlaInfo(reg).level === 'critical').length;
     const pendingWarn = registros.filter((reg) => getSlaInfo(reg).level === 'warn').length;
+    const selectedPersonalName = filterPersonal
+        ? (personal.find((p) => p.id === filterPersonal)?.nombre || 'Persona seleccionada')
+        : null;
 
     return (
         <div className="space-y-6">
@@ -259,6 +262,16 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                         ))}
                     </select>
                 </div>
+
+                {filterPersonal && (
+                    <button
+                        onClick={() => setFilterPersonal('')}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                        <XCircle className="w-4 h-4 text-slate-500" />
+                        Limpiar filtro ({selectedPersonalName})
+                    </button>
+                )}
             </div>
 
             {/* Observados List */}
