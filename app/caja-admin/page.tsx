@@ -40,7 +40,7 @@ function currentMes() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export default function CajaAdminPage() {
+function CajaAdminContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -319,5 +319,13 @@ export default function CajaAdminPage() {
                 </div>
             </div>
         </RoleGuard>
+    );
+}
+
+export default function CajaAdminPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-500">Cargando Administración...</div>}>
+            <CajaAdminContent />
+        </Suspense>
     );
 }
