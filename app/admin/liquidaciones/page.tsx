@@ -106,9 +106,9 @@ type CompanySummary = {
 };
 
 const ESTADO_CONFIG: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
-    pending:  { label: 'Pendiente', icon: <Clock size={12} />, cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-    approved: { label: 'Aprobada',  icon: <CheckCircle2 size={12} />, cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-    paid:     { label: 'Pagada',    icon: <Banknote size={12} />, cls: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
+    pending: { label: 'Pendiente', icon: <Clock size={12} />, cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+    approved: { label: 'Aprobada', icon: <CheckCircle2 size={12} />, cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+    paid: { label: 'Pagada', icon: <Banknote size={12} />, cls: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
     rejected: { label: 'Rechazada', icon: <XCircle size={12} />, cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
 };
 
@@ -254,11 +254,10 @@ function EditLiquidacionModal({
                                 <button
                                     key={opt}
                                     onClick={() => setMoneda(opt)}
-                                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                                        moneda === opt
-                                            ? 'border-violet-500 bg-violet-500/20 text-violet-300'
-                                            : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-white'
-                                    }`}
+                                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${moneda === opt
+                                        ? 'border-violet-500 bg-violet-500/20 text-violet-300'
+                                        : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-white'
+                                        }`}
                                 >
                                     {opt}
                                 </button>
@@ -857,33 +856,33 @@ function HorasDetalleModal({
                             </div>
 
                             <div className="space-y-2">
-                            {filteredRows.map(reg => {
-                                const fecha = new Date(`${reg.fecha}T12:00:00`);
-                                const dia = fecha.toLocaleDateString('es-AR', { weekday: 'long' });
-                                const fechaLabel = formatFecha(reg.fecha);
+                                {filteredRows.map(reg => {
+                                    const fecha = new Date(`${reg.fecha}T12:00:00`);
+                                    const dia = fecha.toLocaleDateString('es-AR', { weekday: 'long' });
+                                    const fechaLabel = formatFecha(reg.fecha);
 
-                                return (
-                                    <div key={reg.id} className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div>
-                                                <p className="text-sm text-white font-medium capitalize">{dia} · {fechaLabel}</p>
-                                                <p className="text-xs text-slate-500 mt-0.5">Estado: {reg.estado}</p>
+                                    return (
+                                        <div key={reg.id} className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div>
+                                                    <p className="text-sm text-white font-medium capitalize">{dia} · {fechaLabel}</p>
+                                                    <p className="text-xs text-slate-500 mt-0.5">Estado: {reg.estado}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm text-violet-300 font-semibold">
+                                                        {Number(reg.horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })} h
+                                                    </p>
+                                                    <p className="text-xs text-slate-400">
+                                                        {reg.hora_ingreso || '--:--'} → {reg.hora_egreso || '--:--'}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm text-violet-300 font-semibold">
-                                                    {Number(reg.horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })} h
-                                                </p>
-                                                <p className="text-xs text-slate-400">
-                                                    {reg.hora_ingreso || '--:--'} → {reg.hora_egreso || '--:--'}
-                                                </p>
-                                            </div>
+                                            {reg.observaciones && (
+                                                <p className="text-xs text-amber-300/90 mt-2">{reg.observaciones}</p>
+                                            )}
                                         </div>
-                                        {reg.observaciones && (
-                                            <p className="text-xs text-amber-300/90 mt-2">{reg.observaciones}</p>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -1028,11 +1027,10 @@ function TarifarioView({ items }: { items: TarifarioItem[] }) {
                         <button
                             key={opt}
                             onClick={() => setMonedaFilter(opt)}
-                            className={`px-3 py-2 rounded-lg text-xs border transition-colors ${
-                                monedaFilter === opt
-                                    ? 'bg-violet-600 border-violet-500 text-white'
-                                    : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
-                            }`}
+                            className={`px-3 py-2 rounded-lg text-xs border transition-colors ${monedaFilter === opt
+                                ? 'bg-violet-600 border-violet-500 text-white'
+                                : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
+                                }`}
                         >
                             {opt === 'all' ? 'Todas monedas' : opt}
                         </button>
@@ -1042,11 +1040,10 @@ function TarifarioView({ items }: { items: TarifarioItem[] }) {
                 <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => setAreaFilter('all')}
-                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                            areaFilter === 'all'
-                                ? 'bg-violet-600 border-violet-500 text-white'
-                                : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${areaFilter === 'all'
+                            ? 'bg-violet-600 border-violet-500 text-white'
+                            : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
+                            }`}
                     >
                         Todas las áreas
                     </button>
@@ -1054,11 +1051,10 @@ function TarifarioView({ items }: { items: TarifarioItem[] }) {
                         <button
                             key={area}
                             onClick={() => setAreaFilter(area)}
-                            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                                areaFilter === area
-                                    ? 'bg-violet-600 border-violet-500 text-white'
-                                    : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${areaFilter === area
+                                ? 'bg-violet-600 border-violet-500 text-white'
+                                : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
+                                }`}
                         >
                             {area}
                         </button>
@@ -1815,587 +1811,583 @@ export default function LiquidacionesPage() {
 
             {tab === 'liquidaciones' && <>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <TrendingUp size={14} className="text-violet-400" />
-                        <span className="text-xs text-slate-400">Total nómina</span>
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp size={14} className="text-violet-400" />
+                            <span className="text-xs text-slate-400">Total nómina</span>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-bold text-white truncate" title={formatARS(totalArs)}>{formatARS(totalArs)}</p>
                     </div>
-                    <p className="text-lg font-bold text-white">{formatARS(totalArs)}</p>
-                </div>
 
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <DollarSign size={14} className="text-emerald-400" />
-                        <span className="text-xs text-slate-400">TC BNA Venta</span>
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <DollarSign size={14} className="text-emerald-400" />
+                            <span className="text-xs text-slate-400">TC BNA Venta</span>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-bold text-white truncate">
+                            {tcBna ? `$${Number(tcBna).toLocaleString('es-AR')}` : '—'}
+                        </p>
                     </div>
-                    <p className="text-lg font-bold text-white">
-                        {tcBna ? `$${Number(tcBna).toLocaleString('es-AR')}` : '—'}
-                    </p>
-                </div>
 
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <Users size={14} className="text-blue-400" />
-                        <span className="text-xs text-slate-400">Generadas / Total</span>
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Users size={14} className="text-blue-400" />
+                            <span className="text-xs text-slate-400">Generadas / Total</span>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-bold text-white truncate">{conLiq} / {rows.length}</p>
+                        {sinLiq > 0 && (
+                            <p className="text-xs text-amber-400 mt-0.5">{sinLiq} sin generar</p>
+                        )}
                     </div>
-                    <p className="text-lg font-bold text-white">{conLiq} / {rows.length}</p>
-                    {sinLiq > 0 && (
-                        <p className="text-xs text-amber-400 mt-0.5">{sinLiq} sin generar</p>
-                    )}
-                </div>
 
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle size={14} className="text-amber-400" />
-                        <span className="text-xs text-slate-400">Con alertas</span>
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <AlertTriangle size={14} className="text-amber-400" />
+                            <span className="text-xs text-slate-400">Con alertas</span>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-bold text-white truncate">{withPendSlides}</p>
+                        {pendientes > 0 && (
+                            <p className="text-xs text-amber-400 mt-0.5">{pendientes} pendientes de aprobación</p>
+                        )}
                     </div>
-                    <p className="text-lg font-bold text-white">{withPendSlides}</p>
-                    {pendientes > 0 && (
-                        <p className="text-xs text-amber-400 mt-0.5">{pendientes} pendientes de aprobación</p>
-                    )}
                 </div>
-            </div>
 
-            {/* Search + Filter tabs */}
-            <div className="mb-4 space-y-3">
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1 max-w-md">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Buscar por nombre o área..."
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500"
-                        />
+                {/* Search + Filter tabs */}
+                <div className="mb-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1 max-w-md">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                            <input
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Buscar por nombre o área..."
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500"
+                            />
+                        </div>
+                        <button
+                            onClick={load}
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
+                        >
+                            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                            Actualizar
+                        </button>
                     </div>
-                    <button
-                        onClick={load}
-                        className="flex items-center gap-1.5 px-3 py-2 text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
-                    >
-                        <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                        Actualizar
-                    </button>
-                </div>
 
-                <div className="flex gap-2 flex-wrap">
-                {([
-                    ['all', 'Todos', rows.length],
-                    ['sin_generar', 'Sin generar', sinLiq],
-                    ['pending', 'Pendiente', pendientes],
-                    ['approved', 'Aprobada', rows.filter(r => r.liquidacion?.estado === 'approved').length],
-                    ['paid', 'Pagada', rows.filter(r => r.liquidacion?.estado === 'paid').length],
-                ] as const).map(([val, label, count]) => (
-                    <button
-                        key={val}
-                        onClick={() => setFilter(val as typeof filter)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                            filter === val
-                                ? 'bg-violet-600 border-violet-500 text-white'
-                                : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        {label} ({count})
-                    </button>
-                ))}
-                    <span className="ml-auto text-xs text-slate-500 self-center">
-                        {viewMode === 'empresa' ? filteredCompanySummaries.length : filteredRows.length} resultados
-                    </span>
-                </div>
+                    <div className="flex gap-2 flex-wrap">
+                        {([
+                            ['all', 'Todos', rows.length],
+                            ['sin_generar', 'Sin generar', sinLiq],
+                            ['pending', 'Pendiente', pendientes],
+                            ['approved', 'Aprobada', rows.filter(r => r.liquidacion?.estado === 'approved').length],
+                            ['paid', 'Pagada', rows.filter(r => r.liquidacion?.estado === 'paid').length],
+                        ] as const).map(([val, label, count]) => (
+                            <button
+                                key={val}
+                                onClick={() => setFilter(val as typeof filter)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${filter === val
+                                    ? 'bg-violet-600 border-violet-500 text-white'
+                                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                                    }`}
+                            >
+                                {label} ({count})
+                            </button>
+                        ))}
+                        <span className="ml-auto text-xs text-slate-500 self-center">
+                            {viewMode === 'empresa' ? filteredCompanySummaries.length : filteredRows.length} resultados
+                        </span>
+                    </div>
 
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setViewMode('individual')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                            viewMode === 'individual'
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setViewMode('individual')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${viewMode === 'individual'
                                 ? 'bg-indigo-600 border-indigo-500 text-white'
                                 : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        Vista individual
-                    </button>
-                    <button
-                        onClick={() => setViewMode('empresa')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                            viewMode === 'empresa'
+                                }`}
+                        >
+                            Vista individual
+                        </button>
+                        <button
+                            onClick={() => setViewMode('empresa')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${viewMode === 'empresa'
                                 ? 'bg-indigo-600 border-indigo-500 text-white'
                                 : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        Vista por empresa
-                    </button>
-                </div>
+                                }`}
+                        >
+                            Vista por empresa
+                        </button>
+                    </div>
 
-                {viewMode === 'individual' && (
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="text-xs text-slate-400">
-                                Acciones rápidas (vista actual):
-                                <span className="ml-2 text-slate-300">{quickTargetsGenerate.length} sin generar</span>
-                                <span className="ml-2 text-amber-300">{quickTargetsApprove.length} pendientes</span>
-                                <span className="ml-2 text-emerald-300">{quickTargetsPay.length} aprobadas</span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    onClick={handleQuickGenerateVisible}
-                                    disabled={Boolean(quickActionBusy) || quickTargetsGenerate.length === 0}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs"
-                                >
-                                    {quickActionBusy === 'generate' ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
-                                    Generar visibles
-                                </button>
-                                <button
-                                    onClick={handleQuickApproveVisible}
-                                    disabled={Boolean(quickActionBusy) || quickTargetsApprove.length === 0}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs"
-                                >
-                                    {quickActionBusy === 'approve' ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
-                                    Aprobar visibles
-                                </button>
-                                <button
-                                    onClick={async () => {
-                                        if (quickTargetsApproveClean.length === 0) {
-                                            toast.info('No hay pendientes limpias para aprobar en la vista actual.');
-                                            return;
-                                        }
-
-                                        setQuickActionBusy('approve-clean');
-                                        let ok = 0;
-                                        let fail = 0;
-
-                                        for (const row of quickTargetsApproveClean) {
-                                            if (!row.liquidacion) continue;
-                                            try {
-                                                await approveLiquidacion(row.liquidacion.id);
-                                                ok += 1;
-                                            } catch {
-                                                fail += 1;
+                    {viewMode === 'individual' && (
+                        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="text-xs text-slate-400">
+                                    Acciones rápidas (vista actual):
+                                    <span className="ml-2 text-slate-300">{quickTargetsGenerate.length} sin generar</span>
+                                    <span className="ml-2 text-amber-300">{quickTargetsApprove.length} pendientes</span>
+                                    <span className="ml-2 text-emerald-300">{quickTargetsPay.length} aprobadas</span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        onClick={handleQuickGenerateVisible}
+                                        disabled={Boolean(quickActionBusy) || quickTargetsGenerate.length === 0}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs"
+                                    >
+                                        {quickActionBusy === 'generate' ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
+                                        Generar visibles
+                                    </button>
+                                    <button
+                                        onClick={handleQuickApproveVisible}
+                                        disabled={Boolean(quickActionBusy) || quickTargetsApprove.length === 0}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs"
+                                    >
+                                        {quickActionBusy === 'approve' ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                                        Aprobar visibles
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            if (quickTargetsApproveClean.length === 0) {
+                                                toast.info('No hay pendientes limpias para aprobar en la vista actual.');
+                                                return;
                                             }
-                                        }
 
-                                        setQuickActionBusy(null);
-                                        await load();
-                                        toast.success(`Aprobación limpia finalizada: ${ok} ok${fail ? `, ${fail} con error` : ''}.`);
-                                    }}
-                                    disabled={Boolean(quickActionBusy) || quickTargetsApproveClean.length === 0}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-800 disabled:opacity-50 text-emerald-100 text-xs"
-                                >
-                                    {quickActionBusy === 'approve-clean' ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
-                                    Aprobar limpias
-                                </button>
-                                <button
-                                    onClick={handleQuickPayVisible}
-                                    disabled={Boolean(quickActionBusy) || quickTargetsPay.length === 0}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs"
-                                >
-                                    {quickActionBusy === 'pay' ? <RefreshCw size={11} className="animate-spin" /> : <Banknote size={11} />}
-                                    Pagar visibles
-                                </button>
-                                <a
-                                    href="/caja-admin?tab=personal&subtab=profesionales"
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-xs"
-                                >
-                                    <FileSpreadsheet size={11} />
-                                    Cargar prestación
-                                </a>
-                                <button
-                                    onClick={handleCloseMonthAssisted}
-                                    disabled={Boolean(quickActionBusy)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-medium"
-                                >
-                                    {quickActionBusy === 'close' ? <RefreshCw size={11} className="animate-spin" /> : <Wallet size={11} />}
-                                    Cierre asistido
-                                </button>
+                                            setQuickActionBusy('approve-clean');
+                                            let ok = 0;
+                                            let fail = 0;
+
+                                            for (const row of quickTargetsApproveClean) {
+                                                if (!row.liquidacion) continue;
+                                                try {
+                                                    await approveLiquidacion(row.liquidacion.id);
+                                                    ok += 1;
+                                                } catch {
+                                                    fail += 1;
+                                                }
+                                            }
+
+                                            setQuickActionBusy(null);
+                                            await load();
+                                            toast.success(`Aprobación limpia finalizada: ${ok} ok${fail ? `, ${fail} con error` : ''}.`);
+                                        }}
+                                        disabled={Boolean(quickActionBusy) || quickTargetsApproveClean.length === 0}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-800 disabled:opacity-50 text-emerald-100 text-xs"
+                                    >
+                                        {quickActionBusy === 'approve-clean' ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                                        Aprobar limpias
+                                    </button>
+                                    <button
+                                        onClick={handleQuickPayVisible}
+                                        disabled={Boolean(quickActionBusy) || quickTargetsPay.length === 0}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs"
+                                    >
+                                        {quickActionBusy === 'pay' ? <RefreshCw size={11} className="animate-spin" /> : <Banknote size={11} />}
+                                        Pagar visibles
+                                    </button>
+                                    <a
+                                        href="/caja-admin?tab=personal&subtab=profesionales"
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-xs"
+                                    >
+                                        <FileSpreadsheet size={11} />
+                                        Cargar prestación
+                                    </a>
+                                    <button
+                                        onClick={handleCloseMonthAssisted}
+                                        disabled={Boolean(quickActionBusy)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-medium"
+                                    >
+                                        {quickActionBusy === 'close' ? <RefreshCw size={11} className="animate-spin" /> : <Wallet size={11} />}
+                                        Cierre asistido
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-2">
+                                    <p className="text-[11px] text-slate-400">Sin generar</p>
+                                    <p className="text-sm font-semibold text-white">{pipelineCounts.sinGenerar}</p>
+                                </div>
+                                <div className="rounded-lg border border-amber-800/50 bg-amber-950/20 p-2">
+                                    <p className="text-[11px] text-amber-300/80">Pendiente</p>
+                                    <p className="text-sm font-semibold text-amber-300">{pipelineCounts.pendiente}</p>
+                                </div>
+                                <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/20 p-2">
+                                    <p className="text-[11px] text-emerald-300/80">Aprobada</p>
+                                    <p className="text-sm font-semibold text-emerald-300">{pipelineCounts.aprobada}</p>
+                                </div>
+                                <div className="rounded-lg border border-blue-800/50 bg-blue-950/20 p-2">
+                                    <p className="text-[11px] text-blue-300/80">Pagada</p>
+                                    <p className="text-sm font-semibold text-blue-300">{pipelineCounts.pagada}</p>
+                                </div>
                             </div>
                         </div>
+                    )}
+                </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                            <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-2">
-                                <p className="text-[11px] text-slate-400">Sin generar</p>
-                                <p className="text-sm font-semibold text-white">{pipelineCounts.sinGenerar}</p>
-                            </div>
-                            <div className="rounded-lg border border-amber-800/50 bg-amber-950/20 p-2">
-                                <p className="text-[11px] text-amber-300/80">Pendiente</p>
-                                <p className="text-sm font-semibold text-amber-300">{pipelineCounts.pendiente}</p>
-                            </div>
-                            <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/20 p-2">
-                                <p className="text-[11px] text-emerald-300/80">Aprobada</p>
-                                <p className="text-sm font-semibold text-emerald-300">{pipelineCounts.aprobada}</p>
-                            </div>
-                            <div className="rounded-lg border border-blue-800/50 bg-blue-950/20 p-2">
-                                <p className="text-[11px] text-blue-300/80">Pagada</p>
-                                <p className="text-sm font-semibold text-blue-300">{pipelineCounts.pagada}</p>
-                            </div>
+                {/* Table */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-16 text-slate-500">
+                            <RefreshCw size={20} className="animate-spin mr-2" />
+                            Cargando...
                         </div>
-                    </div>
-                )}
-            </div>
+                    ) : viewMode === 'empresa' ? (
+                        filteredCompanySummaries.length === 0 ? (
+                            <div className="text-center py-16 text-slate-500 text-sm">
+                                No hay empresas prestadoras que coincidan con el filtro.
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-slate-800">
+                                            <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Empresa</th>
+                                            <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Miembros</th>
+                                            <th className="text-right px-4 py-3 text-xs text-slate-400 font-medium">Total</th>
+                                            <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Estado</th>
+                                            <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/50">
+                                        {filteredCompanySummaries.map((group) => {
+                                            const allPaid = group.paid === group.members.length && group.members.length > 0;
+                                            const allGenerated = group.generated === group.members.length && group.members.length > 0;
+                                            const companyGenerating = generatingCompany === group.empresaId;
+                                            const isUnassignedGroup = group.empresaId === '__sin_empresa__';
 
-            {/* Table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                {loading ? (
-                    <div className="flex items-center justify-center py-16 text-slate-500">
-                        <RefreshCw size={20} className="animate-spin mr-2" />
-                        Cargando...
-                    </div>
-                ) : viewMode === 'empresa' ? (
-                    filteredCompanySummaries.length === 0 ? (
+                                            return (
+                                                <tr key={group.empresaId} className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="px-4 py-3">
+                                                        <p className="font-medium text-white text-xs">{group.empresaNombre}</p>
+                                                        <p className="text-xs text-slate-500 mt-1">{group.members.length} personas vinculadas</p>
+                                                        {isUnassignedGroup && (
+                                                            <p className="text-[11px] text-amber-400 mt-1">
+                                                                Tip: asignales empresa desde Staff para liquidación agrupada real.
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <p className="text-xs text-slate-300">
+                                                            {group.members.map((m) => `${m.nombre} ${m.apellido || ''}`.trim()).join(', ')}
+                                                        </p>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <p className="font-semibold text-white">{formatARS(group.totalArs)}</p>
+                                                        {group.totalUsd > 0 && (
+                                                            <p className="text-xs text-slate-400">{formatUSD(group.totalUsd)}</p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        {allPaid ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-blue-500/10 text-blue-400 border-blue-500/30">
+                                                                <Banknote size={12} /> Pagada
+                                                            </span>
+                                                        ) : allGenerated ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                                                                <CheckCircle2 size={12} /> Generada
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                                                <Clock size={12} /> Pendiente
+                                                            </span>
+                                                        )}
+                                                        {group.without > 0 && (
+                                                            <p className="text-[11px] text-amber-400 mt-1">{group.without} sin generar</p>
+                                                        )}
+                                                        {group.hasAlerts && (
+                                                            <p className="text-[11px] text-amber-400 mt-1">Con alertas de slides</p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                                                            <button
+                                                                onClick={() => handleGenerateCompany(group.empresaId)}
+                                                                disabled={companyGenerating || isUnassignedGroup}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
+                                                            >
+                                                                {companyGenerating ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
+                                                                Generar grupo
+                                                            </button>
+                                                            {allGenerated && !allPaid && !isUnassignedGroup && (
+                                                                <button
+                                                                    onClick={() => handleMarkCompanyPaid(group.empresaId)}
+                                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
+                                                                >
+                                                                    <Banknote size={11} />
+                                                                    Marcar pagada
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleExportCompanyExcel(group)}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs transition-colors"
+                                                            >
+                                                                <Download size={11} />
+                                                                Excel
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleExportCompanyPdf(group)}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs transition-colors"
+                                                            >
+                                                                <Printer size={11} />
+                                                                PDF
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    ) : filteredRows.length === 0 ? (
                         <div className="text-center py-16 text-slate-500 text-sm">
-                            No hay empresas prestadoras que coincidan con el filtro.
+                            No hay liquidaciones que coincidan con el filtro.
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-slate-800">
-                                        <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Empresa</th>
-                                        <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Miembros</th>
-                                        <th className="text-right px-4 py-3 text-xs text-slate-400 font-medium">Total</th>
+                                        <th className="w-10 px-2 py-3" />
+                                        <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Prestador</th>
+                                        <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Modelo</th>
+                                        <th className="text-right px-4 py-3 text-xs text-slate-400 font-medium">Monto</th>
                                         <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Estado</th>
                                         <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
-                                    {filteredCompanySummaries.map((group) => {
-                                        const allPaid = group.paid === group.members.length && group.members.length > 0;
-                                        const allGenerated = group.generated === group.members.length && group.members.length > 0;
-                                        const companyGenerating = generatingCompany === group.empresaId;
-                                        const isUnassignedGroup = group.empresaId === '__sin_empresa__';
+                                    {filteredRows.map(row => {
+                                        const liq = row.liquidacion;
+                                        const estadoCfg = liq ? ESTADO_CONFIG[liq.estado] : null;
+                                        const isGenerating = generating === row.personal_id;
+                                        const isExpanded = expandedRow === row.personal_id;
+                                        const modeloPagoActual = liq?.modelo_pago || row.modelo_pago;
+                                        const breakdown = (liq?.breakdown || {}) as Record<string, unknown>;
+                                        const manualOverride =
+                                            breakdown.manual_override && typeof breakdown.manual_override === 'object'
+                                                ? breakdown.manual_override as Record<string, unknown>
+                                                : null;
 
                                         return (
-                                            <tr key={group.empresaId} className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="px-4 py-3">
-                                                    <p className="font-medium text-white text-xs">{group.empresaNombre}</p>
-                                                    <p className="text-xs text-slate-500 mt-1">{group.members.length} personas vinculadas</p>
-                                                    {isUnassignedGroup && (
-                                                        <p className="text-[11px] text-amber-400 mt-1">
-                                                            Tip: asignales empresa desde Staff para liquidación agrupada real.
-                                                        </p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <p className="text-xs text-slate-300">
-                                                        {group.members.map((m) => `${m.nombre} ${m.apellido || ''}`.trim()).join(', ')}
-                                                    </p>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <p className="font-semibold text-white">{formatARS(group.totalArs)}</p>
-                                                    {group.totalUsd > 0 && (
-                                                        <p className="text-xs text-slate-400">{formatUSD(group.totalUsd)}</p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {allPaid ? (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-blue-500/10 text-blue-400 border-blue-500/30">
-                                                            <Banknote size={12} /> Pagada
-                                                        </span>
-                                                    ) : allGenerated ? (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
-                                                            <CheckCircle2 size={12} /> Generada
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-amber-500/10 text-amber-400 border-amber-500/30">
-                                                            <Clock size={12} /> Pendiente
-                                                        </span>
-                                                    )}
-                                                    {group.without > 0 && (
-                                                        <p className="text-[11px] text-amber-400 mt-1">{group.without} sin generar</p>
-                                                    )}
-                                                    {group.hasAlerts && (
-                                                        <p className="text-[11px] text-amber-400 mt-1">Con alertas de slides</p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center justify-center gap-2 flex-wrap">
-                                                        <button
-                                                            onClick={() => handleGenerateCompany(group.empresaId)}
-                                                            disabled={companyGenerating || isUnassignedGroup}
-                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
-                                                        >
-                                                            {companyGenerating ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
-                                                            Generar grupo
-                                                        </button>
-                                                        {allGenerated && !allPaid && !isUnassignedGroup && (
+                                            <Fragment key={row.personal_id}>
+                                                <tr className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="px-2 py-3 text-center">
+                                                        {liq ? (
                                                             <button
-                                                                onClick={() => handleMarkCompanyPaid(group.empresaId)}
-                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
+                                                                onClick={() => setExpandedRow(isExpanded ? null : row.personal_id)}
+                                                                className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+                                                                title={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
                                                             >
-                                                                <Banknote size={11} />
-                                                                Marcar pagada
+                                                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                                             </button>
+                                                        ) : (
+                                                            <span className="text-slate-700">•</span>
                                                         )}
-                                                        <button
-                                                            onClick={() => handleExportCompanyExcel(group)}
-                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs transition-colors"
-                                                        >
-                                                            <Download size={11} />
-                                                            Excel
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleExportCompanyPdf(group)}
-                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs transition-colors"
-                                                        >
-                                                            <Printer size={11} />
-                                                            PDF
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                                    </td>
+
+                                                    {/* Prestador */}
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            {row.foto_url ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img src={row.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                                                                    {row.nombre[0]}{row.apellido?.[0] || ''}
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <p className="font-medium text-white text-xs">
+                                                                    {row.nombre} {row.apellido}
+                                                                </p>
+                                                                <p className="text-xs text-slate-500">
+                                                                    {row.app_role ? roleLabel(row.app_role) : (row.area || '—')}
+                                                                    {row.app_role && row.area ? ` · ${row.area}` : ''}
+                                                                </p>
+                                                                {row.empresa_prestadora_nombre && (
+                                                                    <p className="text-[11px] text-amber-400">
+                                                                        Empresa: {row.empresa_prestadora_nombre}
+                                                                    </p>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => openDetalleHoras(row)}
+                                                                    className="text-[11px] text-violet-300 hover:text-violet-200 mt-0.5 transition-colors"
+                                                                >
+                                                                    Ver horarios del mes
+                                                                </button>
+                                                            </div>
+                                                            {row.tiene_pendientes && (
+                                                                <div title="Prestaciones sin Slides" className="ml-1">
+                                                                    <FileVideo size={14} className="text-amber-400" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Modelo */}
+                                                    <td className="px-4 py-3">
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${modeloPagoActual === 'prestacion_usd'
+                                                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
+                                                            : 'bg-teal-500/10 text-teal-300 border-teal-500/20'
+                                                            }`}>
+                                                            {modeloPagoActual === 'prestacion_usd' ? '$ USD/prestación' : '⏱ ARS/hora'}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Monto */}
+                                                    <td className="px-4 py-3 text-right">
+                                                        {liq ? (
+                                                            <div>
+                                                                <p className="font-semibold text-white">{formatARS(Number(liq.total_ars || 0))}</p>
+                                                                {liq.total_usd && (
+                                                                    <p className="text-xs text-slate-400">{formatUSD(Number(liq.total_usd))}</p>
+                                                                )}
+                                                                {manualOverride && (
+                                                                    <p className="text-[10px] text-violet-300">ajuste manual</p>
+                                                                )}
+                                                                {liq.prestaciones_pendientes > 0 && (
+                                                                    <p className="text-xs text-amber-400">
+                                                                        +{liq.prestaciones_pendientes} sin slides
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-600 text-xs">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Estado */}
+                                                    <td className="px-4 py-3 text-center">
+                                                        {estadoCfg ? (
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${estadoCfg.cls}`}>
+                                                                {estadoCfg.icon}
+                                                                {estadoCfg.label}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-600 text-xs">Sin liquidar</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Acciones */}
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                                            {!liq && (
+                                                                <button
+                                                                    onClick={() => handleGenerate(row.personal_id)}
+                                                                    disabled={isGenerating}
+                                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
+                                                                >
+                                                                    {isGenerating
+                                                                        ? <RefreshCw size={11} className="animate-spin" />
+                                                                        : <Play size={11} />
+                                                                    }
+                                                                    Generar
+                                                                </button>
+                                                            )}
+
+                                                            {liq?.estado === 'pending' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleGenerate(row.personal_id)}
+                                                                        disabled={isGenerating}
+                                                                        className="flex items-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg text-xs transition-colors"
+                                                                        title="Recalcular"
+                                                                    >
+                                                                        <RefreshCw size={11} className={isGenerating ? 'animate-spin' : ''} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleApprove(liq.id)}
+                                                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs transition-colors"
+                                                                    >
+                                                                        <CheckCircle2 size={11} />
+                                                                        Aprobar
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleReject(liq.id)}
+                                                                        className="px-2 py-1.5 text-red-400 hover:text-red-300 text-xs transition-colors"
+                                                                        title="Rechazar"
+                                                                    >
+                                                                        <XCircle size={14} />
+                                                                    </button>
+                                                                </>
+                                                            )}
+
+                                                            {liq?.estado === 'approved' && (
+                                                                <button
+                                                                    onClick={() => setPayModal(liq.id)}
+                                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
+                                                                >
+                                                                    <Banknote size={11} />
+                                                                    Marcar pagada
+                                                                </button>
+                                                            )}
+
+                                                            {liq && (
+                                                                <button
+                                                                    onClick={() => setEditing({ row, liq })}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-violet-700/70 hover:bg-violet-700 text-white rounded-lg text-xs transition-colors"
+                                                                >
+                                                                    <PencilLine size={11} />
+                                                                    Editar
+                                                                </button>
+                                                            )}
+
+                                                            {liq?.estado === 'paid' && (
+                                                                <span className="text-xs text-slate-500">
+                                                                    {liq.fecha_pago
+                                                                        ? new Date(liq.fecha_pago).toLocaleDateString('es-AR')
+                                                                        : 'Pagada'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+
+                                                {liq && isExpanded && (
+                                                    <tr className="bg-slate-950/60">
+                                                        <td colSpan={6} className="px-4 py-3">
+                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">TC</p>
+                                                                    <p className="text-sm text-white font-semibold">{Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
+                                                                </div>
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Precio</p>
+                                                                    <p className="text-sm text-white font-semibold">
+                                                                        {manualOverride?.moneda === 'USD' ? 'USD' : 'ARS'} {Number(manualOverride?.precio_unitario || liq.valor_hora_snapshot || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Cantidad</p>
+                                                                    <p className="text-sm text-white font-semibold">{Number(manualOverride?.cantidad || liq.total_horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
+                                                                </div>
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Observaciones</p>
+                                                                    <p className="text-sm text-slate-200 truncate">{liq.observaciones || 'Sin notas'}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </Fragment>
                                         );
                                     })}
                                 </tbody>
                             </table>
                         </div>
-                    )
-                ) : filteredRows.length === 0 ? (
-                    <div className="text-center py-16 text-slate-500 text-sm">
-                        No hay liquidaciones que coincidan con el filtro.
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-slate-800">
-                                    <th className="w-10 px-2 py-3" />
-                                    <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Prestador</th>
-                                    <th className="text-left px-4 py-3 text-xs text-slate-400 font-medium">Modelo</th>
-                                    <th className="text-right px-4 py-3 text-xs text-slate-400 font-medium">Monto</th>
-                                    <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Estado</th>
-                                    <th className="text-center px-4 py-3 text-xs text-slate-400 font-medium">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/50">
-                                {filteredRows.map(row => {
-                                    const liq = row.liquidacion;
-                                    const estadoCfg = liq ? ESTADO_CONFIG[liq.estado] : null;
-                                    const isGenerating = generating === row.personal_id;
-                                    const isExpanded = expandedRow === row.personal_id;
-                                    const modeloPagoActual = liq?.modelo_pago || row.modelo_pago;
-                                    const breakdown = (liq?.breakdown || {}) as Record<string, unknown>;
-                                    const manualOverride =
-                                        breakdown.manual_override && typeof breakdown.manual_override === 'object'
-                                            ? breakdown.manual_override as Record<string, unknown>
-                                            : null;
+                    )}
+                </div>
 
-                                    return (
-                                        <Fragment key={row.personal_id}>
-                                            <tr className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="px-2 py-3 text-center">
-                                                    {liq ? (
-                                                        <button
-                                                            onClick={() => setExpandedRow(isExpanded ? null : row.personal_id)}
-                                                            className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
-                                                            title={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
-                                                        >
-                                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-slate-700">•</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Prestador */}
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        {row.foto_url ? (
-                                                            // eslint-disable-next-line @next/next/no-img-element
-                                                            <img src={row.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                                                        ) : (
-                                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
-                                                                {row.nombre[0]}{row.apellido?.[0] || ''}
-                                                            </div>
-                                                        )}
-                                                        <div>
-                                                            <p className="font-medium text-white text-xs">
-                                                                {row.nombre} {row.apellido}
-                                                            </p>
-                                                            <p className="text-xs text-slate-500">
-                                                                {row.app_role ? roleLabel(row.app_role) : (row.area || '—')}
-                                                                {row.app_role && row.area ? ` · ${row.area}` : ''}
-                                                            </p>
-                                                            {row.empresa_prestadora_nombre && (
-                                                                <p className="text-[11px] text-amber-400">
-                                                                    Empresa: {row.empresa_prestadora_nombre}
-                                                                </p>
-                                                            )}
-                                                            <button
-                                                                onClick={() => openDetalleHoras(row)}
-                                                                className="text-[11px] text-violet-300 hover:text-violet-200 mt-0.5 transition-colors"
-                                                            >
-                                                                Ver horarios del mes
-                                                            </button>
-                                                        </div>
-                                                        {row.tiene_pendientes && (
-                                                            <div title="Prestaciones sin Slides" className="ml-1">
-                                                                <FileVideo size={14} className="text-amber-400" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-
-                                                {/* Modelo */}
-                                                <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
-                                                        modeloPagoActual === 'prestacion_usd'
-                                                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
-                                                            : 'bg-teal-500/10 text-teal-300 border-teal-500/20'
-                                                    }`}>
-                                                        {modeloPagoActual === 'prestacion_usd' ? '$ USD/prestación' : '⏱ ARS/hora'}
-                                                    </span>
-                                                </td>
-
-                                                {/* Monto */}
-                                                <td className="px-4 py-3 text-right">
-                                                    {liq ? (
-                                                        <div>
-                                                            <p className="font-semibold text-white">{formatARS(Number(liq.total_ars || 0))}</p>
-                                                            {liq.total_usd && (
-                                                                <p className="text-xs text-slate-400">{formatUSD(Number(liq.total_usd))}</p>
-                                                            )}
-                                                            {manualOverride && (
-                                                                <p className="text-[10px] text-violet-300">ajuste manual</p>
-                                                            )}
-                                                            {liq.prestaciones_pendientes > 0 && (
-                                                                <p className="text-xs text-amber-400">
-                                                                    +{liq.prestaciones_pendientes} sin slides
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-slate-600 text-xs">—</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Estado */}
-                                                <td className="px-4 py-3 text-center">
-                                                    {estadoCfg ? (
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${estadoCfg.cls}`}>
-                                                            {estadoCfg.icon}
-                                                            {estadoCfg.label}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-600 text-xs">Sin liquidar</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Acciones */}
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                                        {!liq && (
-                                                            <button
-                                                                onClick={() => handleGenerate(row.personal_id)}
-                                                                disabled={isGenerating}
-                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
-                                                            >
-                                                                {isGenerating
-                                                                    ? <RefreshCw size={11} className="animate-spin" />
-                                                                    : <Play size={11} />
-                                                                }
-                                                                Generar
-                                                            </button>
-                                                        )}
-
-                                                        {liq?.estado === 'pending' && (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleGenerate(row.personal_id)}
-                                                                    disabled={isGenerating}
-                                                                    className="flex items-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg text-xs transition-colors"
-                                                                    title="Recalcular"
-                                                                >
-                                                                    <RefreshCw size={11} className={isGenerating ? 'animate-spin' : ''} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleApprove(liq.id)}
-                                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs transition-colors"
-                                                                >
-                                                                    <CheckCircle2 size={11} />
-                                                                    Aprobar
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleReject(liq.id)}
-                                                                    className="px-2 py-1.5 text-red-400 hover:text-red-300 text-xs transition-colors"
-                                                                    title="Rechazar"
-                                                                >
-                                                                    <XCircle size={14} />
-                                                                </button>
-                                                            </>
-                                                        )}
-
-                                                        {liq?.estado === 'approved' && (
-                                                            <button
-                                                                onClick={() => setPayModal(liq.id)}
-                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs transition-colors"
-                                                            >
-                                                                <Banknote size={11} />
-                                                                Marcar pagada
-                                                            </button>
-                                                        )}
-
-                                                        {liq && (
-                                                            <button
-                                                                onClick={() => setEditing({ row, liq })}
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-violet-700/70 hover:bg-violet-700 text-white rounded-lg text-xs transition-colors"
-                                                            >
-                                                                <PencilLine size={11} />
-                                                                Editar
-                                                            </button>
-                                                        )}
-
-                                                        {liq?.estado === 'paid' && (
-                                                            <span className="text-xs text-slate-500">
-                                                                {liq.fecha_pago
-                                                                    ? new Date(liq.fecha_pago).toLocaleDateString('es-AR')
-                                                                    : 'Pagada'}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-
-                                            {liq && isExpanded && (
-                                                <tr className="bg-slate-950/60">
-                                                    <td colSpan={6} className="px-4 py-3">
-                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">TC</p>
-                                                                <p className="text-sm text-white font-semibold">{Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
-                                                            </div>
-                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">Precio</p>
-                                                                <p className="text-sm text-white font-semibold">
-                                                                    {manualOverride?.moneda === 'USD' ? 'USD' : 'ARS'} {Number(manualOverride?.precio_unitario || liq.valor_hora_snapshot || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
-                                                                </p>
-                                                            </div>
-                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">Cantidad</p>
-                                                                <p className="text-sm text-white font-semibold">{Number(manualOverride?.cantidad || liq.total_horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
-                                                            </div>
-                                                            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                <p className="text-[10px] uppercase tracking-widest text-slate-500">Observaciones</p>
-                                                                <p className="text-sm text-slate-200 truncate">{liq.observaciones || 'Sin notas'}</p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </Fragment>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* Legend */}
-            <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
-                <span className="flex items-center gap-1">
-                    <FileVideo size={12} className="text-amber-400" />
-                    Prestaciones sin link de Google Slides (no se incluyen en el cálculo)
-                </span>
-            </div>
+                {/* Legend */}
+                <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                        <FileVideo size={12} className="text-amber-400" />
+                        Prestaciones sin link de Google Slides (no se incluyen en el cálculo)
+                    </span>
+                </div>
 
             </>}
         </div>

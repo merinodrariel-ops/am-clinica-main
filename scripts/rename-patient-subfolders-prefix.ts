@@ -1,5 +1,5 @@
 import { google, drive_v3 } from 'googleapis';
-import type { GaxiosResponse } from 'gaxios';
+
 import * as dotenv from 'dotenv';
 import path from 'path';
 

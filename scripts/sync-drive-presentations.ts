@@ -14,7 +14,7 @@
  */
 
 import { google, drive_v3 } from 'googleapis';
-import type { GaxiosResponse } from 'gaxios';
+
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';

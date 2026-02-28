@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 
 export type StaffViewMode = 'board' | 'table';
 export type StaffGroupMode = 'role' | 'company' | 'access' | 'compliance';
@@ -14,7 +14,7 @@ export interface StaffUiPreferencesInput {
     roleOrder: string[];
 }
 
-export interface StaffUiPreferences extends StaffUiPreferencesInput {}
+export interface StaffUiPreferences extends StaffUiPreferencesInput { }
 
 function isValidViewMode(value: string): value is StaffViewMode {
     return value === 'board' || value === 'table';
