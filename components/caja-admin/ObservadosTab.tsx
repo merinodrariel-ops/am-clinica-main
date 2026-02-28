@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/Textarea";
 
 interface Props {
     mes: string;
+    initialPersonalId?: string;
     onCountChange?: (count: number) => void;
 }
 
@@ -80,14 +81,14 @@ function getSlaInfo(registro: RegistroHoras): {
     };
 }
 
-export default function ObservadosTab({ mes, onCountChange }: Props) {
+export default function ObservadosTab({ mes, initialPersonalId, onCountChange }: Props) {
     const [registros, setRegistros] = useState<RegistroHoras[]>([]);
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedRegistro, setSelectedRegistro] = useState<RegistroHoras | null>(null);
 
     // Filters
-    const [filterPersonal, setFilterPersonal] = useState<string>('');
+    const [filterPersonal, setFilterPersonal] = useState<string>(initialPersonalId || '');
     const [filterMotivo, setFilterMotivo] = useState<MotivoObservado | ''>('');
 
     // Resolution form
@@ -140,6 +141,10 @@ export default function ObservadosTab({ mes, onCountChange }: Props) {
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mes, filterPersonal, filterMotivo]);
+
+    useEffect(() => {
+        setFilterPersonal(initialPersonalId || '');
+    }, [initialPersonalId]);
 
     function openResolver(registro: RegistroHoras) {
         setSelectedRegistro(registro);

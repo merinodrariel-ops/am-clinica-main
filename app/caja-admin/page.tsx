@@ -132,6 +132,9 @@ function CajaAdminContent() {
         const initialSubTab = requestedSubTab === 'observados'
             ? 'observados'
             : undefined;
+        const initialObservedPersonalId = requestedSubTab === 'observados'
+            ? (searchParams.get('observado_personal_id') || undefined)
+            : undefined;
 
         switch (activeTab) {
             case 'movimientos':
@@ -141,7 +144,14 @@ function CajaAdminContent() {
             case 'profesionales':
                 return <ProfesionalesTab sucursal={selectedSucursal} tcBna={tcBna} />;
             case 'personal':
-                return <PersonalTab sucursal={selectedSucursal} tcBna={tcBna} initialTab={initialSubTab} />;
+                return (
+                    <PersonalTab
+                        sucursal={selectedSucursal}
+                        tcBna={tcBna}
+                        initialTab={initialSubTab}
+                        initialObservedPersonalId={initialObservedPersonalId}
+                    />
+                );
             case 'reportes':
                 return <ReportesTab sucursal={selectedSucursal} />;
             case 'configuracion':
@@ -158,15 +168,23 @@ function CajaAdminContent() {
         params.set('tab', tabId);
         if (tabId !== 'personal') {
             params.delete('subtab');
+            params.delete('observado_personal_id');
         }
 
         router.replace(`/caja-admin?${params.toString()}`, { scroll: false });
     }
 
-    function openObservadosTab() {
+    function openObservadosTab(personalId?: string) {
         const params = new URLSearchParams(searchParams.toString());
         params.set('tab', 'personal');
         params.set('subtab', 'observados');
+
+        if (personalId) {
+            params.set('observado_personal_id', personalId);
+        } else {
+            params.delete('observado_personal_id');
+        }
+
         setActiveTab('personal');
         router.replace(`/caja-admin?${params.toString()}`, { scroll: false });
     }
@@ -254,12 +272,13 @@ function CajaAdminContent() {
                                         {observadosCriticalLeaders.length > 0 && (
                                             <div className="flex flex-wrap items-center gap-2 mt-2">
                                                 {observadosCriticalLeaders.map((leader) => (
-                                                    <span
+                                                    <button
                                                         key={leader.personal_id}
+                                                        onClick={() => openObservadosTab(leader.personal_id)}
                                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
                                                     >
                                                         {`${leader.nombre} ${leader.apellido}`.trim()}: {leader.critical_count}
-                                                    </span>
+                                                    </button>
                                                 ))}
                                             </div>
                                         )}

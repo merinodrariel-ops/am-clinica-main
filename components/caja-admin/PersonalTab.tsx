@@ -62,6 +62,7 @@ interface Props {
     sucursal: Sucursal;
     tcBna: number | null;
     initialTab?: MainTab;
+    initialObservedPersonalId?: string;
 }
 
 type MainTab = 'equipo' | 'profesionales' | 'registros' | 'observados';
@@ -73,7 +74,7 @@ const CONDICION_AFIP_OPTIONS = [
     { value: 'otro', label: 'Otro' },
 ];
 
-export default function PersonalTab({ tcBna, initialTab }: Props) {
+export default function PersonalTab({ tcBna, initialTab, initialObservedPersonalId }: Props) {
     const [activeTab, setActiveTab] = useState<MainTab>(initialTab || 'equipo');
     const [observadosCount, setObservadosCount] = useState(0);
     const [personal, setPersonal] = useState<Personal[]>([]);
@@ -1392,6 +1393,7 @@ export default function PersonalTab({ tcBna, initialTab }: Props) {
                 activeTab === 'observados' && (
                     <ObservadosTab
                         mes={mesActual}
+                        initialPersonalId={initialObservedPersonalId}
                         onCountChange={(count) => setObservadosCount(count)}
                     />
                 )
