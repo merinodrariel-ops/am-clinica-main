@@ -36,7 +36,11 @@ import {
     ChevronRight,
 } from 'lucide-react';
 import { getOwnerDashboardStats, type OwnerDashboardStats } from '@/lib/dashboard';
-import PredictiveInsights from './PredictiveInsights';
+import dynamic from 'next/dynamic';
+const PredictiveInsights = dynamic(() => import('./PredictiveInsights'), {
+    ssr: false,
+    loading: () => <div className="h-[200px] w-full animate-pulse bg-white/5 rounded-2xl mb-6" />
+});
 import Link from 'next/link';
 
 const STORAGE_KEY = 'owner-dashboard-layout';

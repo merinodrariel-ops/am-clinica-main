@@ -322,17 +322,52 @@ function CajaRecepcionContent() {
                     )
                 `)
                 .gte('fecha_movimiento', `${mesActual}-01`)
-                .lt('fecha_movimiento', `${nextMonthStr}-01`)
-                .order('fecha_hora', { ascending: false });
+                .lt('fecha_movimiento', `${nextMonthStr}-01`);
 
-            // Cast to Movimiento[] to avoid any
-            const movs = movMesRaw as unknown as Movimiento[] | null;
+            // Fetch transfers/withdrawals for selected month
+            const { data: transRaw, error: transError } = await supabase
+                .from('transferencias_caja')
+                .select('*')
+                .or(`caja_origen.eq.RECEPCION,caja_destino.eq.RECEPCION`)
+                .gte('fecha_hora', `${mesActual}-01`)
+                .lt('fecha_hora', `${nextMonthStr}-01`);
+
+            if (transError) console.error('Error fetching transfers:', transError);
+
+            // Merge and sort all movements
+            let allMovs: Movimiento[] = [];
+
+            // Add standard movements
+            if (movMesRaw) {
+                allMovs = [...(movMesRaw as unknown as Movimiento[])];
+            }
+
+            // Add transfers adapted to Movimiento interface
+            if (transRaw) {
+                const transMovs: Movimiento[] = transRaw.map(t => ({
+                    id: t.id,
+                    fecha_hora: t.fecha_hora,
+                    fecha_movimiento: t.fecha_hora.split('T')[0],
+                    concepto_nombre: `${t.tipo_transferencia}${t.motivo ? ': ' + t.motivo : ''}`,
+                    categoria: t.tipo_transferencia === 'Retiro' ? 'Retiro' : 'Traspaso',
+                    monto: t.caja_origen === 'RECEPCION' ? -Number(t.monto) : Number(t.monto),
+                    moneda: t.moneda,
+                    metodo_pago: t.tipo_transferencia === 'Retiro' ? 'Efectivo' : (t.caja_destino || t.caja_origen),
+                    estado: t.estado || 'completado',
+                    usd_equivalente: t.caja_origen === 'RECEPCION' ? -Number(t.usd_equivalente) : Number(t.usd_equivalente),
+                    origen: 'transferencias_caja'
+                }));
+                allMovs = [...allMovs, ...transMovs];
+            }
+
+            // Sort by date descending
+            allMovs.sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime());
 
             if (movError) {
                 console.error('Error fetching movements:', movError);
             } else {
                 // If there are Notion imports, try to find matching patients
-                const hasNotionImports = (movs || []).some(m => m.paciente?.id_paciente === 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59');
+                const hasNotionImports = allMovs.some(m => m.paciente?.id_paciente === 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59');
 
                 if (hasNotionImports) {
                     const { data: allPacientes } = await supabase
@@ -340,7 +375,7 @@ function CajaRecepcionContent() {
                         .select('id_paciente, nombre, apellido, telefono, email, financ_estado, financ_monto_total, financ_cuotas_total');
 
                     if (allPacientes) {
-                        const enrichedMovs = (movs || []).map(m => {
+                        const enrichedMovs = allMovs.map(m => {
                             if (m.paciente?.id_paciente === 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59') {
                                 const concepto = m.concepto_nombre.toLowerCase().trim();
 
@@ -381,10 +416,10 @@ function CajaRecepcionContent() {
                         });
                         setMovimientos(enrichedMovs);
                     } else {
-                        setMovimientos(movs || []);
+                        setMovimientos(allMovs);
                     }
                 } else {
-                    setMovimientos(movs || []);
+                    setMovimientos(allMovs);
                 }
             }
 
@@ -399,19 +434,29 @@ function CajaRecepcionContent() {
             setAperturaAudit((aperturaRaw as AperturaAudit | null) || null);
 
             // Calculate stats - GROSS INCOME (Ingresos Brutos)
-            // We only sum positive amounts for "Ingresos". Negative amounts are "Egresos" or "Transfers".
-            const pagados = (movs || []).filter((m) => m.estado !== 'anulado');
+            // We only sum positive amounts for \"Ingresos\". Negative amounts are \"Egresos\" or \"Transfers\".
+            const movsForStats = movMesRaw as unknown as Movimiento[] || []; // Keep using original movs for income stats to avoid double counting transfers as income?
+            // Actually, the user wants transfers to be visible.
+            // Stats should probably still reflect real income.
+
+            const pagados = allMovs.filter((m) => m.estado !== 'anulado');
 
             const pagadosHoy = pagados.filter(m => {
                 const datePart = m.fecha_movimiento || m.fecha_hora.split('T')[0];
                 return datePart === today;
             });
 
-            // Sum only positive values for Inkome
-            const totalDiaUsd = pagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
-            const totalMesUsd = pagados.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
+            // Sum only positive values for Inkome - using standard movements only for "Ingresos"
+            const standardPagados = (movMesRaw as unknown as Movimiento[] || []).filter(m => m.estado !== 'anulado');
+            const standardPagadosHoy = standardPagados.filter(m => {
+                const datePart = m.fecha_movimiento || m.fecha_hora.split('T')[0];
+                return datePart === today;
+            });
 
-            const pendientes = (movs || []).filter((m) => m.estado === 'pendiente');
+            const totalDiaUsd = standardPagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
+            const totalMesUsd = standardPagados.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
+
+            const pendientes = allMovs.filter((m) => m.estado === 'pendiente');
             const transferSummary = await getTransferenciasResumenMes(mesActual);
 
             const { count: totalCount } = await supabase
@@ -491,12 +536,14 @@ function CajaRecepcionContent() {
 
         setSavingDate(true);
         try {
+            const tabla = editingMov.origen === 'transferencias_caja' ? 'transferencias_caja' : 'caja_recepcion_movimientos';
+
             // Log changes before updating
             const currentMovDate = editingMov.fecha_movimiento || editingMov.fecha_hora.split('T')[0];
-            if (newFecha !== currentMovDate) {
+            if (newFecha !== currentMovDate && editingMov.origen !== 'transferencias_caja') {
                 await logMovimientoEdit(
                     editingMov.id,
-                    'caja_recepcion_movimientos',
+                    tabla,
                     'fecha_movimiento',
                     editingMov.fecha_movimiento || null,
                     newFecha,
@@ -506,7 +553,7 @@ function CajaRecepcionContent() {
             if (editMonto !== editingMov.monto) {
                 await logMovimientoEdit(
                     editingMov.id,
-                    'caja_recepcion_movimientos',
+                    tabla,
                     'monto',
                     editingMov.monto.toString(),
                     editMonto.toString(),
@@ -516,37 +563,37 @@ function CajaRecepcionContent() {
             if (editMoneda !== editingMov.moneda) {
                 await logMovimientoEdit(
                     editingMov.id,
-                    'caja_recepcion_movimientos',
+                    tabla,
                     'moneda',
                     editingMov.moneda,
                     editMoneda,
                     editMotivo
                 );
             }
-            if (editMetodo !== editingMov.metodo_pago) {
+            if (editMetodo !== editingMov.metodo_pago && editingMov.origen !== 'transferencias_caja') {
                 await logMovimientoEdit(
                     editingMov.id,
-                    'caja_recepcion_movimientos',
+                    tabla,
                     'metodo_pago',
                     editingMov.metodo_pago,
                     editMetodo,
                     editMotivo
                 );
             }
-            if (editConcepto !== editingMov.concepto_nombre) {
+            if (editConcepto !== editingMov.concepto_nombre && editingMov.origen !== 'transferencias_caja') {
                 await logMovimientoEdit(
                     editingMov.id,
-                    'caja_recepcion_movimientos',
+                    tabla,
                     'concepto_nombre',
                     editingMov.concepto_nombre,
                     editConcepto,
                     editMotivo
                 );
             }
-            if (editCategoria !== (editingMov.categoria || "")) {
+            if (editCategoria !== (editingMov.categoria || "") && editingMov.origen !== 'transferencias_caja') {
                 await logMovimientoEdit(
                     editingMov.id,
-                    'caja_recepcion_movimientos',
+                    tabla,
                     'categoria',
                     editingMov.categoria || null,
                     editCategoria,
@@ -556,7 +603,7 @@ function CajaRecepcionContent() {
             if (editEstado !== editingMov.estado) {
                 await logMovimientoEdit(
                     editingMov.id,
-                    'caja_recepcion_movimientos',
+                    tabla,
                     'estado',
                     editingMov.estado,
                     editEstado,
@@ -585,38 +632,36 @@ function CajaRecepcionContent() {
                 console.error('Error sending security alert:', alertErr);
             }
 
-            const updates: {
-                fecha_movimiento: string;
-                monto: number;
-                moneda: string;
-                metodo_pago: string;
-                concepto_nombre: string;
-                categoria: string;
-                estado: string;
-                registro_editado: boolean;
-                comprobante_url: string | null;
-                usd_equivalente?: number;
-            } = {
-                fecha_movimiento: newFecha,
-                monto: editMonto,
-                moneda: editMoneda,
-                metodo_pago: editMetodo,
-                concepto_nombre: editConcepto,
-                categoria: editCategoria,
+            const updates: any = {
                 estado: editEstado,
-                registro_editado: true, // Mark as edited
-                comprobante_url: editComprobanteUrl
+                comprobante_url: editComprobanteUrl,
             };
 
-            // Recalculate USD equivalent if amount/currency changed or if it was null
+            // Recalculate USD equivalent
+            let usd_equivalente = 0;
             if (editMoneda === 'USD') {
-                updates.usd_equivalente = editMonto;
+                usd_equivalente = Math.abs(editMonto);
             } else if (editMoneda === 'ARS' && bnaRate?.venta) {
-                updates.usd_equivalente = editMonto / bnaRate.venta;
+                usd_equivalente = Math.abs(editMonto) / bnaRate.venta;
+            }
+
+            if (editingMov.origen === 'transferencias_caja') {
+                updates.monto = Math.abs(editMonto);
+                updates.moneda = editMoneda;
+                updates.usd_equivalente = usd_equivalente;
+            } else {
+                updates.fecha_movimiento = newFecha;
+                updates.monto = editMonto;
+                updates.moneda = editMoneda;
+                updates.metodo_pago = editMetodo;
+                updates.concepto_nombre = editConcepto;
+                updates.categoria = editCategoria;
+                updates.registro_editado = true;
+                updates.usd_equivalente = usd_equivalente;
             }
 
             const { error } = await supabase
-                .from('caja_recepcion_movimientos')
+                .from(tabla)
                 .update(updates)
                 .eq('id', editingMov.id);
 

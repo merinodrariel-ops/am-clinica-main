@@ -85,6 +85,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   const { role } = useAuth();
   const canEditAdminAmounts = role === "owner" || role === "admin";
   const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
+  const [transfers, setTransfers] = useState<any[]>([]);
   const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
   const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,6 +216,17 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       const balanceData = await getCurrentBalanceAdmin(sucursal.id);
 
       setMovimientos(movData || []);
+
+      const supabase = createClient();
+      const { data: transData } = await supabase
+        .from("transferencias_caja")
+        .select("*")
+        .or(`origen.eq.CAJA_ADMIN,destino.eq.CAJA_ADMIN`)
+        .eq("sucursal_id", sucursal.id)
+        .eq("estado", "completado")
+        .order("fecha_hora", { ascending: false });
+
+      setTransfers(transData || []);
       setCuentas(cuentasData || []);
       setCategorias((categoriasData || []).filter(c => c.activo));
       setAperturaHoy(aperturaHoy);
@@ -910,6 +922,22 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       data: m,
       sortTs: m.fecha_hora || m.fecha_movimiento + "T12:00:00",
     })),
+    ...transfers.map((t) => ({
+      kind: "movimiento" as const, // We use kind movement for now to reuse handling
+      data: {
+        id: t.id,
+        fecha_hora: t.fecha_hora,
+        fecha_movimiento: t.fecha_hora.split('T')[0],
+        tipo_movimiento: t.tipo as any,
+        descripcion: t.motivo || t.tipo,
+        usd_equivalente_total: t.moneda === 'USD' ? t.monto : (t.monto / (tcBna || 1)),
+        estado: 'Registrado',
+        nota: t.observaciones,
+        adjuntos: t.comprobante_url ? [t.comprobante_url] : [],
+        caja_admin_movimiento_lineas: []
+      } as any,
+      sortTs: t.fecha_hora,
+    })),
     ...(arqueoVisible
       ? arqueos.flatMap((a): TableRow[] => {
         const rows: TableRow[] = [];
@@ -931,7 +959,10 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
   // --- Gastos del mes (EGRESO + RETIRO, todas las cuentas, en USD equivalente) ---
   const totalGastosMesUsd = movimientos
     .filter((m) => (m.tipo_movimiento === "EGRESO" || m.tipo_movimiento === "RETIRO") && m.estado !== "Anulado")
-    .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
+    .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0) +
+    transfers
+      .filter(t => t.tipo === "RETIRO" && t.estado === "completado")
+      .reduce((sum, t) => sum + (t.moneda === 'USD' ? t.monto : (t.monto / (tcBna || 1))), 0);
 
 
   // --- Helper for Privacy Mode ---

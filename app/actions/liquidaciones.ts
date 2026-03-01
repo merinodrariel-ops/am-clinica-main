@@ -391,7 +391,6 @@ export async function updateLiquidacionManual(input: UpdateLiquidacionManualInpu
                     edited_at: new Date().toISOString(),
                 },
             },
-            updated_at: new Date().toISOString(),
         })
         .eq('id', input.id);
 

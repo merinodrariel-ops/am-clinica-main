@@ -7,6 +7,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import { Textarea } from '@/components/ui/Textarea';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
+import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 
 type TransferenciaTipo = 'TRASPASO_INTERNO' | 'RETIRO_EFECTIVO';
 type CajaNodo = 'RECEPCION' | 'ADMIN';
@@ -52,6 +53,7 @@ export default function TransferenciaAdmin({
     const [cajaDestino, setCajaDestino] = useState<CajaNodo>('ADMIN');
     const [motivo, setMotivo] = useState(MOTIVOS[defaultTipo][0]);
     const [observaciones, setObservaciones] = useState('');
+    const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -108,6 +110,7 @@ export default function TransferenciaAdmin({
                 observaciones: observaciones || null,
                 usuario: 'Recepcion',
                 estado: 'confirmada',
+                comprobante_url: comprobanteUrl
             };
 
             let { error } = await supabase
@@ -154,6 +157,7 @@ export default function TransferenciaAdmin({
         setCajaDestino('ADMIN');
         setMotivo(MOTIVOS[defaultTipo][0]);
         setObservaciones('');
+        setComprobanteUrl(null);
         onClose();
     }
 
@@ -206,21 +210,19 @@ export default function TransferenciaAdmin({
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 onClick={() => setTipoTransferencia('TRASPASO_INTERNO')}
-                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
-                                    tipoTransferencia === 'TRASPASO_INTERNO'
-                                        ? 'bg-indigo-600 text-white border-indigo-500'
-                                        : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-                                }`}
+                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${tipoTransferencia === 'TRASPASO_INTERNO'
+                                    ? 'bg-indigo-600 text-white border-indigo-500'
+                                    : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                    }`}
                             >
                                 Traspaso interno
                             </button>
                             <button
                                 onClick={() => setTipoTransferencia('RETIRO_EFECTIVO')}
-                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
-                                    tipoTransferencia === 'RETIRO_EFECTIVO'
-                                        ? 'bg-orange-600 text-white border-orange-500'
-                                        : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-                                }`}
+                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${tipoTransferencia === 'RETIRO_EFECTIVO'
+                                    ? 'bg-orange-600 text-white border-orange-500'
+                                    : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                    }`}
                             >
                                 Retiro efectivo
                             </button>
@@ -305,16 +307,30 @@ export default function TransferenciaAdmin({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Observaciones
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                            Comprobante (opcional)
                         </label>
-                        <Textarea
-                            value={observaciones}
-                            onChange={(e) => setObservaciones(e.target.value)}
-                            className="w-full px-4 py-2.5 border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 resize-none min-h-[60px]"
-                            rows={2}
-                            placeholder="Detalles adicionales..."
+                        <ComprobanteUpload
+                            area="caja-recepcion"
+                            onUploadComplete={(res) => setComprobanteUrl(res.url)}
+                            className="w-full"
                         />
+                        {comprobanteUrl && (
+                            <div className="mt-2 flex items-center justify-between">
+                                <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                    <span className="h-3 w-3 rounded-full bg-green-500 flex items-center justify-center text-white p-0.5">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6L9 17L4 12" /></svg>
+                                    </span>
+                                    Comprobante adjuntado
+                                </p>
+                                <button
+                                    onClick={() => setComprobanteUrl(null)}
+                                    className="text-xs text-red-600 hover:underline"
+                                >
+                                    Eliminar
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
