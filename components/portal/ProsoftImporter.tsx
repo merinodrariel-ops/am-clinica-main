@@ -51,6 +51,17 @@ export default function ProsoftImporter() {
 
     const isObservedRecord = (r: { incompleto?: boolean; requiereRevision?: boolean }) => Boolean(r.incompleto || r.requiereRevision);
 
+    const getFriendlyActionError = (error: unknown, fallback: string) => {
+        const rawMessage = error instanceof Error ? error.message : '';
+        if (!rawMessage) return fallback;
+
+        if (rawMessage.includes('Server Components render')) {
+            return 'No se pudo procesar la planilla. Verificá que el link sea público, que apunte a la pestaña correcta (gid) y reintentá.';
+        }
+
+        return rawMessage;
+    };
+
     useEffect(() => {
         getAllPersonalBasic().then(setAllPersonal).catch(() => { });
         getProsoftMappings().then(setSavedMappings).catch(() => { });
@@ -67,7 +78,7 @@ export default function ProsoftImporter() {
             setPreview(data);
             toast.success(`${data.totalRegistros} registros encontrados · ${mesLabel(data.mes)}`);
         } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : 'Error al leer la planilla');
+            toast.error(getFriendlyActionError(e, 'Error al leer la planilla'));
         } finally {
             setLoading(false);
         }
@@ -93,7 +104,7 @@ export default function ProsoftImporter() {
                 toast.warning(`${observed} registros quedaron en estado Observado para resolución manual.`);
             }
         } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : 'Error al importar');
+            toast.error(getFriendlyActionError(e, 'Error al importar'));
         } finally {
             setImporting(false);
         }

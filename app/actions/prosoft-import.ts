@@ -314,10 +314,41 @@ function toIsoFromArDate(dateAr: string): string | null {
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function parseIsoDate(dateIso: string): { year: number; month: number; day: number } | null {
+    const m = dateIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    return {
+        year: Number(m[1]),
+        month: Number(m[2]),
+        day: Number(m[3]),
+    };
+}
+
+function buildDayToDateMap(period: { desde: string; hasta: string } | null): Map<number, string> {
+    const map = new Map<number, string>();
+    if (!period) return map;
+
+    const desde = parseIsoDate(period.desde);
+    const hasta = parseIsoDate(period.hasta);
+    if (!desde || !hasta) return map;
+
+    let cursor = Date.UTC(desde.year, desde.month - 1, desde.day);
+    const end = Date.UTC(hasta.year, hasta.month - 1, hasta.day);
+
+    while (cursor <= end) {
+        const d = new Date(cursor);
+        const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+        map.set(d.getUTCDate(), iso);
+        cursor += 24 * 60 * 60 * 1000;
+    }
+
+    return map;
+}
+
 function extractPeriodFromCsv(rows: string[][]): { desde: string; hasta: string; mes: string } | null {
-    for (const row of rows.slice(0, 12)) {
+    for (const row of rows.slice(0, 30)) {
         const joined = row.join(' ').replace(/\s+/g, ' ').trim();
-        const match = joined.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[~\-]\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+        const match = joined.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*(?:~|\-|–|—|a|al|hasta)\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
         if (!match) continue;
 
         const desde = toIsoFromArDate(match[1]);
@@ -355,19 +386,17 @@ async function fetchCsv(csvUrl: string): Promise<string[][]> {
 
 // ─── Parse Matrix ─────────────────────────────────────────────────────────────
 
-function parseProsoftMatrix(rows: string[][], mes: string): {
+function parseProsoftMatrix(rows: string[][]): {
     employeeRows: { rawName: string; timeCells: Record<number, string> }[];
     dayColumns: Record<number, number>; // colIndex → day number (1-31)
 } {
-    const [year, month] = mes.split('-').map(Number);
-
     // Find the header row: the row with the most day-number columns (1–31).
-    // Search up to 20 rows to handle Prosoft layouts with multiple info rows at the top.
+    // Search up to 60 rows to handle layouts with multiple metadata blocks at the top.
     let headerRowIdx = -1;
     let dayColumns: Record<number, number> = {};
     let bestDayCount = 0;
 
-    for (let r = 0; r < Math.min(20, rows.length); r++) {
+    for (let r = 0; r < Math.min(60, rows.length); r++) {
         const row = rows[r];
         let dayCount = 0;
         const cols: Record<number, number> = {};
@@ -405,11 +434,7 @@ function parseProsoftMatrix(rows: string[][], mes: string): {
         );
     }
 
-    // Validate days belong to the given month
-    const lastDay = new Date(year, month, 0).getDate();
-    const validDays = Object.fromEntries(
-        Object.entries(dayColumns).filter(([, d]) => d <= lastDay)
-    );
+    const validDays = dayColumns;
 
     // Detect name column: the non-day column (among first 3 cols) with the most
     // alphabetic content in the data rows. Handles Prosoft layouts where col 0
@@ -604,9 +629,10 @@ export async function previewProsoftImport(
         );
     }
 
-    const { employeeRows } = parseProsoftMatrix(csvRows, mes);
+    const { employeeRows } = parseProsoftMatrix(csvRows);
 
     const [year, month] = mes.split('-').map(Number);
+    const dayToDateMap = buildDayToDateMap(detectedPeriod);
 
     const rawNames = employeeRows.map(r => r.rawName);
     const matchMap = await matchEmployees(rawNames);
@@ -623,7 +649,7 @@ export async function previewProsoftImport(
                 const dia = parseInt(dayStr);
                 const parsed = await parseTimeCell(cell);
                 if (!parsed) return null;
-                const fecha = `${year}-${String(month).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                const fecha = dayToDateMap.get(dia) || `${year}-${String(month).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
                 return { dia, fecha, ...parsed };
             });
 
