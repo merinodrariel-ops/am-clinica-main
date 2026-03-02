@@ -302,10 +302,10 @@ function CajaRecepcionContent() {
             const rateData = await rateRes.json();
             setBnaRate(rateData);
 
-            // Range calculation for the month
-            const nextMonth = new Date(mesActual + '-01');
-            nextMonth.setMonth(nextMonth.getMonth() + 1);
-            const nextMonthStr = getLocalYearMonth(nextMonth);
+            // Range calculation for the month (parse as local to avoid UTC timezone shift)
+            const [rangeYear, rangeMonth] = mesActual.split('-').map(Number);
+            const nextMonthDate = new Date(rangeYear, rangeMonth, 1); // rangeMonth is 1-indexed + Date 0-indexed = next month's 1st
+            const nextMonthStr = getLocalYearMonth(nextMonthDate);
 
             // Fetch movements for selected month from Supabase
             const { data: movMesRaw, error: movError } = await supabase
