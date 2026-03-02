@@ -61,6 +61,8 @@ interface LayoutConfig {
     hidden: CardId[];
 }
 
+type PresetId = 'ejecutivo' | 'finanzas' | 'operaciones';
+
 const DEFAULT_ORDER: CardId[] = [
     'predictive-pulse',
     'total-pacientes',
@@ -80,6 +82,49 @@ const CARD_TITLES: Record<CardId, string> = {
     'en-financiacion': 'En Financiación',
     'deuda-total': 'Deuda Total Circulante',
 };
+
+const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout: LayoutConfig }> = {
+    ejecutivo: {
+        name: 'Ejecutivo',
+        description: 'Vista general con KPIs claves y tendencia clínica.',
+        layout: {
+            order: ['predictive-pulse', 'total-pacientes', 'primera-vez', 'ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion'],
+            hidden: [],
+        },
+    },
+    finanzas: {
+        name: 'Finanzas',
+        description: 'Enfocado en ingresos, egresos, deuda y financiación.',
+        layout: {
+            order: ['ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion', 'predictive-pulse', 'total-pacientes', 'primera-vez'],
+            hidden: ['total-pacientes', 'primera-vez'],
+        },
+    },
+    operaciones: {
+        name: 'Operaciones',
+        description: 'Prioriza actividad clínica y nuevos pacientes.',
+        layout: {
+            order: ['predictive-pulse', 'primera-vez', 'total-pacientes', 'en-financiacion', 'ingresos-mes', 'egresos-mes', 'deuda-total'],
+            hidden: ['egresos-mes', 'deuda-total'],
+        },
+    },
+};
+
+function sameLayout(a: LayoutConfig, b: LayoutConfig) {
+    if (a.order.length !== b.order.length) return false;
+    for (let i = 0; i < a.order.length; i += 1) {
+        if (a.order[i] !== b.order[i]) return false;
+    }
+
+    const hiddenA = [...a.hidden].sort();
+    const hiddenB = [...b.hidden].sort();
+    if (hiddenA.length !== hiddenB.length) return false;
+    for (let i = 0; i < hiddenA.length; i += 1) {
+        if (hiddenA[i] !== hiddenB[i]) return false;
+    }
+
+    return true;
+}
 
 function getLayout(): LayoutConfig {
     if (typeof window === 'undefined') return { order: DEFAULT_ORDER, hidden: [] };
@@ -110,6 +155,7 @@ function SortableCard({
     id,
     children,
     isEditing,
+    isDragEnabled,
     isDropTarget,
     isRecentlyDropped,
     className,
@@ -117,6 +163,7 @@ function SortableCard({
     id: string;
     children: React.ReactNode;
     isEditing: boolean;
+    isDragEnabled: boolean;
     isDropTarget: boolean;
     isRecentlyDropped: boolean;
     className?: string;
@@ -128,7 +175,7 @@ function SortableCard({
         transform,
         transition,
         isDragging,
-    } = useSortable({ id, disabled: !isEditing });
+    } = useSortable({ id, disabled: !isDragEnabled });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -138,13 +185,13 @@ function SortableCard({
         filter: isDragging ? 'saturate(0.75)' : 'none',
     };
 
-    const sortableProps = isEditing ? { ...attributes, ...listeners } : {};
+    const sortableProps = isDragEnabled ? { ...attributes, ...listeners } : {};
 
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`relative transition-all duration-200 ${isEditing ? 'touch-none cursor-grab active:cursor-grabbing' : ''} ${className || ''}`}
+            className={`relative transition-all duration-200 ${isDragEnabled ? 'touch-none cursor-grab active:cursor-grabbing' : ''} ${className || ''}`}
             data-drag-target={isDropTarget ? 'true' : undefined}
             data-drag-dropped={isRecentlyDropped ? 'true' : undefined}
             aria-dropeffect={isDropTarget ? 'move' : undefined}
@@ -155,7 +202,7 @@ function SortableCard({
             }}
             {...sortableProps}
         >
-            {isEditing && isDropTarget && (
+            {isDragEnabled && isDropTarget && (
                 <div
                     className="pointer-events-none absolute -inset-1 rounded-3xl animate-pulse"
                     style={{
@@ -164,7 +211,7 @@ function SortableCard({
                     }}
                 />
             )}
-            {isEditing && isRecentlyDropped && (
+            {isDragEnabled && isRecentlyDropped && (
                 <div
                     className="pointer-events-none absolute inset-0 rounded-2xl"
                     style={{
@@ -177,6 +224,7 @@ function SortableCard({
                     className="absolute top-2 left-2 z-10 p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all touch-none"
                     style={{ background: 'hsla(230, 15%, 25%, 0.8)', color: 'hsl(230, 10%, 60%)' }}
                     aria-label="Arrastrar tarjeta"
+                    {...(isDragEnabled ? { ...attributes, ...listeners } : {})}
                 >
                     <GripVertical size={16} />
                 </button>
@@ -542,6 +590,7 @@ export default function OwnerDashboard() {
     const [overCardId, setOverCardId] = useState<CardId | null>(null);
     const [recentlyDroppedCardId, setRecentlyDroppedCardId] = useState<CardId | null>(null);
     const droppedPulseTimeoutRef = useRef<number | null>(null);
+    const isDragEnabled = isEditing && activeTab === 'dashboard';
 
     const currentMonth = MONTH_NAMES[new Date().getMonth()];
 
@@ -637,6 +686,16 @@ export default function OwnerDashboard() {
         saveLayout(defaultLayout);
         setIsEditing(false);
         setActiveTab('dashboard');
+    }, []);
+
+    const applyPreset = useCallback((presetId: PresetId) => {
+        const presetLayout = GRID_PRESETS[presetId].layout;
+        const nextLayout: LayoutConfig = {
+            order: [...presetLayout.order],
+            hidden: [...presetLayout.hidden],
+        };
+        setLayout(nextLayout);
+        saveLayout(nextLayout);
     }, []);
 
     const removeCard = useCallback((id: CardId) => {
@@ -819,6 +878,8 @@ export default function OwnerDashboard() {
 
     const visibleCards = layout.order.filter(id => !layout.hidden.includes(id) || isEditing);
     const removedCards = DEFAULT_ORDER.filter(id => !layout.order.includes(id));
+    const activePresetId = (Object.keys(GRID_PRESETS) as PresetId[])
+        .find((presetId) => sameLayout(layout, GRID_PRESETS[presetId].layout)) || null;
 
     const openConfigTab = () => {
         setActiveTab('config');
@@ -921,6 +982,41 @@ export default function OwnerDashboard() {
                             {layout.order.length} activas • {layout.hidden.length} ocultas • {removedCards.length} eliminadas
                         </p>
                     </div>
+
+                    <div className="mb-4">
+                        <p className="text-[11px] font-semibold mb-2" style={{ color: 'hsl(230 10% 65%)' }}>
+                            Presets rápidos
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            {(Object.keys(GRID_PRESETS) as PresetId[]).map((presetId) => {
+                                const preset = GRID_PRESETS[presetId];
+                                const active = activePresetId === presetId;
+                                return (
+                                    <button
+                                        key={`preset-${presetId}`}
+                                        onClick={() => applyPreset(presetId)}
+                                        className="rounded-xl px-3 py-2 text-left transition-all"
+                                        style={{
+                                            background: active ? 'hsla(165, 100%, 42%, 0.16)' : 'hsla(230, 15%, 20%, 0.45)',
+                                            border: `1px solid ${active ? 'hsla(165, 100%, 42%, 0.35)' : 'hsla(230, 15%, 28%, 0.45)'}`,
+                                            color: active ? 'hsl(165 85% 55%)' : 'hsl(210 20% 88%)',
+                                        }}
+                                    >
+                                        <p className="text-xs font-semibold">{preset.name}</p>
+                                        <p className="text-[11px] mt-0.5" style={{ color: active ? 'hsl(165 55% 70%)' : 'hsl(230 10% 55%)' }}>
+                                            {preset.description}
+                                        </p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {activePresetId === null && (
+                            <p className="text-[11px] mt-2" style={{ color: 'hsl(230 10% 50%)' }}>
+                                Estás en vista personalizada.
+                            </p>
+                        )}
+                    </div>
+
                     <div className="space-y-2">
                         {DEFAULT_ORDER.map((id) => {
                             const inGrid = layout.order.includes(id);
@@ -998,7 +1094,7 @@ export default function OwnerDashboard() {
                 </div>
             )}
 
-            {isEditing && (
+            {isDragEnabled && (
                 <div
                     className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg text-xs"
                     style={{
@@ -1015,7 +1111,7 @@ export default function OwnerDashboard() {
 
             {/* Cards Grid */}
             <DndContext
-                sensors={sensors}
+                sensors={isDragEnabled ? sensors : undefined}
                 autoScroll={{
                     enabled: true,
                     activator: AutoScrollActivator.Pointer,
@@ -1029,10 +1125,10 @@ export default function OwnerDashboard() {
                     },
                 }}
                 collisionDetection={collisionDetectionStrategy}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragCancel={handleDragCancel}
-                onDragEnd={handleDragEnd}
+                onDragStart={isDragEnabled ? handleDragStart : undefined}
+                onDragOver={isDragEnabled ? handleDragOver : undefined}
+                onDragCancel={isDragEnabled ? handleDragCancel : undefined}
+                onDragEnd={isDragEnabled ? handleDragEnd : undefined}
             >
                 <SortableContext items={visibleCards} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1044,6 +1140,7 @@ export default function OwnerDashboard() {
                                         id={id}
                                         className="md:col-span-2"
                                         isEditing={isEditing}
+                                        isDragEnabled={isDragEnabled}
                                         isDropTarget={overCardId === id && activeCardId !== id}
                                         isRecentlyDropped={recentlyDroppedCardId === id}
                                     >
@@ -1065,6 +1162,7 @@ export default function OwnerDashboard() {
                                     id={id}
                                     className={card.isGiant ? 'md:col-span-2' : ''}
                                     isEditing={isEditing}
+                                    isDragEnabled={isDragEnabled}
                                     isDropTarget={overCardId === id && activeCardId !== id}
                                     isRecentlyDropped={recentlyDroppedCardId === id}
                                 >
