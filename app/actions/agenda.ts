@@ -193,3 +193,86 @@ export async function getDoctors() {
         .filter((doctor): doctor is { id: string; full_name: string; role: string } => Boolean(doctor))
         .sort((a, b) => a.full_name.localeCompare(b.full_name, 'es', { sensitivity: 'base' }));
 }
+
+export async function getImportedEventTypes() {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from('agenda_appointments')
+        .select('title, source, doctor_id')
+        .in('source', ['calendly', 'google_calendar']);
+
+    if (error) {
+        console.error('Error fetching imported event types:', error);
+        return [];
+    }
+
+    if (!data || data.length === 0) return [];
+
+    // Group by title + source + doctor_id and count
+    const groups = new Map<string, { title: string; source: string; doctorId: string; count: number }>();
+    for (const row of data) {
+        const key = `${row.title}||${row.source}||${row.doctor_id}`;
+        const existing = groups.get(key);
+        if (existing) {
+            existing.count++;
+        } else {
+            groups.set(key, {
+                title: row.title || 'Sin título',
+                source: row.source || 'calendly',
+                doctorId: row.doctor_id || '',
+                count: 1,
+            });
+        }
+    }
+
+    // Fetch doctor names for all unique doctor IDs
+    const doctorIds = [...new Set([...groups.values()].map(g => g.doctorId).filter(Boolean))];
+    let doctorNames: Record<string, string> = {};
+    if (doctorIds.length > 0) {
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', doctorIds);
+        if (profiles) {
+            for (const p of profiles) {
+                doctorNames[p.id] = p.full_name || 'Sin nombre';
+            }
+        }
+    }
+
+    return [...groups.values()].map(g => ({
+        title: g.title,
+        source: g.source,
+        doctorId: g.doctorId,
+        doctorName: doctorNames[g.doctorId] || 'Sin asignar',
+        count: g.count,
+    }));
+}
+
+export async function reassignDoctorBulk(
+    filters: { title: string; source: string; currentDoctorId: string },
+    newDoctorId: string
+) {
+    const supabase = await createClient();
+
+    let query = supabase
+        .from('agenda_appointments')
+        .update({ doctor_id: newDoctorId, updated_at: new Date().toISOString() })
+        .eq('title', filters.title)
+        .eq('source', filters.source);
+
+    if (filters.currentDoctorId) {
+        query = query.eq('doctor_id', filters.currentDoctorId);
+    }
+
+    const { data, error } = await query.select('id');
+
+    if (error) {
+        console.error('Error reassigning doctors:', error);
+        return { success: false, error: error.message, updatedCount: 0 };
+    }
+
+    revalidatePath('/agenda');
+    return { success: true, updatedCount: data?.length || 0 };
+}

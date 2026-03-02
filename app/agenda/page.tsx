@@ -6,6 +6,7 @@ import TodaySchedulePanel from '@/components/agenda/TodaySchedulePanel';
 import WaitingRoomDashboard from '@/components/agenda/WaitingRoomDashboard';
 import DoctorScheduleConfig from '@/components/agenda/DoctorScheduleConfig';
 import CsvImportWizard from '@/components/agenda/CsvImportWizard';
+import DoctorReassignmentPanel from '@/components/agenda/DoctorReassignmentPanel';
 import { Calendar, Users, Settings, Upload } from 'lucide-react';
 
 type Tab = 'calendar' | 'waiting' | 'config' | 'import';
@@ -81,8 +82,9 @@ export default function AgendaPage() {
 
             {activeTab === 'import' && (
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 xl:p-8">
-                    <div className="max-w-4xl mx-auto">
+                    <div className="max-w-4xl mx-auto space-y-8">
                         <CsvImportWizard />
+                        <DoctorReassignmentPanel />
                     </div>
                 </div>
             )}
