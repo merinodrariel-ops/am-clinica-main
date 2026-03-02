@@ -214,11 +214,12 @@ export async function anularMovimiento(
 export async function deleteMovimiento(
   id: string,
   motivo: string,
+  tabla: "caja_recepcion_movimientos" | "transferencias_caja" = "caja_recepcion_movimientos",
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await logMovimientoEdit(
       id,
-      "caja_recepcion_movimientos",
+      tabla,
       "REGISTRO_ELIMINADO",
       "ACTIVO",
       "ELIMINADO",
@@ -229,7 +230,7 @@ export async function deleteMovimiento(
   }
 
   const { error } = await getSupabase()
-    .from("caja_recepcion_movimientos")
+    .from(tabla)
     .delete()
     .eq("id", id);
 

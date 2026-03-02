@@ -10,7 +10,7 @@ import MoneyInput from "@/components/ui/MoneyInput";
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/bna';
 import { getLocalISODate } from '@/lib/local-date';
-// import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NuevoGastoFormProps {
     isOpen: boolean;
@@ -28,6 +28,7 @@ interface ExpenseData {
 }
 
 export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: NuevoGastoFormProps) {
+    const { user } = useAuth();
     const [saving, setSaving] = useState(false);
 
     // Form data
@@ -73,9 +74,9 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                     tc_fecha_hora: formData.moneda === 'ARS' ? new Date().toISOString() : null,
                     usd_equivalente: usdEquivalente,
                     usuario: 'Recepción',
+                    created_by: user?.id || null,
                     fecha_movimiento: getLocalISODate(),
                     origen: 'manual',
-                    // Nullable fields (hopefully)
                     paciente_id: null,
                 });
 

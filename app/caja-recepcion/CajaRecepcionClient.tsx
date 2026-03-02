@@ -2201,9 +2201,15 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                     )
                                                         return;
 
+                                                    // Determine source table for the record being deleted
+                                                    const movToDelete = movimientos.find(m => m.id === deletingMovId);
+                                                    const deleteTable = movToDelete?.origen === 'transferencias_caja'
+                                                        ? 'transferencias_caja' as const
+                                                        : 'caja_recepcion_movimientos' as const;
                                                     const { success, error } = await deleteMovimiento(
                                                         deletingMovId!,
                                                         deletionReason,
+                                                        deleteTable,
                                                     );
                                                     if (success) {
                                                         setDeletingMovId(null);

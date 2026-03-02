@@ -335,7 +335,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
                     tc_fuente: formData.moneda === 'ARS' ? 'BNA_AUTO' : 'N/A',
                     tc_fecha_hora: formData.moneda === 'ARS' ? new Date().toISOString() : null,
                     usd_equivalente: usdEquivalente,
-                    usuario: 'Recepción', // TODO: Get from auth
+                    usuario: 'Recepción',
+                    created_by: user?.id || null,
                     // Dual date fields
                     fecha_movimiento: cargaHistorica ? fechaMovimiento : getLocalISODate(),
                     origen: cargaHistorica ? 'carga_historica' : 'manual',
