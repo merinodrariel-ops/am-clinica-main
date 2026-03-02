@@ -63,7 +63,7 @@ function PatientSearchInline({
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
-    const debounceRef = useRef<NodeJS.Timeout>();
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         inputRef.current?.focus();
@@ -84,7 +84,7 @@ function PatientSearchInline({
 
     const handleInput = (val: string) => {
         setQuery(val);
-        clearTimeout(debounceRef.current);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => doSearch(val), 300);
     };
 
@@ -445,7 +445,7 @@ export default function CsvImportWizard() {
                                     className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${source === val
                                         ? 'bg-black dark:bg-white text-white dark:text-gray-900 border-transparent'
                                         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-400'
-                                    }`}
+                                        }`}
                                 >
                                     {label}
                                 </button>

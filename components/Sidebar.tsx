@@ -207,22 +207,17 @@ export default function Sidebar() {
                 'fixed left-0 top-0 h-screen z-50 flex flex-col transform transition-all duration-300',
                 isDesktop
                     ? (compactMode ? 'w-20 translate-x-0' : 'w-64 translate-x-0')
-                    : (mobileOpen ? 'w-[84vw] max-w-80 translate-x-0 shadow-2xl' : 'w-[84vw] max-w-80 -translate-x-full pointer-events-none')
+                    : (mobileOpen ? 'w-[84vw] max-w-80 translate-x-0 shadow-2xl' : 'w-[84vw] max-w-80 -translate-x-full pointer-events-none'),
+                'glass-card rounded-none border-y-0 border-l-0 border-r border-[var(--glass-border)]'
             )}
-                style={{
-                    background: 'hsl(var(--sidebar-bg))',
-                    borderRight: '1px solid hsl(var(--sidebar-border))',
-                }}
             >
-                {/* Logo area */}
                 <div
-                    className={clsx(compactMode ? 'p-3' : 'p-5')}
-                    style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}
+                    className={clsx(compactMode ? 'p-3' : 'p-5', 'border-b border-[var(--glass-border)]')}
                 >
                     <div className={clsx('flex items-center', compactMode ? 'justify-center' : 'justify-between')}>
                         <div className={clsx(compactMode && 'text-center')}>
-                            <h1 className="text-xl font-bold" style={{
-                                background: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(165 85% 60%))',
+                            <h1 className="text-xl font-bold tracking-tight drop-shadow-[0_0_15px_rgba(52,211,153,0.3)]" style={{
+                                background: 'linear-gradient(135deg, hsl(165 100% 50%), hsl(165 85% 70%))',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
                             }}>
@@ -238,10 +233,7 @@ export default function Sidebar() {
                         {isDesktop && !compactMode && (
                             <button
                                 onClick={toggleCollapsed}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{ color: 'hsl(230 10% 45%)' }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'hsl(230 15% 18%)'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                className="p-2 rounded-lg transition-all duration-300 text-gray-400 hover:text-white hover:bg-white/10"
                                 title="Contraer menú lateral"
                             >
                                 <ChevronLeft size={16} />
@@ -251,8 +243,7 @@ export default function Sidebar() {
                         {!isDesktop && (
                             <button
                                 onClick={() => setMobileOpen(false)}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{ color: 'hsl(230 10% 45%)' }}
+                                className="p-2 rounded-lg transition-all duration-300 text-gray-400 hover:text-white hover:bg-white/10"
                                 title="Cerrar menú"
                             >
                                 <X size={16} />
@@ -263,10 +254,7 @@ export default function Sidebar() {
                     {isDesktop && compactMode && (
                         <button
                             onClick={toggleCollapsed}
-                            className="mt-2 w-full flex items-center justify-center p-2 rounded-lg transition-colors"
-                            style={{ color: 'hsl(230 10% 45%)' }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'hsl(230 15% 18%)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            className="mt-2 w-full flex items-center justify-center p-2 rounded-lg transition-all duration-300 text-gray-400 hover:text-white hover:bg-white/10"
                             title="Expandir menú lateral"
                         >
                             <ChevronRight size={16} />
@@ -285,58 +273,47 @@ export default function Sidebar() {
                                 key={item.href}
                                 href={item.href}
                                 className={clsx(
-                                    'sidebar-glow flex items-center rounded-xl text-sm font-medium transition-all duration-200 relative',
+                                    'sidebar-glow flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
                                     compactMode ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-2.5',
-                                    isActive && 'active'
+                                    isActive ? 'active text-emerald-400 font-semibold shadow-[inset_0_0_20px_rgba(52,211,153,0.1)]' : 'text-gray-400 hover:text-white hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]'
                                 )}
-                                style={isActive ? {
-                                    background: 'hsla(165, 100%, 42%, 0.1)',
-                                    color: 'hsl(165 85% 50%)',
-                                } : {
-                                    color: 'hsl(230 10% 55%)',
-                                }}
-                                onMouseEnter={e => {
-                                    if (!isActive) {
-                                        e.currentTarget.style.background = 'hsl(230 15% 16%)';
-                                        e.currentTarget.style.color = 'hsl(210 20% 90%)';
-                                    }
-                                }}
-                                onMouseLeave={e => {
-                                    if (!isActive) {
-                                        e.currentTarget.style.background = 'transparent';
-                                        e.currentTarget.style.color = 'hsl(230 10% 55%)';
-                                    }
-                                }}
                                 onClick={() => {
                                     if (!isDesktop) setMobileOpen(false);
                                 }}
                                 title={compactMode ? item.label : undefined}
                             >
-                                <Icon size={20} strokeWidth={isActive ? 2 : 1.5} />
-                                {!compactMode && item.label}
+                                {/* Active background gradient layer */}
+                                <div className={clsx(
+                                    'absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent transition-opacity duration-300 -z-10',
+                                    isActive ? 'opacity-100' : 'opacity-0'
+                                )} />
+                                {/* Hover background gradient layer */}
+                                <div className="absolute inset-0 bg-white/5 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none -z-10" />
+
+                                <Icon size={20} strokeWidth={isActive ? 2 : 1.5} className={clsx("transition-transform duration-300", isActive && "drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]")} />
+                                {!compactMode && <span>{item.label}</span>}
                             </Link>
                         );
                     })}
                 </nav>
 
                 {/* User Profile & Actions */}
-                <div className="p-3 space-y-1" style={{ borderTop: '1px solid hsl(var(--sidebar-border))' }}>
+                <div className="p-3 space-y-2 border-t border-[var(--glass-border)]">
 
                     {/* Settings button */}
                     <button
                         onClick={() => setShowSettings(true)}
                         className={clsx(
-                            'w-full flex items-center rounded-xl text-sm font-medium transition-all duration-200',
-                            compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5'
+                            'w-full flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
+                            compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5',
+                            showSettings ? 'text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]'
                         )}
-                        style={{
-                            color: showSettings ? 'hsl(210 20% 90%)' : 'hsl(230 10% 55%)',
-                            background: showSettings ? 'hsl(230 15% 16%)' : 'transparent',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'hsl(230 15% 16%)'; e.currentTarget.style.color = 'hsl(210 20% 90%)'; }}
-                        onMouseLeave={e => { if (!showSettings) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'hsl(230 10% 55%)'; } }}
                         title={compactMode ? 'Configuración' : undefined}
                     >
+                        {/* Selected/Hover background gradient layers */}
+                        <div className={clsx('absolute inset-0 bg-white/10 transition-opacity duration-300 pointer-events-none -z-10', showSettings ? 'opacity-100' : 'opacity-0')} />
+                        <div className="absolute inset-0 bg-white/5 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none -z-10" />
+
                         <SlidersHorizontal size={18} />
                         {!compactMode && <span>Configuración</span>}
                     </button>
@@ -346,17 +323,15 @@ export default function Sidebar() {
                         <Link
                             href="/admin-users"
                             className={clsx(
-                                'flex items-center rounded-xl text-sm font-medium transition-all duration-200',
-                                compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5'
+                                'flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
+                                compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5',
+                                pathname.startsWith('/admin-users') ? 'text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]'
                             )}
-                            style={{
-                                color: pathname.startsWith('/admin-users') ? 'hsl(210 20% 90%)' : 'hsl(230 10% 55%)',
-                                background: pathname.startsWith('/admin-users') ? 'hsl(230 15% 16%)' : 'transparent',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'hsl(230 15% 16%)'; e.currentTarget.style.color = 'hsl(210 20% 90%)'; }}
-                            onMouseLeave={e => { if (!pathname.startsWith('/admin-users')) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'hsl(230 10% 55%)'; } }}
                             title={compactMode ? 'Gestión de Usuarios' : undefined}
                         >
+                            <div className={clsx('absolute inset-0 bg-white/10 transition-opacity duration-300 pointer-events-none -z-10', pathname.startsWith('/admin-users') ? 'opacity-100' : 'opacity-0')} />
+                            <div className="absolute inset-0 bg-white/5 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none -z-10" />
+
                             <Settings size={18} />
                             {!compactMode && <span>Gestión de Usuarios</span>}
                         </Link>
@@ -367,41 +342,36 @@ export default function Sidebar() {
                         <button
                             onClick={() => setImpersonatedRole(null)}
                             className={clsx(
-                                'w-full flex items-center rounded-xl text-sm font-medium transition-colors',
+                                'w-full flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden text-amber-500 border border-amber-500/30 hover:shadow-[0_0_15px_rgba(245,158,11,0.2)] hover:bg-amber-500/10',
                                 compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5'
                             )}
-                            style={{
-                                background: 'hsla(38, 92%, 50%, 0.1)',
-                                color: 'hsl(38 92% 60%)',
-                                border: '1px solid hsla(38, 92%, 50%, 0.2)',
-                            }}
                             title={compactMode ? 'Dejar de Imitar' : undefined}
                         >
-                            <EyeOff size={18} />
+                            <EyeOff size={18} className="drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]" />
                             {!compactMode && <span>Dejar de Imitar</span>}
                         </button>
                     )}
 
                     {/* User info */}
-                    <div className={clsx('flex items-center py-3', compactMode ? 'justify-center px-2' : 'gap-3 px-4')}>
+                    <div className={clsx('flex items-center py-3 pt-4', compactMode ? 'justify-center px-2' : 'gap-3 px-4')}>
                         <div
-                            className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0"
+                            className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-2 ring-white/10"
                             style={{
-                                background: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(200 80% 50%))',
+                                background: 'linear-gradient(135deg, hsl(165 100% 40%), hsl(200 80% 40%))',
                             }}
                         >
-                            <span className="text-xs font-bold text-white">
+                            <span className="text-xs font-bold text-white tracking-widest">
                                 {(profile?.full_name || user.email || 'U').charAt(0).toUpperCase()}
                             </span>
                         </div>
                         {!compactMode && (
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate" style={{ color: 'hsl(210 20% 90%)' }}>
+                                <p className="text-sm font-semibold truncate text-white tracking-wide">
                                     {profile?.full_name || user.email?.split('@')[0]}
                                 </p>
-                                <p className="text-xs capitalize truncate" style={{ color: 'hsl(230 10% 45%)' }}>
+                                <p className="text-xs capitalize truncate text-emerald-400 font-medium">
                                     {userRole.replace('_', ' ')}
-                                    {impersonatedRole && <span className="ml-1" style={{ color: 'hsl(38 92% 60%)' }}>(Imitando)</span>}
+                                    {impersonatedRole && <span className="ml-1 text-amber-500">(Imitando)</span>}
                                 </p>
                             </div>
                         )}
@@ -414,12 +384,9 @@ export default function Sidebar() {
                                 window.location.href = '/login';
                             }}
                             className={clsx(
-                                'flex items-center transition-colors text-sm font-medium',
+                                'flex items-center transition-all duration-300 text-sm font-medium text-gray-400 hover:text-red-400 hover:drop-shadow-[0_0_8px_rgba(248,113,113,0.5)]',
                                 compactMode ? 'justify-center p-1.5' : 'gap-2'
                             )}
-                            style={{ color: 'hsl(230 10% 45%)' }}
-                            onMouseEnter={e => e.currentTarget.style.color = 'hsl(0 72% 60%)'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'hsl(230 10% 45%)'}
                             title="Cerrar Sesión"
                         >
                             <LogOut size={18} />

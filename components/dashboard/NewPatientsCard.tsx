@@ -192,19 +192,19 @@ export default function NewPatientsCard() {
 
     if (loading) {
         return (
-            <div className="glass-card rounded-xl p-5 animate-pulse h-full">
-                <div className="h-5 rounded w-1/3 mb-4" style={{ background: 'hsl(230 15% 18%)' }}></div>
+            <div className="glass-card rounded-xl p-5 animate-pulse h-full border border-white/5 bg-black/20">
+                <div className="h-5 rounded w-1/3 mb-4 bg-white/5"></div>
                 <div className="space-y-3">
-                    <div className="h-10 rounded-lg" style={{ background: 'hsl(230 15% 16%)' }}></div>
-                    <div className="h-10 rounded-lg" style={{ background: 'hsl(230 15% 16%)' }}></div>
-                    <div className="h-40 rounded-lg" style={{ background: 'hsl(230 15% 16%)' }}></div>
+                    <div className="h-10 rounded-lg bg-white/5"></div>
+                    <div className="h-10 rounded-lg bg-white/5"></div>
+                    <div className="h-40 rounded-lg bg-white/5"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="glass-card rounded-xl overflow-hidden h-full flex flex-col p-5 bg-slate-900/40 border border-slate-800/50">
+        <div className="glass-card rounded-xl overflow-hidden h-full flex flex-col p-5 bg-black/20 border border-white/5">
             {/* SVG Filter for Neon Glow */}
             <svg style={{ position: 'absolute', width: 0, height: 0 }}>
                 <defs>
@@ -229,13 +229,13 @@ export default function NewPatientsCard() {
                     <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mt-0.5">Gestión de crecimiento</p>
                 </div>
 
-                <div className="flex items-center gap-1 bg-slate-950/40 rounded-lg border border-slate-800 p-0.5">
+                <div className="flex items-center gap-1 bg-black/20 rounded-lg border border-white/5 p-0.5">
                     {monthlyTrend.map((m) => (
                         <button
                             key={m.key}
                             onClick={() => setSelectedMonthKey(m.key)}
                             className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${selectedMonthKey === m.key
-                                ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                                ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20 shadow-[0_0_10px_rgba(45,212,191,0.1)]'
                                 : 'text-slate-500 hover:text-slate-300'
                                 }`}
                         >
@@ -267,7 +267,7 @@ export default function NewPatientsCard() {
                             <Link
                                 key={patient.id}
                                 href={`/patients/${patient.id}`}
-                                className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/60 border border-slate-800/50 transition-all group"
+                                className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group lg:min-h-[64px]"
                             >
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${patient.tieneMovimientos
@@ -296,7 +296,7 @@ export default function NewPatientsCard() {
             </div>
 
             {/* Neon Glowing Trend Chart */}
-            <div className="relative mt-auto border-t border-slate-800/50 pt-6">
+            <div className="relative mt-auto border-t border-white/10 pt-6">
                 <div className="flex items-center justify-between mb-4 px-1">
                     <div>
                         <h5 className="text-xs font-bold text-slate-300">Tendencia de Crecimiento</h5>
@@ -354,7 +354,7 @@ export default function NewPatientsCard() {
 
             {/* Footer Summary Cards */}
             <div className="grid grid-cols-2 gap-3 mt-6">
-                <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-800 transition-hover hover:border-teal-500/30">
+                <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-hover hover:border-teal-500/30">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-tighter mb-1">Crecimiento</p>
                     <div className="flex items-end gap-2">
                         <span className="text-xl font-black text-white">{growthRate > 0 ? `+${growthRate}` : growthRate}%</span>
@@ -365,7 +365,7 @@ export default function NewPatientsCard() {
                     </div>
                 </div>
 
-                <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-800 transition-hover hover:border-amber-500/30">
+                <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-hover hover:border-amber-500/30">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-tighter mb-1">Sin Seguimiento</p>
                     <div className="flex items-end gap-2">
                         <span className="text-xl font-black text-amber-500">{sinSeguimiento}</span>

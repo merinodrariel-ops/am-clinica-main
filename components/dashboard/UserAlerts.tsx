@@ -86,29 +86,29 @@ export default function UserAlerts() {
         <div className="space-y-4 mb-8">
             {alerts.map(alert => (
                 <div key={alert.type}
-                    className={`rounded-xl p-4 border ${alert.type === 'pending'
-                        ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800'
-                        : 'bg-orange-50 border-orange-200 dark:bg-orange-900/10 dark:border-orange-800'
+                    className={`rounded-xl p-4 border glass-card ${alert.type === 'pending'
+                        ? 'bg-yellow-500/5 border-yellow-500/20'
+                        : 'bg-orange-500/5 border-orange-500/20'
                         }`}
                 >
                     <div className="flex items-start gap-4">
-                        <div className={`p-2 rounded-lg ${alert.type === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-orange-100 text-orange-600'
+                        <div className={`p-2 rounded-lg ${alert.type === 'pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-orange-500/10 text-orange-500'
                             }`}>
                             {alert.type === 'pending' ? <Clock size={24} /> : <UserX size={24} />}
                         </div>
                         <div className="flex-1">
-                            <h3 className={`text-lg font-semibold ${alert.type === 'pending' ? 'text-yellow-900 dark:text-yellow-100' : 'text-orange-900 dark:text-orange-100'
+                            <h3 className={`text-lg font-semibold drop-shadow-sm ${alert.type === 'pending' ? 'text-yellow-400' : 'text-orange-400'
                                 }`}>
                                 {alert.type === 'pending' ? 'Invitaciones Pendientes' : 'Usuarios Suspendidos'}
                             </h3>
-                            <p className={`mb-3 ${alert.type === 'pending' ? 'text-yellow-700' : 'text-orange-700'
+                            <p className={`mb-3 ${alert.type === 'pending' ? 'text-yellow-500/70' : 'text-orange-500/70'
                                 }`}>
                                 Hay {alert.count} {alert.type === 'pending' ? 'usuarios que aún no aceptaron la invitación' : 'usuarios sin acceso al sistema'}.
                             </p>
 
                             <div className="space-y-2 mb-4">
                                 {alert.users.slice(0, 3).map(u => (
-                                    <div key={u.id} className="flex justify-between text-sm bg-white/50 dark:bg-black/10 p-2 rounded">
+                                    <div key={u.id} className="flex justify-between text-sm bg-black/20 border border-white/5 p-2 rounded text-slate-300">
                                         <span className="font-medium">{u.full_name}</span>
                                         <span className="opacity-70">{new Date(u.date).toLocaleDateString()}</span>
                                     </div>
@@ -120,7 +120,7 @@ export default function UserAlerts() {
 
                             <Link
                                 href="/admin/users"
-                                className={`inline-flex items-center gap-2 text-sm font-medium hover:underline ${alert.type === 'pending' ? 'text-yellow-800' : 'text-orange-800'
+                                className={`inline-flex items-center gap-2 text-sm font-medium hover:underline ${alert.type === 'pending' ? 'text-yellow-500' : 'text-orange-500'
                                     }`}
                             >
                                 Gestionar Usuarios <ArrowRight size={16} />

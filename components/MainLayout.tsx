@@ -30,7 +30,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
     return (
         <CommandPalette>
             <main className={clsx(
-                'min-h-screen transition-all duration-200',
+                'min-h-screen transition-all duration-300 bg-background text-foreground selection:bg-emerald-500/30',
                 isSidebarVisible ? (sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64') : ''
             )}>
                 {children}

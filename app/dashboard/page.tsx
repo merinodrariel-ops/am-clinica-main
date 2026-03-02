@@ -62,10 +62,10 @@ export default function DashboardPage() {
     return (
         <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight" style={{ color: 'hsl(210 20% 95%)' }}>
+                <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md">
                     Dashboard
                 </h1>
-                <p className="mt-1" style={{ color: 'hsl(230 10% 50%)' }}>AM Clínica – Operativa 360</p>
+                <p className="mt-1 text-slate-400">AM Clínica – Operativa 360</p>
             </div>
 
             {/* Owner-only Dashboard */}
@@ -98,46 +98,46 @@ export default function DashboardPage() {
             {/* Quick Links */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
                 <Link href="/patients" className="group">
-                    <div className="glass-card glass-card-hover rounded-xl p-4">
+                    <div className="glass-card hover:bg-white/5 transition-colors duration-300 rounded-xl p-4 border border-white/10 group-hover:border-teal-500/50">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(224 76% 48%))' }}>
+                            <div className="h-10 w-10 rounded-lg flex items-center justify-center text-teal-400 bg-teal-500/10 border border-teal-500/20 group-hover:bg-teal-500/20 transition-colors">
                                 <Users size={20} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-sm" style={{ color: 'hsl(210 20% 93%)' }}>Pacientes</h3>
-                                <p className="text-xs" style={{ color: 'hsl(230 10% 50%)' }}>Gestión y fichas</p>
+                                <h3 className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">Pacientes</h3>
+                                <p className="text-xs text-slate-500">Gestión y fichas</p>
                             </div>
-                            <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1" style={{ color: 'hsl(230 10% 40%)' }} />
+                            <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1 text-slate-500 group-hover:text-teal-400" />
                         </div>
                     </div>
                 </Link>
 
                 <Link href="/caja-recepcion" className="group">
-                    <div className="glass-card glass-card-hover rounded-xl p-4">
+                    <div className="glass-card hover:bg-white/5 transition-colors duration-300 rounded-xl p-4 border border-white/10 group-hover:border-emerald-500/50">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(160 80% 35%))' }}>
+                            <div className="h-10 w-10 rounded-lg flex items-center justify-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors">
                                 <Banknote size={20} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-sm" style={{ color: 'hsl(210 20% 93%)' }}>Caja Recepción</h3>
-                                <p className="text-xs" style={{ color: 'hsl(230 10% 50%)' }}>Ingresos y cobros</p>
+                                <h3 className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">Caja Recepción</h3>
+                                <p className="text-xs text-slate-500">Ingresos y cobros</p>
                             </div>
-                            <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1" style={{ color: 'hsl(230 10% 40%)' }} />
+                            <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1 text-slate-500 group-hover:text-emerald-400" />
                         </div>
                     </div>
                 </Link>
 
                 <Link href="/agenda" className="group">
-                    <div className="glass-card glass-card-hover rounded-xl p-4">
+                    <div className="glass-card hover:bg-white/5 transition-colors duration-300 rounded-xl p-4 border border-white/10 group-hover:border-purple-500/50">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg, hsl(280 67% 55%), hsl(265 70% 50%))' }}>
+                            <div className="h-10 w-10 rounded-lg flex items-center justify-center text-purple-400 bg-purple-500/10 border border-purple-500/20 group-hover:bg-purple-500/20 transition-colors">
                                 <Calendar size={20} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-sm" style={{ color: 'hsl(210 20% 93%)' }}>Agenda</h3>
-                                <p className="text-xs" style={{ color: 'hsl(230 10% 50%)' }}>Citas y turnos</p>
+                                <h3 className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">Agenda</h3>
+                                <p className="text-xs text-slate-500">Citas y turnos</p>
                             </div>
-                            <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1" style={{ color: 'hsl(230 10% 40%)' }} />
+                            <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1 text-slate-500 group-hover:text-purple-400" />
                         </div>
                     </div>
                 </Link>

@@ -21,12 +21,12 @@ export default function StatsGrid() {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
                 {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="glass-card rounded-2xl p-6 animate-pulse">
+                    <div key={i} className="glass-card rounded-2xl p-6 border border-white/10 animate-pulse">
                         <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-xl" style={{ background: 'hsl(230 15% 18%)' }} />
+                            <div className="h-12 w-12 rounded-xl bg-white/5 border border-white/5" />
                             <div className="space-y-2">
-                                <div className="h-4 w-20 rounded" style={{ background: 'hsl(230 15% 18%)' }} />
-                                <div className="h-6 w-12 rounded" style={{ background: 'hsl(230 15% 18%)' }} />
+                                <div className="h-4 w-20 rounded bg-white/5" />
+                                <div className="h-6 w-12 rounded bg-white/5" />
                             </div>
                         </div>
                     </div>
@@ -77,29 +77,30 @@ export default function StatsGrid() {
             {cards.map((card, i) => {
                 const Icon = card.icon;
                 return (
-                    <div key={i} className="glass-card glass-card-hover rounded-2xl p-6 overflow-hidden">
-                        <div className="flex items-center gap-4">
+                    <div key={i} className="glass-card rounded-2xl p-6 overflow-hidden hover:bg-white/5 transition-colors duration-300 border border-white/10 relative group">
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                        <div className="flex items-center gap-4 relative z-10">
                             <div
-                                className="h-12 w-12 rounded-xl flex items-center justify-center"
+                                className="h-12 w-12 rounded-xl flex items-center justify-center border border-white/5"
                                 style={{ background: card.iconBg }}
                             >
                                 <Icon size={24} style={{ color: card.iconColor }} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm" style={{ color: 'hsl(230 10% 50%)' }}>{card.label}</p>
+                                <p className="text-sm text-slate-400">{card.label}</p>
                                 {card.isDouble ? (
                                     <div className="flex flex-col">
-                                        <span className="text-lg font-bold truncate block" style={{ color: 'hsl(210 20% 95%)' }}>
+                                        <span className="text-lg font-bold truncate block text-white drop-shadow-sm">
                                             {card.valueUsd}
                                         </span>
-                                        <span className="text-sm font-medium" style={{ color: 'hsl(230 10% 50%)' }}>
+                                        <span className="text-sm font-medium text-slate-500">
                                             {card.valueArs}
                                         </span>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col">
                                         <div className="flex items-baseline gap-2">
-                                            <p className="text-2xl font-bold truncate" style={{ color: 'hsl(210 20% 95%)' }}>
+                                            <p className="text-2xl font-bold truncate text-white drop-shadow-sm">
                                                 {card.value}
                                             </p>
                                             {card.label === 'Pacientes' && (

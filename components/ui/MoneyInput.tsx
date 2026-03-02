@@ -137,7 +137,7 @@ export default function MoneyInput({
                 inputMode="decimal"
                 disabled={disabled}
                 className={clsx(
-                    "pr-3 text-right font-mono tabular-nums focus:ring-2 focus:ring-blue-500/20 transition-all",
+                    "pr-3 text-right font-mono tabular-nums focus:ring-2 focus:ring-teal-500/30 transition-all",
                     !hideSymbol ? "pl-7" : "pl-3",
                     className
                 )}

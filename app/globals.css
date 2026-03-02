@@ -183,6 +183,7 @@ html {
   color-scheme: dark;
 }
 
+/* Force dark mode background on body */
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -206,6 +207,7 @@ body {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
+  border-radius: var(--radius);
 }
 
 .glass-card-hover {
@@ -213,10 +215,10 @@ body {
 }
 
 .glass-card-hover:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.12);
-  transform: translateY(-1px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
 }
 
 /* ============================================================

@@ -550,6 +550,16 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                   >
                     CONTACTAR A UN EJECUTIVO <MessageCircle className="w-5 h-5" />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleGoToContractStep();
+                    }}
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-white/10"
+                  >
+                    <FileText className="w-4 h-4" />
+                    O generar contrato ahora
+                  </button>
                 </div>
               </div>
             )}

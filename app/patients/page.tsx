@@ -94,12 +94,12 @@ export default function PatientsPage() {
         <RoleGuard allowedRoles={['reception', 'admin', 'recaptacion']}>
             <div className="p-6 max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                        <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-md">
                             Pacientes
                         </h1>
-                        <p className="text-gray-500 mt-1">
+                        <p className="text-slate-400 mt-1">
                             {totalCount} pacientes registrados
                         </p>
                     </div>
@@ -109,7 +109,7 @@ export default function PatientsPage() {
                         <div className="flex items-center gap-3">
                             <Link
                                 href="/admision"
-                                className="flex items-center gap-2 px-4 py-2.5 border border-purple-200 dark:border-purple-900/30 bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/20 rounded-lg font-medium transition-colors"
+                                className="flex items-center gap-2 px-4 py-2.5 border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-lg font-medium transition-colors"
                             >
                                 <UserPlus size={18} />
                                 Formulario Admisión
@@ -117,7 +117,7 @@ export default function PatientsPage() {
                             <button
                                 onClick={() => handleSyncSheets(false)}
                                 disabled={syncing}
-                                className="flex items-center gap-2 px-4 py-2.5 border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-lg font-medium transition-colors disabled:opacity-50"
+                                className="flex items-center gap-2 px-4 py-2.5 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg font-medium transition-colors disabled:opacity-50"
                                 title="Sincronizar directamente con las respuestas de Google Form"
                             >
                                 <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
@@ -125,7 +125,7 @@ export default function PatientsPage() {
                             </button>
                             <button
                                 onClick={() => setShowNuevoPaciente(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-400 text-white rounded-lg font-medium transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] hover:opacity-90 border-none"
                             >
                                 <Plus size={20} />
                                 Agregar Paciente
@@ -135,16 +135,16 @@ export default function PatientsPage() {
                 </div>
 
                 {/* Search and Filters */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+                <div className="glass-card rounded-xl p-4 mb-6 relative overflow-visible z-20">
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-white/10 bg-navy-900/50 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500/50 transition-colors backdrop-blur-sm"
                                 placeholder="Buscar por nombre, apellido, email, teléfono o documento..."
                             />
                         </div>
@@ -155,7 +155,7 @@ export default function PatientsPage() {
                                     setEstadoFilter(e.target.value);
                                     setTimeout(loadPatients, 100);
                                 }}
-                                className="px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                className="px-4 py-2.5 rounded-lg border border-white/10 bg-navy-900/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500/50 transition-colors backdrop-blur-sm [&>option]:bg-navy-900"
                             >
                                 <option value="">Todos los estados</option>
                                 <option value="Activo">Activo</option>
@@ -165,13 +165,13 @@ export default function PatientsPage() {
                             </select>
                             <button
                                 onClick={handleSearch}
-                                className="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300"
+                                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-slate-300 transition-colors border border-white/5"
                             >
                                 <Search size={18} />
                             </button>
                             <button
                                 onClick={loadPatients}
-                                className="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300"
+                                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-slate-300 transition-colors border border-white/5"
                             >
                                 <RefreshCw size={18} />
                             </button>

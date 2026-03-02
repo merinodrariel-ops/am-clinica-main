@@ -56,23 +56,23 @@ export default function CajaAlerts() {
     return (
         <div className="mb-8 space-y-4">
             {alertsRecepcion.length > 0 && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                <div className="glass-card bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
                     <div className="flex items-start gap-4">
-                        <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
-                            <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                        <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                            <AlertTriangle className="w-6 h-6 text-amber-500" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-100">
+                            <h3 className="text-lg font-semibold text-amber-400 drop-shadow-sm">
                                 Días sin cerrar en Recepción
                             </h3>
-                            <p className="text-amber-700 dark:text-amber-300 mb-3">
+                            <p className="text-amber-500/70 mb-3">
                                 Se detectaron {alertsRecepcion.length} días con movimientos sin cierre de caja.
                             </p>
                             <div className="space-y-2">
                                 {alertsRecepcion.map((dia) => (
-                                    <div key={dia.fecha} className="flex items-center justify-between text-sm bg-white/50 dark:bg-black/20 p-2 rounded">
+                                    <div key={dia.fecha} className="flex items-center justify-between text-sm bg-black/20 border border-white/5 p-2 rounded text-slate-300">
                                         <span>{new Date(dia.fecha).toLocaleDateString()}</span>
-                                        <span className="text-amber-800 dark:text-amber-200">
+                                        <span className="text-amber-500/80">
                                             {dia.cantidad} mov. (Últ: {dia.ultimo_usuario})
                                         </span>
                                     </div>
@@ -81,7 +81,7 @@ export default function CajaAlerts() {
                             <div className="mt-4">
                                 <Link
                                     href="/caja-recepcion"
-                                    className="inline-flex items-center gap-2 text-sm font-medium text-amber-800 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
+                                    className="inline-flex items-center gap-2 text-sm font-medium text-amber-500 hover:text-amber-400 transition-colors"
                                 >
                                     Ir a Caja Recepción <ArrowRight size={16} />
                                 </Link>
@@ -92,23 +92,23 @@ export default function CajaAlerts() {
             )}
 
             {alertsAdmin.map((alert) => (
-                <div key={alert.sucursal} className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                <div key={alert.sucursal} className="glass-card bg-red-500/5 border border-red-500/20 rounded-xl p-4">
                     <div className="flex items-start gap-4">
-                        <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg">
-                            <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                        <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/20">
+                            <AlertTriangle className="w-6 h-6 text-red-500" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">
+                            <h3 className="text-lg font-semibold text-red-400 drop-shadow-sm">
                                 Días sin cerrar en Administración ({alert.sucursal})
                             </h3>
-                            <p className="text-red-700 dark:text-red-300 mb-3">
+                            <p className="text-red-500/70 mb-3">
                                 Se detectaron {alert.dias.length} días con movimientos sin cierre.
                             </p>
                             <div className="space-y-2">
                                 {alert.dias.map((dia) => (
-                                    <div key={dia.fecha} className="flex items-center justify-between text-sm bg-white/50 dark:bg-black/20 p-2 rounded">
+                                    <div key={dia.fecha} className="flex items-center justify-between text-sm bg-black/20 border border-white/5 p-2 rounded text-slate-300">
                                         <span>{new Date(dia.fecha).toLocaleDateString()}</span>
-                                        <span className="text-red-800 dark:text-red-200">
+                                        <span className="text-red-500/80">
                                             {dia.cantidad} mov. (Últ: {dia.ultimo_usuario})
                                         </span>
                                     </div>
@@ -117,7 +117,7 @@ export default function CajaAlerts() {
                             <div className="mt-4">
                                 <Link
                                     href="/caja-admin"
-                                    className="inline-flex items-center gap-2 text-sm font-medium text-red-800 hover:text-red-900 dark:text-red-300 dark:hover:text-red-200"
+                                    className="inline-flex items-center gap-2 text-sm font-medium text-red-500 hover:text-red-400 transition-colors"
                                 >
                                     Ir a Caja Administración <ArrowRight size={16} />
                                 </Link>

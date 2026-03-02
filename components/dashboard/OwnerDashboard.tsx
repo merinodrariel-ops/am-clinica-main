@@ -221,8 +221,7 @@ function SortableCard({
             )}
             {isEditing && (
                 <button
-                    className="absolute top-2 left-2 z-10 p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all touch-none"
-                    style={{ background: 'hsla(230, 15%, 25%, 0.8)', color: 'hsl(230, 10%, 60%)' }}
+                    className="absolute top-2 left-2 z-10 p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all touch-none bg-white/5 hover:bg-white/10 text-slate-400"
                     aria-label="Arrastrar tarjeta"
                     {...(isDragEnabled ? { ...attributes, ...listeners } : {})}
                 >
@@ -283,23 +282,14 @@ function KpiCard({
 
     return (
         <div
-            className={`glass-card rounded-2xl p-6 transition-all duration-300 relative ${isGiant ? 'col-span-1 md:col-span-2' : ''
-                } ${isHidden ? 'opacity-40' : ''} ${isEditing ? 'ring-1 ring-white/10' : ''} ${cardClassName}`}
-            style={{
-                background: isHidden
-                    ? 'hsla(230, 15%, 12%, 0.5)'
-                    : 'hsla(230, 15%, 12%, 0.6)',
-            }}
+            className={`glass-card rounded-2xl p-6 transition-all duration-300 relative border border-white/5 ${isGiant ? 'col-span-1 md:col-span-2' : ''
+                } ${isHidden ? 'opacity-40 bg-black/40' : 'bg-black/20'} ${isEditing ? 'ring-1 ring-white/10' : ''} ${cardClassName}`}
         >
             {isEditing && (
                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
                     <button
                         onClick={() => onToggleVisibility(id)}
-                        className="p-1.5 rounded-lg transition-all hover:scale-110"
-                        style={{
-                            background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 25%, 0.8)',
-                            color: isHidden ? 'hsl(0, 70%, 60%)' : 'hsl(230, 10%, 60%)',
-                        }}
+                        className={`p-1.5 rounded-lg transition-all hover:scale-110 ${isHidden ? 'bg-red-500/20 text-red-400' : 'bg-white/5 hover:bg-white/10 text-slate-400'}`}
                         title={isHidden ? 'Mostrar' : 'Ocultar'}
                     >
                         {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -307,11 +297,7 @@ function KpiCard({
                     <button
                         onClick={() => onRemove(id)}
                         disabled={!canRemove}
-                        className="p-1.5 rounded-lg transition-all hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed"
-                        style={{
-                            background: 'hsla(0, 70%, 50%, 0.2)',
-                            color: 'hsl(0, 70%, 60%)',
-                        }}
+                        className="p-1.5 rounded-lg transition-all hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed bg-red-500/20 text-red-500"
                         title={canRemove ? 'Eliminar del grid' : 'Debe quedar al menos una tarjeta'}
                     >
                         <Trash2 size={14} />
@@ -329,8 +315,7 @@ function KpiCard({
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <p
-                            className={`${isGiant ? 'text-base' : 'text-sm'} font-medium`}
-                            style={{ color: 'hsl(230 10% 55%)' }}
+                            className={`${isGiant ? 'text-base' : 'text-sm'} font-medium text-slate-400`}
                         >
                             {label}
                         </p>
@@ -360,7 +345,7 @@ function KpiCard({
                         {value}
                     </p>
                     {subtitle && (
-                        <p className="text-xs mt-1.5" style={{ color: 'hsl(230 10% 45%)' }}>
+                        <p className="text-xs mt-1.5 text-slate-500">
                             {subtitle}
                         </p>
                     )}
@@ -372,8 +357,7 @@ function KpiCard({
                     {!alwaysExpanded && (
                         <button
                             onClick={() => setExpanded(!expanded)}
-                            className="flex items-center gap-1 text-xs transition-colors"
-                            style={{ color: 'hsl(230 10% 50%)' }}
+                            className="flex items-center gap-1 text-xs transition-colors text-slate-400 hover:text-slate-300"
                         >
                             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             {expanded ? 'Ocultar detalle' : 'Ver detalle'}
@@ -381,8 +365,7 @@ function KpiCard({
                     )}
                     {(alwaysExpanded || expanded) && (
                         <div
-                            className={`rounded-xl p-3 overflow-y-auto ${alwaysExpanded ? 'mt-0 max-h-80' : 'mt-2 max-h-48'}`}
-                            style={{ background: 'hsla(230, 15%, 8%, 0.5)' }}
+                            className={`rounded-xl p-3 overflow-y-auto ${alwaysExpanded ? 'mt-0 max-h-80' : 'mt-2 max-h-48'} bg-black/40 border border-white/5`}
                         >
                             {expandContent}
                         </div>
@@ -429,20 +412,19 @@ function NewPatientsTrendDetail({
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg px-2 py-1" style={{ background: 'hsl(230 15% 12%)', border: '1px solid hsl(230 15% 18%)' }}>
+            <div className="flex items-center justify-between rounded-lg px-2 py-1 bg-black/40 border border-white/5">
                 <button
                     type="button"
                     onClick={() => canPrev && setSelectedMonthKey(monthly[safeIndex - 1].key)}
                     disabled={!canPrev}
-                    className="p-1 rounded disabled:opacity-30"
-                    style={{ color: 'hsl(230 10% 60%)' }}
+                    className="p-1 rounded disabled:opacity-30 text-slate-400 hover:text-slate-300"
                     aria-label="Mes anterior"
                 >
                     <ChevronLeft size={14} />
                 </button>
                 <div className="text-center">
-                    <p className="text-xs capitalize" style={{ color: 'hsl(210 20% 85%)' }}>{selectedMonth?.label || 'Sin datos'}</p>
-                    <p className="text-[11px]" style={{ color: 'hsl(230 10% 45%)' }}>
+                    <p className="text-xs capitalize text-slate-200">{selectedMonth?.label || 'Sin datos'}</p>
+                    <p className="text-[11px] text-slate-500">
                         {currentCount} nuevos{previousMonth ? ` · vs ${previousMonth.shortLabel}: ${previousCount}` : ''}
                     </p>
                 </div>
@@ -450,8 +432,7 @@ function NewPatientsTrendDetail({
                     type="button"
                     onClick={() => canNext && setSelectedMonthKey(monthly[safeIndex + 1].key)}
                     disabled={!canNext}
-                    className="p-1 rounded disabled:opacity-30"
-                    style={{ color: 'hsl(230 10% 60%)' }}
+                    className="p-1 rounded disabled:opacity-30 text-slate-400 hover:text-slate-300"
                     aria-label="Mes siguiente"
                 >
                     <ChevronRight size={14} />
@@ -470,7 +451,7 @@ function NewPatientsTrendDetail({
                             className="flex flex-col items-center justify-end gap-1"
                             title={`${month.label}: ${month.count}`}
                         >
-                            <span className="text-[10px]" style={{ color: isSelected ? 'hsl(165 85% 50%)' : 'hsl(230 10% 45%)' }}>
+                            <span className={`text-[10px] ${isSelected ? 'text-teal-500' : 'text-slate-500'}`}>
                                 {month.count}
                             </span>
                             <div
@@ -478,14 +459,14 @@ function NewPatientsTrendDetail({
                                 style={{
                                     height: `${height}%`,
                                     background: isSelected
-                                        ? 'linear-gradient(180deg, hsl(165 100% 42%), hsl(160 80% 35%))'
-                                        : 'hsl(230 12% 30%)',
+                                        ? 'linear-gradient(180deg, #14b8a6, #0f766e)'
+                                        : 'rgba(255, 255, 255, 0.05)',
                                     border: isSelected
-                                        ? '1px solid hsla(165, 100%, 42%, 0.5)'
-                                        : '1px solid hsl(230 15% 20%)',
+                                        ? '1px solid rgba(20, 184, 166, 0.5)'
+                                        : '1px solid rgba(255, 255, 255, 0.1)',
                                 }}
                             />
-                            <span className="text-[10px] uppercase" style={{ color: isSelected ? 'hsl(210 20% 80%)' : 'hsl(230 10% 45%)' }}>
+                            <span className={`text-[10px] uppercase ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
                                 {month.shortLabel}
                             </span>
                         </button>
@@ -494,21 +475,20 @@ function NewPatientsTrendDetail({
             </div>
 
             {(trendUp || trendDown) && (
-                <p className="text-xs" style={{ color: trendUp ? 'hsl(165 85% 50%)' : 'hsl(0 72% 60%)' }}>
+                <p className={`text-xs ${trendUp ? 'text-teal-500' : 'text-red-400'}`}>
                     {trendUp ? 'Sube' : 'Baja'} {Math.abs(changePct)}% respecto al mes previo.
                 </p>
             )}
 
-            <p className="text-[11px]" style={{ color: 'hsl(230 10% 45%)' }}>
+            <p className="text-[11px] text-slate-500">
                 Tocá una barra para cambiar el mes de referencia.
             </p>
 
-            <div className="pt-2" style={{ borderTop: '1px solid hsl(230 15% 18%)' }}>
+            <div className="pt-2 border-t border-white/5">
                 <button
                     type="button"
                     onClick={() => setShowSelectedList((prev) => !prev)}
-                    className="flex items-center gap-1 text-xs transition-colors"
-                    style={{ color: 'hsl(230 10% 50%)' }}
+                    className="flex items-center gap-1 text-xs transition-colors text-slate-400 hover:text-slate-300"
                 >
                     {showSelectedList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     {showSelectedList ? 'Ocultar lista del mes' : 'Ver lista del mes'}
@@ -517,7 +497,7 @@ function NewPatientsTrendDetail({
                 {showSelectedList && (
                     <div className="mt-2 space-y-1.5">
                         {selectedPatients.length === 0 ? (
-                            <p className="text-xs" style={{ color: 'hsl(230 10% 45%)' }}>
+                            <p className="text-xs text-slate-500">
                                 Sin pacientes nuevos para {selectedMonth?.label || 'el mes seleccionado'}.
                             </p>
                         ) : (
@@ -525,11 +505,10 @@ function NewPatientsTrendDetail({
                                 <Link
                                     key={`${p.monthKey}-${p.nombre}-${p.apellido}-${i}`}
                                     href={`/patients/${p.id_paciente}`}
-                                    className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group"
-                                    style={{ color: 'hsl(210 20% 80%)' }}
+                                    className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group text-slate-300"
                                 >
                                     <span className="font-medium group-hover:underline">{p.nombre} {p.apellido}</span>
-                                    <span style={{ color: 'hsl(230 10% 40%)' }}>
+                                    <span className="text-slate-500">
                                         {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                                     </span>
                                 </Link>
@@ -540,12 +519,11 @@ function NewPatientsTrendDetail({
             </div>
 
             {januaryMonth && (
-                <div className="pt-2" style={{ borderTop: '1px solid hsl(230 15% 18%)' }}>
+                <div className="pt-2 border-t border-white/5">
                     <button
                         type="button"
                         onClick={() => setShowJanuaryList((prev) => !prev)}
-                        className="flex items-center gap-1 text-xs transition-colors"
-                        style={{ color: 'hsl(230 10% 50%)' }}
+                        className="flex items-center gap-1 text-xs transition-colors text-slate-400 hover:text-slate-300"
                     >
                         {showJanuaryList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                         {showJanuaryList ? 'Ocultar lista de enero' : `Ver lista de enero (${januaryMonth.count})`}
@@ -554,7 +532,7 @@ function NewPatientsTrendDetail({
                     {showJanuaryList && (
                         <div className="mt-2 space-y-1.5">
                             {januaryPatients.length === 0 ? (
-                                <p className="text-xs" style={{ color: 'hsl(230 10% 45%)' }}>
+                                <p className="text-xs text-slate-500">
                                     No hay pacientes nuevos en enero.
                                 </p>
                             ) : (
@@ -562,11 +540,10 @@ function NewPatientsTrendDetail({
                                     <Link
                                         key={`enero-${p.monthKey}-${p.nombre}-${p.apellido}-${i}`}
                                         href={`/patients/${p.id_paciente}`}
-                                        className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group"
-                                        style={{ color: 'hsl(210 20% 80%)' }}
+                                        className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group text-slate-300"
                                     >
                                         <span className="font-medium group-hover:underline">{p.nombre} {p.apellido}</span>
-                                        <span style={{ color: 'hsl(230 10% 40%)' }}>
+                                        <span className="text-slate-500">
                                             {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                                         </span>
                                     </Link>
@@ -740,18 +717,18 @@ export default function OwnerDashboard() {
             <div className="mb-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <div className="h-7 w-48 rounded-lg animate-pulse" style={{ background: 'hsl(230 15% 18%)' }} />
-                        <div className="h-4 w-32 mt-2 rounded animate-pulse" style={{ background: 'hsl(230 15% 18%)' }} />
+                        <div className="h-7 w-48 rounded-lg animate-pulse bg-white/5" />
+                        <div className="h-4 w-32 mt-2 rounded animate-pulse bg-white/5" />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[1, 2, 3, 4, 5, 6].map(i => (
-                        <div key={i} className="glass-card rounded-2xl p-6 animate-pulse" style={{ height: i === 1 ? '140px' : '120px' }}>
+                        <div key={i} className="glass-card rounded-2xl p-6 animate-pulse bg-black/20 border border-white/5" style={{ height: i === 1 ? '140px' : '120px' }}>
                             <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 rounded-xl" style={{ background: 'hsl(230 15% 18%)' }} />
+                                <div className="h-12 w-12 rounded-xl bg-white/5" />
                                 <div className="space-y-2">
-                                    <div className="h-4 w-24 rounded" style={{ background: 'hsl(230 15% 18%)' }} />
-                                    <div className="h-8 w-20 rounded" style={{ background: 'hsl(230 15% 18%)' }} />
+                                    <div className="h-4 w-24 rounded bg-white/5" />
+                                    <div className="h-8 w-20 rounded bg-white/5" />
                                 </div>
                             </div>
                         </div>
@@ -897,35 +874,23 @@ export default function OwnerDashboard() {
             <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
                 <div>
                     <h2
-                        className="text-xl font-bold tracking-tight"
-                        style={{ color: 'hsl(210 20% 95%)' }}
+                        className="text-xl font-bold tracking-tight text-white"
                     >
                         📊 Panel del Dueño
                     </h2>
-                    <p className="text-sm mt-0.5" style={{ color: 'hsl(230 10% 45%)' }}>
+                    <p className="text-sm mt-0.5 text-slate-400">
                         {currentMonth} {new Date().getFullYear()} — Vista ejecutiva
                     </p>
-                    <div
-                        className="mt-3 inline-flex items-center gap-1 rounded-xl p-1"
-                        style={{ background: 'hsla(230, 15%, 20%, 0.65)', border: '1px solid hsla(230, 15%, 30%, 0.5)' }}
-                    >
+                    <div className="mt-3 inline-flex items-center gap-1 rounded-xl p-1 bg-black/40 border border-white/5">
                         <button
                             onClick={openDashboardTab}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                            style={{
-                                background: activeTab === 'dashboard' ? 'hsla(165, 100%, 42%, 0.16)' : 'transparent',
-                                color: activeTab === 'dashboard' ? 'hsl(165 85% 52%)' : 'hsl(230 10% 60%)',
-                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === 'dashboard' ? 'bg-teal-500/10 text-teal-400' : 'text-slate-400 hover:text-slate-300 hover:bg-white/5'}`}
                         >
                             Dashboard
                         </button>
                         <button
                             onClick={openConfigTab}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5"
-                            style={{
-                                background: activeTab === 'config' ? 'hsla(165, 100%, 42%, 0.16)' : 'transparent',
-                                color: activeTab === 'config' ? 'hsl(165 85% 52%)' : 'hsl(230 10% 60%)',
-                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${activeTab === 'config' ? 'bg-teal-500/10 text-teal-400' : 'text-slate-400 hover:text-slate-300 hover:bg-white/5'}`}
                         >
                             <Settings2 size={12} />
                             Configurar grid
@@ -935,12 +900,7 @@ export default function OwnerDashboard() {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={resetLayout}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
-                        style={{
-                            background: 'hsla(230, 15%, 20%, 0.8)',
-                            color: 'hsl(230, 10%, 60%)',
-                            border: '1px solid hsla(230, 15%, 30%, 0.5)',
-                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
                     >
                         <RotateCcw size={12} />
                         Restablecer
@@ -948,16 +908,7 @@ export default function OwnerDashboard() {
                     {activeTab === 'dashboard' && (
                         <button
                             onClick={() => setIsEditing(!isEditing)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 ${isEditing ? 'ring-1' : ''}`}
-                            style={{
-                                background: isEditing
-                                    ? 'hsla(165, 100%, 42%, 0.15)'
-                                    : 'hsla(230, 15%, 20%, 0.8)',
-                                color: isEditing
-                                    ? 'hsl(165, 85%, 50%)'
-                                    : 'hsl(230, 10%, 60%)',
-                                border: `1px solid ${isEditing ? 'hsla(165, 100%, 42%, 0.3)' : 'hsla(230, 15%, 30%, 0.5)'}`,
-                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 ${isEditing ? 'ring-1 border-teal-500/30 bg-teal-500/10 text-teal-400' : 'border-white/5 bg-white/5 text-slate-300 hover:bg-white/10'}`}
                         >
                             <Settings2 size={12} />
                             {isEditing ? 'Listo' : 'Personalizar'}
@@ -967,24 +918,18 @@ export default function OwnerDashboard() {
             </div>
 
             {activeTab === 'config' && (
-                <div
-                    className="mb-4 rounded-2xl p-4"
-                    style={{
-                        background: 'linear-gradient(135deg, hsla(230, 18%, 14%, 0.9), hsla(230, 20%, 10%, 0.85))',
-                        border: '1px solid hsla(230, 15%, 30%, 0.5)',
-                    }}
-                >
+                <div className="mb-4 glass-card rounded-2xl p-4 bg-black/20 border border-white/5">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                        <p className="text-xs font-semibold" style={{ color: 'hsl(210 20% 90%)' }}>
+                        <p className="text-xs font-semibold text-slate-200">
                             Configuración del grid
                         </p>
-                        <p className="text-[11px]" style={{ color: 'hsl(230 10% 50%)' }}>
+                        <p className="text-[11px] text-slate-500">
                             {layout.order.length} activas • {layout.hidden.length} ocultas • {removedCards.length} eliminadas
                         </p>
                     </div>
 
                     <div className="mb-4">
-                        <p className="text-[11px] font-semibold mb-2" style={{ color: 'hsl(230 10% 65%)' }}>
+                        <p className="text-[11px] font-semibold mb-2 text-slate-400">
                             Presets rápidos
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -995,15 +940,10 @@ export default function OwnerDashboard() {
                                     <button
                                         key={`preset-${presetId}`}
                                         onClick={() => applyPreset(presetId)}
-                                        className="rounded-xl px-3 py-2 text-left transition-all"
-                                        style={{
-                                            background: active ? 'hsla(165, 100%, 42%, 0.16)' : 'hsla(230, 15%, 20%, 0.45)',
-                                            border: `1px solid ${active ? 'hsla(165, 100%, 42%, 0.35)' : 'hsla(230, 15%, 28%, 0.45)'}`,
-                                            color: active ? 'hsl(165 85% 55%)' : 'hsl(210 20% 88%)',
-                                        }}
+                                        className={`rounded-xl px-3 py-2 text-left transition-all border ${active ? 'bg-teal-500/10 border-teal-500/30 text-teal-400' : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'}`}
                                     >
                                         <p className="text-xs font-semibold">{preset.name}</p>
-                                        <p className="text-[11px] mt-0.5" style={{ color: active ? 'hsl(165 55% 70%)' : 'hsl(230 10% 55%)' }}>
+                                        <p className={`text-[11px] mt-0.5 ${active ? 'text-teal-500' : 'text-slate-500'}`}>
                                             {preset.description}
                                         </p>
                                     </button>
@@ -1011,7 +951,7 @@ export default function OwnerDashboard() {
                             })}
                         </div>
                         {activePresetId === null && (
-                            <p className="text-[11px] mt-2" style={{ color: 'hsl(230 10% 50%)' }}>
+                            <p className="text-[11px] mt-2 text-slate-500">
                                 Estás en vista personalizada.
                             </p>
                         )}
@@ -1025,12 +965,11 @@ export default function OwnerDashboard() {
                             return (
                                 <div
                                     key={`config-${id}`}
-                                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2"
-                                    style={{ background: 'hsla(230, 15%, 20%, 0.45)', border: '1px solid hsla(230, 15%, 28%, 0.45)' }}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 bg-white/5 border border-white/5"
                                 >
                                     <div>
-                                        <p className="text-sm font-medium" style={{ color: 'hsl(210 20% 90%)' }}>{CARD_TITLES[id]}</p>
-                                        <p className="text-[11px]" style={{ color: 'hsl(230 10% 50%)' }}>
+                                        <p className="text-sm font-medium text-slate-200">{CARD_TITLES[id]}</p>
+                                        <p className="text-[11px] text-slate-500">
                                             {!inGrid ? 'Eliminada del grid' : isHidden ? 'Oculta en dashboard' : `Visible en posición ${currentIndex + 1}`}
                                         </p>
                                     </div>
@@ -1040,8 +979,7 @@ export default function OwnerDashboard() {
                                                 <button
                                                     onClick={() => moveCardInConfig(id, 'up')}
                                                     disabled={currentIndex <= 0}
-                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed"
-                                                    style={{ background: 'hsla(230, 15%, 26%, 0.75)', color: 'hsl(230 10% 70%)' }}
+                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed bg-white/10 hover:bg-white/20 text-slate-400"
                                                     title="Subir"
                                                 >
                                                     <ChevronUp size={14} />
@@ -1049,19 +987,14 @@ export default function OwnerDashboard() {
                                                 <button
                                                     onClick={() => moveCardInConfig(id, 'down')}
                                                     disabled={currentIndex < 0 || currentIndex >= layout.order.length - 1}
-                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed"
-                                                    style={{ background: 'hsla(230, 15%, 26%, 0.75)', color: 'hsl(230 10% 70%)' }}
+                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed bg-white/10 hover:bg-white/20 text-slate-400"
                                                     title="Bajar"
                                                 >
                                                     <ChevronDown size={14} />
                                                 </button>
                                                 <button
                                                     onClick={() => toggleVisibility(id)}
-                                                    className="p-1.5 rounded-lg"
-                                                    style={{
-                                                        background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 26%, 0.75)',
-                                                        color: isHidden ? 'hsl(0 70% 62%)' : 'hsl(230 10% 70%)',
-                                                    }}
+                                                    className={`p-1.5 rounded-lg transition-all ${isHidden ? 'bg-red-500/20 text-red-500' : 'bg-white/10 hover:bg-white/20 text-slate-400'}`}
                                                     title={isHidden ? 'Mostrar' : 'Ocultar'}
                                                 >
                                                     {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -1069,8 +1002,7 @@ export default function OwnerDashboard() {
                                                 <button
                                                     onClick={() => removeCard(id)}
                                                     disabled={layout.order.length <= 1}
-                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed"
-                                                    style={{ background: 'hsla(0, 70%, 50%, 0.2)', color: 'hsl(0 70% 62%)' }}
+                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed bg-red-500/20 hover:bg-red-500/30 text-red-500"
                                                     title="Eliminar del grid"
                                                 >
                                                     <Trash2 size={14} />
@@ -1079,8 +1011,7 @@ export default function OwnerDashboard() {
                                         ) : (
                                             <button
                                                 onClick={() => restoreCard(id)}
-                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium"
-                                                style={{ background: 'hsla(165, 100%, 42%, 0.16)', color: 'hsl(165 85% 52%)' }}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 transition-all border border-teal-500/20"
                                             >
                                                 <Plus size={12} />
                                                 Agregar al grid
@@ -1096,12 +1027,7 @@ export default function OwnerDashboard() {
 
             {isDragEnabled && (
                 <div
-                    className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg text-xs"
-                    style={{
-                        background: 'hsla(217, 91%, 60%, 0.08)',
-                        border: '1px solid hsla(217, 91%, 60%, 0.15)',
-                        color: 'hsl(217 91% 70%)',
-                    }}
+                    className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg text-xs bg-teal-500/10 border border-teal-500/20 text-teal-400"
                 >
                     <GripVertical size={14} />
                     Arrastrá para reordenar • Ojo para ocultar/mostrar • Basura para eliminar del grid

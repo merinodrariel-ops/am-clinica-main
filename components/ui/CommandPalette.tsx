@@ -99,13 +99,13 @@ export default function CommandPalette({ children }: { children: React.ReactNode
     return (
         <KBarProvider actions={actions}>
             <KBarPortal>
-                <KBarPositioner className="z-[99999] bg-black/40 backdrop-blur-sm p-4">
-                    <KBarAnimator className="w-full max-w-[600px] bg-white dark:bg-[#1a1c1e] overflow-hidden rounded-2xl shadow-2xl border border-white/20 dark:border-white/10">
+                <KBarPositioner className="z-[99999] bg-black/60 backdrop-blur-md p-4">
+                    <KBarAnimator className="w-full max-w-[600px] glass-card overflow-hidden rounded-2xl shadow-[0_0_50px_-12px_rgba(16,185,129,0.15)] border border-white/10">
                         <div className="relative">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                                <Search className="w-5 h-5 text-gray-400" />
+                                <Search className="w-5 h-5 text-slate-400" />
                             </div>
-                            <KBarSearch className="w-full bg-transparent py-5 pl-12 pr-4 text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400 text-lg border-b border-gray-100 dark:border-white/5" placeholder="¿Qué necesitas hacer? (Escribe o busca...)" />
+                            <KBarSearch className="w-full bg-transparent py-5 pl-12 pr-4 text-slate-100 outline-none placeholder:text-slate-500 text-lg border-b border-white/5 transition-colors focus:bg-white/5" placeholder="¿Qué necesitas hacer? (Escribe o busca...)" />
                         </div>
                         <div className="max-h-[400px] overflow-y-auto pb-2 scrollbar-hide">
                             <RenderResults />

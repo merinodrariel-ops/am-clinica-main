@@ -24,11 +24,11 @@ export default function ReferralChart() {
 
     if (loading) {
         return (
-            <div className="glass-card rounded-xl p-4 animate-pulse">
-                <div className="h-4 rounded w-1/3 mb-4" style={{ background: 'hsl(230 15% 18%)' }}></div>
+            <div className="glass-card rounded-xl p-4 animate-pulse border border-white/5">
+                <div className="h-4 rounded w-1/3 mb-4 bg-white/5"></div>
                 <div className="space-y-3">
                     {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-3 rounded" style={{ background: 'hsl(230 15% 16%)' }}></div>
+                        <div key={i} className="h-3 rounded bg-white/5"></div>
                     ))}
                 </div>
             </div>
@@ -37,8 +37,8 @@ export default function ReferralChart() {
 
     if (data.length === 0) {
         return (
-            <div className="glass-card rounded-xl p-4">
-                <div className="flex items-center gap-2 text-sm" style={{ color: 'hsl(230 10% 50%)' }}>
+            <div className="glass-card rounded-xl p-4 border border-white/5">
+                <div className="flex items-center gap-2 text-sm text-slate-500">
                     <Users size={16} />
                     <span>Sin datos de origen</span>
                 </div>
@@ -49,13 +49,13 @@ export default function ReferralChart() {
     const maxValue = Math.max(...data.map(d => d.value));
 
     return (
-        <div className="glass-card glass-card-hover rounded-xl p-4">
+        <div className="glass-card glass-card-hover rounded-xl p-4 border border-white/5">
             <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'hsl(210 20% 90%)' }}>
-                    <Users size={14} style={{ color: 'hsl(165 100% 42%)' }} />
+                <h4 className="text-sm font-semibold flex items-center gap-2 text-slate-200">
+                    <Users size={14} className="text-teal-400" />
                     Origen de Pacientes
                 </h4>
-                <span className="text-xs" style={{ color: 'hsl(230 10% 45%)' }}>{total} total</span>
+                <span className="text-xs text-slate-500">{total} total</span>
             </div>
 
             <div className="space-y-2.5">
@@ -66,7 +66,7 @@ export default function ReferralChart() {
                     return (
                         <div key={item.name} className="group">
                             <div className="flex items-center justify-between text-xs mb-1">
-                                <div className="flex items-center gap-1.5" style={{ color: 'hsl(230 10% 55%)' }}>
+                                <div className="flex items-center gap-1.5 text-slate-400">
                                     <div
                                         className="w-2 h-2 rounded-full flex-shrink-0"
                                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
@@ -76,15 +76,15 @@ export default function ReferralChart() {
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-medium" style={{ color: 'hsl(210 20% 93%)' }}>
+                                    <span className="font-medium text-slate-200">
                                         {item.value}
                                     </span>
-                                    <span className="w-8 text-right" style={{ color: 'hsl(230 10% 45%)' }}>
+                                    <span className="w-8 text-right text-slate-500">
                                         {percentage}%
                                     </span>
                                 </div>
                             </div>
-                            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(230 15% 16%)' }}>
+                            <div className="h-1.5 rounded-full overflow-hidden bg-white/5">
                                 <div
                                     className="h-full rounded-full transition-all duration-500 ease-out"
                                     style={{

@@ -52,7 +52,7 @@ export default function PredictiveInsights({
 
     if (loading) {
         return (
-            <div className={`glass-card rounded-2xl p-6 mb-6 animate-pulse ${isHidden ? 'opacity-40' : ''}`} style={{ background: 'hsla(230, 15%, 12%, 0.6)' }}>
+            <div className={`glass-card rounded-2xl p-6 mb-6 animate-pulse ${isHidden ? 'opacity-40' : ''} bg-black/40 border border-white/5`}>
                 <div className="flex items-center gap-3 mb-4">
                     <div className="h-10 w-10 rounded-xl bg-white/5" />
                     <div className="h-6 w-48 rounded-lg bg-white/5" />
@@ -74,19 +74,13 @@ export default function PredictiveInsights({
     if (!data) return null;
 
     return (
-        <div className={`glass-card rounded-2xl p-6 mb-6 relative overflow-hidden group border border-white/5 hover:border-white/10 transition-all duration-500 ${isHidden ? 'opacity-40' : ''} ${isEditing ? 'ring-1 ring-white/10' : ''}`}
-            style={{ background: isHidden ? 'hsla(230, 15%, 12%, 0.5)' : 'linear-gradient(135deg, hsla(230, 15%, 12%, 0.7), hsla(230, 15%, 15%, 0.4))' }}>
+        <div className={`glass-card rounded-2xl p-6 mb-6 relative overflow-hidden group border border-white/5 hover:border-white/10 transition-all duration-500 ${isHidden ? 'opacity-40 bg-black/20' : 'bg-black/40'} ${isEditing ? 'ring-1 ring-white/10' : ''}`}>
 
             {isEditing && (
                 <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
                     <button
                         onClick={() => onToggleVisibility?.('predictive-pulse')}
-                        className="p-2 rounded-xl transition-all hover:scale-110 active:scale-95"
-                        style={{
-                            background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 25%, 0.8)',
-                            color: isHidden ? 'hsl(0, 70%, 60%)' : 'hsl(230, 10%, 60%)',
-                            border: '1px solid hsla(230, 100%, 100%, 0.1)'
-                        }}
+                        className={`p-2 rounded-xl transition-all hover:scale-110 active:scale-95 border ${isHidden ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-white/5 text-slate-400 border-white/10'}`}
                         title={isHidden ? 'Mostrar' : 'Ocultar'}
                     >
                         {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -94,12 +88,7 @@ export default function PredictiveInsights({
                     <button
                         onClick={() => onRemove?.('predictive-pulse')}
                         disabled={!canRemove}
-                        className="p-2 rounded-xl transition-all hover:scale-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                        style={{
-                            background: 'hsla(0, 70%, 50%, 0.2)',
-                            color: 'hsl(0, 70%, 60%)',
-                            border: '1px solid hsla(0, 80%, 60%, 0.25)'
-                        }}
+                        className="p-2 rounded-xl transition-all hover:scale-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed bg-red-500/20 text-red-400 border border-red-500/30"
                         title={canRemove ? 'Eliminar del grid' : 'Debe quedar al menos una tarjeta'}
                     >
                         <Trash2 size={16} />
@@ -113,8 +102,7 @@ export default function PredictiveInsights({
             <div className="relative z-10">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl flex items-center justify-center"
-                            style={{ background: 'linear-gradient(135deg, hsla(260, 100%, 70%, 0.2), hsla(220, 100%, 70%, 0.1))' }}>
+                        <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500/20 to-blue-500/10 border border-indigo-500/20">
                             <Sparkles size={20} className="text-indigo-400 animate-pulse" />
                         </div>
                         <div>

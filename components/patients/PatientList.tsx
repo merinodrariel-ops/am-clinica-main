@@ -38,36 +38,36 @@ function DeleteModal({ isOpen, onClose, onDelete, patient, isDeleting }: DeleteM
     if (!isOpen || !patient) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl border border-red-100 dark:border-red-900 overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card rounded-2xl w-full max-w-md shadow-2xl border border-red-500/30 overflow-hidden">
                 <div className="p-6">
-                    <div className="flex items-center gap-3 text-red-600 mb-4">
-                        <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <div className="flex items-center gap-3 text-red-500 mb-4">
+                        <div className="p-3 bg-red-500/10 rounded-full">
                             <AlertTriangle size={24} />
                         </div>
                         <h3 className="text-lg font-bold">Eliminar Paciente</h3>
                     </div>
 
-                    <p className="text-gray-600 dark:text-gray-300 mb-4">
-                        Estás a punto de eliminar a <span className="font-bold text-gray-900 dark:text-white">{patient.nombre} {patient.apellido}</span>.
+                    <p className="text-slate-300 mb-4">
+                        Estás a punto de eliminar a <span className="font-bold text-white">{patient.nombre} {patient.apellido}</span>.
                     </p>
 
-                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl mb-4 border border-red-100 dark:border-red-800/50">
-                        <ul className="text-sm text-red-700 dark:text-red-400 space-y-1 list-disc list-inside">
+                    <div className="bg-red-500/10 p-4 rounded-xl mb-4 border border-red-500/20">
+                        <ul className="text-sm text-red-400 space-y-1 list-disc list-inside">
                             <li>El paciente se marcará como eliminado.</li>
                             <li>No aparecerá en las listas activas.</li>
                             <li>Podrás volver a registrar este DNI/Email.</li>
                         </ul>
                     </div>
 
-                    <p className="text-sm text-gray-500 mb-2">
-                        Escribí <strong>ELIMINAR</strong> para confirmar:
+                    <p className="text-sm text-slate-400 mb-2">
+                        Escribí <strong className="text-white relative px-1 before:absolute before:inset-0 before:bg-white/10 before:rounded">ELIMINAR</strong> para confirmar:
                     </p>
                     <input
                         type="text"
                         value={confirmText}
                         onChange={(e) => setConfirmText(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-6 bg-gray-50 dark:bg-gray-900"
+                        className="w-full px-4 py-2 border border-white/10 rounded-lg mb-6 bg-navy-900/50 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500/50 transition-colors"
                         placeholder="ELIMINAR"
                     />
 
@@ -75,14 +75,14 @@ function DeleteModal({ isOpen, onClose, onDelete, patient, isDeleting }: DeleteM
                         <button
                             onClick={onClose}
                             disabled={isDeleting}
-                            className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium"
+                            className="px-4 py-2 text-slate-300 hover:bg-white/5 rounded-lg font-medium transition-colors"
                         >
                             Cancelar
                         </button>
                         <button
                             onClick={onDelete}
                             disabled={confirmText !== 'ELIMINAR' || isDeleting}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-all"
                         >
                             {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                             Eliminar
@@ -143,11 +143,11 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
 
     function getStatusColor(status: string | undefined): string {
         switch (status) {
-            case 'Activo': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-            case 'En tratamiento': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-            case 'Alta': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
-            case 'Inactivo': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
-            default: return 'bg-gray-100 text-gray-700';
+            case 'Activo': return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20';
+            case 'En tratamiento': return 'bg-teal-500/20 text-teal-400 border border-teal-500/20';
+            case 'Alta': return 'bg-purple-500/20 text-purple-400 border border-purple-500/20';
+            case 'Inactivo': return 'bg-white/5 text-slate-400 border border-white/10';
+            default: return 'bg-white/5 text-slate-400 border border-white/10';
         }
     }
 
@@ -156,8 +156,8 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
 
     if (patients.length === 0) {
         return (
-            <div className="text-center py-20 text-gray-500">
-                <User size={48} className="mx-auto mb-4 text-gray-300" />
+            <div className="text-center py-20 text-slate-500">
+                <User size={48} className="mx-auto mb-4 text-slate-600/50" />
                 <p>No se encontraron pacientes.</p>
             </div>
         );
@@ -175,9 +175,9 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
 
     return (
         <div className="space-y-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div className="glass-card rounded-xl border border-white/10 overflow-hidden">
                 <table className="w-full">
-                    <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-900">
+                    <thead className="text-xs text-slate-400 uppercase bg-navy-900/50 border-b border-white/10">
                         <tr>
                             <th className="px-4 py-3 text-left">Paciente</th>
                             <th className="px-4 py-3 text-left">Estado</th>
@@ -186,7 +186,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                             <th className="px-4 py-3 text-center w-20"></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-white/5">
                         {currentPatients.map((patient, index) => {
                             const whatsapp = getWhatsAppNumber(patient);
                             const email = patient.email;
@@ -197,22 +197,22 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.02 }}
-                                    className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                                    className="hover:bg-white/5 transition-colors"
                                 >
                                     <td className="px-4 py-3">
                                         <Link
                                             href={`/patients/${patient.id_paciente}`}
                                             className="flex items-center gap-3 group"
                                         >
-                                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors">
+                                            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0 group-hover:bg-emerald-500/20 transition-colors border border-emerald-500/20">
                                                 <User size={20} />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                <p className="font-medium text-white group-hover:text-teal-400 transition-colors drop-shadow-sm">
                                                     {patient.apellido}, {patient.nombre}
                                                 </p>
                                                 {patient.documento && (
-                                                    <p className="text-xs text-gray-500">
+                                                    <p className="text-xs text-slate-500">
                                                         DNI: {patient.documento}
                                                     </p>
                                                 )}
@@ -221,13 +221,13 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                     </td>
 
                                     <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(patient.estado_paciente)}`}>
+                                        <span className={`px-2 py-1 flex w-max items-center justify-center rounded-full text-xs font-medium ${getStatusColor(patient.estado_paciente)}`}>
                                             {patient.estado_paciente || 'Sin estado'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-                                            <MapPin size={14} className="text-gray-400" />
+                                        <div className="flex items-center gap-1 text-sm text-slate-400">
+                                            <MapPin size={14} className="text-slate-500/50" />
                                             {patient.ciudad || patient.zona_barrio || '-'}
                                         </div>
                                     </td>
@@ -299,7 +299,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                     </button>
                                                 </>
                                             ) : (
-                                                <span className="p-2 text-gray-300">
+                                                <span className="p-2 text-white/10">
                                                     <Mail size={16} />
                                                 </span>
                                             )}
@@ -309,14 +309,14 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                         <div className="flex items-center justify-center gap-2">
                                             <Link
                                                 href={`/patients/${patient.id_paciente}`}
-                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg inline-flex"
+                                                className="p-2 text-slate-500 hover:text-teal-400 hover:bg-teal-500/10 rounded-lg inline-flex transition-colors"
                                                 title="Ver ficha"
                                             >
                                                 <Edit2 size={18} />
                                             </Link>
                                             <button
                                                 onClick={() => setPatientToDelete(patient)}
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg inline-flex"
+                                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg inline-flex transition-colors"
                                                 title="Eliminar paciente"
                                             >
                                                 <Trash2 size={18} />
@@ -332,15 +332,15 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <div className="flex justify-between items-center bg-white dark:bg-gray-800 px-4 py-3 rounded-xl border border-gray-100 dark:border-gray-700">
-                    <p className="text-sm text-gray-500">
-                        Mostrando <span className="font-medium">{startIndex + 1}</span> a <span className="font-medium">{Math.min(startIndex + itemsPerPage, patients.length)}</span> de <span className="font-medium">{patients.length}</span> resultados
+                <div className="flex justify-between items-center glass-card px-4 py-3 rounded-xl border border-white/10">
+                    <p className="text-sm text-slate-400">
+                        Mostrando <span className="font-medium text-white">{startIndex + 1}</span> a <span className="font-medium text-white">{Math.min(startIndex + itemsPerPage, patients.length)}</span> de <span className="font-medium text-white">{patients.length}</span> resultados
                     </p>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => goToPage(currentPage - 1)}
                             disabled={currentPage === 1}
-                            className="px-3 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                            className="px-3 py-1 text-sm border border-white/10 rounded-lg disabled:opacity-50 text-slate-300 hover:bg-white/5 transition-colors"
                         >
                             Anterior
                         </button>
@@ -356,9 +356,9 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                 <button
                                     key={i}
                                     onClick={() => goToPage(p)}
-                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition ${currentPage === p
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-all ${currentPage === p
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                                        : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent hover:border-white/10'
                                         }`}
                                 >
                                     {p}
@@ -368,7 +368,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                         <button
                             onClick={() => goToPage(currentPage + 1)}
                             disabled={currentPage === totalPages}
-                            className="px-3 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                            className="px-3 py-1 text-sm border border-white/10 rounded-lg disabled:opacity-50 text-slate-300 hover:bg-white/5 transition-colors"
                         >
                             Siguiente
                         </button>

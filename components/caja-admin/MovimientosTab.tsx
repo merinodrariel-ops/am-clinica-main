@@ -977,23 +977,23 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
       {/* ── Live Balance Strip ── */}
       {balanceVivo && (
         <div className={`rounded-xl p-4 shadow-sm border transition-colors ${balanceVivo.status === "Cerrado"
-          ? "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
-          : "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
+          ? "glass-card bg-black/40 border-white/5"
+          : "glass-card bg-emerald-500/10 border-emerald-500/20"
           }`}>
           {/* Status header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${balanceVivo.status === "Cerrado" ? "bg-gray-200 dark:bg-gray-700" : "bg-green-100 dark:bg-green-900/40"
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${balanceVivo.status === "Cerrado" ? "bg-white/10" : "bg-emerald-500/20"
                 }`}>
-                <div className={`w-2.5 h-2.5 rounded-full ${balanceVivo.status === "Cerrado" ? "bg-gray-400" : "bg-green-500 animate-pulse"
+                <div className={`w-2.5 h-2.5 rounded-full ${balanceVivo.status === "Cerrado" ? "bg-slate-400" : "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]"
                   }`} />
               </div>
               <div>
-                <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                <p className="font-semibold text-white text-sm">
                   {balanceVivo.status === "Cerrado" ? "Caja Cerrada" : "Jornada Abierta"}
                 </p>
                 {balanceVivo.lastCloseDate && (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-400">
                     {balanceVivo.status === "Cerrado"
                       ? `Último cierre: ${balanceVivo.lastCloseDate}`
                       : `Desde cierre del ${balanceVivo.lastCloseDate}`}
@@ -1019,35 +1019,35 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
           </div>
 
           {/* Saldos */}
-          <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-2">Saldo Actual Estimado</p>
+          <p className="text-[10px] font-semibold text-teal-400 uppercase tracking-wider mb-2">Saldo Actual Estimado</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Efectivo USD */}
-            <div className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-200 dark:border-blue-800/50">
+            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo USD</span>
+                <div className="w-2 h-2 rounded-full bg-blue-400" />
+                <span className="text-xs font-medium text-slate-300">Efectivo USD</span>
               </div>
-              <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+              <span className="text-sm font-bold text-white font-mono">
                 {formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.saldoUsd))}
               </span>
             </div>
             {/* Efectivo ARS */}
-            <div className="flex justify-between items-center bg-blue-100/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-200 dark:border-blue-800/50">
+            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Efectivo ARS</span>
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-medium text-slate-300">Efectivo ARS</span>
               </div>
-              <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">
+              <span className="text-sm font-bold text-white font-mono">
                 {formatPrivacy(new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(balanceVivo.saldoArs))}
               </span>
             </div>
             {/* Giro Activo */}
-            <div className={`flex justify-between items-center p-3 rounded-xl border ${balanceVivo.giroUsd > 0
-              ? "bg-amber-100/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
-              : "bg-blue-100/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
+            <div className={`flex justify-between items-center p-3 rounded-xl border border-white/10 ${balanceVivo.giroUsd > 0
+              ? "bg-amber-500/10"
+              : "bg-white/5"
               }`}>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${balanceVivo.giroUsd > 0 ? "bg-amber-500" : "bg-slate-300"}`} />
+                <div className={`w-2 h-2 rounded-full ${balanceVivo.giroUsd > 0 ? "bg-amber-400" : "bg-slate-500"}`} />
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Giro Activo</span>
               </div>
               <span className={`text-sm font-bold font-mono ${balanceVivo.giroUsd > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
