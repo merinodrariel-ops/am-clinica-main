@@ -3,12 +3,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
     DndContext,
-    closestCenter,
+    DragOverlay,
+    AutoScrollActivator,
+    closestCorners,
     KeyboardSensor,
     PointerSensor,
+    pointerWithin,
     useSensor,
     useSensors,
     type DragEndEvent,
+    type DragStartEvent,
+    type CollisionDetection,
 } from '@dnd-kit/core';
 import {
     arrayMove,
@@ -62,6 +67,16 @@ const DEFAULT_ORDER: CardId[] = [
     'deuda-total',
 ];
 
+const CARD_TITLES: Record<CardId, string> = {
+    'predictive-pulse': 'Predictive Pulse',
+    'total-pacientes': 'Pacientes Totales',
+    'primera-vez': 'Pacientes Nuevos',
+    'ingresos-mes': 'Ingresos Recepción',
+    'egresos-mes': 'Egresos Admin',
+    'en-financiacion': 'En Financiación',
+    'deuda-total': 'Deuda Total Circulante',
+};
+
 function getLayout(): LayoutConfig {
     if (typeof window === 'undefined') return { order: DEFAULT_ORDER, hidden: [] };
     try {
@@ -108,18 +123,25 @@ function SortableCard({
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        zIndex: isDragging ? 50 : 'auto',
-        opacity: isDragging ? 0.8 : 1,
+        zIndex: isDragging ? 60 : 'auto',
+        opacity: isDragging ? 0.35 : 1,
+        filter: isDragging ? 'saturate(0.75)' : 'none',
     };
 
+    const sortableProps = isEditing ? { ...attributes, ...listeners } : {};
+
     return (
-        <div ref={setNodeRef} style={style} className="relative">
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={`relative ${isEditing ? 'touch-none cursor-grab active:cursor-grabbing' : ''}`}
+            {...sortableProps}
+        >
             {isEditing && (
                 <button
-                    className="absolute top-2 left-2 z-10 p-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all"
+                    className="absolute top-2 left-2 z-10 p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all touch-none"
                     style={{ background: 'hsla(230, 15%, 25%, 0.8)', color: 'hsl(230, 10%, 60%)' }}
-                    {...attributes}
-                    {...listeners}
+                    aria-label="Arrastrar tarjeta"
                 >
                     <GripVertical size={16} />
                 </button>
@@ -462,13 +484,20 @@ export default function OwnerDashboard() {
     const [loading, setLoading] = useState(true);
     const [layout, setLayout] = useState<LayoutConfig>({ order: DEFAULT_ORDER, hidden: [] });
     const [isEditing, setIsEditing] = useState(false);
+    const [activeCardId, setActiveCardId] = useState<CardId | null>(null);
 
     const currentMonth = MONTH_NAMES[new Date().getMonth()];
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
+
+    const collisionDetectionStrategy: CollisionDetection = useCallback((args) => {
+        const pointerHits = pointerWithin(args);
+        if (pointerHits.length > 0) return pointerHits;
+        return closestCorners(args);
+    }, []);
 
     useEffect(() => {
         setLayout(getLayout());
@@ -483,17 +512,27 @@ export default function OwnerDashboard() {
         load();
     }, []);
 
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        setActiveCardId(event.active.id as CardId);
+    }, []);
+
+    const handleDragCancel = useCallback(() => {
+        setActiveCardId(null);
+    }, []);
+
     const handleDragEnd = useCallback((event: DragEndEvent) => {
+        setActiveCardId(null);
         const { active, over } = event;
-        if (over && active.id !== over.id) {
-            setLayout(prev => {
-                const oldIndex = prev.order.indexOf(active.id as CardId);
-                const newIndex = prev.order.indexOf(over.id as CardId);
-                const newLayout = { ...prev, order: arrayMove(prev.order, oldIndex, newIndex) };
-                saveLayout(newLayout);
-                return newLayout;
-            });
-        }
+        if (!over || active.id === over.id) return;
+
+        setLayout(prev => {
+            const oldIndex = prev.order.indexOf(active.id as CardId);
+            const newIndex = prev.order.indexOf(over.id as CardId);
+            if (oldIndex < 0 || newIndex < 0) return prev;
+            const newLayout = { ...prev, order: arrayMove(prev.order, oldIndex, newIndex) };
+            saveLayout(newLayout);
+            return newLayout;
+        });
     }, []);
 
     const toggleVisibility = useCallback((id: string) => {
@@ -651,6 +690,11 @@ export default function OwnerDashboard() {
         },
     };
 
+    const activeCard = activeCardId ? cardData[activeCardId] : undefined;
+    const ActiveCardIcon = activeCardId
+        ? (activeCardId === 'predictive-pulse' ? TrendingUp : activeCard?.icon || GripVertical)
+        : GripVertical;
+
     const visibleCards = layout.order.filter(id => !layout.hidden.includes(id) || isEditing);
 
     return (
@@ -713,7 +757,7 @@ export default function OwnerDashboard() {
                     }}
                 >
                     <GripVertical size={14} />
-                    Arrastrá las tarjetas para reordenar • Usá el ojo 👁️ para ocultar/mostrar
+                    Arrastrá desde el agarre para reordenar • Usá el ojo 👁️ para ocultar/mostrar
                 </div>
             )}
 
@@ -721,7 +765,16 @@ export default function OwnerDashboard() {
             {/* Cards Grid */}
             <DndContext
                 sensors={sensors}
-                collisionDetection={closestCenter}
+                autoScroll={{
+                    enabled: true,
+                    activator: AutoScrollActivator.Pointer,
+                    acceleration: 16,
+                    threshold: { x: 0.08, y: 0.22 },
+                    interval: 4,
+                }}
+                collisionDetection={collisionDetectionStrategy}
+                onDragStart={handleDragStart}
+                onDragCancel={handleDragCancel}
                 onDragEnd={handleDragEnd}
             >
                 <SortableContext items={visibleCards} strategy={rectSortingStrategy}>
@@ -755,6 +808,37 @@ export default function OwnerDashboard() {
                         })}
                     </div>
                 </SortableContext>
+                <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }}>
+                    {activeCardId && (
+                        <div
+                            className="rounded-2xl border px-4 py-3 backdrop-blur-xl"
+                            style={{
+                                minWidth: '260px',
+                                maxWidth: '420px',
+                                background: 'linear-gradient(145deg, hsla(230, 20%, 14%, 0.95), hsla(230, 18%, 10%, 0.92))',
+                                borderColor: 'hsla(165, 100%, 42%, 0.35)',
+                                boxShadow: '0 24px 50px -18px rgba(0,0,0,0.8), 0 0 0 1px hsla(165, 100%, 42%, 0.12)',
+                            }}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div
+                                    className="h-9 w-9 rounded-xl flex items-center justify-center"
+                                    style={{ background: 'hsla(165, 100%, 42%, 0.16)', color: 'hsl(165 85% 55%)' }}
+                                >
+                                    <ActiveCardIcon size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold truncate" style={{ color: 'hsl(210 20% 94%)' }}>
+                                        {CARD_TITLES[activeCardId]}
+                                    </p>
+                                    <p className="text-[11px]" style={{ color: 'hsl(230 10% 52%)' }}>
+                                        Soltá para reordenar
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DragOverlay>
             </DndContext>
         </div>
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, BellOff, CheckCircle2, Circle, Clock, AlertTriangle, X } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
@@ -43,9 +43,11 @@ export default function NotificationBell({ userId }: { userId: string }) {
     );
 
     const [open, setOpen] = useState(false);
+    const [placement, setPlacement] = useState<'top' | 'bottom'>('top');
     const [todos, setTodos] = useState<Todo[]>([]);
     const [unread, setUnread] = useState(0);
     const panelRef = useRef<HTMLDivElement>(null);
+    const floatingPanelRef = useRef<HTMLDivElement>(null);
 
     const { permission, subscription, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications(userId);
 
@@ -107,6 +109,44 @@ export default function NotificationBell({ userId }: { userId: string }) {
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    // ── Dynamic placement (up/down) based on viewport space ───────────────────
+    useLayoutEffect(() => {
+        if (!open) return;
+
+        const updatePlacement = () => {
+            const anchor = panelRef.current;
+            const panel = floatingPanelRef.current;
+            if (!anchor || !panel) return;
+
+            const gap = 8;
+            const anchorRect = anchor.getBoundingClientRect();
+            const panelHeight = panel.offsetHeight;
+            const spaceAbove = anchorRect.top;
+            const spaceBelow = window.innerHeight - anchorRect.bottom;
+
+            if (spaceBelow >= panelHeight + gap) {
+                setPlacement('bottom');
+                return;
+            }
+
+            if (spaceAbove >= panelHeight + gap) {
+                setPlacement('top');
+                return;
+            }
+
+            setPlacement(spaceAbove > spaceBelow ? 'top' : 'bottom');
+        };
+
+        updatePlacement();
+        window.addEventListener('resize', updatePlacement);
+        window.addEventListener('scroll', updatePlacement, true);
+
+        return () => {
+            window.removeEventListener('resize', updatePlacement);
+            window.removeEventListener('scroll', updatePlacement, true);
+        };
+    }, [open]);
+
     return (
         <div className="relative" ref={panelRef}>
             {/* Bell button */}
@@ -134,11 +174,15 @@ export default function NotificationBell({ userId }: { userId: string }) {
             <AnimatePresence>
                 {open && (
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                        ref={floatingPanelRef}
+                        initial={{ opacity: 0, scale: 0.95, y: placement === 'top' ? 8 : -8 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                        exit={{ opacity: 0, scale: 0.95, y: placement === 'top' ? 8 : -8 }}
                         transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                        className="absolute left-0 top-full mt-2 w-80 rounded-2xl bg-[#1A1A24] border border-white/10 shadow-2xl shadow-black/60 overflow-hidden z-50"
+                        className={clsx(
+                            'absolute left-0 w-80 rounded-2xl bg-[#1A1A24] border border-white/10 shadow-2xl shadow-black/60 overflow-hidden z-50',
+                            placement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                        )}
                     >
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
