@@ -2,6 +2,7 @@ import { getPacienteById, getHistoriaClinica, getPlanesTratamiento } from '@/lib
 import { createClient } from '@/utils/supabase/server';
 import PatientDashboard from '@/components/patients/PatientDashboard';
 import { getPrestacionesByPaciente } from '@/app/actions/prestaciones';
+import { getMovimientosPorPaciente } from '@/lib/caja-recepcion';
 
 export const revalidate = 0; // Always get fresh data
 
@@ -26,11 +27,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             const relatedData = await Promise.all([
                 getHistoriaClinica(id),
                 getPlanesTratamiento(id),
-                supabase
-                    .from('caja_recepcion_movimientos')
-                    .select('*')
-                    .eq('paciente_id', id)
-                    .order('fecha_hora', { ascending: false }),
+                getMovimientosPorPaciente(id),
                 supabase
                     .from('agenda_appointments')
                     .select('id, patient_id, doctor_id, start_time, status, type')
@@ -41,7 +38,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
             historiaClinica = relatedData[0];
             planes = relatedData[1];
-            payments = relatedData[2].data || [];
+            payments = relatedData[2] || [];
             appointments = relatedData[3].data || [];
             prestaciones = relatedData[4];
         }

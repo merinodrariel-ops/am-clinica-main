@@ -40,10 +40,12 @@ import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAp
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import PatientCommandCenter from './PatientCommandCenter';
 import PatientCadence from '@/components/recalls/PatientCadence';
+import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 
 interface Movement {
     id: string;
     fecha_hora: string;
+    fecha_movimiento?: string;
     concepto_nombre: string;
     monto: number;
     moneda: string;
@@ -53,6 +55,7 @@ interface Movement {
     observaciones?: string;
     cuota_nro?: number;
     cuotas_total?: number;
+    comprobante_url?: string | null;
 }
 
 interface AppointmentSignal {
@@ -531,10 +534,10 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     </div>
                                 </div>
 
-                                {payments.length === 0 ? (
-                                    <div className="p-10 text-center text-gray-500">
-                                        <CreditCard size={48} className="mx-auto mb-4 text-gray-300" />
-                                        <p>No hay pagos registrados.</p>
+                                <div className="p-6">
+                                    <PatientPaymentHistory payments={payments} variant="internal" />
+
+                                    {payments.length === 0 && (
                                         <Link
                                             href="/caja-recepcion"
                                             className="inline-flex items-center gap-2 mt-4 text-blue-500 hover:underline"
@@ -542,51 +545,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             <ExternalLink size={16} />
                                             Ir a Caja Recepción
                                         </Link>
-                                    </div>
-                                ) : (
-                                    <table className="w-full text-sm">
-                                        <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left">Fecha</th>
-                                                <th className="px-6 py-3 text-left">Concepto</th>
-                                                <th className="px-6 py-3 text-left">Método</th>
-                                                <th className="px-6 py-3 text-left">Estado</th>
-                                                <th className="px-6 py-3 text-right">Monto</th>
-                                                <th className="px-6 py-3 text-right">USD Equiv.</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                            {payments.map((payment) => (
-                                                <tr key={payment.id} className={clsx(
-                                                    "hover:bg-gray-50 dark:hover:bg-gray-800/50",
-                                                    payment.estado === 'Anulado' && 'opacity-50 line-through'
-                                                )}>
-                                                    <td className="px-6 py-4">
-                                                        {new Date(payment.fecha_hora).toLocaleDateString('es-AR')}
-                                                    </td>
-                                                    <td className="px-6 py-4 font-medium">{payment.concepto_nombre}</td>
-                                                    <td className="px-6 py-4 text-gray-500">{payment.metodo_pago}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={clsx(
-                                                            "px-2 py-1 rounded-full text-xs font-medium",
-                                                            payment.estado === 'Confirmado' ? 'bg-green-100 text-green-700' :
-                                                                payment.estado === 'Anulado' ? 'bg-red-100 text-red-700' :
-                                                                    'bg-yellow-100 text-yellow-700'
-                                                        )}>
-                                                            {payment.estado}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        {payment.moneda} {payment.monto.toLocaleString('es-AR')}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right font-medium">
-                                                        ${payment.usd_equivalente?.toFixed(2) || '-'}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { X, DollarSign, Check, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,6 +13,9 @@ const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { getLocalISODate } from '@/lib/local-date';
 import { useAuth } from '@/contexts/AuthContext';
+import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
+import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
+import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
 
 interface NuevoGastoFormProps {
     isOpen: boolean;
@@ -32,6 +35,7 @@ interface ExpenseData {
 export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: NuevoGastoFormProps) {
     const { user } = useAuth();
     const [saving, setSaving] = useState(false);
+    const receiptCanvasRef = useRef<HTMLCanvasElement>(null);
 
     // Form data
     const [formData, setFormData] = useState<ExpenseData>({
@@ -61,15 +65,15 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                 usdEquivalente = Math.round((finalMonto / bnaRate) * 100) / 100;
             }
 
-            const { error } = await supabase
+            const { data: insertedMov, error } = await supabase
                 .from('caja_recepcion_movimientos')
                 .insert({
                     concepto_nombre: formData.concepto,
-                    categoria: 'Egreso', // Tag for filtering
+                    categoria: 'Egreso',
                     monto: finalMonto,
                     moneda: formData.moneda,
                     metodo_pago: formData.metodo_pago,
-                    estado: 'pagado', // Expenses are immediate
+                    estado: 'pagado',
                     observaciones: formData.observaciones,
                     tc_bna_venta: formData.moneda === 'ARS' ? bnaRate : null,
                     tc_fuente: formData.moneda === 'ARS' ? 'BNA_AUTO' : 'N/A',
@@ -80,9 +84,36 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                     fecha_movimiento: getLocalISODate(),
                     origen: 'manual',
                     paciente_id: null,
-                });
+                })
+                .select('id')
+                .single();
 
             if (error) throw error;
+
+            // Auto-generate receipt in background
+            if (insertedMov?.id) {
+                try {
+                    const canvas = receiptCanvasRef.current;
+                    if (canvas) {
+                        const receiptNumber = generateReciboNumber();
+                        const imageDataUrl = drawReceiptOnCanvas(canvas, {
+                            numero: receiptNumber,
+                            fecha: new Date(),
+                            paciente: 'EGRESO — Caja Chica',
+                            concepto: formData.concepto,
+                            monto: Math.abs(formData.monto),
+                            moneda: formData.moneda,
+                            metodoPago: formData.metodo_pago,
+                            atendidoPor: 'AM Clínica',
+                        });
+                        const base64Data = imageDataUrl.split(',')[1];
+                        saveReceiptAndLinkToMovement(insertedMov.id, receiptNumber, base64Data)
+                            .catch(err => console.error('Auto-receipt (gasto) failed:', err));
+                    }
+                } catch (receiptError) {
+                    console.error('Auto-receipt (gasto) failed:', receiptError);
+                }
+            }
 
             onSuccess();
             handleClose();
@@ -209,6 +240,8 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                     </Button>
                 </div>
             </div>
+            {/* Hidden canvas for auto-receipt generation */}
+            <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
         </div >
     );
 }

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users, Wallet } from 'lucide-react';
+import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users, Wallet, Loader2 } from 'lucide-react';
 import { ComprobanteLink } from '@/components/caja/ComprobanteLink';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,13 +47,15 @@ import ArqueoPanel from '@/components/caja/ArqueoPanel';
 import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
 import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
-import { ReciboGenerator, generateReciboNumber } from '@/components/caja/ReciboGenerator';
+import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
 import { logMovimientoEdit, deleteMovimiento, getCurrentBalanceRecepcion, getTransferenciasResumenMes } from '@/lib/caja-recepcion';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
 import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
 import { useAuth } from '@/contexts/AuthContext';
 import RoleGuard from '@/components/auth/RoleGuard';
+import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
+import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 
 
 // Types
@@ -267,23 +269,8 @@ function CajaRecepcionContent() {
         title: ''
     });
 
-    // Recibo Modal state
-    const [reciboMov, setReciboMov] = useState<Movimiento | null>(null);
-    const [isReciboMinimized, setIsReciboMinimized] = useState(false);
-
-    useEffect(() => {
-        if (!reciboMov) return;
-
-        const handleEsc = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                setReciboMov(null);
-                setIsReciboMinimized(false);
-            }
-        };
-
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
-    }, [reciboMov]);
+    const [regeneratingReceiptId, setRegeneratingReceiptId] = useState<string | null>(null);
+    const receiptCanvasRef = useRef<HTMLCanvasElement>(null);
 
     function getWhatsappLink(text: string) {
         return `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -634,7 +621,15 @@ function CajaRecepcionContent() {
                 console.error('Error sending security alert:', alertErr);
             }
 
-            const updates: any = {
+            const updates: {
+                estado: string;
+                comprobante_url: string | null;
+                monto?: number;
+                moneda?: string;
+                categoria?: string;
+                registro_editado?: boolean;
+                usd_equivalente?: number;
+            } = {
                 estado: editEstado,
                 comprobante_url: editComprobanteUrl,
             };
@@ -744,6 +739,53 @@ Te escribimos amablemente de *AM Estética Dental* para recordarte que quedó un
 
 Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
     };
+
+    const regenerateReceiptForMovement = useCallback(async (mov: Movimiento) => {
+        const canvas = receiptCanvasRef.current;
+        if (!canvas) {
+            alert('No se pudo inicializar el generador de comprobantes.');
+            return;
+        }
+
+        setRegeneratingReceiptId(mov.id);
+        try {
+            const patientLabel = mov.paciente
+                ? `${mov.paciente.nombre} ${mov.paciente.apellido}`
+                : mov.categoria === 'Egreso'
+                    ? 'EGRESO — Caja Chica'
+                    : 'Paciente General';
+
+            const cuotaInfo = mov.cuota_nro
+                ? `${mov.cuota_nro}/${mov.cuotas_total || '?'}`
+                : undefined;
+
+            const receiptNumber = generateReciboNumber();
+            const imageDataUrl = drawReceiptOnCanvas(canvas, {
+                numero: receiptNumber,
+                fecha: new Date(mov.fecha_hora),
+                paciente: patientLabel,
+                concepto: mov.concepto_nombre,
+                monto: Math.abs(mov.monto),
+                moneda: mov.moneda,
+                metodoPago: mov.metodo_pago,
+                atendidoPor: 'AM Clínica',
+                cuotaInfo,
+            });
+
+            const base64Data = imageDataUrl.split(',')[1];
+            const result = await saveReceiptAndLinkToMovement(mov.id, receiptNumber, base64Data);
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo guardar el comprobante.');
+            }
+
+            await loadData();
+        } catch (error) {
+            console.error('Error regenerating receipt:', error);
+            alert('No se pudo regenerar el comprobante en este momento.');
+        } finally {
+            setRegeneratingReceiptId(null);
+        }
+    }, [loadData]);
 
     const isSenaConcept = (concepto: string) => {
         const normalized = (concepto || '')
@@ -1333,6 +1375,21 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                     />
                                                                 )}
 
+                                                                {!mov.comprobante_url && mov.estado === 'pagado' && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            void regenerateReceiptForMovement(mov);
+                                                                        }}
+                                                                        disabled={regeneratingReceiptId === mov.id}
+                                                                        className="p-1.5 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg text-purple-500 hover:text-purple-600 transition-colors disabled:opacity-60"
+                                                                        title="Regenerar comprobante"
+                                                                    >
+                                                                        {regeneratingReceiptId === mov.id
+                                                                            ? <Loader2 size={16} className="animate-spin" />
+                                                                            : <FileImage size={16} />}
+                                                                    </button>
+                                                                )}
+
                                                                 {mov.categoria !== 'Egreso' && (
                                                                     <>
                                                                         <button
@@ -1351,18 +1408,6 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                         >
                                                                             <MessageCircle size={16} />
                                                                         </button>
-                                                                        {mov.estado === 'pagado' && (
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setReciboMov(mov);
-                                                                                    setIsReciboMinimized(false);
-                                                                                }}
-                                                                                className="p-1.5 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg text-purple-500 hover:text-purple-600 transition-colors"
-                                                                                title="Generar Recibo Visual (imagen)"
-                                                                            >
-                                                                                <FileImage size={16} />
-                                                                            </button>
-                                                                        )}
                                                                     </>
                                                                 )}
                                                                 <button
@@ -1770,94 +1815,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             tabla="caja_recepcion_movimientos"
                         />
 
-                        {/* Recibo Visual Modal */}
-                        {reciboMov && !isReciboMinimized && (
-                            <div
-                                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-                                onClick={() => setReciboMov(null)}
-                            >
-                                <div
-                                    className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-xl w-full max-h-[92vh] overflow-hidden flex flex-col"
-                                    onClick={(event) => event.stopPropagation()}
-                                >
-                                    <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                                <FileImage size={20} className="text-purple-500" />
-                                                Recibo de Pago
-                                            </h3>
-                                            <p className="text-sm text-gray-500 mt-1">
-                                                Genera una imagen del recibo para compartir
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => setIsReciboMinimized(true)}
-                                                className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
-                                            >
-                                                Minimizar
-                                            </button>
-                                            <button
-                                                onClick={() => setReciboMov(null)}
-                                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                            >
-                                                <X size={20} className="text-gray-500" />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-4 md:p-6 overflow-y-auto">
-                                        <ReciboGenerator
-                                            data={{
-                                                numero: generateReciboNumber(),
-                                                fecha: new Date(reciboMov.fecha_hora),
-                                                paciente: reciboMov.paciente
-                                                    ? `${reciboMov.paciente.nombre} ${reciboMov.paciente.apellido}`
-                                                    : 'Paciente General',
-                                                concepto: reciboMov.concepto_nombre,
-                                                monto: reciboMov.monto,
-                                                moneda: reciboMov.moneda,
-                                                metodoPago: reciboMov.metodo_pago,
-                                                atendidoPor: 'AM Clínica',
-                                            }}
-                                            onGenerated={(result) => {
-                                                console.log('Recibo generado:', result.imageUrl);
-                                            }}
-                                            recipientPhone={reciboMov.paciente?.telefono || null}
-                                            recipientEmail={reciboMov.paciente?.email || null}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {reciboMov && isReciboMinimized && (
-                            <div className="fixed bottom-4 right-4 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-[280px]">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Recibo minimizado</p>
-                                        <p className="text-xs text-gray-500 truncate">
-                                            {reciboMov.paciente
-                                                ? `${reciboMov.paciente.nombre} ${reciboMov.paciente.apellido}`
-                                                : 'Paciente General'}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() => setReciboMov(null)}
-                                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                                    >
-                                        <X size={16} className="text-gray-500" />
-                                    </button>
-                                </div>
-
-                                <button
-                                    onClick={() => setIsReciboMinimized(false)}
-                                    className="mt-3 w-full px-3 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                                >
-                                    Restaurar recibo
-                                </button>
-                            </div>
-                        )}
+                        <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
 
                         {/* Edit Date Modal */}
 

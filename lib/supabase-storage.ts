@@ -214,6 +214,20 @@ export async function refreshSignedUrl(
     expiresIn = 60 * 60 * 24 * 7 // 7 días por defecto
 ): Promise<string | null> {
     try {
+        if (storedValue.startsWith('storage:')) {
+            const parts = storedValue.split(':');
+            if (parts.length < 3) return null;
+            const bucket = parts[1];
+            const filePath = parts.slice(2).join(':');
+
+            const { data, error } = await getSupabase().storage
+                .from(bucket)
+                .createSignedUrl(filePath, expiresIn);
+
+            if (error) return null;
+            return data?.signedUrl ?? null;
+        }
+
         let filePath: string;
 
         if (storedValue.startsWith('https://')) {
