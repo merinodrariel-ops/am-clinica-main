@@ -626,7 +626,10 @@ function CajaRecepcionContent() {
                 comprobante_url: string | null;
                 monto?: number;
                 moneda?: string;
+                metodo_pago?: string;
+                concepto_nombre?: string;
                 categoria?: string;
+                fecha_movimiento?: string;
                 registro_editado?: boolean;
                 usd_equivalente?: number;
             } = {
