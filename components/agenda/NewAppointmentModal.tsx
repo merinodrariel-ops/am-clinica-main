@@ -31,8 +31,8 @@ interface AppointmentData {
     status: string;
     type: string;
     notes: string;
-    patient?: { full_name: string };
-    doctor?: { full_name: string };
+    patient?: { full_name?: string };
+    doctor?: { full_name?: string };
 }
 
 interface NewAppointmentModalProps {

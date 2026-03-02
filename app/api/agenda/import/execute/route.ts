@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         }
 
         // Map rows to `agenda_appointments` format
-        const appointmentsToInsert = rowsToImport.map((rowData) => {
+        const appointmentsToInsert = rowsToImport.map((rowData: any) => {
             const raw = rowData.raw_data;
             const finalPatientId = rowData.resolved_patient_id || rowData.suggested_patient_id;
 
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         await adminClient
             .from('agenda_import_rows')
             .update({ status: 'imported' })
-            .in('id', rowsToImport.map(r => r.id));
+            .in('id', rowsToImport.map((r: any) => r.id));
 
         // Update job status
         await adminClient

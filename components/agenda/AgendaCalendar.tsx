@@ -32,8 +32,8 @@ interface AppointmentModalData {
     status: string;
     type: string;
     notes: string;
-    patient?: { full_name: string };
-    doctor?: { full_name: string };
+    patient?: { full_name?: string };
+    doctor?: { full_name?: string };
 }
 
 interface AgendaAppointmentRecord {
@@ -57,7 +57,8 @@ interface AgendaEventExtendedProps {
     notes?: string;
     patient_id?: string;
     doctor_id?: string;
-    doctor?: { full_name: string };
+    patient?: { full_name?: string };
+    doctor?: { full_name?: string };
     conflict?: boolean;
 }
 
@@ -283,6 +284,10 @@ export default function AgendaCalendar() {
     ) => {
         try {
             const appointments = (await getAppointments(fetchInfo.startStr, fetchInfo.endStr)) as AgendaAppointmentRecord[];
+
+            const filtered = activeDoctorIds.has('all')
+                ? appointments
+                : appointments.filter(apt => apt.doctor_id && activeDoctorIds.has(apt.doctor_id));
 
             const sorted = [...filtered].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
