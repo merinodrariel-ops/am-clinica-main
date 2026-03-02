@@ -13,7 +13,10 @@ import {
     DollarSign,
     Check
 } from 'lucide-react';
-import { supabase, TarifarioItem, TarifarioVersion } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+import type { TarifarioItem, TarifarioVersion } from '@/lib/supabase';
+
+const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 
 const CATEGORIAS = [

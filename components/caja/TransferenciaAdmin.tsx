@@ -5,7 +5,9 @@ import { ArrowRightLeft, Loader2, X, Send, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { Textarea } from '@/components/ui/Textarea';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 

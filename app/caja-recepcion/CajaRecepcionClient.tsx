@@ -39,7 +39,9 @@ const PresentacionesSyncTab = dynamic(() => import('@/components/caja/Presentaci
 type CajaTab = 'caja' | 'financiacion' | 'contratos' | 'presentaciones';
 import clsx from 'clsx';
 import { formatCurrency } from '@/lib/bna';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import NuevoIngresoForm from '@/components/caja/NuevoIngresoForm';
 import ArqueoPanel from '@/components/caja/ArqueoPanel';
 import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';

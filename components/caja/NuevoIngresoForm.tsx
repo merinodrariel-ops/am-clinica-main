@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import MoneyInput from "@/components/ui/MoneyInput";
 import clsx from 'clsx';
-import { supabase, TarifarioItem } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+import type { TarifarioItem } from '@/lib/supabase';
+
+const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerWorkflowFromSenaPayment } from '@/app/actions/clinical-workflows';

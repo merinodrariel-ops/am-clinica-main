@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Loader2, DollarSign, Lock, CheckCircle, AlertTriangle, PlayCircle } from 'lucide-react';
 import clsx from 'clsx';
-import { supabase, CajaArqueo } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+import type { CajaArqueo } from '@/lib/supabase';
+
+const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { getUltimoCierre, cerrarCajaDelDia, abrirCajaDelDia, getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
 import { formatDateForLocale, getLocalISODate } from '@/lib/local-date';

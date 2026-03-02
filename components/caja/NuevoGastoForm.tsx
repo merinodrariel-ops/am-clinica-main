@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import MoneyInput from "@/components/ui/MoneyInput";
 
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { getLocalISODate } from '@/lib/local-date';
 import { useAuth } from '@/contexts/AuthContext';

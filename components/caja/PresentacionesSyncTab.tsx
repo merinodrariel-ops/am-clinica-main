@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Download, ExternalLink, Loader2, RefreshCw, Search, UserRound, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import type { Paciente } from '@/lib/patients';
 import {
     getPatientPresentationsAction,
