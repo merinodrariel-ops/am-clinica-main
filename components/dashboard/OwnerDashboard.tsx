@@ -5,6 +5,7 @@ import {
     DndContext,
     DragOverlay,
     AutoScrollActivator,
+    MeasuringStrategy,
     closestCorners,
     KeyboardSensor,
     PointerSensor,
@@ -40,6 +41,8 @@ import {
     ChevronUp,
     ChevronLeft,
     ChevronRight,
+    Trash2,
+    Plus,
 } from 'lucide-react';
 import { getOwnerDashboardStats, type OwnerDashboardStats } from '@/lib/dashboard';
 import dynamic from 'next/dynamic';
@@ -109,12 +112,14 @@ function SortableCard({
     isEditing,
     isDropTarget,
     isRecentlyDropped,
+    className,
 }: {
     id: string;
     children: React.ReactNode;
     isEditing: boolean;
     isDropTarget: boolean;
     isRecentlyDropped: boolean;
+    className?: string;
 }) {
     const {
         attributes,
@@ -139,7 +144,7 @@ function SortableCard({
         <div
             ref={setNodeRef}
             style={style}
-            className={`relative transition-all duration-200 ${isEditing ? 'touch-none cursor-grab active:cursor-grabbing' : ''}`}
+            className={`relative transition-all duration-200 ${isEditing ? 'touch-none cursor-grab active:cursor-grabbing' : ''} ${className || ''}`}
             data-drag-target={isDropTarget ? 'true' : undefined}
             data-drag-dropped={isRecentlyDropped ? 'true' : undefined}
             aria-dropeffect={isDropTarget ? 'move' : undefined}
@@ -198,7 +203,9 @@ interface KpiCardProps {
     cardClassName?: string;
     isEditing: boolean;
     isHidden: boolean;
+    canRemove: boolean;
     onToggleVisibility: (id: CardId) => void;
+    onRemove: (id: CardId) => void;
 }
 
 function KpiCard({
@@ -218,7 +225,9 @@ function KpiCard({
     cardClassName = '',
     isEditing,
     isHidden,
+    canRemove,
     onToggleVisibility,
+    onRemove,
 }: KpiCardProps) {
     const [expanded, setExpanded] = useState(alwaysExpanded);
 
@@ -235,17 +244,31 @@ function KpiCard({
             }}
         >
             {isEditing && (
-                <button
-                    onClick={() => onToggleVisibility(id)}
-                    className="absolute top-2 right-2 z-10 p-1.5 rounded-lg transition-all hover:scale-110"
-                    style={{
-                        background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 25%, 0.8)',
-                        color: isHidden ? 'hsl(0, 70%, 60%)' : 'hsl(230, 10%, 60%)',
-                    }}
-                    title={isHidden ? 'Mostrar' : 'Ocultar'}
-                >
-                    {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
+                <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+                    <button
+                        onClick={() => onToggleVisibility(id)}
+                        className="p-1.5 rounded-lg transition-all hover:scale-110"
+                        style={{
+                            background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 25%, 0.8)',
+                            color: isHidden ? 'hsl(0, 70%, 60%)' : 'hsl(230, 10%, 60%)',
+                        }}
+                        title={isHidden ? 'Mostrar' : 'Ocultar'}
+                    >
+                        {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                    <button
+                        onClick={() => onRemove(id)}
+                        disabled={!canRemove}
+                        className="p-1.5 rounded-lg transition-all hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{
+                            background: 'hsla(0, 70%, 50%, 0.2)',
+                            color: 'hsl(0, 70%, 60%)',
+                        }}
+                        title={canRemove ? 'Eliminar del grid' : 'Debe quedar al menos una tarjeta'}
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
             )}
 
             <div className="flex items-start gap-4">
@@ -512,8 +535,9 @@ function NewPatientsTrendDetail({
 export default function OwnerDashboard() {
     const [stats, setStats] = useState<OwnerDashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
-    const [layout, setLayout] = useState<LayoutConfig>({ order: DEFAULT_ORDER, hidden: [] });
+    const [layout, setLayout] = useState<LayoutConfig>(() => getLayout());
     const [isEditing, setIsEditing] = useState(false);
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'config'>('dashboard');
     const [activeCardId, setActiveCardId] = useState<CardId | null>(null);
     const [overCardId, setOverCardId] = useState<CardId | null>(null);
     const [recentlyDroppedCardId, setRecentlyDroppedCardId] = useState<CardId | null>(null);
@@ -530,10 +554,6 @@ export default function OwnerDashboard() {
         const pointerHits = pointerWithin(args);
         if (pointerHits.length > 0) return pointerHits;
         return closestCorners(args);
-    }, []);
-
-    useEffect(() => {
-        setLayout(getLayout());
     }, []);
 
     useEffect(() => {
@@ -616,6 +636,44 @@ export default function OwnerDashboard() {
         setLayout(defaultLayout);
         saveLayout(defaultLayout);
         setIsEditing(false);
+        setActiveTab('dashboard');
+    }, []);
+
+    const removeCard = useCallback((id: CardId) => {
+        setLayout(prev => {
+            if (!prev.order.includes(id) || prev.order.length <= 1) return prev;
+            const order = prev.order.filter(cardId => cardId !== id);
+            const hidden = prev.hidden.filter(cardId => cardId !== id);
+            const newLayout = { ...prev, order, hidden };
+            saveLayout(newLayout);
+            return newLayout;
+        });
+        if (activeCardId === id) setActiveCardId(null);
+        if (overCardId === id) setOverCardId(null);
+    }, [activeCardId, overCardId]);
+
+    const restoreCard = useCallback((id: CardId) => {
+        setLayout(prev => {
+            if (prev.order.includes(id)) return prev;
+            const order = [...prev.order, id];
+            const hidden = prev.hidden.filter(cardId => cardId !== id);
+            const newLayout = { ...prev, order, hidden };
+            saveLayout(newLayout);
+            return newLayout;
+        });
+    }, []);
+
+    const moveCardInConfig = useCallback((id: CardId, direction: 'up' | 'down') => {
+        setLayout(prev => {
+            const index = prev.order.indexOf(id);
+            if (index < 0) return prev;
+            const targetIndex = direction === 'up' ? index - 1 : index + 1;
+            if (targetIndex < 0 || targetIndex >= prev.order.length) return prev;
+            const order = arrayMove(prev.order, index, targetIndex);
+            const newLayout = { ...prev, order };
+            saveLayout(newLayout);
+            return newLayout;
+        });
     }, []);
 
     if (loading) {
@@ -646,7 +704,7 @@ export default function OwnerDashboard() {
 
     if (!stats) return null;
 
-    const cardData: Partial<Record<CardId, Omit<KpiCardProps, 'isEditing' | 'isHidden' | 'onToggleVisibility'>>> = {
+    const cardData: Partial<Record<CardId, Omit<KpiCardProps, 'isEditing' | 'isHidden' | 'canRemove' | 'onToggleVisibility' | 'onRemove'>>> = {
         'total-pacientes': {
             id: 'total-pacientes',
             icon: Users,
@@ -760,11 +818,22 @@ export default function OwnerDashboard() {
         : GripVertical;
 
     const visibleCards = layout.order.filter(id => !layout.hidden.includes(id) || isEditing);
+    const removedCards = DEFAULT_ORDER.filter(id => !layout.order.includes(id));
+
+    const openConfigTab = () => {
+        setActiveTab('config');
+        setIsEditing(true);
+    };
+
+    const openDashboardTab = () => {
+        setActiveTab('dashboard');
+        setIsEditing(false);
+    };
 
     return (
         <div className="mb-8">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
                 <div>
                     <h2
                         className="text-xl font-bold tracking-tight"
@@ -775,41 +844,159 @@ export default function OwnerDashboard() {
                     <p className="text-sm mt-0.5" style={{ color: 'hsl(230 10% 45%)' }}>
                         {currentMonth} {new Date().getFullYear()} — Vista ejecutiva
                     </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {isEditing && (
+                    <div
+                        className="mt-3 inline-flex items-center gap-1 rounded-xl p-1"
+                        style={{ background: 'hsla(230, 15%, 20%, 0.65)', border: '1px solid hsla(230, 15%, 30%, 0.5)' }}
+                    >
                         <button
-                            onClick={resetLayout}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
+                            onClick={openDashboardTab}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                             style={{
-                                background: 'hsla(230, 15%, 20%, 0.8)',
-                                color: 'hsl(230, 10%, 60%)',
-                                border: '1px solid hsla(230, 15%, 30%, 0.5)',
+                                background: activeTab === 'dashboard' ? 'hsla(165, 100%, 42%, 0.16)' : 'transparent',
+                                color: activeTab === 'dashboard' ? 'hsl(165 85% 52%)' : 'hsl(230 10% 60%)',
                             }}
                         >
-                            <RotateCcw size={12} />
-                            Restablecer
+                            Dashboard
                         </button>
-                    )}
+                        <button
+                            onClick={openConfigTab}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5"
+                            style={{
+                                background: activeTab === 'config' ? 'hsla(165, 100%, 42%, 0.16)' : 'transparent',
+                                color: activeTab === 'config' ? 'hsl(165 85% 52%)' : 'hsl(230 10% 60%)',
+                            }}
+                        >
+                            <Settings2 size={12} />
+                            Configurar grid
+                        </button>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
                     <button
-                        onClick={() => setIsEditing(!isEditing)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 ${isEditing ? 'ring-1' : ''
-                            }`}
+                        onClick={resetLayout}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
                         style={{
-                            background: isEditing
-                                ? 'hsla(165, 100%, 42%, 0.15)'
-                                : 'hsla(230, 15%, 20%, 0.8)',
-                            color: isEditing
-                                ? 'hsl(165, 85%, 50%)'
-                                : 'hsl(230, 10%, 60%)',
-                            border: `1px solid ${isEditing ? 'hsla(165, 100%, 42%, 0.3)' : 'hsla(230, 15%, 30%, 0.5)'}`,
+                            background: 'hsla(230, 15%, 20%, 0.8)',
+                            color: 'hsl(230, 10%, 60%)',
+                            border: '1px solid hsla(230, 15%, 30%, 0.5)',
                         }}
                     >
-                        <Settings2 size={12} />
-                        {isEditing ? 'Listo' : 'Personalizar'}
+                        <RotateCcw size={12} />
+                        Restablecer
                     </button>
+                    {activeTab === 'dashboard' && (
+                        <button
+                            onClick={() => setIsEditing(!isEditing)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 ${isEditing ? 'ring-1' : ''}`}
+                            style={{
+                                background: isEditing
+                                    ? 'hsla(165, 100%, 42%, 0.15)'
+                                    : 'hsla(230, 15%, 20%, 0.8)',
+                                color: isEditing
+                                    ? 'hsl(165, 85%, 50%)'
+                                    : 'hsl(230, 10%, 60%)',
+                                border: `1px solid ${isEditing ? 'hsla(165, 100%, 42%, 0.3)' : 'hsla(230, 15%, 30%, 0.5)'}`,
+                            }}
+                        >
+                            <Settings2 size={12} />
+                            {isEditing ? 'Listo' : 'Personalizar'}
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {activeTab === 'config' && (
+                <div
+                    className="mb-4 rounded-2xl p-4"
+                    style={{
+                        background: 'linear-gradient(135deg, hsla(230, 18%, 14%, 0.9), hsla(230, 20%, 10%, 0.85))',
+                        border: '1px solid hsla(230, 15%, 30%, 0.5)',
+                    }}
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <p className="text-xs font-semibold" style={{ color: 'hsl(210 20% 90%)' }}>
+                            Configuración del grid
+                        </p>
+                        <p className="text-[11px]" style={{ color: 'hsl(230 10% 50%)' }}>
+                            {layout.order.length} activas • {layout.hidden.length} ocultas • {removedCards.length} eliminadas
+                        </p>
+                    </div>
+                    <div className="space-y-2">
+                        {DEFAULT_ORDER.map((id) => {
+                            const inGrid = layout.order.includes(id);
+                            const isHidden = layout.hidden.includes(id);
+                            const currentIndex = layout.order.indexOf(id);
+                            return (
+                                <div
+                                    key={`config-${id}`}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2"
+                                    style={{ background: 'hsla(230, 15%, 20%, 0.45)', border: '1px solid hsla(230, 15%, 28%, 0.45)' }}
+                                >
+                                    <div>
+                                        <p className="text-sm font-medium" style={{ color: 'hsl(210 20% 90%)' }}>{CARD_TITLES[id]}</p>
+                                        <p className="text-[11px]" style={{ color: 'hsl(230 10% 50%)' }}>
+                                            {!inGrid ? 'Eliminada del grid' : isHidden ? 'Oculta en dashboard' : `Visible en posición ${currentIndex + 1}`}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        {inGrid ? (
+                                            <>
+                                                <button
+                                                    onClick={() => moveCardInConfig(id, 'up')}
+                                                    disabled={currentIndex <= 0}
+                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed"
+                                                    style={{ background: 'hsla(230, 15%, 26%, 0.75)', color: 'hsl(230 10% 70%)' }}
+                                                    title="Subir"
+                                                >
+                                                    <ChevronUp size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => moveCardInConfig(id, 'down')}
+                                                    disabled={currentIndex < 0 || currentIndex >= layout.order.length - 1}
+                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed"
+                                                    style={{ background: 'hsla(230, 15%, 26%, 0.75)', color: 'hsl(230 10% 70%)' }}
+                                                    title="Bajar"
+                                                >
+                                                    <ChevronDown size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => toggleVisibility(id)}
+                                                    className="p-1.5 rounded-lg"
+                                                    style={{
+                                                        background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 26%, 0.75)',
+                                                        color: isHidden ? 'hsl(0 70% 62%)' : 'hsl(230 10% 70%)',
+                                                    }}
+                                                    title={isHidden ? 'Mostrar' : 'Ocultar'}
+                                                >
+                                                    {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                </button>
+                                                <button
+                                                    onClick={() => removeCard(id)}
+                                                    disabled={layout.order.length <= 1}
+                                                    className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed"
+                                                    style={{ background: 'hsla(0, 70%, 50%, 0.2)', color: 'hsl(0 70% 62%)' }}
+                                                    title="Eliminar del grid"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button
+                                                onClick={() => restoreCard(id)}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium"
+                                                style={{ background: 'hsla(165, 100%, 42%, 0.16)', color: 'hsl(165 85% 52%)' }}
+                                            >
+                                                <Plus size={12} />
+                                                Agregar al grid
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {isEditing && (
                 <div
@@ -821,7 +1008,7 @@ export default function OwnerDashboard() {
                     }}
                 >
                     <GripVertical size={14} />
-                    Arrastrá desde el agarre para reordenar • Usá el ojo 👁️ para ocultar/mostrar
+                    Arrastrá para reordenar • Ojo para ocultar/mostrar • Basura para eliminar del grid
                 </div>
             )}
 
@@ -836,6 +1023,11 @@ export default function OwnerDashboard() {
                     threshold: { x: 0.08, y: 0.22 },
                     interval: 4,
                 }}
+                measuring={{
+                    droppable: {
+                        strategy: MeasuringStrategy.Always,
+                    },
+                }}
                 collisionDetection={collisionDetectionStrategy}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
@@ -847,20 +1039,22 @@ export default function OwnerDashboard() {
                         {visibleCards.map(id => {
                             if (id === 'predictive-pulse') {
                                 return (
-                                    <div key={id} className="col-span-1 md:col-span-2">
-                                        <SortableCard
-                                            id={id}
+                                    <SortableCard
+                                        key={id}
+                                        id={id}
+                                        className="md:col-span-2"
+                                        isEditing={isEditing}
+                                        isDropTarget={overCardId === id && activeCardId !== id}
+                                        isRecentlyDropped={recentlyDroppedCardId === id}
+                                    >
+                                        <PredictiveInsights
                                             isEditing={isEditing}
-                                            isDropTarget={overCardId === id && activeCardId !== id}
-                                            isRecentlyDropped={recentlyDroppedCardId === id}
-                                        >
-                                            <PredictiveInsights
-                                                isEditing={isEditing}
-                                                isHidden={layout.hidden.includes(id)}
-                                                onToggleVisibility={toggleVisibility}
-                                            />
-                                        </SortableCard>
-                                    </div>
+                                            isHidden={layout.hidden.includes(id)}
+                                            canRemove={layout.order.length > 1}
+                                            onToggleVisibility={toggleVisibility}
+                                            onRemove={(cardId) => removeCard(cardId as CardId)}
+                                        />
+                                    </SortableCard>
                                 );
                             }
                             const card = cardData[id];
@@ -869,6 +1063,7 @@ export default function OwnerDashboard() {
                                 <SortableCard
                                     key={id}
                                     id={id}
+                                    className={card.isGiant ? 'md:col-span-2' : ''}
                                     isEditing={isEditing}
                                     isDropTarget={overCardId === id && activeCardId !== id}
                                     isRecentlyDropped={recentlyDroppedCardId === id}
@@ -877,7 +1072,9 @@ export default function OwnerDashboard() {
                                         {...card}
                                         isEditing={isEditing}
                                         isHidden={layout.hidden.includes(id)}
+                                        canRemove={layout.order.length > 1}
                                         onToggleVisibility={toggleVisibility}
+                                        onRemove={removeCard}
                                     />
                                 </SortableCard>
                             );

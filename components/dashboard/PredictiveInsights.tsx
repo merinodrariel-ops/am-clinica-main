@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Sparkles, TrendingUp, TrendingDown, Target, Lightbulb, Zap, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, TrendingUp, TrendingDown, Target, Lightbulb, Zap, Eye, EyeOff, Trash2 } from 'lucide-react';
 
 interface Analysis {
     forecast: {
@@ -16,13 +16,17 @@ interface Analysis {
 interface PredictiveInsightsProps {
     isEditing?: boolean;
     isHidden?: boolean;
+    canRemove?: boolean;
     onToggleVisibility?: (id: string) => void;
+    onRemove?: (id: string) => void;
 }
 
 export default function PredictiveInsights({
     isEditing,
     isHidden,
+    canRemove,
     onToggleVisibility,
+    onRemove,
 }: PredictiveInsightsProps) {
     const [data, setData] = useState<Analysis | null>(null);
     const [loading, setLoading] = useState(true);
@@ -74,18 +78,33 @@ export default function PredictiveInsights({
             style={{ background: isHidden ? 'hsla(230, 15%, 12%, 0.5)' : 'linear-gradient(135deg, hsla(230, 15%, 12%, 0.7), hsla(230, 15%, 15%, 0.4))' }}>
 
             {isEditing && (
-                <button
-                    onClick={() => onToggleVisibility?.('predictive-pulse')}
-                    className="absolute top-4 right-4 z-20 p-2 rounded-xl transition-all hover:scale-110 active:scale-95"
-                    style={{
-                        background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 25%, 0.8)',
-                        color: isHidden ? 'hsl(0, 70%, 60%)' : 'hsl(230, 10%, 60%)',
-                        border: '1px solid hsla(230, 100%, 100%, 0.1)'
-                    }}
-                    title={isHidden ? 'Mostrar' : 'Ocultar'}
-                >
-                    {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+                    <button
+                        onClick={() => onToggleVisibility?.('predictive-pulse')}
+                        className="p-2 rounded-xl transition-all hover:scale-110 active:scale-95"
+                        style={{
+                            background: isHidden ? 'hsla(0, 70%, 50%, 0.2)' : 'hsla(230, 15%, 25%, 0.8)',
+                            color: isHidden ? 'hsl(0, 70%, 60%)' : 'hsl(230, 10%, 60%)',
+                            border: '1px solid hsla(230, 100%, 100%, 0.1)'
+                        }}
+                        title={isHidden ? 'Mostrar' : 'Ocultar'}
+                    >
+                        {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button
+                        onClick={() => onRemove?.('predictive-pulse')}
+                        disabled={!canRemove}
+                        className="p-2 rounded-xl transition-all hover:scale-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{
+                            background: 'hsla(0, 70%, 50%, 0.2)',
+                            color: 'hsl(0, 70%, 60%)',
+                            border: '1px solid hsla(0, 80%, 60%, 0.25)'
+                        }}
+                        title={canRemove ? 'Eliminar del grid' : 'Debe quedar al menos una tarjeta'}
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
             )}
 
             {/* Background Accent */}
