@@ -9,7 +9,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.RESEND_FROM ?? 'agenda@am-clinica.ar';
-const APP_URL    = process.env.NEXT_PUBLIC_APP_URL ?? 'https://am-clinica.ar';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://am-clinica.ar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,11 +42,11 @@ function formatDateTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString('es-AR', {
     weekday: 'long',
-    day:     '2-digit',
-    month:   'long',
-    year:    'numeric',
-    hour:    '2-digit',
-    minute:  '2-digit',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
     timeZone: 'America/Argentina/Buenos_Aires',
   });
 }
@@ -64,10 +64,10 @@ function renderTemplate(
   key: string,
   ctx: AppointmentNotificationContext
 ): TemplateOutput {
-  const clinic   = ctx.clinicName ?? 'AM Clínica';
-  const dateStr  = formatDateTime(ctx.startTime);
-  const timeStr  = formatTime(ctx.startTime);
-  const doctor   = ctx.doctorName ? `Dr/a. ${ctx.doctorName}` : clinic;
+  const clinic = ctx.clinicName ?? 'AM Clínica';
+  const dateStr = formatDateTime(ctx.startTime);
+  const timeStr = formatTime(ctx.startTime);
+  const doctor = ctx.doctorName ? `Dr/a. ${ctx.doctorName}` : clinic;
 
   const baseStyle = `
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -191,6 +191,48 @@ function renderTemplate(
         </div>`,
       };
 
+    case 'birthday_greeting':
+      return {
+        subject: `¡Feliz Cumpleaños! 🎉 — ${clinic}`,
+        whatsapp: `🎉 ¡Muy feliz cumpleaños *${ctx.patientName}*! 🎂\n\nDe parte de todo el equipo de *${clinic}* te deseamos un excelente día. Recordá que tu sonrisa es tu mejor regalo. 😁🥂`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">¡Feliz Cumpleaños! 🎉</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            ¡Te deseamos que pases un hermoso día rodeado de tus seres queridos! 🎂🥂
+          </p>
+          ${footer}
+        </div>`,
+      };
+
+    case 'post_treatment_followup':
+      return {
+        subject: `¿Cómo te sentís hoy? — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* 👋, nos comunicamos de *${clinic}* para saber cómo venís evolucionando después de tu atención de ayer.\n\nSi tenés alguna molestia o duda, avisanos por este medio. ¡Que sigas muy bien! 🩺`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Seguimiento post-atención</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            Nos comunicamos para saber cómo te sentís hoy después de tu visita. Si tenés alguna duda, estamos a tu disposición.
+          </p>
+          ${footer}
+        </div>`,
+      };
+
+    case 'recall_6_months':
+      return {
+        subject: `Es momento de tu control preventivo 🦷 — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* 👋, ya pasaron 6 meses desde tu última visita a *${clinic}*.\n\nPara mantener tu sonrisa saludable, te recomendamos agendar un control preventivo. Escribinos para coordinar un horario. ✨`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Control Preventivo 🦷</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            Ya han pasado 6 meses desde tu última visita. Te recomendamos agendar un turno para control preventivo y limpieza.
+          </p>
+          ${footer}
+        </div>`,
+      };
+
     default:
       return {
         subject: `Notificación de ${clinic}`,
@@ -209,8 +251,8 @@ async function sendEmail(ctx: AppointmentNotificationContext): Promise<{ success
 
   try {
     const { data, error } = await resend.emails.send({
-      from:    FROM_EMAIL,
-      to:      ctx.patientEmail,
+      from: FROM_EMAIL,
+      to: ctx.patientEmail,
       subject,
       html,
     });
@@ -228,8 +270,8 @@ async function sendWhatsApp(ctx: AppointmentNotificationContext): Promise<{ succ
   if (!ctx.patientPhone) return { success: false, error: 'No phone number' };
 
   const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-  const AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
-  const FROM_WA     = process.env.TWILIO_WHATSAPP_FROM ?? 'whatsapp:+14155238886';
+  const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+  const FROM_WA = process.env.TWILIO_WHATSAPP_FROM ?? 'whatsapp:+14155238886';
 
   if (!ACCOUNT_SID || !AUTH_TOKEN) {
     console.warn('[AM-Scheduler] Twilio credentials not configured — skipping WhatsApp');
@@ -240,20 +282,20 @@ async function sendWhatsApp(ctx: AppointmentNotificationContext): Promise<{ succ
 
   // Normalize phone: ensure E.164 format for Argentina (+549...)
   const phone = ctx.patientPhone.replace(/\D/g, '');
-  const e164  = phone.startsWith('54') ? `+${phone}` : `+54${phone}`;
+  const e164 = phone.startsWith('54') ? `+${phone}` : `+54${phone}`;
 
   try {
     const response = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}/Messages.json`,
       {
-        method:  'POST',
+        method: 'POST',
         headers: {
-          'Content-Type':  'application/x-www-form-urlencoded',
+          'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': `Basic ${Buffer.from(`${ACCOUNT_SID}:${AUTH_TOKEN}`).toString('base64')}`,
         },
         body: new URLSearchParams({
           From: FROM_WA,
-          To:   `whatsapp:${e164}`,
+          To: `whatsapp:${e164}`,
           Body: body,
         }),
       }
@@ -277,17 +319,17 @@ async function logNotification(
   try {
     const supabase = createAdminClient();
     await supabase.from('notification_logs').insert({
-      appointment_id:  ctx.appointmentId,
-      rule_id:         ctx.ruleId ?? null,
+      appointment_id: ctx.appointmentId,
+      rule_id: ctx.ruleId ?? null,
       channel,
-      recipient_email: channel === 'email'     ? ctx.patientEmail  : null,
-      recipient_phone: channel === 'whatsapp'  ? ctx.patientPhone  : null,
-      template_key:    ctx.templateKey,
-      payload:         { patientName: ctx.patientName, doctorName: ctx.doctorName, startTime: ctx.startTime },
-      status:          result.success ? 'sent' : 'failed',
-      provider_id:     result.id ?? null,
-      error_message:   result.error ?? null,
-      sent_at:         result.success ? new Date().toISOString() : null,
+      recipient_email: channel === 'email' ? ctx.patientEmail : null,
+      recipient_phone: channel === 'whatsapp' ? ctx.patientPhone : null,
+      template_key: ctx.templateKey,
+      payload: { patientName: ctx.patientName, doctorName: ctx.doctorName, startTime: ctx.startTime },
+      status: result.success ? 'sent' : 'failed',
+      provider_id: result.id ?? null,
+      error_message: result.error ?? null,
+      sent_at: result.success ? new Date().toISOString() : null,
     });
   } catch (err) {
     console.error('[AM-Scheduler] Failed to log notification:', err);
@@ -303,8 +345,8 @@ export async function sendNotification(ctx: AppointmentNotificationContext): Pro
     const emailResult = await sendEmail(ctx);
     await logNotification(ctx, 'email', emailResult);
     if (emailResult.success) {
-      results.success  = true;
-      results.emailId  = emailResult.id;
+      results.success = true;
+      results.emailId = emailResult.id;
     } else {
       results.error = emailResult.error;
     }
@@ -314,8 +356,8 @@ export async function sendNotification(ctx: AppointmentNotificationContext): Pro
     const waResult = await sendWhatsApp(ctx);
     await logNotification(ctx, 'whatsapp', waResult);
     if (waResult.success) {
-      results.success      = true;
-      results.whatsappId   = waResult.id;
+      results.success = true;
+      results.whatsappId = waResult.id;
     } else if (!results.success) {
       results.error = waResult.error;
     }
@@ -350,15 +392,15 @@ export async function createAndSendSurvey(
 
   await sendNotification({
     appointmentId,
-    templateKey:  'survey_post_appointment',
-    channel:      'whatsapp',
+    templateKey: 'survey_post_appointment',
+    channel: 'whatsapp',
     patientName,
     patientEmail,
     patientPhone,
     doctorName,
-    startTime:    new Date().toISOString(),
-    endTime:      new Date().toISOString(),
-    surveyToken:  survey.token,
+    startTime: new Date().toISOString(),
+    endTime: new Date().toISOString(),
+    surveyToken: survey.token,
   });
 
   // Mark appointment as survey sent
