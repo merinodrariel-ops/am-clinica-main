@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-02-25T07:51:12.556Z",
+  "generatedAt": "2026-03-02T22:50:15.958Z",
   "sourceFile": "calendar_report.json",
   "summary": {
     "total": 804,
-    "A_import": 354,
-    "B_review": 26,
-    "C_exclude": 174,
+    "A_import": 355,
+    "B_review": 27,
+    "C_exclude": 165,
     "D_cancelled": 38,
-    "E_primitive_recall": 212
+    "E_primitive_recall": 219
   },
   "recallTypeBreakdown": {
-    "(sin tipo — general)": 269,
+    "(sin tipo — general)": 270,
     "mantenimiento_implantes": 12,
     "control_carillas": 27,
     "limpieza": 34,
@@ -44,14 +44,15 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): marianopaez88@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: marianopaez88@gmail.com",
           "+10: looks like patient name",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Mariano Páez",
         "extractedProcedure": "Consultas primera vez - Dr. Ariel Merino",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "marianopaez88@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -77,14 +78,15 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): juaniroumec@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: juaniroumec@gmail.com",
           "+10: looks like patient name",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas virtual",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Juan Ignacio Roumec)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "juaniroumec@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -229,13 +231,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): gdoretti@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: gdoretti@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Graciela Amanda doretti)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "gdoretti@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -291,13 +294,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): marianelaalberich@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: marianelaalberich@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (MARIANELA ALBERICH)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "marianelaalberich@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -353,13 +357,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): gdoretti@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: gdoretti@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Graciela Amanda doretti)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "gdoretti@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -385,13 +390,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): gonzaloacevedo09@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: gonzaloacevedo09@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Staff (Gonzalo Acevedo)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "gonzaloacevedo09@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -417,13 +423,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): marianelaalberich@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: marianelaalberich@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (MARIANELA ALBERICH)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "marianelaalberich@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -449,13 +456,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): sesinjoaquin@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: sesinjoaquin@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Rocio  Poli)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "sesinjoaquin@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -481,13 +489,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): drarielmerino@gmail.com, mariainesbezus@gmail.com",
+          "+15: real attendee email: drarielmerino@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Staff (Ines Bezus)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "drarielmerino@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -513,13 +522,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): suarezlilianae@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: suarezlilianae@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Eduardo Nestor Fernandez)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "suarezlilianae@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -545,13 +555,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): suarezlilianae@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: suarezlilianae@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Liliana Esther Suarez)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "suarezlilianae@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -577,13 +588,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): souza.rey.enrique@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: souza.rey.enrique@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Staff (Enrique Souza Rey)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "souza.rey.enrique@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -609,13 +621,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): alemigliorisi@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: alemigliorisi@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Staff (Alejandro Migliorisi)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "alemigliorisi@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -641,13 +654,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): mariadelosmilagrosr33@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: mariadelosmilagrosr33@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Milagros Rodriguez)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "mariadelosmilagrosr33@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -673,13 +687,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): drarielmerino@gmail.com, silviaardiz@yahoo.com.ar",
+          "+15: real attendee email: drarielmerino@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (silvia Ardiz)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "drarielmerino@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -705,13 +720,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): ezio_z@hotmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: ezio_z@hotmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Pietro Ezio Zucchet)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "ezio_z@hotmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -737,13 +753,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): natali.davila.ux@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: natali.davila.ux@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Natalí Dávila)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "natali.davila.ux@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -769,13 +786,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): drarielmerino@gmail.com, dpgodoy@gmail.com",
+          "+15: real attendee email: drarielmerino@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Dario Godoy)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "drarielmerino@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -801,13 +819,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): lucasgil.1798@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: lucasgil.1798@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Lucas Gil)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "lucasgil.1798@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -833,13 +852,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): andalaftnicolas@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: andalaftnicolas@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Nicolas Andalaft)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "andalaftnicolas@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -865,13 +885,14 @@
         "signals": [
           "+30: old format \"Nombre - Procedimiento\"",
           "+15: nueva primera vez marker",
-          "+15: 2 real attendee email(s): drarielmerino@gmail.com, gattilupe@hotmail.com",
+          "+15: real attendee email: drarielmerino@gmail.com",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Consultas",
         "extractedProcedure": "Primera vez - Dr. Ariel Merino   (Guadalupe Gatti)",
-        "isOldFormat": true
+        "isOldFormat": true,
+        "attendeeEmail": "drarielmerino@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -3161,12 +3182,13 @@
         "score": 60,
         "signals": [
           "+15: nueva primera vez marker",
-          "+15: 1 real attendee email(s): gabriela.distefano@live.com",
+          "+15: real attendee email: gabriela.distefano@live.com",
           "+10: looks like patient name",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
-        "extractedName": "Gabriela Distefano ari"
+        "extractedName": "Gabriela Distefano ari",
+        "attendeeEmail": "gabriela.distefano@live.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -3218,12 +3240,41 @@
         "score": 60,
         "signals": [
           "+15: nueva primera vez marker",
-          "+15: 1 real attendee email(s): s.flaviarominac@gmail.com",
+          "+15: real attendee email: s.flaviarominac@gmail.com",
           "+10: looks like patient name",
           "+10: has clinical description/notes",
           "+10: normal duration 60 min"
         ],
-        "extractedName": "Flavia Romina Silva"
+        "extractedName": "Flavia Romina Silva",
+        "attendeeEmail": "s.flaviarominac@gmail.com"
+      },
+      {
+        "calendarName": "Director - Dr. Merino Ariel ",
+        "date": "2025-06-17T15:30:00-03:00",
+        "yearMonth": "2025-06",
+        "year": 2025,
+        "month": 5,
+        "dayOfWeek": 2,
+        "hour": 15,
+        "summary": "Fernando Sibilla - Zoom por tratamiento de cirugía",
+        "description": "<a href=\"https://us05web.zoom.us/j/85746659312?pwd=cLk5sPbxBskDnK9YxAL9fKhlORXkgQ.1\" target=\"_blank\">https://us05web.zoom.us/j/85746659312?pwd=cLk5sPbxBskDnK9YxAL9fKhlORXkgQ.1</a><br><br><a href=\"https://docs.google.com/presentation/d/1eKukqJT5gIvfcyG8HSyZNNFGHnMFlG_U1H7AxmUGcDA/edit\" class=\"pastedDriveLink-0\">https://docs.google.com/presentation/d/1eKukqJT5gIvfcyG8HSyZNNFGHnMFlG_U1H7AxmUGcDA/edit</a>",
+        "organizer": "51baf8adafc7d1e2e6508a1dea9f9dbc8ec238852a6d1639039c388cdbcbdb6a@group.calendar.google.com",
+        "attendees": [],
+        "treatment": "Cirugía",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 30,
+        "bucket": "A_import",
+        "score": 60,
+        "signals": [
+          "+30: old format \"Nombre - Procedimiento\"",
+          "+10: looks like patient name",
+          "+10: has clinical description/notes",
+          "+10: normal duration 30 min"
+        ],
+        "extractedName": "Fernando Sibilla",
+        "extractedProcedure": "Zoom por tratamiento de cirugía",
+        "isOldFormat": true
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -3275,12 +3326,13 @@
         "score": 55,
         "signals": [
           "+20: recall keyword → control_carillas",
-          "+15: 1 real attendee email(s): lisandrozuccari@gmail.com",
+          "+15: real attendee email: lisandrozuccari@gmail.com",
           "+10: looks like patient name",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Control",
-        "suggestedRecallType": "control_carillas"
+        "suggestedRecallType": "control_carillas",
+        "attendeeEmail": "lisandrozuccari@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -3523,12 +3575,13 @@
         "score": 55,
         "signals": [
           "+20: new format \"nombre procedimiento ariel\"",
-          "+15: 1 real attendee email(s): drarielmerino@gmail.com",
+          "+15: real attendee email: drarielmerino@gmail.com",
           "+10: looks like patient name",
           "+10: normal duration 60 min"
         ],
         "extractedName": "Analia Kobal consulta",
-        "isNewFormat": true
+        "isNewFormat": true,
+        "attendeeEmail": "drarielmerino@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -3579,11 +3632,12 @@
         "score": 50,
         "signals": [
           "+15: nueva primera vez marker",
-          "+15: 1 real attendee email(s): eventospinoazul@gmail.com",
+          "+15: real attendee email: eventospinoazul@gmail.com",
           "+10: looks like patient name",
           "+10: normal duration 60 min"
         ],
-        "extractedName": "Karina Santini Rojas"
+        "extractedName": "Karina Santini Rojas",
+        "attendeeEmail": "eventospinoazul@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -3688,11 +3742,12 @@
         "score": 50,
         "signals": [
           "+15: nueva primera vez marker",
-          "+15: 1 real attendee email(s): ginalongo@hotmail.com",
+          "+15: real attendee email: ginalongo@hotmail.com",
           "+10: looks like patient name",
           "+10: normal duration 50 min"
         ],
-        "extractedName": "Gina Longo"
+        "extractedName": "Gina Longo",
+        "attendeeEmail": "ginalongo@hotmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -8037,12 +8092,13 @@
         "bucket": "A_import",
         "score": 45,
         "signals": [
-          "+15: 3 real attendee email(s): dr.arielmerinopersonal@gmail.com, covello@xwf.google.com, drarielmerino@gmail.com",
+          "+15: real attendee email: dr.arielmerinopersonal@gmail.com",
           "+10: looks like patient name",
           "+10: has clinical description/notes",
           "+10: normal duration 30 min"
         ],
-        "extractedName": "Google // Dr."
+        "extractedName": "Google // Dr.",
+        "attendeeEmail": "dr.arielmerinopersonal@gmail.com"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -8066,12 +8122,13 @@
         "bucket": "A_import",
         "score": 45,
         "signals": [
-          "+15: 2 real attendee email(s): valentinogranata1988@gmail.com, drarielmerino@gmail.com",
+          "+15: real attendee email: valentinogranata1988@gmail.com",
           "+10: looks like patient name",
           "+10: has clinical description/notes",
           "+10: normal duration 30 min"
         ],
-        "extractedName": "Ariel merino and"
+        "extractedName": "Ariel merino and",
+        "attendeeEmail": "valentinogranata1988@gmail.com"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -9814,6 +9871,31 @@
           "+10: normal duration 30 min"
         ],
         "extractedName": "ariel con Fausto"
+      },
+      {
+        "calendarName": "Director - Dr. Merino Ariel ",
+        "date": "2025-06-12T17:00:00-03:00",
+        "yearMonth": "2025-06",
+        "year": 2025,
+        "month": 5,
+        "dayOfWeek": 4,
+        "hour": 17,
+        "summary": "Constanza Dekleva zoom",
+        "description": "<a href=\"https://us05web.zoom.us/j/89690473080?pwd=oNbzatmNSqvI6eZ7Ufar981ZJcDK5C.1\">https://us05web.zoom.us/j/89690473080?pwd=oNbzatmNSqvI6eZ7Ufar981ZJcDK5C.1</a>",
+        "organizer": "51baf8adafc7d1e2e6508a1dea9f9dbc8ec238852a6d1639039c388cdbcbdb6a@group.calendar.google.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 30,
+        "bucket": "B_review",
+        "score": 30,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: has clinical description/notes",
+          "+10: normal duration 30 min"
+        ],
+        "extractedName": "Constanza Dekleva zoom"
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
@@ -11606,28 +11688,6 @@
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
-        "date": "2025-06-04T18:30:00-03:00",
-        "yearMonth": "2025-06",
-        "year": 2025,
-        "month": 5,
-        "dayOfWeek": 3,
-        "hour": 18,
-        "summary": "Zoom dudas Santiago Ferraro",
-        "description": "",
-        "organizer": "51baf8adafc7d1e2e6508a1dea9f9dbc8ec238852a6d1639039c388cdbcbdb6a@group.calendar.google.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 30,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"zoom\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Director - Dr. Merino Ariel ",
         "date": "2025-06-05T16:00:00-03:00",
         "yearMonth": "2025-06",
         "year": 2025,
@@ -11649,50 +11709,6 @@
         "score": -100,
         "signals": [
           "EXCLUDE: Calendly consultation meeting (AM Estética Dental)"
-        ]
-      },
-      {
-        "calendarName": "Director - Dr. Merino Ariel ",
-        "date": "2025-06-12T17:00:00-03:00",
-        "yearMonth": "2025-06",
-        "year": 2025,
-        "month": 5,
-        "dayOfWeek": 4,
-        "hour": 17,
-        "summary": "Constanza Dekleva zoom",
-        "description": "<a href=\"https://us05web.zoom.us/j/89690473080?pwd=oNbzatmNSqvI6eZ7Ufar981ZJcDK5C.1\">https://us05web.zoom.us/j/89690473080?pwd=oNbzatmNSqvI6eZ7Ufar981ZJcDK5C.1</a>",
-        "organizer": "51baf8adafc7d1e2e6508a1dea9f9dbc8ec238852a6d1639039c388cdbcbdb6a@group.calendar.google.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 30,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"zoom\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Director - Dr. Merino Ariel ",
-        "date": "2025-06-17T15:30:00-03:00",
-        "yearMonth": "2025-06",
-        "year": 2025,
-        "month": 5,
-        "dayOfWeek": 2,
-        "hour": 15,
-        "summary": "Fernando Sibilla - Zoom por tratamiento de cirugía",
-        "description": "<a href=\"https://us05web.zoom.us/j/85746659312?pwd=cLk5sPbxBskDnK9YxAL9fKhlORXkgQ.1\" target=\"_blank\">https://us05web.zoom.us/j/85746659312?pwd=cLk5sPbxBskDnK9YxAL9fKhlORXkgQ.1</a><br><br><a href=\"https://docs.google.com/presentation/d/1eKukqJT5gIvfcyG8HSyZNNFGHnMFlG_U1H7AxmUGcDA/edit\" class=\"pastedDriveLink-0\">https://docs.google.com/presentation/d/1eKukqJT5gIvfcyG8HSyZNNFGHnMFlG_U1H7AxmUGcDA/edit</a>",
-        "organizer": "51baf8adafc7d1e2e6508a1dea9f9dbc8ec238852a6d1639039c388cdbcbdb6a@group.calendar.google.com",
-        "attendees": [],
-        "treatment": "Cirugía",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 30,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"zoom\" in summary"
         ]
       },
       {
@@ -13783,28 +13799,6 @@
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
-        "date": "2025-09-23T10:30:00-03:00",
-        "yearMonth": "2025-09",
-        "year": 2025,
-        "month": 8,
-        "dayOfWeek": 2,
-        "hour": 10,
-        "summary": "Residuos patológicos",
-        "description": "",
-        "organizer": "drarielmerino@gmail.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 60,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"residuo\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Turnos Manuales - Recordatorios",
         "date": "2025-10-07T10:00:00-03:00",
         "yearMonth": "2025-10",
         "year": 2025,
@@ -13941,28 +13935,6 @@
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
-        "date": "2025-10-28T10:30:00-03:00",
-        "yearMonth": "2025-10",
-        "year": 2025,
-        "month": 9,
-        "dayOfWeek": 2,
-        "hour": 10,
-        "summary": "Residuos patológicos",
-        "description": "",
-        "organizer": "drarielmerino@gmail.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 60,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"residuo\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Turnos Manuales - Recordatorios",
         "date": "2025-10-29T13:00:00-03:00",
         "yearMonth": "2025-10",
         "year": 2025,
@@ -14003,28 +13975,6 @@
         "score": -100,
         "signals": [
           "EXCLUDE: keyword \"reunion\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Turnos Manuales - Recordatorios",
-        "date": "2025-11-25T10:30:00-03:00",
-        "yearMonth": "2025-11",
-        "year": 2025,
-        "month": 10,
-        "dayOfWeek": 2,
-        "hour": 10,
-        "summary": "Residuos patológicos",
-        "description": "",
-        "organizer": "drarielmerino@gmail.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 60,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"residuo\" in summary"
         ]
       },
       {
@@ -14186,28 +14136,6 @@
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
-        "date": "2025-12-23T10:30:00-03:00",
-        "yearMonth": "2025-12",
-        "year": 2025,
-        "month": 11,
-        "dayOfWeek": 2,
-        "hour": 10,
-        "summary": "Residuos patológicos",
-        "description": "",
-        "organizer": "drarielmerino@gmail.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 60,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"residuo\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Turnos Manuales - Recordatorios",
         "date": "2025-12-24T11:15:00-03:00",
         "yearMonth": "2025-12",
         "year": 2025,
@@ -14342,28 +14270,6 @@
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
-        "date": "2026-01-27T10:30:00-03:00",
-        "yearMonth": "2026-01",
-        "year": 2026,
-        "month": 0,
-        "dayOfWeek": 2,
-        "hour": 10,
-        "summary": "Residuos patológicos",
-        "description": "",
-        "organizer": "drarielmerino@gmail.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 60,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"residuo\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Turnos Manuales - Recordatorios",
         "date": "2026-02-02T10:45:00-03:00",
         "yearMonth": "2026-02",
         "year": 2026,
@@ -14381,7 +14287,7 @@
         "bucket": "C_exclude",
         "score": -100,
         "signals": [
-          "EXCLUDE: keyword \"vacacion\" in summary"
+          "EXCLUDE: keyword \"vacaciones\" in summary"
         ]
       },
       {
@@ -14403,7 +14309,7 @@
         "bucket": "C_exclude",
         "score": -100,
         "signals": [
-          "EXCLUDE: keyword \"vacacion\" in summary"
+          "EXCLUDE: keyword \"vacaciones\" in summary"
         ]
       },
       {
@@ -14447,7 +14353,7 @@
         "bucket": "C_exclude",
         "score": -100,
         "signals": [
-          "EXCLUDE: keyword \"vacacion\" in summary"
+          "EXCLUDE: keyword \"vacaciones\" in summary"
         ]
       },
       {
@@ -14469,29 +14375,7 @@
         "bucket": "C_exclude",
         "score": -100,
         "signals": [
-          "EXCLUDE: keyword \"vacacion\" in summary"
-        ]
-      },
-      {
-        "calendarName": "Turnos Manuales - Recordatorios",
-        "date": "2026-02-24T10:30:00-03:00",
-        "yearMonth": "2026-02",
-        "year": 2026,
-        "month": 1,
-        "dayOfWeek": 2,
-        "hour": 10,
-        "summary": "Residuos patológicos",
-        "description": "",
-        "organizer": "drarielmerino@gmail.com",
-        "attendees": [],
-        "treatment": "Otros",
-        "isAllDay": false,
-        "status": "confirmed",
-        "duration_min": 60,
-        "bucket": "C_exclude",
-        "score": -100,
-        "signals": [
-          "EXCLUDE: keyword \"residuo\" in summary"
+          "EXCLUDE: keyword \"vacaciones\" in summary"
         ]
       }
     ],
@@ -17052,6 +16936,31 @@
       },
       {
         "calendarName": "Director - Dr. Merino Ariel ",
+        "date": "2025-06-04T18:30:00-03:00",
+        "yearMonth": "2025-06",
+        "year": 2025,
+        "month": 5,
+        "dayOfWeek": 3,
+        "hour": 18,
+        "summary": "Zoom dudas Santiago Ferraro",
+        "description": "",
+        "organizer": "51baf8adafc7d1e2e6508a1dea9f9dbc8ec238852a6d1639039c388cdbcbdb6a@group.calendar.google.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 30,
+        "bucket": "E_primitive_recall",
+        "score": 20,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: normal duration 30 min",
+          "E: name-only staff reminder (no procedure, no format markers)"
+        ],
+        "extractedName": "Zoom dudas Santiago"
+      },
+      {
+        "calendarName": "Director - Dr. Merino Ariel ",
         "date": "2025-06-09T16:40:00-03:00",
         "yearMonth": "2025-06",
         "year": 2025,
@@ -18227,6 +18136,31 @@
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
+        "date": "2025-09-23T10:30:00-03:00",
+        "yearMonth": "2025-09",
+        "year": 2025,
+        "month": 8,
+        "dayOfWeek": 2,
+        "hour": 10,
+        "summary": "Residuos patológicos",
+        "description": "",
+        "organizer": "drarielmerino@gmail.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 60,
+        "bucket": "E_primitive_recall",
+        "score": 20,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: normal duration 60 min",
+          "E: name-only staff reminder (no procedure, no format markers)"
+        ],
+        "extractedName": "Residuos patológicos"
+      },
+      {
+        "calendarName": "Turnos Manuales - Recordatorios",
         "date": "2025-09-23T18:00:00-03:00",
         "yearMonth": "2025-09",
         "year": 2025,
@@ -18524,6 +18458,31 @@
           "E: name-only staff reminder (no procedure, no format markers)"
         ],
         "extractedName": "Marianella Alberich"
+      },
+      {
+        "calendarName": "Turnos Manuales - Recordatorios",
+        "date": "2025-10-28T10:30:00-03:00",
+        "yearMonth": "2025-10",
+        "year": 2025,
+        "month": 9,
+        "dayOfWeek": 2,
+        "hour": 10,
+        "summary": "Residuos patológicos",
+        "description": "",
+        "organizer": "drarielmerino@gmail.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 60,
+        "bucket": "E_primitive_recall",
+        "score": 20,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: normal duration 60 min",
+          "E: name-only staff reminder (no procedure, no format markers)"
+        ],
+        "extractedName": "Residuos patológicos"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -19025,6 +18984,31 @@
           "E: name-only staff reminder (no procedure, no format markers)"
         ],
         "extractedName": "Ver turno elizabeth"
+      },
+      {
+        "calendarName": "Turnos Manuales - Recordatorios",
+        "date": "2025-11-25T10:30:00-03:00",
+        "yearMonth": "2025-11",
+        "year": 2025,
+        "month": 10,
+        "dayOfWeek": 2,
+        "hour": 10,
+        "summary": "Residuos patológicos",
+        "description": "",
+        "organizer": "drarielmerino@gmail.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 60,
+        "bucket": "E_primitive_recall",
+        "score": 20,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: normal duration 60 min",
+          "E: name-only staff reminder (no procedure, no format markers)"
+        ],
+        "extractedName": "Residuos patológicos"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
@@ -19653,6 +19637,31 @@
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
+        "date": "2025-12-23T10:30:00-03:00",
+        "yearMonth": "2025-12",
+        "year": 2025,
+        "month": 11,
+        "dayOfWeek": 2,
+        "hour": 10,
+        "summary": "Residuos patológicos",
+        "description": "",
+        "organizer": "drarielmerino@gmail.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 60,
+        "bucket": "E_primitive_recall",
+        "score": 20,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: normal duration 60 min",
+          "E: name-only staff reminder (no procedure, no format markers)"
+        ],
+        "extractedName": "Residuos patológicos"
+      },
+      {
+        "calendarName": "Turnos Manuales - Recordatorios",
         "date": "2025-12-23T11:30:00-03:00",
         "yearMonth": "2025-12",
         "year": 2025,
@@ -20253,6 +20262,31 @@
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",
+        "date": "2026-01-27T10:30:00-03:00",
+        "yearMonth": "2026-01",
+        "year": 2026,
+        "month": 0,
+        "dayOfWeek": 2,
+        "hour": 10,
+        "summary": "Residuos patológicos",
+        "description": "",
+        "organizer": "drarielmerino@gmail.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 60,
+        "bucket": "E_primitive_recall",
+        "score": 20,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: normal duration 60 min",
+          "E: name-only staff reminder (no procedure, no format markers)"
+        ],
+        "extractedName": "Residuos patológicos"
+      },
+      {
+        "calendarName": "Turnos Manuales - Recordatorios",
         "date": "2026-01-27T12:00:00-03:00",
         "yearMonth": "2026-01",
         "year": 2026,
@@ -20649,6 +20683,31 @@
           "E: name-only staff reminder (no procedure, no format markers)"
         ],
         "extractedName": "escribir ayelen"
+      },
+      {
+        "calendarName": "Turnos Manuales - Recordatorios",
+        "date": "2026-02-24T10:30:00-03:00",
+        "yearMonth": "2026-02",
+        "year": 2026,
+        "month": 1,
+        "dayOfWeek": 2,
+        "hour": 10,
+        "summary": "Residuos patológicos",
+        "description": "",
+        "organizer": "drarielmerino@gmail.com",
+        "attendees": [],
+        "treatment": "Otros",
+        "isAllDay": false,
+        "status": "confirmed",
+        "duration_min": 60,
+        "bucket": "E_primitive_recall",
+        "score": 20,
+        "signals": [
+          "+10: looks like patient name",
+          "+10: normal duration 60 min",
+          "E: name-only staff reminder (no procedure, no format markers)"
+        ],
+        "extractedName": "Residuos patológicos"
       },
       {
         "calendarName": "Turnos Manuales - Recordatorios",

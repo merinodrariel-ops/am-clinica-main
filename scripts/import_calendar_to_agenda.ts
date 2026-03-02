@@ -63,14 +63,52 @@ interface Patient {
     id_paciente: string;
     nombre: string;
     apellido: string;
+    documento?: string;
+    email?: string;
+    telefono?: string;
     normFull: string;
     normNombre: string;
     normApellido: string;
 }
 
-function findPatientMatch(extractedName: string, patients: Patient[]): { patient: Patient; confidence: 'high' | 'medium' } | null {
-    if (!extractedName || extractedName.trim().length < 3) return null;
-    const normName = normalize(extractedName);
+function findPatientMatch(
+    params: {
+        name?: string;
+        email?: string;
+        dni?: string;
+        phone?: string;
+    },
+    patients: Patient[]
+): { patient: Patient; confidence: 'high' | 'medium'; method: string } | null {
+    const { name, email, dni, phone } = params;
+
+    // 1. Match by Email (High confidence)
+    if (email) {
+        const match = patients.find(p => p.email && p.email.toLowerCase() === email.toLowerCase());
+        if (match) return { patient: match, confidence: 'high', method: 'email' };
+    }
+
+    // 2. Match by DNI (High confidence)
+    if (dni) {
+        const cleanDni = dni.replace(/[^0-9]/g, '');
+        if (cleanDni.length >= 7) {
+            const match = patients.find(p => p.documento && p.documento.replace(/[^0-9]/g, '') === cleanDni);
+            if (match) return { patient: match, confidence: 'high', method: 'dni' };
+        }
+    }
+
+    // 3. Match by Phone (Medium-High confidence)
+    if (phone) {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.length >= 8) {
+            const match = patients.find(p => p.telefono && p.telefono.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-8)));
+            if (match) return { patient: match, confidence: 'high', method: 'phone' };
+        }
+    }
+
+    // 4. Fallback to Name Match (Current logic)
+    if (!name || name.trim().length < 3) return null;
+    const normName = normalize(name);
     const matches: Array<{ patient: Patient; score: number }> = [];
 
     for (const p of patients) {
@@ -86,7 +124,7 @@ function findPatientMatch(extractedName: string, patients: Patient[]): { patient
     }
     if (matches.length === 0) return null;
     matches.sort((a, b) => b.score - a.score || a.patient.normFull.length - b.patient.normFull.length);
-    return { patient: matches[0].patient, confidence: matches.length === 1 ? 'high' : 'medium' };
+    return { patient: matches[0].patient, confidence: matches.length === 1 ? 'high' : 'medium', method: 'name' };
 }
 
 // ── Treatment → appointment_type mapping ─────────────────────────────────────
@@ -123,6 +161,9 @@ interface FilteredEvent {
     bucket: string;
     score: number;
     extractedName?: string;
+    attendeeEmail?: string;
+    extractedDNI?: string;
+    extractedPhone?: string;
     signals: string[];
 }
 
@@ -161,7 +202,7 @@ async function main() {
     console.log('🔌 Loading patients from Supabase...');
     const { data: patientsData, error: pErr } = await supabase
         .from('pacientes')
-        .select('id_paciente, nombre, apellido')
+        .select('id_paciente, nombre, apellido, documento, email, telefono')
         .eq('is_deleted', false);
 
     if (pErr) { console.error('❌ Failed to load patients:', pErr.message); process.exit(1); }
@@ -196,28 +237,38 @@ async function main() {
     const unmatchedRows: object[] = [];
 
     for (const event of allEvents) {
-        // Extract name candidates
-        const nameCandidates: string[] = [];
-        if (event.extractedName && event.extractedName.trim().length > 3) {
-            nameCandidates.push(event.extractedName);
-        }
-        const parenMatch = event.summary.match(/\(([^)]{4,})\)/);
-        if (parenMatch) {
-            const pName = parenMatch[1].trim();
-            if (/^[A-ZÁÉÍÓÚÑÜ]/.test(pName)) nameCandidates.push(pName);
-        }
-
-        // Find patient match
-        let match = null;
-        for (const candidate of nameCandidates) {
-            const m = findPatientMatch(candidate, patients);
-            if (m) { match = m; break; }
-        }
+        // Find patient match with multi-criteria
+        let match = findPatientMatch({
+            name: event.extractedName,
+            email: event.attendeeEmail,
+            dni: event.extractedDNI,
+            phone: event.extractedPhone
+        }, patients);
 
         if (!match) {
-            stats.unmatched++;
-            unmatchedRows.push({ date: event.date, summary: event.summary, extractedName: event.extractedName });
-            continue;
+            // Try matching secondary candidates from summary (if any)
+            let secondaryMatch = null;
+            const parenMatch = event.summary.match(/\(([^)]{4,})\)/);
+            if (parenMatch) {
+                const pName = parenMatch[1].trim();
+                if (/^[A-ZÁÉÍÓÚÑÜ]/.test(pName)) {
+                    secondaryMatch = findPatientMatch({ name: pName }, patients);
+                }
+            }
+
+            if (!secondaryMatch) {
+                stats.unmatched++;
+                unmatchedRows.push({
+                    date: event.date,
+                    summary: event.summary,
+                    extractedName: event.extractedName,
+                    email: event.attendeeEmail,
+                    dni: event.extractedDNI
+                });
+                continue;
+            }
+            // Use secondary match
+            match = secondaryMatch;
         }
 
         stats.matched++;
@@ -237,6 +288,7 @@ async function main() {
                 status: agendaStatus,
                 duration: `${event.duration_min}min`,
                 confidence: match.confidence,
+                method: match.method,
             });
             continue;
         }
@@ -254,6 +306,15 @@ async function main() {
             continue;
         }
 
+        const notes = [
+            `Importado desde Google Calendar (${event.calendarName}).`,
+            event.description ? `Notas originales: ${event.description.slice(0, 1000)}` : null,
+            event.attendeeEmail ? `Email Calendly: ${event.attendeeEmail}` : null,
+            event.extractedDNI ? `DNI extraído: ${event.extractedDNI}` : null,
+            event.extractedPhone ? `Teléfono extraído: ${event.extractedPhone}` : null,
+            `Match vía: ${match.method} (${match.confidence})`
+        ].filter(Boolean).join('\n');
+
         // Insert
         const { error } = await supabase.from('agenda_appointments').insert({
             patient_id: match.patient.id_paciente,
@@ -263,10 +324,7 @@ async function main() {
             title: cleanedTitle || `Turno ${event.treatment}`,
             status: agendaStatus,
             type: appointmentType,
-            notes: [
-                `Importado desde Google Calendar (${event.calendarName}).`,
-                event.description ? `Notas originales: ${event.description.slice(0, 200)}` : null,
-            ].filter(Boolean).join('\n'),
+            notes,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         });
@@ -309,11 +367,12 @@ async function main() {
         Object.entries(typeMap).sort((a, b) => b[1] - a[1]).forEach(([t, n]) => console.log(`  ${t.padEnd(15)} ${n}`));
 
         console.log('\n📗 MUESTRA (primeros 20 a importar):');
-        (importedRows as Array<{ date: string; patient: string; title: string; type: string; status: string; confidence: string }>)
+        (importedRows as Array<{ date: string; patient: string; title: string; type: string; status: string; confidence: string; method: string }>)
             .slice(0, 20)
             .forEach(r => {
                 const conf = r.confidence === 'medium' ? ' ⚠️' : '';
-                console.log(`  ${r.date} [${r.type}] ${r.status === 'cancelled' ? '❌ ' : '✅ '}${r.patient}${conf} — "${r.title}"`);
+                const mtd = r.method !== 'name' ? ` [${r.method.toUpperCase()}]` : '';
+                console.log(`  ${r.date} [${r.type}] ${r.status === 'cancelled' ? '❌ ' : '✅ '}${r.patient}${conf}${mtd} — "${r.title}"`);
             });
     }
 

@@ -132,11 +132,26 @@ function getLayout(): LayoutConfig {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             const parsed = JSON.parse(saved);
-            // Ensure all cards are in the order (handle new cards added later)
+            // Ensure all cards are valid, unique, and complete (including newly added cards)
             const allCards = new Set(DEFAULT_ORDER);
-            const order = (parsed.order || []).filter((id: string) => allCards.has(id as CardId)) as CardId[];
+            const orderRaw = (parsed.order || []).filter((id: string) => allCards.has(id as CardId)) as CardId[];
+            const seenOrder = new Set<CardId>();
+            const order = orderRaw.filter((id) => {
+                if (seenOrder.has(id)) return false;
+                seenOrder.add(id);
+                return true;
+            });
             DEFAULT_ORDER.forEach(id => { if (!order.includes(id)) order.push(id); });
-            return { order, hidden: parsed.hidden || [] };
+
+            const hiddenRaw = (parsed.hidden || []).filter((id: string) => allCards.has(id as CardId)) as CardId[];
+            const seenHidden = new Set<CardId>();
+            const hidden = hiddenRaw.filter((id) => {
+                if (seenHidden.has(id)) return false;
+                seenHidden.add(id);
+                return true;
+            });
+
+            return { order, hidden };
         }
     } catch { /* ignore */ }
     return { order: DEFAULT_ORDER, hidden: [] };
@@ -185,13 +200,11 @@ function SortableCard({
         filter: isDragging ? 'saturate(0.75)' : 'none',
     };
 
-    const sortableProps = isDragEnabled ? { ...attributes, ...listeners } : {};
-
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`relative transition-all duration-200 ${isDragEnabled ? 'touch-none cursor-grab active:cursor-grabbing' : ''} ${className || ''}`}
+            className={`relative transition-all duration-200 ${isDragEnabled ? 'touch-none' : ''} ${className || ''}`}
             data-drag-target={isDropTarget ? 'true' : undefined}
             data-drag-dropped={isRecentlyDropped ? 'true' : undefined}
             aria-dropeffect={isDropTarget ? 'move' : undefined}
@@ -200,7 +213,6 @@ function SortableCard({
                 if (!isEditing) return;
                 event.currentTarget.style.transformOrigin = 'center';
             }}
-            {...sortableProps}
         >
             {isDragEnabled && isDropTarget && (
                 <div
@@ -665,6 +677,19 @@ export default function OwnerDashboard() {
         setActiveTab('dashboard');
     }, []);
 
+    const repairLayout = useCallback(() => {
+        const defaultLayout = { order: DEFAULT_ORDER, hidden: [] };
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+        } catch {
+            // ignore
+        }
+        setLayout(defaultLayout);
+        saveLayout(defaultLayout);
+        setIsEditing(false);
+        setActiveTab('dashboard');
+    }, []);
+
     const applyPreset = useCallback((presetId: PresetId) => {
         const presetLayout = GRID_PRESETS[presetId].layout;
         const nextLayout: LayoutConfig = {
@@ -898,6 +923,14 @@ export default function OwnerDashboard() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={repairLayout}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 bg-amber-500/10 hover:bg-amber-500/15 text-amber-300 border border-amber-500/25"
+                        title="Borra layout guardado y reconstruye el grid"
+                    >
+                        <Settings2 size={12} />
+                        Reparar grid
+                    </button>
                     <button
                         onClick={resetLayout}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"

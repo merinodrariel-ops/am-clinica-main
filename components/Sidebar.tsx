@@ -20,6 +20,7 @@ import {
     ChevronRight,
     Menu,
     X,
+    Plus,
     SlidersHorizontal,
     CheckSquare,
     Stethoscope,
@@ -96,6 +97,12 @@ const MENU_ITEMS = [
         icon: Wallet,
         label: 'Liquidaciones',
         href: '/admin/liquidaciones',
+        roles: ['owner', 'admin']
+    },
+    {
+        icon: Plus,
+        label: 'Cargar Prestaciones',
+        href: '/admin/prestaciones',
         roles: ['owner', 'admin']
     },
     {

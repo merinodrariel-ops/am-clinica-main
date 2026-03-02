@@ -50,6 +50,9 @@ interface ClassifiedEvent extends RawEvent {
     suggestedRecallType?: string;
     isNewFormat?: boolean;  // "nombre apellido procedimiento ariel" style
     isOldFormat?: boolean;  // "Nombre Apellido - Procedimiento" style
+    attendeeEmail?: string;
+    extractedDNI?: string;
+    extractedPhone?: string;
 }
 
 // ─── Normalization ────────────────────────────────────────────────────────────
@@ -159,13 +162,27 @@ function looksLikePatientName(summary: string): boolean {
 /** Calendly consultation/meeting event (has "y AM Estética Dental" or "AM Estética Dental") */
 function isCalendlyMeeting(event: RawEvent): boolean {
     const norm = normalize(event.summary);
-    return norm.includes('am estetica dental') || norm.includes('estetica dental');
+    const isInternal = norm.includes('am estetica dental') || norm.includes('estetica dental');
+
+    // If it's a "Consultas primera vez" via Calendly, we WANT it (not an internal meeting)
+    if (norm.includes('consultas primera vez') || norm.includes('1ra vez')) {
+        return false;
+    }
+
+    return isInternal;
 }
 
 /** Description is a Zoom/Calendly invite */
 function hasZoomDescription(description: string): boolean {
     const norm = normalize(description);
-    return norm.includes('zoom.us') || norm.includes('zoom.com') || norm.includes('calendly.com');
+    const isZoom = norm.includes('zoom.us') || norm.includes('zoom.com') || norm.includes('calendly.com');
+
+    // If it's a patient consultation, we WANT it even if it has a Zoom/Calendly link
+    if (norm.includes('consultas primera vez') || norm.includes('1ra vez')) {
+        return false;
+    }
+
+    return isZoom;
 }
 
 // ─── Hard-exclude word lists ──────────────────────────────────────────────────
@@ -223,6 +240,7 @@ function classifyEvent(event: RawEvent): ClassifiedEvent {
     }
 
     // Hard-exclude words in title
+    const HARD_EXCLUDE_WORDS_NORM = ['bloqueo', 'reunion', 'personal', 'almuerzo', 'vacaciones', 'feriado'].map(normalize);
     for (const w of HARD_EXCLUDE_WORDS_NORM) {
         const words = normSummary.split(/\s+/);
         if (words.some(word => word.startsWith(w))) {
@@ -258,6 +276,7 @@ function classifyEvent(event: RawEvent): ClassifiedEvent {
     // ── Scoring ──────────────────────────────────────────────────────────────
 
     // Payment reminder prefix → strip for analysis but flag
+    const PAYMENT_REMINDER_WORDS_NORM = ['abonar', 'cobrar'].map(normalize);
     const hasPaymentPrefix = PAYMENT_REMINDER_WORDS_NORM.some(w => normSummary.startsWith(w));
     if (hasPaymentPrefix) {
         signals.push('NOTE: payment reminder prefix (ABONAR/COBRAR)');
@@ -297,13 +316,29 @@ function classifyEvent(event: RawEvent): ClassifiedEvent {
         signals.push('+15: nueva primera vez marker');
     }
 
-    // Attendee email (exclude group calendar IDs which are hex strings)
+    // ── Metadata Extraction ──────────────────────────────────────────────────
+
+    // Attendee email (exclude group calendar IDs)
     const realAttendees = (event.attendees || []).filter(
         a => a.includes('@') && !a.includes('group.calendar.google.com') && a.length < 60
     );
+    const attendeeEmail = realAttendees.length > 0 ? realAttendees[0] : undefined;
+
+    // Extract DNI/Phone from description if present (common Calendly formats)
+    let extractedDNI: string | undefined = undefined;
+    let extractedPhone: string | undefined = undefined;
+
+    if (event.description) {
+        const dniMatch = event.description.match(/DNI:?\s*([0-9]{7,9})/i);
+        if (dniMatch) extractedDNI = dniMatch[1];
+
+        const phoneMatch = event.description.match(/(Tel[eé]fono|Celular|WhatsApp):?\s*([0-9+\s-]{8,20})/i);
+        if (phoneMatch) extractedPhone = phoneMatch[2].replace(/[^0-9+]/g, '');
+    }
+
     if (realAttendees.length > 0) {
         score += 15;
-        signals.push(`+15: ${realAttendees.length} real attendee email(s): ${realAttendees.join(', ')}`);
+        signals.push(`+15: real attendee email: ${attendeeEmail}`);
     }
 
     // Looks like "Nombre Apellido" in title
@@ -391,6 +426,9 @@ function classifyEvent(event: RawEvent): ClassifiedEvent {
         suggestedRecallType: recallType,
         isNewFormat: isNewFormat || undefined,
         isOldFormat: isOldFormat || undefined,
+        attendeeEmail,
+        extractedDNI,
+        extractedPhone
     };
 }
 

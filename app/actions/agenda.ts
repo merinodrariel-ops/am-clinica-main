@@ -25,18 +25,33 @@ export async function getAppointments(start: string, end: string) {
         .from('agenda_appointments')
         .select(`
             *,
-            patient:patient_id (nombre, apellido, telefono),
-            doctor:doctor_id (full_name)
+            patient_data:patient_id (nombre, apellido, telefono),
+            doctor_data:doctor_id (full_name)
         `)
         .gte('start_time', start)
         .lte('end_time', end);
 
     if (error) {
         console.error('Error fetching appointments:', error);
-        throw new Error('Failed to fetch appointments');
+        return [];
     }
 
-    return data;
+    if (!data) return [];
+
+    // Map data to include computed full_name and ensure patient/doctor objects are properly structured
+    return data.map(apt => {
+        const patient = Array.isArray(apt.patient_data) ? apt.patient_data[0] : apt.patient_data;
+        const doctor = Array.isArray(apt.doctor_data) ? apt.doctor_data[0] : apt.doctor_data;
+
+        return {
+            ...apt,
+            patient: patient ? {
+                ...patient,
+                full_name: `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'Paciente'
+            } : null,
+            doctor: doctor || null
+        };
+    });
 }
 
 export async function createAppointment(formData: FormData) {

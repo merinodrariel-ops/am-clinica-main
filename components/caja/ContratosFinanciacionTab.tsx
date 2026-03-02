@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Calculator, FileText, Printer, Search, User, Calendar, DollarSign, ChevronRight, CheckCircle2, AlertCircle, X, Zap, ShieldCheck, Star, MessageCircle } from 'lucide-react';
+import { Calculator, Printer, Search, User, Calendar, DollarSign, ChevronRight, CheckCircle2, AlertCircle, X, Zap, ShieldCheck, Star, MessageCircle } from 'lucide-react';
 
 import { createClient } from '@/utils/supabase/client';
 
@@ -181,12 +181,35 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     setShowResults(true);
   };
 
-  const handleGoToContractStep = (plan?: PlanOption) => {
+  const buildExecutiveWhatsappUrl = (plan?: PlanOption) => {
+    const cleanPhone = EXECUTIVE_WHATSAPP_NUMBER.replace(/\D/g, '');
+    const selectedPlan = plan || selectedPlanForContract;
+    const selectedPlanText = selectedPlan
+      ? `${selectedPlan.months} cuotas de ${formatCurrency(selectedPlan.installmentValue)}`
+      : 'A definir';
+
+    const patientName = patientData.nombre.trim() || 'Paciente';
+    const totalText = calculations ? formatCurrency(calculations.amount) : 'A definir';
+
+    const message = [
+      `Hola, soy ${patientName}.`,
+      '',
+      'Quiero hablar con un ejecutivo para avanzar con mi sonrisa y resolver dudas sobre los planes.',
+      `Monto estimado: ${totalText}`,
+      `Anticipo: ${downPaymentPct}%`,
+      `Plan de cuotas: ${selectedPlanText}`,
+      '',
+      'Me ayudan por favor?',
+    ].join('\n');
+
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  };
+
+  const handleContactExecutive = (plan?: PlanOption) => {
     if (plan) {
       setSelectedPlanForContract(plan);
     }
-    setActiveTab('contract');
-    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+    window.open(buildExecutiveWhatsappUrl(plan), '_blank', 'noopener,noreferrer');
   };
 
   const handlePrintContract = () => {
@@ -269,29 +292,6 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     return { amount, downPayment, amountToFinance, plans };
   }, [totalAmount, downPaymentPct]);
 
-  const executiveWhatsappUrl = useMemo(() => {
-    const cleanPhone = EXECUTIVE_WHATSAPP_NUMBER.replace(/\D/g, '');
-    const selectedPlanText = selectedPlanForContract
-      ? `${selectedPlanForContract.months} cuotas de ${formatCurrency(selectedPlanForContract.installmentValue)}`
-      : 'A definir';
-
-    const patientName = patientData.nombre.trim() || 'Paciente';
-    const totalText = calculations ? formatCurrency(calculations.amount) : 'A definir';
-
-    const message = [
-      `Hola, soy ${patientName}.`,
-      '',
-      'Quiero hablar con un ejecutivo para resolver dudas sobre los planes de financiacion.',
-      `Monto estimado: ${totalText}`,
-      `Anticipo: ${downPaymentPct}%`,
-      `Plan de cuotas: ${selectedPlanText}`,
-      '',
-      'Me ayudan por favor?',
-    ].join('\n');
-
-    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-  }, [calculations, downPaymentPct, patientData.nombre, selectedPlanForContract]);
-
   return (
     <div className="bg-[#0a0a0a] text-white p-4 md:p-8 font-sans selection:bg-emerald-500/30 rounded-2xl max-w-full overflow-hidden">
       <div className="max-w-6xl mx-auto">
@@ -314,7 +314,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                   : 'text-gray-400 hover:text-white'
                 }`}
             >
-              Contratos
+              Gestión interna
             </button>
           </div>
         </div>
@@ -518,15 +518,15 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                       <button
                         type="button"
                         onClick={() => {
-                          handleGoToContractStep(plan);
+                          handleContactExecutive(plan);
                         }}
                         className={`w-full py-4 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 uppercase tracking-widest ${(hoveredPlan === plan.id || plan.tag === 'Más Popular')
                             ? 'bg-white text-black hover:bg-gray-200'
                             : 'bg-white/5 text-white hover:bg-white/10'
                           }`}
                       >
-                        Generar Contrato
-                        <ChevronRight className="w-5 h-5" />
+                        QUIERO ESTE PLAN
+                        <MessageCircle className="w-5 h-5" />
                       </button>
                     </div>
                   ))}
@@ -544,22 +544,15 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                   <button
                     type="button"
                     onClick={() => {
-                      window.open(executiveWhatsappUrl, '_blank', 'noopener,noreferrer');
+                      handleContactExecutive();
                     }}
                     className="bg-emerald-400 hover:bg-emerald-300 text-black font-bold text-base md:text-lg px-8 py-4 md:py-5 rounded-2xl flex items-center justify-center gap-3 mx-auto transition-all shadow-[0_0_30px_rgba(52,211,153,0.3)] hover:shadow-[0_0_40px_rgba(52,211,153,0.4)] hover:-translate-y-1 w-full md:w-auto"
                   >
-                    CONTACTAR A UN EJECUTIVO <MessageCircle className="w-5 h-5" />
+                    QUIERO MI SONRISA <MessageCircle className="w-5 h-5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleGoToContractStep();
-                    }}
-                    className="mt-3 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-white/10"
-                  >
-                    <FileText className="w-4 h-4" />
-                    O generar contrato ahora
-                  </button>
+                  <p className="mt-3 text-xs text-gray-400">
+                    Te conectamos por WhatsApp con un ejecutivo para resolver dudas y ayudarte a elegir tu mejor plan.
+                  </p>
                 </div>
               </div>
             )}

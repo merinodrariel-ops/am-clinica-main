@@ -234,6 +234,44 @@ export async function registrarPrestacion(
     return { success: true };
 }
 
+export async function registrarMultiplesPrestaciones(
+    items: RegistrarPrestacionInput[]
+): Promise<{ success: boolean; error?: string }> {
+    if (!items || items.length === 0) return { success: true };
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const admin = getAdminClient();
+
+    const insertData = items.map(item => ({
+        profesional_id: item.profesional_id,
+        tarifario_id: item.tarifario_id ?? null,
+        prestacion_nombre: item.prestacion_nombre,
+        paciente_nombre: item.paciente_nombre ?? '',
+        paciente_id: item.paciente_id ?? null,
+        fecha_realizacion: item.fecha_realizacion,
+        valor_cobrado: item.monto_honorarios,
+        monto_honorarios: item.monto_honorarios,
+        moneda_cobro: item.moneda_cobro,
+        slides_url: item.slides_url ?? null,
+        slides_validado: Boolean(item.slides_url),
+        notas: item.notas ?? null,
+        estado_pago: 'pendiente',
+    }));
+
+    const { error } = await admin
+        .from('prestaciones_realizadas')
+        .insert(insertData);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/portal/prestaciones');
+    revalidatePath('/admin/liquidaciones');
+    return { success: true };
+}
+
 export async function actualizarSlidesUrl(
     prestacionId: string,
     slidesUrl: string
@@ -381,5 +419,19 @@ export async function buscarPacientes(q: string): Promise<
         .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%`)
         .limit(8);
 
+    return data || [];
+}
+
+/**
+ * Retorna la lista de profesionales activos para uso administrativo.
+ */
+export async function getProfesionales(): Promise<Array<{ id: string; nombre: string; apellido?: string; area?: string }>> {
+    const admin = getAdminClient();
+    const { data } = await admin
+        .from('personal')
+        .select('id, nombre, apellido, area')
+        .eq('tipo', 'profesional')
+        .eq('activo', true)
+        .order('nombre');
     return data || [];
 }
