@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
     DndContext,
     DragOverlay,
@@ -13,6 +13,7 @@ import {
     useSensors,
     type DragEndEvent,
     type DragStartEvent,
+    type DragOverEvent,
     type CollisionDetection,
 } from '@dnd-kit/core';
 import {
@@ -106,10 +107,14 @@ function SortableCard({
     id,
     children,
     isEditing,
+    isDropTarget,
+    isRecentlyDropped,
 }: {
     id: string;
     children: React.ReactNode;
     isEditing: boolean;
+    isDropTarget: boolean;
+    isRecentlyDropped: boolean;
 }) {
     const {
         attributes,
@@ -134,9 +139,34 @@ function SortableCard({
         <div
             ref={setNodeRef}
             style={style}
-            className={`relative ${isEditing ? 'touch-none cursor-grab active:cursor-grabbing' : ''}`}
+            className={`relative transition-all duration-200 ${isEditing ? 'touch-none cursor-grab active:cursor-grabbing' : ''}`}
+            data-drag-target={isDropTarget ? 'true' : undefined}
+            data-drag-dropped={isRecentlyDropped ? 'true' : undefined}
+            aria-dropeffect={isDropTarget ? 'move' : undefined}
+            aria-grabbed={isDragging ? 'true' : undefined}
+            onMouseEnter={(event) => {
+                if (!isEditing) return;
+                event.currentTarget.style.transformOrigin = 'center';
+            }}
             {...sortableProps}
         >
+            {isEditing && isDropTarget && (
+                <div
+                    className="pointer-events-none absolute -inset-1 rounded-3xl animate-pulse"
+                    style={{
+                        border: '1px solid hsla(165, 100%, 42%, 0.42)',
+                        boxShadow: '0 0 0 1px hsla(165, 100%, 42%, 0.18), 0 14px 34px -20px rgba(24, 255, 189, 0.7)',
+                    }}
+                />
+            )}
+            {isEditing && isRecentlyDropped && (
+                <div
+                    className="pointer-events-none absolute inset-0 rounded-2xl"
+                    style={{
+                        boxShadow: '0 0 0 1px hsla(165, 100%, 42%, 0.25), 0 0 30px -16px rgba(24, 255, 189, 0.8)',
+                    }}
+                />
+            )}
             {isEditing && (
                 <button
                     className="absolute top-2 left-2 z-10 p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all touch-none"
@@ -485,6 +515,9 @@ export default function OwnerDashboard() {
     const [layout, setLayout] = useState<LayoutConfig>({ order: DEFAULT_ORDER, hidden: [] });
     const [isEditing, setIsEditing] = useState(false);
     const [activeCardId, setActiveCardId] = useState<CardId | null>(null);
+    const [overCardId, setOverCardId] = useState<CardId | null>(null);
+    const [recentlyDroppedCardId, setRecentlyDroppedCardId] = useState<CardId | null>(null);
+    const droppedPulseTimeoutRef = useRef<number | null>(null);
 
     const currentMonth = MONTH_NAMES[new Date().getMonth()];
 
@@ -512,18 +545,48 @@ export default function OwnerDashboard() {
         load();
     }, []);
 
+    useEffect(() => {
+        return () => {
+            if (droppedPulseTimeoutRef.current) {
+                window.clearTimeout(droppedPulseTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const triggerDropPulse = useCallback((id: CardId) => {
+        if (droppedPulseTimeoutRef.current) {
+            window.clearTimeout(droppedPulseTimeoutRef.current);
+        }
+        setRecentlyDroppedCardId(id);
+        droppedPulseTimeoutRef.current = window.setTimeout(() => {
+            setRecentlyDroppedCardId(null);
+            droppedPulseTimeoutRef.current = null;
+        }, 260);
+    }, []);
+
     const handleDragStart = useCallback((event: DragStartEvent) => {
         setActiveCardId(event.active.id as CardId);
+        setOverCardId(event.active.id as CardId);
+    }, []);
+
+    const handleDragOver = useCallback((event: DragOverEvent) => {
+        setOverCardId((event.over?.id as CardId | undefined) || null);
     }, []);
 
     const handleDragCancel = useCallback(() => {
         setActiveCardId(null);
+        setOverCardId(null);
     }, []);
 
     const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const draggedCardId = event.active.id as CardId;
         setActiveCardId(null);
+        setOverCardId(null);
         const { active, over } = event;
-        if (!over || active.id === over.id) return;
+        if (!over || active.id === over.id) {
+            triggerDropPulse(draggedCardId);
+            return;
+        }
 
         setLayout(prev => {
             const oldIndex = prev.order.indexOf(active.id as CardId);
@@ -533,7 +596,8 @@ export default function OwnerDashboard() {
             saveLayout(newLayout);
             return newLayout;
         });
-    }, []);
+        triggerDropPulse(draggedCardId);
+    }, [triggerDropPulse]);
 
     const toggleVisibility = useCallback((id: string) => {
         const cardId = id as CardId;
@@ -774,6 +838,7 @@ export default function OwnerDashboard() {
                 }}
                 collisionDetection={collisionDetectionStrategy}
                 onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
                 onDragCancel={handleDragCancel}
                 onDragEnd={handleDragEnd}
             >
@@ -783,7 +848,12 @@ export default function OwnerDashboard() {
                             if (id === 'predictive-pulse') {
                                 return (
                                     <div key={id} className="col-span-1 md:col-span-2">
-                                        <SortableCard id={id} isEditing={isEditing}>
+                                        <SortableCard
+                                            id={id}
+                                            isEditing={isEditing}
+                                            isDropTarget={overCardId === id && activeCardId !== id}
+                                            isRecentlyDropped={recentlyDroppedCardId === id}
+                                        >
                                             <PredictiveInsights
                                                 isEditing={isEditing}
                                                 isHidden={layout.hidden.includes(id)}
@@ -796,7 +866,13 @@ export default function OwnerDashboard() {
                             const card = cardData[id];
                             if (!card) return null;
                             return (
-                                <SortableCard key={id} id={id} isEditing={isEditing}>
+                                <SortableCard
+                                    key={id}
+                                    id={id}
+                                    isEditing={isEditing}
+                                    isDropTarget={overCardId === id && activeCardId !== id}
+                                    isRecentlyDropped={recentlyDroppedCardId === id}
+                                >
                                     <KpiCard
                                         {...card}
                                         isEditing={isEditing}
