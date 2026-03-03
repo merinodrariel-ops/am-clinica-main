@@ -11,6 +11,30 @@ function getAdminClient() {
     );
 }
 
+async function validateProfesionalIds(admin: ReturnType<typeof getAdminClient>, ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return { ok: false, error: 'Profesional no informado' };
+
+    const { data, error } = await admin
+        .from('personal')
+        .select('id')
+        .in('id', uniqueIds)
+        .eq('tipo', 'profesional')
+        .eq('activo', true);
+
+    if (error) {
+        return { ok: false, error: error.message };
+    }
+
+    const validIds = new Set((data || []).map((p) => p.id));
+    const invalid = uniqueIds.find((id) => !validIds.has(id));
+    if (invalid) {
+        return { ok: false, error: 'Solo se pueden registrar prestaciones para doctores/profesionales activos' };
+    }
+
+    return { ok: true as const };
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TarifarioItem {
@@ -209,6 +233,11 @@ export async function registrarPrestacion(
 
     const admin = getAdminClient();
 
+    const validation = await validateProfesionalIds(admin, [input.profesional_id]);
+    if (!validation.ok) {
+        return { success: false, error: validation.error };
+    }
+
     const { error } = await admin
         .from('prestaciones_realizadas')
         .insert({
@@ -244,6 +273,11 @@ export async function registrarMultiplesPrestaciones(
     if (!user) return { success: false, error: 'No autenticado' };
 
     const admin = getAdminClient();
+
+    const validation = await validateProfesionalIds(admin, items.map((item) => item.profesional_id));
+    if (!validation.ok) {
+        return { success: false, error: validation.error };
+    }
 
     const insertData = items.map(item => ({
         profesional_id: item.profesional_id,

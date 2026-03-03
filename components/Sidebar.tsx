@@ -10,7 +10,6 @@ import {
     Wallet,
     Settings,
     LogOut,
-    UserCircle,
     Package,
     CalendarDays,
     Bell,
@@ -101,7 +100,7 @@ const MENU_ITEMS = [
     },
     {
         icon: Plus,
-        label: 'Cargar Prestaciones',
+        label: 'Prestaciones (Doctores)',
         href: '/admin/prestaciones',
         roles: ['owner', 'admin']
     },

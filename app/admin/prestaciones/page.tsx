@@ -3,12 +3,12 @@ import { getProfesionales, getTarifarioCompleto } from '@/app/actions/prestacion
 import AdminPrestacionesClient from './AdminPrestacionesClient';
 
 export const metadata: Metadata = {
-    title: 'Carga de Prestaciones | Admin',
-    description: 'Sistema de carga rápida de prestaciones para profesionales.',
+    title: 'Prestaciones de Doctores | Admin',
+    description: 'Carga rápida de prestaciones realizadas por profesionales odontólogos.',
 };
 
 export default async function AdminPrestacionesPage() {
-    const [profesionales, tarifario] = await Promise.all([
+    const [profesionales, prestacionesCatalogo] = await Promise.all([
         getProfesionales(),
         getTarifarioCompleto(),
     ]);
@@ -17,7 +17,7 @@ export default async function AdminPrestacionesPage() {
         <div className="flex-1 w-full bg-[#050505] min-h-screen">
             <AdminPrestacionesClient
                 profesionales={profesionales}
-                tarifario={tarifario}
+                prestacionesCatalogo={prestacionesCatalogo}
             />
         </div>
     );

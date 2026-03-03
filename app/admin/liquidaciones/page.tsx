@@ -1001,7 +1001,7 @@ function TarifarioView({ items }: { items: TarifarioItem[] }) {
         return (
             <div className="flex items-center justify-center py-20 text-slate-500">
                 <ListChecks size={32} className="mr-3 text-slate-700" />
-                Cargando tarifario...
+                Cargando prestaciones...
             </div>
         );
     }
@@ -1216,8 +1216,8 @@ export default function LiquidacionesPage() {
     const now = new Date();
     const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const [tab, setTab] = useState<'liquidaciones' | 'prosoft' | 'tarifario' | 'horas'>('liquidaciones');
-    const [tarifario, setTarifario] = useState<TarifarioItem[]>([]);
+    const [tab, setTab] = useState<'liquidaciones' | 'prosoft' | 'prestaciones' | 'horas'>('liquidaciones');
+    const [prestacionesCatalogo, setPrestacionesCatalogo] = useState<TarifarioItem[]>([]);
     const [mes, setMes] = useState(defaultMes);
     const [rows, setRows] = useState<LiquidacionAdminRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1250,10 +1250,10 @@ export default function LiquidacionesPage() {
     useEffect(() => { load(); }, [load]);
 
     useEffect(() => {
-        if (tab === 'tarifario' && tarifario.length === 0) {
-            getTarifarioCompleto().then(setTarifario);
+        if (tab === 'prestaciones' && prestacionesCatalogo.length === 0) {
+            getTarifarioCompleto().then(setPrestacionesCatalogo);
         }
-    }, [tab, tarifario.length]);
+    }, [tab, prestacionesCatalogo.length]);
 
     // ── Stats ────────────────────────────────────────────────────────────────
     const totalArs = rows.reduce((s, r) => s + Number(r.liquidacion?.total_ars || 0), 0);
@@ -1792,18 +1792,18 @@ export default function LiquidacionesPage() {
                     Importar Prosoft
                 </button>
                 <button
-                    onClick={() => setTab('tarifario')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'tarifario' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
+                    onClick={() => setTab('prestaciones')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'prestaciones' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
                     <ListChecks size={14} />
-                    Tarifario
+                    Prestaciones
                 </button>
                 <button
                     onClick={() => setTab('horas')}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'horas' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
                     <Clock size={14} />
-                    Horas
+                    Horas (No profesionales)
                 </button>
             </div>
 
@@ -1813,8 +1813,8 @@ export default function LiquidacionesPage() {
                 </div>
             )}
 
-            {tab === 'tarifario' && (
-                <TarifarioView items={tarifario} />
+            {tab === 'prestaciones' && (
+                <TarifarioView items={prestacionesCatalogo} />
             )}
 
             {tab === 'horas' && (

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useTransition, useCallback, useMemo } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
     Plus, Stethoscope, Trash2, Search, X,
     CheckCircle2, Clock, Loader2, CalendarDays,
-    User, ChevronRight, Hash, DollarSign
+    User, ChevronRight, Hash
 } from 'lucide-react';
 import {
     registrarMultiplesPrestaciones,
@@ -13,7 +13,6 @@ import {
 } from '@/app/actions/prestaciones';
 import type {
     TarifarioItem,
-    RegistrarPrestacionInput,
 } from '@/app/actions/prestaciones';
 
 interface Profesional {
@@ -25,13 +24,25 @@ interface Profesional {
 
 interface Props {
     profesionales: Profesional[];
-    tarifario: TarifarioItem[];
+    prestacionesCatalogo: TarifarioItem[];
 }
 
 interface PacienteOption {
     id_paciente: string;
     nombre: string;
     apellido: string;
+}
+
+interface BulkEntry {
+    id: string;
+    profesional_id: string;
+    tarifario_id: string;
+    prestacion_nombre: string;
+    monto_honorarios: number;
+    moneda_cobro: 'ARS' | 'USD';
+    fecha_realizacion: string;
+    paciente_nombre: string;
+    paciente_id: string | null;
 }
 
 function today() {
@@ -47,20 +58,16 @@ function groupByArea(items: TarifarioItem[]) {
     return map;
 }
 
-export default function AdminPrestacionesClient({ profesionales, tarifario }: Props) {
+export default function AdminPrestacionesClient({ profesionales, prestacionesCatalogo }: Props) {
     const [selectedProfId, setSelectedProfId] = useState<string>('');
     const [selectedPaciente, setSelectedPaciente] = useState<PacienteOption | null>(null);
     const [pacienteQuery, setPacienteQuery] = useState('');
     const [pacientes, setPacientes] = useState<PacienteOption[]>([]);
     const [fecha, setFecha] = useState(today());
-    const [bulkEntries, setBulkEntries] = useState<any[]>([]);
+    const [bulkEntries, setBulkEntries] = useState<BulkEntry[]>([]);
     const [submitting, startSubmit] = useTransition();
 
-    const selectedProf = useMemo(() =>
-        profesionales.find(p => p.id === selectedProfId),
-        [profesionales, selectedProfId]);
-
-    const areaGroups = useMemo(() => groupByArea(tarifario), [tarifario]);
+    const areaGroups = useMemo(() => groupByArea(prestacionesCatalogo), [prestacionesCatalogo]);
 
     const handlePacienteSearch = async (val: string) => {
         setPacienteQuery(val);
@@ -74,12 +81,14 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
 
     const handleAddToBulk = (item: TarifarioItem) => {
         if (!selectedProfId) {
-            toast.error('Selecciona un profesional primero');
+            toast.error('Selecciona un doctor primero');
             return;
         }
 
-        const newEntry = {
-            id: Math.random().toString(36).slice(2, 9),
+        setBulkEntries(prev => {
+            const sameServiceCount = prev.filter((entry) => entry.tarifario_id === item.id).length + 1;
+            const newEntry: BulkEntry = {
+                id: `${selectedProfId}-${item.id}-${fecha}-${sameServiceCount}`,
             profesional_id: selectedProfId,
             tarifario_id: item.id,
             prestacion_nombre: item.nombre,
@@ -88,9 +97,10 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
             fecha_realizacion: fecha,
             paciente_nombre: selectedPaciente ? `${selectedPaciente.nombre} ${selectedPaciente.apellido}` : '',
             paciente_id: selectedPaciente?.id_paciente || null,
-        };
+            };
 
-        setBulkEntries(prev => [...prev, newEntry]);
+            return [...prev, newEntry];
+        });
         toast.success(`Agregado: ${item.nombre}`, { duration: 800 });
     };
 
@@ -118,8 +128,9 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
                 } else {
                     toast.error(res.error || 'Error al registrar');
                 }
-            } catch (err: any) {
-                toast.error(err.message || 'Error inesperado');
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Error inesperado';
+                toast.error(message);
             }
         });
     };
@@ -134,7 +145,7 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
                             <Stethoscope size={22} />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black text-white tracking-tight">Carga de Prestaciones</h1>
+                            <h1 className="text-2xl font-black text-white tracking-tight">Prestaciones de Doctores</h1>
                             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Panel de Administración</p>
                         </div>
                     </div>
@@ -142,7 +153,7 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
 
                 <div className="w-full md:w-80">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                        Profesional Responsable
+                        Doctor Responsable
                     </label>
                     <div className="relative">
                         <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -154,7 +165,7 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
                             }}
                             className="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-9 pr-4 py-3 text-slate-200 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 appearance-none cursor-pointer transition-all"
                         >
-                            <option value="">Seleccionar profesional...</option>
+                            <option value="">Seleccionar doctor...</option>
                             {profesionales.map(p => (
                                 <option key={p.id} value={p.id}>
                                     {p.nombre} {p.apellido} {p.area ? `(${p.area})` : ''}
@@ -166,14 +177,24 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
                 </div>
             </div>
 
-            {!selectedProfId ? (
+            {profesionales.length === 0 ? (
                 <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-[32px] p-20 flex flex-col items-center justify-center text-center">
                     <div className="p-4 bg-slate-950 rounded-full mb-4 text-slate-700">
                         <User size={48} strokeWidth={1} />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-300">Selecciona un profesional</h3>
+                    <h3 className="text-xl font-bold text-slate-300">No hay doctores disponibles</h3>
                     <p className="text-slate-500 text-sm max-w-sm mt-2">
-                        Para comenzar a cargar prestaciones, primero debes seleccionar el profesional que realizó el trabajo.
+                        Esta pantalla solo carga prestaciones de profesionales activos. Revisa la configuración en Prestadores.
+                    </p>
+                </div>
+            ) : !selectedProfId ? (
+                <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-[32px] p-20 flex flex-col items-center justify-center text-center">
+                    <div className="p-4 bg-slate-950 rounded-full mb-4 text-slate-700">
+                        <User size={48} strokeWidth={1} />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-300">Selecciona un doctor</h3>
+                    <p className="text-slate-500 text-sm max-w-sm mt-2">
+                        Para comenzar a cargar prestaciones, primero selecciona el profesional odontólogo que realizó el trabajo.
                     </p>
                 </div>
             ) : (
@@ -262,8 +283,13 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
                                 </h2>
                             </div>
                             <div className="p-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {Object.entries(areaGroups).map(([area, items]) => (
+                                {prestacionesCatalogo.length === 0 ? (
+                                    <div className="text-center py-12 border border-dashed border-slate-800 rounded-2xl">
+                                        <p className="text-slate-500 text-sm">No hay prestaciones activas para cargar.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {Object.entries(areaGroups).map(([area, items]) => (
                                         <div key={area} className="md:col-span-2 space-y-3 mb-6 last:mb-0">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-px flex-1 bg-slate-800/50"></div>
@@ -291,8 +317,9 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
                                                 ))}
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -433,7 +460,7 @@ export default function AdminPrestacionesClient({ profesionales, tarifario }: Pr
                 <div className="h-4 w-px bg-slate-800"></div>
                 <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                     <span>{profesionales.length} Prof.</span>
-                    <span>{tarifario.length} Prest.</span>
+                    <span>{prestacionesCatalogo.length} Prest.</span>
                 </div>
             </div>
 
