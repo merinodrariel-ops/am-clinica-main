@@ -320,6 +320,7 @@ export default function AgendaCalendar() {
                     : getStatusColor(apt.status);
 
                 const fallbackColor = doctors.length > 0 && apt.doctor_id ? doctorColor : getStatusColor(apt.status);
+                // Ignore external color_tag when it's invalid or too light to keep weekly/daily events readable.
                 const color = normalizeEventColor(apt.color_tag, fallbackColor);
                 const textColor = getReadableTextColor(color);
 
@@ -568,14 +569,19 @@ export default function AgendaCalendar() {
                             const patientName = props.patient?.full_name ?? '';
                             const isTimeGridView = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
                             const primaryLine = patientName || event.title || 'Cita';
-                            const secondaryLine = props.doctor?.full_name ? `Dr. ${props.doctor.full_name.split(' ')[0]}` : '';
+                            const treatmentLine = event.title && event.title !== primaryLine ? event.title : '';
+                            const doctorLine = props.doctor?.full_name ? `Dr. ${props.doctor.full_name.split(' ')[0]}` : '';
+                            const secondaryLine = treatmentLine || doctorLine;
                             return (
                                 <div className={`px-1 overflow-hidden ${isTimeGridView ? 'py-0.5' : ''}`}>
                                     <div className="font-semibold truncate text-[11px] leading-tight flex items-center justify-between">
                                         <span>{primaryLine}</span>
                                         {props.conflict && <span title="Conflicto de horario" className="text-white ml-1">⚠️</span>}
                                     </div>
-                                    {!isTimeGridView && patientName && patientName !== event.title && (
+                                    {!isTimeGridView && treatmentLine && (
+                                        <div className="opacity-80 truncate text-[10px] leading-tight">{treatmentLine}</div>
+                                    )}
+                                    {!isTimeGridView && patientName && patientName !== event.title && !treatmentLine && (
                                         <div className="opacity-80 truncate text-[10px] leading-tight">{patientName}</div>
                                     )}
                                     {secondaryLine && (
@@ -907,6 +913,12 @@ function normalizeEventColor(input: string | null | undefined, fallback: string)
         return fallback;
     }
 
+    const rgb = parseColorToRgb(color);
+    if (!rgb) return fallback;
+
+    const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+    if (luminance > 0.9) return fallback;
+
     return color;
 }
 
@@ -950,7 +962,7 @@ function parseColorToRgb(color: string): { r: number; g: number; b: number } | n
         };
     }
 
-    const hsl = c.match(/^hsla?\(([-\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/);
+    const hsl = c.match(/^hsla?\(([-\d.]+)(?:deg|)?(?:\s*,|\s+)\s*([\d.]+)%(?:\s*,|\s+)\s*([\d.]+)%/);
     if (hsl) {
         const h = (((Number(hsl[1]) % 360) + 360) % 360) / 360;
         const s = Math.max(0, Math.min(1, Number(hsl[2]) / 100));
