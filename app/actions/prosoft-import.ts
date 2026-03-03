@@ -226,46 +226,73 @@ function getGidFromUrl(url: URL): string {
     return '0';
 }
 
-// Accepts common Google Sheets links and returns a CSV endpoint.
-function getCsvUrlFromSheetUrl(rawUrl: string): string | null {
+function uniqueStrings(values: string[]): string[] {
+    return Array.from(new Set(values.filter(Boolean)));
+}
+
+function getCsvUrlsFromSheetUrl(rawUrl: string): string[] {
     let parsed: URL;
     try {
         parsed = new URL(rawUrl);
     } catch {
-        return null;
+        return [];
     }
 
     const path = parsed.pathname;
+    const candidates: string[] = [];
+
+    // Direct export URL already provided
+    if (path.includes('/export')) {
+        parsed.searchParams.set('format', 'csv');
+        candidates.push(parsed.toString());
+    }
 
     // Already a gviz URL; ensure CSV output is requested.
     if (path.includes('/gviz/tq')) {
         parsed.searchParams.set('tqx', 'out:csv');
-        return parsed.toString();
+        candidates.push(parsed.toString());
     }
 
     // Published sheet URL (d/e/.../pub or /pubhtml)
     if (/\/spreadsheets\/d\/e\/[^/]+\/(pub|pubhtml)$/.test(path)) {
+        const pubUrl = new URL(parsed.toString());
+
         if (path.endsWith('/pubhtml')) {
-            parsed.pathname = path.replace(/\/pubhtml$/, '/pub');
+            pubUrl.pathname = path.replace(/\/pubhtml$/, '/pub');
         }
-        parsed.searchParams.set('output', 'csv');
+
+        pubUrl.searchParams.set('output', 'csv');
         const gid = getGidFromUrl(parsed);
+
         if (gid !== '0') {
-            parsed.searchParams.set('gid', gid);
-            parsed.searchParams.set('single', 'true');
+            pubUrl.searchParams.set('gid', gid);
+            pubUrl.searchParams.set('single', 'true');
         }
-        return parsed.toString();
+
+        candidates.push(pubUrl.toString());
+
+        // Fallback without gid for published docs
+        if (gid !== '0') {
+            const fallbackPub = new URL(pubUrl.toString());
+            fallbackPub.searchParams.delete('gid');
+            fallbackPub.searchParams.delete('single');
+            candidates.push(fallbackPub.toString());
+        }
     }
 
     // Standard editable sheet URL (d/{sheetId}/...)
-    const idMatch = path.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    const idMatch = path.match(/\/spreadsheets(?:\/u\/\d+)?\/d\/([a-zA-Z0-9_-]+)/);
     if (idMatch) {
         const sheetId = idMatch[1];
         const gid = getGidFromUrl(parsed);
-        return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+
+        candidates.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`);
+        candidates.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`);
+        candidates.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`);
+        candidates.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`);
     }
 
-    return null;
+    return uniqueStrings(candidates);
 }
 
 // Proper RFC-4180 CSV parser that handles quoted multi-line cells.
@@ -393,6 +420,25 @@ async function fetchCsv(csvUrl: string): Promise<string[][]> {
     }
 
     return parseCsvText(text);
+}
+
+async function fetchCsvWithFallback(csvUrls: string[]): Promise<string[][]> {
+    const errors: string[] = [];
+
+    for (const csvUrl of csvUrls) {
+        try {
+            const rows = await fetchCsv(csvUrl);
+            return rows;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Error desconocido';
+            errors.push(message);
+        }
+    }
+
+    const detail = errors[0] ? ` Detalle: ${errors[0]}` : '';
+    throw new Error(
+        `No se pudo acceder a la planilla. Probá usar el link de Google Sheets en formato /edit#gid=... de la pestaña correcta.${detail}`
+    );
 }
 
 // ─── Parse Matrix ─────────────────────────────────────────────────────────────
@@ -623,14 +669,14 @@ export async function previewProsoftImport(
     sheetUrl: string,
     mesOverride?: string // optional manual override: 'YYYY-MM'
 ): Promise<ProsoftPreview> {
-    const csvUrl = getCsvUrlFromSheetUrl(sheetUrl);
-    if (!csvUrl) {
+    const csvUrls = getCsvUrlsFromSheetUrl(sheetUrl);
+    if (csvUrls.length === 0) {
         throw new Error(
             'URL inválida. Pegá un link de Google Sheets (edit, pub/pubhtml o gviz) y, si aplica, el gid de la pestaña.'
         );
     }
 
-    const csvRows = await fetchCsv(csvUrl);
+    const csvRows = await fetchCsvWithFallback(csvUrls);
     const detectedPeriod = extractPeriodFromCsv(csvRows);
     const mes = mesOverride || detectedPeriod?.mes;
 
