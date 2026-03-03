@@ -233,6 +233,7 @@ export async function editarRegistroHoras(
     }
 
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     revalidatePath('/portal');
     return { success: true };
 }
@@ -273,5 +274,6 @@ export async function eliminarRegistroHoras(
     if (error) return { success: false, error: error.message };
 
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     return { success: true };
 }

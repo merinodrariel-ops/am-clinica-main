@@ -230,6 +230,8 @@ export async function uploadWorkerPhoto(workerId: string, file: File) {
     revalidatePath('/portal/profile');
     revalidatePath('/admin/staff');
     revalidatePath(`/admin/staff/${workerId}`);
+    revalidatePath('/caja-admin/personal');
+    revalidatePath(`/caja-admin/personal/${workerId}`);
     return { success: true, url: publicUrl };
 }
 
@@ -553,6 +555,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
 
     if (personalError) throw new Error(personalError.message);
     revalidatePath('/admin/staff');
+    revalidatePath('/caja-admin/personal');
     return record as WorkerProfile;
 }
 
@@ -653,6 +656,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
     }
 
     revalidatePath('/admin/staff');
+    revalidatePath('/caja-admin/personal');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -784,6 +788,8 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
 
     revalidatePath('/admin/staff');
     revalidatePath(`/admin/staff/${workerId}`);
+    revalidatePath('/caja-admin/personal');
+    revalidatePath(`/caja-admin/personal/${workerId}`);
     revalidatePath('/portal/profile');
     revalidatePath('/portal/dashboard');
 }

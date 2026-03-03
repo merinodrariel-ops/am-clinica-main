@@ -245,6 +245,7 @@ export async function generateLiquidacion(
     if (liqError) throw new Error(liqError.message || 'Error al generar liquidación');
 
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
 
     // Evaluate badges after generating (non-blocking)
     checkAndAwardBadges(personalId).catch(console.error);
@@ -277,6 +278,7 @@ export async function approveLiquidacion(id: string): Promise<void> {
 
     if (lastError) throw new Error(lastError.message || 'Error al aprobar liquidación');
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
 }
 
 export async function markLiquidacionPaid(id: string, fechaPago: string): Promise<void> {
@@ -300,6 +302,7 @@ export async function markLiquidacionPaid(id: string, fechaPago: string): Promis
 
     if (lastError) throw new Error(lastError.message || 'Error al registrar pago');
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
 }
 
 export async function rejectLiquidacion(id: string, motivo?: string): Promise<void> {
@@ -323,6 +326,7 @@ export async function rejectLiquidacion(id: string, motivo?: string): Promise<vo
 
     if (lastError) throw new Error(lastError.message || 'Error al rechazar liquidación');
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
 }
 
 export async function updateLiquidacionManual(input: UpdateLiquidacionManualInput): Promise<void> {
@@ -396,6 +400,7 @@ export async function updateLiquidacionManual(input: UpdateLiquidacionManualInpu
 
     if (error) throw new Error(error.message);
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     revalidatePath('/portal/liquidation');
 }
 
@@ -534,6 +539,7 @@ export async function generateLiquidacionesEmpresa(empresaId: string, mes: strin
     }
 
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     return { generated, skipped };
 }
 
@@ -562,6 +568,7 @@ export async function markLiquidacionesEmpresaPaid(empresaId: string, mes: strin
     }
 
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     return { updated, skipped };
 }
 

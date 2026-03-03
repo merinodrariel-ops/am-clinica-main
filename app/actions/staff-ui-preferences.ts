@@ -86,4 +86,5 @@ export async function saveStaffUiPreferences(input: StaffUiPreferencesInput): Pr
 
     if (error) throw new Error(error.message);
     revalidatePath('/admin/staff');
+    revalidatePath('/caja-admin/personal');
 }

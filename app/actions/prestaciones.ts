@@ -232,6 +232,7 @@ export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Prom
     }
 
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     revalidatePath('/portal/prestaciones');
 
     return data as TarifarioItem;
@@ -279,6 +280,7 @@ export async function registrarPrestacion(
 
     revalidatePath('/portal/prestaciones');
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     return { success: true };
 }
 
@@ -322,6 +324,7 @@ export async function registrarMultiplesPrestaciones(
 
     revalidatePath('/portal/prestaciones');
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     return { success: true };
 }
 
@@ -342,6 +345,7 @@ export async function actualizarSlidesUrl(
 
     revalidatePath('/portal/prestaciones');
     revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
     return { success: true };
 }
 

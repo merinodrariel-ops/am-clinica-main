@@ -106,7 +106,14 @@ export async function updateSession(request: NextRequest) {
         }
     }
     if (user && PORTAL_ROLES.includes(userRole)) {
-        const ADMIN_ONLY_PATHS = ['/caja-admin', '/caja-recepcion', '/admin/staff', '/admin-users']
+        const ADMIN_ONLY_PATHS = [
+            '/caja-admin',
+            '/caja-recepcion',
+            '/admin/staff',
+            '/admin/liquidaciones',
+            '/admin/prestaciones',
+            '/admin-users',
+        ]
         if (ADMIN_ONLY_PATHS.some(p => path === p || path.startsWith(p + '/'))) {
             const url = request.nextUrl.clone()
             url.pathname = '/dashboard'
