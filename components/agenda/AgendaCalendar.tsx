@@ -116,6 +116,7 @@ export default function AgendaCalendar() {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<AppointmentModalData | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>('calendar');
+    const [calendarView, setCalendarView] = useState<'dayGridMonth' | 'timeGridWeek' | 'timeGridDay'>('timeGridWeek');
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [activeDoctorIds, setActiveDoctorIds] = useState<Set<string>>(new Set(['all']));
     const [resourceDate, setResourceDate] = useState<Date>(new Date());
@@ -420,6 +421,48 @@ export default function AgendaCalendar() {
                     </button>
                 </div>
 
+                {/* Calendar granularity */}
+                {viewMode === 'calendar' && (
+                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                        <button
+                            onClick={() => {
+                                setCalendarView('dayGridMonth');
+                                calendarRef.current?.getApi()?.changeView('dayGridMonth');
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'dayGridMonth'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                }`}
+                        >
+                            Mes
+                        </button>
+                        <button
+                            onClick={() => {
+                                setCalendarView('timeGridWeek');
+                                calendarRef.current?.getApi()?.changeView('timeGridWeek');
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'timeGridWeek'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                }`}
+                        >
+                            Semana
+                        </button>
+                        <button
+                            onClick={() => {
+                                setCalendarView('timeGridDay');
+                                calendarRef.current?.getApi()?.changeView('timeGridDay');
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'timeGridDay'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                }`}
+                        >
+                            Día
+                        </button>
+                    </div>
+                )}
+
                 {/* Doctor Filter Pills */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                     <button
@@ -484,11 +527,11 @@ export default function AgendaCalendar() {
                     <FullCalendar
                         ref={calendarRef}
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                        initialView="timeGridWeek"
+                        initialView={calendarView}
                         headerToolbar={{
                             left: 'prev,next today',
                             center: 'title',
-                            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                            right: ''
                         }}
                         locale={esLocale}
                         height="100%"
@@ -512,24 +555,32 @@ export default function AgendaCalendar() {
                         expandRows
                         stickyHeaderDates
                         nowIndicator
+                        datesSet={(arg) => {
+                            const type = arg.view.type;
+                            if (type === 'dayGridMonth' || type === 'timeGridWeek' || type === 'timeGridDay') {
+                                setCalendarView(type);
+                            }
+                        }}
                         buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
                         eventContent={(arg) => {
                             const { event } = arg;
                             const props = event.extendedProps as AgendaEventExtendedProps;
                             const patientName = props.patient?.full_name ?? '';
                             const isTimeGridView = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
+                            const primaryLine = patientName || event.title || 'Cita';
+                            const secondaryLine = props.doctor?.full_name ? `Dr. ${props.doctor.full_name.split(' ')[0]}` : '';
                             return (
                                 <div className={`px-1 overflow-hidden ${isTimeGridView ? 'py-0.5' : ''}`}>
                                     <div className="font-semibold truncate text-[11px] leading-tight flex items-center justify-between">
-                                        <span>{event.title}</span>
+                                        <span>{primaryLine}</span>
                                         {props.conflict && <span title="Conflicto de horario" className="text-white ml-1">⚠️</span>}
                                     </div>
-                                    {patientName && patientName !== event.title && (
+                                    {!isTimeGridView && patientName && patientName !== event.title && (
                                         <div className="opacity-80 truncate text-[10px] leading-tight">{patientName}</div>
                                     )}
-                                    {props.doctor?.full_name && (
+                                    {secondaryLine && (
                                         <div className="opacity-70 truncate text-[10px] leading-tight">
-                                            {props.doctor.full_name.split(' ')[0]}
+                                            {secondaryLine}
                                         </div>
                                     )}
                                 </div>
@@ -896,6 +947,43 @@ function parseColorToRgb(color: string): { r: number; g: number; b: number } | n
             r: Math.min(255, Number(rgb[1])),
             g: Math.min(255, Number(rgb[2])),
             b: Math.min(255, Number(rgb[3])),
+        };
+    }
+
+    const hsl = c.match(/^hsla?\(([-\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/);
+    if (hsl) {
+        const h = (((Number(hsl[1]) % 360) + 360) % 360) / 360;
+        const s = Math.max(0, Math.min(1, Number(hsl[2]) / 100));
+        const l = Math.max(0, Math.min(1, Number(hsl[3]) / 100));
+
+        const hue2rgb = (p: number, q: number, t: number) => {
+            let tt = t;
+            if (tt < 0) tt += 1;
+            if (tt > 1) tt -= 1;
+            if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+            if (tt < 1 / 2) return q;
+            if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+            return p;
+        };
+
+        let r: number;
+        let g: number;
+        let b: number;
+
+        if (s === 0) {
+            r = g = b = l;
+        } else {
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1 / 3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1 / 3);
+        }
+
+        return {
+            r: Math.round(r * 255),
+            g: Math.round(g * 255),
+            b: Math.round(b * 255),
         };
     }
 
