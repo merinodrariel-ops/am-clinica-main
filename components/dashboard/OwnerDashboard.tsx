@@ -45,16 +45,11 @@ import {
     Plus,
 } from 'lucide-react';
 import { getOwnerDashboardStats, type OwnerDashboardStats } from '@/lib/dashboard';
-import dynamic from 'next/dynamic';
-const PredictiveInsights = dynamic(() => import('./PredictiveInsights'), {
-    ssr: false,
-    loading: () => <div className="h-[200px] w-full animate-pulse bg-white/5 rounded-2xl mb-6" />
-});
 import Link from 'next/link';
 
 const STORAGE_KEY = 'owner-dashboard-layout';
 
-type CardId = 'total-pacientes' | 'primera-vez' | 'ingresos-mes' | 'egresos-mes' | 'en-financiacion' | 'deuda-total' | 'predictive-pulse';
+type CardId = 'total-pacientes' | 'primera-vez' | 'ingresos-mes' | 'egresos-mes' | 'en-financiacion' | 'deuda-total';
 
 interface LayoutConfig {
     order: CardId[];
@@ -64,7 +59,6 @@ interface LayoutConfig {
 type PresetId = 'ejecutivo' | 'finanzas' | 'operaciones';
 
 const DEFAULT_ORDER: CardId[] = [
-    'predictive-pulse',
     'total-pacientes',
     'primera-vez',
     'ingresos-mes',
@@ -74,7 +68,6 @@ const DEFAULT_ORDER: CardId[] = [
 ];
 
 const CARD_TITLES: Record<CardId, string> = {
-    'predictive-pulse': 'Predictive Pulse',
     'total-pacientes': 'Pacientes Totales',
     'primera-vez': 'Pacientes Nuevos',
     'ingresos-mes': 'Ingresos Recepción',
@@ -86,9 +79,9 @@ const CARD_TITLES: Record<CardId, string> = {
 const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout: LayoutConfig }> = {
     ejecutivo: {
         name: 'Ejecutivo',
-        description: 'Vista general con KPIs claves y tendencia clínica.',
+        description: 'Vista general con KPIs claves.',
         layout: {
-            order: ['predictive-pulse', 'total-pacientes', 'primera-vez', 'ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion'],
+            order: ['total-pacientes', 'primera-vez', 'ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion'],
             hidden: [],
         },
     },
@@ -96,7 +89,7 @@ const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout
         name: 'Finanzas',
         description: 'Enfocado en ingresos, egresos, deuda y financiación.',
         layout: {
-            order: ['ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion', 'predictive-pulse', 'total-pacientes', 'primera-vez'],
+            order: ['ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion', 'total-pacientes', 'primera-vez'],
             hidden: ['total-pacientes', 'primera-vez'],
         },
     },
@@ -104,7 +97,7 @@ const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout
         name: 'Operaciones',
         description: 'Prioriza actividad clínica y nuevos pacientes.',
         layout: {
-            order: ['predictive-pulse', 'primera-vez', 'total-pacientes', 'en-financiacion', 'ingresos-mes', 'egresos-mes', 'deuda-total'],
+            order: ['primera-vez', 'total-pacientes', 'en-financiacion', 'ingresos-mes', 'egresos-mes', 'deuda-total'],
             hidden: ['egresos-mes', 'deuda-total'],
         },
     },
@@ -874,9 +867,7 @@ export default function OwnerDashboard() {
     };
 
     const activeCard = activeCardId ? cardData[activeCardId] : undefined;
-    const ActiveCardIcon = activeCardId
-        ? (activeCardId === 'predictive-pulse' ? TrendingUp : activeCard?.icon || GripVertical)
-        : GripVertical;
+    const ActiveCardIcon = activeCard?.icon || GripVertical;
 
     const visibleCards = layout.order.filter(id => !layout.hidden.includes(id) || isEditing);
     const removedCards = DEFAULT_ORDER.filter(id => !layout.order.includes(id));
@@ -1092,27 +1083,6 @@ export default function OwnerDashboard() {
                 <SortableContext items={visibleCards} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {visibleCards.map(id => {
-                            if (id === 'predictive-pulse') {
-                                return (
-                                    <SortableCard
-                                        key={id}
-                                        id={id}
-                                        className="md:col-span-2"
-                                        isEditing={isEditing}
-                                        isDragEnabled={isDragEnabled}
-                                        isDropTarget={overCardId === id && activeCardId !== id}
-                                        isRecentlyDropped={recentlyDroppedCardId === id}
-                                    >
-                                        <PredictiveInsights
-                                            isEditing={isEditing}
-                                            isHidden={layout.hidden.includes(id)}
-                                            canRemove={layout.order.length > 1}
-                                            onToggleVisibility={toggleVisibility}
-                                            onRemove={(cardId) => removeCard(cardId as CardId)}
-                                        />
-                                    </SortableCard>
-                                );
-                            }
                             const card = cardData[id];
                             if (!card) return null;
                             return (
