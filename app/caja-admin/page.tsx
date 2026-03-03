@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -272,6 +273,30 @@ function CajaAdminContent() {
                                     )}
                                 </div>
                             )}
+                        </div>
+                    </div>
+
+                    <div className="mb-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                        <p className="text-xs uppercase tracking-widest text-indigo-300 mb-3">Caja Administración Unificada</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <Link
+                                href="/caja-admin/prestaciones"
+                                className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 hover:border-indigo-400 hover:text-white transition-colors"
+                            >
+                                Prestaciones (Doctores)
+                            </Link>
+                            <Link
+                                href="/caja-admin/liquidaciones"
+                                className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 hover:border-indigo-400 hover:text-white transition-colors"
+                            >
+                                Liquidaciones
+                            </Link>
+                            <Link
+                                href="/caja-admin/personal"
+                                className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 hover:border-indigo-400 hover:text-white transition-colors"
+                            >
+                                Prestadores / Personal
+                            </Link>
                         </div>
                     </div>
 

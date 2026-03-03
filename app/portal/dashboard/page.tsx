@@ -68,7 +68,7 @@ export default async function WorkerDashboard() {
                 </p>
                 {isAdmin && (
                     <Link
-                        href="/admin/staff"
+                        href="/caja-admin/personal"
                         className="mt-8 flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-sm font-bold transition-all shadow-lg shadow-indigo-500/20"
                     >
                         <Settings size={18} />

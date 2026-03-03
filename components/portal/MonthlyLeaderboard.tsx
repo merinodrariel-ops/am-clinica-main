@@ -38,7 +38,7 @@ export default async function MonthlyLeaderboard({ limit = 5, compact = false }:
                     <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
                         Ranking · {mesLabel}
                     </p>
-                    <Link href="/admin/liquidaciones" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
+                    <Link href="/caja-admin/liquidaciones" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
                         Ver liquidaciones →
                     </Link>
                 </div>

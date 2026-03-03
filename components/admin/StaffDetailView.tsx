@@ -75,7 +75,7 @@ export default function StaffDetailView({
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-700 pb-16">
             {/* Header / Back */}
             <div className="flex items-center justify-between gap-2">
-                <Link href="/admin/staff" className="flex items-center gap-2 text-slate-400 hover:text-white text-xs md:text-sm font-medium transition-colors w-fit border border-slate-800 px-3 py-1.5 rounded-lg">
+                <Link href="/caja-admin/personal" className="flex items-center gap-2 text-slate-400 hover:text-white text-xs md:text-sm font-medium transition-colors w-fit border border-slate-800 px-3 py-1.5 rounded-lg">
                     <ChevronLeft size={16} />
                     <span className="hidden xs:inline">Volver</span>
                 </Link>

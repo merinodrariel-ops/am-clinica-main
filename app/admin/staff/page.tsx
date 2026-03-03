@@ -801,7 +801,7 @@ export default function StaffListPage() {
                                             <td className="px-4 py-3 text-right">
                                                 <div className="inline-flex items-center gap-2">
                                                     <Link
-                                                        href={`/admin/staff/${worker.id}`}
+                                                        href={`/caja-admin/personal/${worker.id}`}
                                                         className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:text-white hover:border-slate-600"
                                                     >
                                                         Abrir ficha
@@ -975,7 +975,7 @@ export default function StaffListPage() {
 
                                                             <div className="mt-3 grid grid-cols-2 gap-2">
                                                                 <Link
-                                                                    href={`/admin/staff/${worker.id}`}
+                                                                    href={`/caja-admin/personal/${worker.id}`}
                                                                     className="text-center py-1.5 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:text-white hover:border-slate-600 transition-colors"
                                                                 >
                                                                     Abrir ficha

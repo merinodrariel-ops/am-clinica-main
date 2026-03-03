@@ -1826,7 +1826,7 @@ export default function LiquidacionesPage() {
                             Este catálogo define las <span className="font-semibold">prestaciones de doctores/profesionales</span>. Para personal no profesional, usar la pestaña <span className="font-semibold">Horas (No profesionales)</span>.
                         </p>
                         <Link
-                            href="/admin/prestaciones"
+                            href="/caja-admin/prestaciones"
                             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
                         >
                             <Plus size={14} />
@@ -2020,7 +2020,7 @@ export default function LiquidacionesPage() {
                                         Pagar visibles
                                     </button>
                                     <a
-                                        href="/admin/prestaciones"
+                                        href="/caja-admin/prestaciones"
                                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-xs"
                                     >
                                         <FileSpreadsheet size={11} />

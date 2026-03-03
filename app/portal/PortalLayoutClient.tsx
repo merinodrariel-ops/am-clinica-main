@@ -99,7 +99,7 @@ export default function PortalLayoutClient({ children, workerName, workerRole, w
                 <div className="p-3 border-t border-slate-800/40 space-y-1">
                     {isAdmin && (
                         <Link
-                            href="/admin/staff"
+                            href="/caja-admin/personal"
                             className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all group"
                         >
                             <Settings size={17} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />

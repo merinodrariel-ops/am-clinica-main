@@ -96,7 +96,7 @@ export default async function CommanderView() {
                 </div>
 
                 <Link
-                    href="/admin/liquidaciones"
+                    href="/caja-admin/liquidaciones"
                     className="mt-4 flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors w-fit"
                 >
                     Gestionar liquidaciones <ArrowRight size={12} />
@@ -160,7 +160,7 @@ export default async function CommanderView() {
                                 ))}
                             </div>
                             <Link
-                                href="/admin/liquidaciones"
+                                href="/caja-admin/liquidaciones"
                                 className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
                             >
                                 Generar liquidaciones <ArrowRight size={10} />

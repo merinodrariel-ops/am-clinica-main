@@ -19,10 +19,8 @@ import {
     ChevronRight,
     Menu,
     X,
-    Plus,
     SlidersHorizontal,
     CheckSquare,
-    Stethoscope,
     Briefcase,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -85,24 +83,6 @@ const MENU_ITEMS = [
         label: 'Tareas',
         href: '/todos',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
-    },
-    {
-        icon: Stethoscope,
-        label: 'Prestadores',
-        href: '/admin/staff',
-        roles: ['owner', 'admin']
-    },
-    {
-        icon: Wallet,
-        label: 'Liquidaciones',
-        href: '/admin/liquidaciones',
-        roles: ['owner', 'admin']
-    },
-    {
-        icon: Plus,
-        label: 'Prestaciones (Doctores)',
-        href: '/admin/prestaciones',
-        roles: ['owner', 'admin']
     },
     {
         icon: Briefcase,
