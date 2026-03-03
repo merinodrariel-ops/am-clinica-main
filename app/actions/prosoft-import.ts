@@ -46,6 +46,17 @@ export interface ImportResult {
     errors: string[];
 }
 
+type ActionResult<T> =
+    | { success: true; data: T }
+    | { success: false; error: string };
+
+function toActionErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof Error && error.message?.trim()) {
+        return error.message;
+    }
+    return fallback;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function norm(s: string) {
@@ -679,6 +690,22 @@ export async function previewProsoftImport(
     };
 }
 
+export async function previewProsoftImportSafe(
+    sheetUrl: string,
+    mesOverride?: string
+): Promise<ActionResult<ProsoftPreview>> {
+    try {
+        const data = await previewProsoftImport(sheetUrl, mesOverride);
+        return { success: true, data };
+    } catch (error) {
+        console.error('previewProsoftImportSafe error:', error);
+        return {
+            success: false,
+            error: toActionErrorMessage(error, 'No se pudo procesar la planilla Prosoft.'),
+        };
+    }
+}
+
 // ─── Import ───────────────────────────────────────────────────────────────────
 
 export async function importProsoftData(
@@ -771,4 +798,21 @@ export async function importProsoftData(
     }
 
     return { inserted, skipped, errors };
+}
+
+export async function importProsoftDataSafe(
+    sheetUrl: string,
+    mesOverride?: string,
+    onlyMatched = true
+): Promise<ActionResult<ImportResult>> {
+    try {
+        const data = await importProsoftData(sheetUrl, mesOverride, onlyMatched);
+        return { success: true, data };
+    } catch (error) {
+        console.error('importProsoftDataSafe error:', error);
+        return {
+            success: false,
+            error: toActionErrorMessage(error, 'No se pudo importar la planilla Prosoft.'),
+        };
+    }
 }

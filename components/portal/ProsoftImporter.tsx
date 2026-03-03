@@ -4,7 +4,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Star, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-    previewProsoftImport, importProsoftData,
+    previewProsoftImportSafe, importProsoftDataSafe,
     getAllPersonalBasic, saveProsoftMapping,
     getProsoftMappings, deleteProsoftMapping,
     ProsoftPreview,
@@ -74,7 +74,13 @@ export default function ProsoftImporter() {
         setResult(null);
         setPendingMaps({});
         try {
-            const data = await previewProsoftImport(url.trim());
+            const previewResult = await previewProsoftImportSafe(url.trim());
+            if (!previewResult.success) {
+                toast.error(previewResult.error);
+                return;
+            }
+
+            const data = previewResult.data;
             setPreview(data);
             toast.success(`${data.totalRegistros} registros encontrados · ${mesLabel(data.mes)}`);
         } catch (e: unknown) {
@@ -88,7 +94,13 @@ export default function ProsoftImporter() {
         if (!preview) return;
         setImporting(true);
         try {
-            const res = await importProsoftData(url.trim(), undefined, true);
+            const importResult = await importProsoftDataSafe(url.trim(), undefined, true);
+            if (!importResult.success) {
+                toast.error(importResult.error);
+                return;
+            }
+
+            const res = importResult.data;
             setResult(res);
             const observed = preview.filas
                 .filter((f) => f.personalId)
