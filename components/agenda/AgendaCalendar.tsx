@@ -318,9 +318,9 @@ export default function AgendaCalendar() {
                     ? getDoctorColor(apt.doctor_id, doctors)
                     : getStatusColor(apt.status);
 
-                const color = apt.color_tag ?? (
-                    doctors.length > 0 && apt.doctor_id ? doctorColor : getStatusColor(apt.status)
-                );
+                const fallbackColor = doctors.length > 0 && apt.doctor_id ? doctorColor : getStatusColor(apt.status);
+                const color = normalizeEventColor(apt.color_tag, fallbackColor);
+                const textColor = getReadableTextColor(color);
 
                 return {
                     id: apt.id,
@@ -329,7 +329,7 @@ export default function AgendaCalendar() {
                     end: apt.end_time,
                     backgroundColor: isConflict ? '#ef4444' : color, // highlight red on conflict
                     borderColor: isConflict ? '#dc2626' : color,
-                    textColor: '#ffffff',
+                    textColor: isConflict ? '#ffffff' : textColor,
                     className: `premium-event ${isConflict ? 'animate-pulse ring-2 ring-red-500' : ''}`,
                     extendedProps: {
                         status: apt.status,
@@ -507,6 +507,8 @@ export default function AgendaCalendar() {
                         slotDuration="00:15:00"
                         slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                         eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+                        eventMinHeight={44}
+                        eventShortHeight={34}
                         expandRows
                         stickyHeaderDates
                         nowIndicator
@@ -515,8 +517,9 @@ export default function AgendaCalendar() {
                             const { event } = arg;
                             const props = event.extendedProps as AgendaEventExtendedProps;
                             const patientName = props.patient?.full_name ?? '';
+                            const isTimeGridView = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
                             return (
-                                <div className="px-1 overflow-hidden">
+                                <div className={`px-1 overflow-hidden ${isTimeGridView ? 'py-0.5' : ''}`}>
                                     <div className="font-semibold truncate text-[11px] leading-tight flex items-center justify-between">
                                         <span>{event.title}</span>
                                         {props.conflict && <span title="Conflicto de horario" className="text-white ml-1">⚠️</span>}
@@ -834,4 +837,67 @@ function getStatusColor(status: string) {
         case 'no_show': return '#1C1C1E';
         default: return '#007AFF';
     }
+}
+
+function normalizeEventColor(input: string | null | undefined, fallback: string): string {
+    const color = (input || '').trim();
+    if (!color) return fallback;
+
+    const normalized = color.toLowerCase();
+    if (
+        normalized === '#fff' ||
+        normalized === '#ffffff' ||
+        normalized === 'white' ||
+        normalized === 'rgb(255,255,255)' ||
+        normalized === 'rgb(255, 255, 255)' ||
+        normalized === 'rgba(255,255,255,1)' ||
+        normalized === 'rgba(255, 255, 255, 1)'
+    ) {
+        return fallback;
+    }
+
+    return color;
+}
+
+function getReadableTextColor(color: string): string {
+    const rgb = parseColorToRgb(color);
+    if (!rgb) return '#ffffff';
+
+    const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+    return luminance > 0.68 ? '#111827' : '#ffffff';
+}
+
+function parseColorToRgb(color: string): { r: number; g: number; b: number } | null {
+    const c = color.trim().toLowerCase();
+
+    const hex3 = c.match(/^#([0-9a-f]{3})$/i);
+    if (hex3) {
+        const h = hex3[1];
+        return {
+            r: parseInt(h[0] + h[0], 16),
+            g: parseInt(h[1] + h[1], 16),
+            b: parseInt(h[2] + h[2], 16),
+        };
+    }
+
+    const hex6 = c.match(/^#([0-9a-f]{6})$/i);
+    if (hex6) {
+        const h = hex6[1];
+        return {
+            r: parseInt(h.slice(0, 2), 16),
+            g: parseInt(h.slice(2, 4), 16),
+            b: parseInt(h.slice(4, 6), 16),
+        };
+    }
+
+    const rgb = c.match(/^rgba?\((\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/);
+    if (rgb) {
+        return {
+            r: Math.min(255, Number(rgb[1])),
+            g: Math.min(255, Number(rgb[2])),
+            b: Math.min(255, Number(rgb[3])),
+        };
+    }
+
+    return null;
 }
