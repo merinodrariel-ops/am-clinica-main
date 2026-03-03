@@ -91,6 +91,18 @@ function roleLabel(role?: string) {
     return labels[role] || role;
 }
 
+function dedupeByKey<T>(items: T[], keyOf: (item: T) => string): T[] {
+    const seen = new Set<string>();
+    const unique: T[] = [];
+    for (const item of items) {
+        const key = keyOf(item);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        unique.push(item);
+    }
+    return unique;
+}
+
 type CompanySummary = {
     empresaId: string;
     empresaNombre: string;
@@ -436,7 +448,7 @@ function HorasDetalleModal({
         custom: 'Personalizado',
     };
 
-    const sortedRows = [...rows].sort((a, b) => {
+    const sortedRows = dedupeByKey(rows, (reg) => reg.id).sort((a, b) => {
         if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
         return (a.hora_ingreso || '').localeCompare(b.hora_ingreso || '');
     });
@@ -1227,7 +1239,7 @@ export default function LiquidacionesPage() {
         setLoading(true);
         try {
             const data = await getLiquidacionesAdmin(mes);
-            setRows(data);
+            setRows(dedupeByKey(data, (row) => row.personal_id));
         } catch {
             toast.error('Error al cargar liquidaciones');
         } finally {
@@ -1479,6 +1491,7 @@ export default function LiquidacionesPage() {
         let latestRows = rows;
         try {
             latestRows = await getLiquidacionesAdmin(mes);
+            latestRows = dedupeByKey(latestRows, (row) => row.personal_id);
             setRows(latestRows);
         } catch {
             // continue with current rows
@@ -1499,6 +1512,7 @@ export default function LiquidacionesPage() {
         // Re-fetch after approvals
         try {
             latestRows = await getLiquidacionesAdmin(mes);
+            latestRows = dedupeByKey(latestRows, (row) => row.personal_id);
             setRows(latestRows);
         } catch {
             // continue
