@@ -27,8 +27,8 @@ import RoleGuard from "@/components/auth/RoleGuard";
 const TABS = [
     { id: 'movimientos', label: 'Movimientos', icon: Receipt },
     { id: 'arqueo', label: 'Inicio / Cierre', icon: Archive },
-    { id: 'profesionales', label: 'Profesionales', icon: Users },
-    { id: 'personal', label: 'Personal', icon: Clock },
+    { id: 'profesionales', label: 'Prestaciones (Caja)', icon: Users },
+    { id: 'personal', label: 'Horas / Personal', icon: Clock },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
 ] as const;
@@ -43,6 +43,7 @@ function currentMes() {
 function CajaAdminContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const requestedAction = searchParams.get('action');
     const [sucursales, setSucursales] = useState<Sucursal[]>([]);
     const [selectedSucursal, setSelectedSucursal] = useState<Sucursal | null>(null);
     const [activeTab, setActiveTab] = useState<TabId>('movimientos');
@@ -80,6 +81,12 @@ function CajaAdminContent() {
             setActiveTab(requestedTab as TabId);
         }
     }, [searchParams]);
+
+    useEffect(() => {
+        if (requestedAction === 'nuevo-egreso') {
+            setActiveTab('movimientos');
+        }
+    }, [requestedAction]);
 
     useEffect(() => {
         if (selectedSucursal?.moneda_local === 'ARS') {
@@ -139,7 +146,13 @@ function CajaAdminContent() {
 
         switch (activeTab) {
             case 'movimientos':
-                return <MovimientosTab sucursal={selectedSucursal} tcBna={tcBna} />;
+                return (
+                    <MovimientosTab
+                        sucursal={selectedSucursal}
+                        tcBna={tcBna}
+                        initialAction={requestedAction || undefined}
+                    />
+                );
             case 'arqueo':
                 return <ArqueoTab sucursal={selectedSucursal} tcBna={tcBna} />;
             case 'profesionales':

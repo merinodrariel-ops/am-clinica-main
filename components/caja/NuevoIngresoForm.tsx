@@ -33,6 +33,7 @@ interface NuevoIngresoFormProps {
     onClose: () => void;
     onSuccess: () => void;
     bnaRate: number;
+    initialPatientId?: string;
 }
 
 type SenaTipo = '' | 'diseno_sonrisa' | 'ortodoncia_invisible' | 'cirugia_implantes';
@@ -103,7 +104,7 @@ const METODOS_PAGO = [
 
 
 
-export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }: NuevoIngresoFormProps) {
+export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, initialPatientId }: NuevoIngresoFormProps) {
     const [step, setStep] = useState(1);
     const [saving, setSaving] = useState(false);
     const receiptCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -195,6 +196,37 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate }
 
         return () => clearTimeout(timer);
     }, [searchQuery]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function prefillPatient() {
+            if (!isOpen || !initialPatientId || formData.paciente_id === initialPatientId) return;
+
+            const { data, error } = await supabase
+                .from('pacientes')
+                .select('id_paciente, nombre, apellido, telefono, documento')
+                .eq('id_paciente', initialPatientId)
+                .single();
+
+            if (cancelled || error || !data) return;
+
+            setFormData(prev => ({
+                ...prev,
+                paciente_id: data.id_paciente,
+                paciente_nombre: `${data.apellido}, ${data.nombre}`,
+            }));
+            setSearchQuery('');
+            setPatients([]);
+            setStep(prev => (prev < 2 ? 2 : prev));
+        }
+
+        prefillPatient();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, initialPatientId, formData.paciente_id]);
 
     async function searchPatients(query: string) {
         setSearchLoading(true);

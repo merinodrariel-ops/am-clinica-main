@@ -2020,11 +2020,11 @@ export default function LiquidacionesPage() {
                                         Pagar visibles
                                     </button>
                                     <a
-                                        href="/caja-admin?tab=personal&subtab=profesionales"
+                                        href="/admin/prestaciones"
                                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-xs"
                                     >
                                         <FileSpreadsheet size={11} />
-                                        Cargar prestación
+                                        Cargar prestaciones
                                     </a>
                                     <button
                                         onClick={handleCloseMonthAssisted}

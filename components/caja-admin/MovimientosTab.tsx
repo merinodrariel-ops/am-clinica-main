@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -65,6 +65,7 @@ import MoneyInput from "@/components/ui/MoneyInput";
 interface Props {
   sucursal: Sucursal;
   tcBna: number | null;
+  initialAction?: string;
 }
 
 type MetodoPagoUI = "EFECTIVO" | "TRANSFERENCIA" | "TARJETA" | "OTRO";
@@ -81,7 +82,7 @@ const TIPOS_MOVIMIENTO = [
   { value: "GIRO_ACTIVO", label: "Giro Activo (Deuda Externa)" },
 ];
 
-export default function MovimientosTab({ sucursal, tcBna }: Props) {
+export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props) {
   const { role } = useAuth();
   const canEditAdminAmounts = role === "owner" || role === "admin";
   const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
@@ -159,6 +160,7 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
 
   const [manualRate, setManualRate] = useState<string>("");
   const [exchangeAmountUSD, setExchangeAmountUSD] = useState<string>("");
+  const handledActionRef = useRef<string | null>(null);
 
   const formatArqueoSaldos = (saldos: Record<string, number> | undefined | null) => {
     if (!saldos) return <span className="text-slate-400">—</span>;
@@ -243,6 +245,27 @@ export default function MovimientosTab({ sucursal, tcBna }: Props) {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sucursal.id, mesActual]);
+
+  useEffect(() => {
+    if (!initialAction) {
+      handledActionRef.current = null;
+      return;
+    }
+
+    if (handledActionRef.current === initialAction) return;
+    if (loading) return;
+
+    if (initialAction === "nuevo-egreso") {
+      if (!isCajaAbierta) {
+        handledActionRef.current = initialAction;
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, tipo_movimiento: "EGRESO" }));
+      setShowForm(true);
+      handledActionRef.current = initialAction;
+    }
+  }, [initialAction, loading, isCajaAbierta]);
   useEffect(() => {
     if (formData.tipo_movimiento === "CAMBIO_MONEDA" && exchangeAmountUSD) {
       const usdVal = parseFloat(exchangeAmountUSD) || 0;

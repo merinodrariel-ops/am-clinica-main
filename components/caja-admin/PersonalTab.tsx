@@ -503,7 +503,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             }`}
                     >
                         <Stethoscope className="w-4 h-4" />
-                        Profesionales
+                        Prestaciones (Caja)
                         <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full ml-2">
                             {profesionales.length}
                         </span>

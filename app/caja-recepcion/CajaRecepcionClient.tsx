@@ -218,6 +218,8 @@ function CajaRecepcionContent() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterMetodo, setFilterMetodo] = useState('');
     const initialTab = searchParams.get('tab');
+    const requestedTab = searchParams.get('tab');
+    const requestedAction = searchParams.get('action');
     const [activeTab, setActiveTab] = useState<CajaTab>(
         initialTab === 'financiacion' || initialTab === 'contratos' || initialTab === 'presentaciones'
             ? (initialTab as CajaTab)
@@ -271,6 +273,34 @@ function CajaRecepcionContent() {
 
     const [regeneratingReceiptId, setRegeneratingReceiptId] = useState<string | null>(null);
     const receiptCanvasRef = useRef<HTMLCanvasElement>(null);
+    const handledActionRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!requestedTab) return;
+        if (requestedTab === 'caja' || requestedTab === 'financiacion' || requestedTab === 'contratos' || requestedTab === 'presentaciones') {
+            setActiveTab(requestedTab as CajaTab);
+        }
+    }, [requestedTab]);
+
+    useEffect(() => {
+        if (!requestedAction) {
+            handledActionRef.current = null;
+            return;
+        }
+        if (handledActionRef.current === requestedAction) return;
+
+        if (requestedAction === 'nuevo-ingreso') {
+            setActiveTab('caja');
+            setShowNuevoIngreso(true);
+        }
+
+        if (requestedAction === 'nuevo-gasto') {
+            setActiveTab('caja');
+            setShowNuevoGasto(true);
+        }
+
+        handledActionRef.current = requestedAction;
+    }, [requestedAction]);
 
     function getWhatsappLink(text: string) {
         return `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -1799,6 +1829,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             onClose={() => setShowNuevoIngreso(false)}
                             onSuccess={loadData}
                             bnaRate={bnaRate?.venta || 0}
+                            initialPatientId={searchParams.get('patientId') || undefined}
                         />
 
                         {/* Transferencia Modal */}

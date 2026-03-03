@@ -83,7 +83,7 @@ export default function CommandPalette({ children }: { children: React.ReactNode
             name: 'Registrar Nuevo Ingreso',
             shortcut: ['n', 'i'],
             keywords: 'nuevo ingreso cobrar dinero venta',
-            perform: () => router.push('/caja-recepcion?action=nuevo-ingreso'),
+            perform: () => router.push('/caja-recepcion?tab=caja&action=nuevo-ingreso'),
             icon: <PlusCircle className="w-5 h-5 text-emerald-500" />,
         },
         {
@@ -91,7 +91,7 @@ export default function CommandPalette({ children }: { children: React.ReactNode
             name: 'Registrar Nuevo Egreso',
             shortcut: ['n', 'e'],
             keywords: 'nuevo egreso gasto pago dinero compra',
-            perform: () => router.push('/caja-admin?action=nuevo-egreso'),
+            perform: () => router.push('/caja-admin?tab=movimientos&action=nuevo-egreso'),
             icon: <MinusCircle className="w-5 h-5 text-rose-500" />,
         },
     ];

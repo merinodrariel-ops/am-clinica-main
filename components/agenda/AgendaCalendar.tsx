@@ -789,7 +789,7 @@ export default function AgendaCalendar() {
 
                             <button
                                 disabled={!quickPopup.fullData.patientId}
-                                onClick={() => router.push(`/pacientes/${quickPopup.fullData.patientId}`)}
+                                onClick={() => router.push(`/patients/${quickPopup.fullData.patientId}`)}
                                 title="Historia Clínica"
                                 className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 rounded-xl transition-colors disabled:opacity-50"
                             >
@@ -799,7 +799,7 @@ export default function AgendaCalendar() {
 
                             <button
                                 disabled={!quickPopup.fullData.patientId}
-                                onClick={() => router.push(`/caja?ingreso=true&paciente=${quickPopup.fullData.patientId}`)}
+                                onClick={() => router.push(`/caja-recepcion?tab=caja&action=nuevo-ingreso&patientId=${quickPopup.fullData.patientId}`)}
                                 title="Ingresar Pago / Cobrar"
                                 className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-xl transition-colors disabled:opacity-50"
                             >
