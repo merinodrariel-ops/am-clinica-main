@@ -45,16 +45,16 @@ import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 interface Movement {
     id: string;
     fecha_hora: string;
-    fecha_movimiento?: string;
+    fecha_movimiento?: string | null;
     concepto_nombre: string;
     monto: number;
     moneda: string;
-    metodo_pago: string;
+    metodo_pago: string | null;
     estado: string;
-    usd_equivalente: number;
-    observaciones?: string;
-    cuota_nro?: number;
-    cuotas_total?: number;
+    usd_equivalente: number | null;
+    observaciones?: string | null;
+    cuota_nro?: number | null;
+    cuotas_total?: number | null;
     comprobante_url?: string | null;
 }
 

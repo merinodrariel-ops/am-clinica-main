@@ -7,7 +7,7 @@ import { ComprobanteLink } from '@/components/caja/ComprobanteLink';
 export interface PatientPaymentItem {
     id: string;
     fecha_hora: string;
-    fecha_movimiento?: string;
+    fecha_movimiento?: string | null;
     concepto_nombre: string;
     monto: number;
     moneda: string;
