@@ -51,7 +51,7 @@ export async function getSilentPatients(dayThreshold = 45): Promise<SilentPatien
 
     const now = new Date();
 
-    return treatments
+    const candidates = treatments
         .filter(t => t.patient_id && !activeIds.has(t.patient_id))
         .map(t => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,6 +75,22 @@ export async function getSilentPatients(dayThreshold = 45): Promise<SilentPatien
                 lastStageChange: t.last_stage_change,
             };
         })
-        .filter(p => p.daysSilent >= dayThreshold)
+        .filter(p => p.daysSilent >= dayThreshold);
+
+    // One row per patient to avoid duplicated cards in UI
+    const byPatient = new Map<string, SilentPatient>();
+    for (const candidate of candidates) {
+        const existing = byPatient.get(candidate.patientId);
+        if (!existing) {
+            byPatient.set(candidate.patientId, candidate);
+            continue;
+        }
+
+        if (candidate.daysSilent > existing.daysSilent) {
+            byPatient.set(candidate.patientId, candidate);
+        }
+    }
+
+    return Array.from(byPatient.values())
         .sort((a, b) => b.daysSilent - a.daysSilent);
 }

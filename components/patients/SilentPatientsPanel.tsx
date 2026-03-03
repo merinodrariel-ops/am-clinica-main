@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { getSilentPatients, type SilentPatient } from '@/app/actions/silent-patients';
 import Link from 'next/link'; // Added Link import
 import { AlertTriangle, MessageCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 function normalizePhone(tel: string): string {
     const d = tel.replace(/\D/g, '');
@@ -33,7 +32,6 @@ function DaysBadge({ days }: { days: number }) {
 }
 
 export default function SilentPatientsPanel() {
-    const router = useRouter();
     const [patients, setPatients] = useState<SilentPatient[]>([]);
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(true);
