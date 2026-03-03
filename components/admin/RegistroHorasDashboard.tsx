@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { Clock, TrendingUp, Users, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { getResumenHorasMes, ResumenMes } from '@/app/actions/registro-horas';
+import { getResumenHorasMes, getRegistrosHorasMes, ResumenMes, RegistroHoras } from '@/app/actions/registro-horas';
+import { Fragment } from 'react';
 
 function mesLabel(ym: string) {
     const [y, m] = ym.split('-');
@@ -38,6 +39,9 @@ export default function RegistroHorasDashboard() {
     const [resumen, setResumen] = useState<ResumenMes | null>(null);
     const [resumenPrev, setResumenPrev] = useState<ResumenMes | null>(null);
     const [loading, setLoading] = useState(false);
+    const [expandedPrestadorId, setExpandedPrestadorId] = useState<string | null>(null);
+    const [detalleByPrestador, setDetalleByPrestador] = useState<Record<string, RegistroHoras[]>>({});
+    const [loadingDetalleId, setLoadingDetalleId] = useState<string | null>(null);
 
     useEffect(() => {
         setLoading(true);
@@ -70,6 +74,27 @@ export default function RegistroHorasDashboard() {
     const diff = resumen && resumenPrev
         ? resumen.total_horas - resumenPrev.total_horas
         : null;
+
+    async function toggleDetallePrestador(personalId: string) {
+        if (expandedPrestadorId === personalId) {
+            setExpandedPrestadorId(null);
+            return;
+        }
+
+        setExpandedPrestadorId(personalId);
+        if (detalleByPrestador[personalId]) return;
+
+        setLoadingDetalleId(personalId);
+        try {
+            const rows = await getRegistrosHorasMes(mes, personalId);
+            setDetalleByPrestador(prev => ({ ...prev, [personalId]: rows }));
+        } catch (error) {
+            console.error('Error loading provider schedule detail:', error);
+            setDetalleByPrestador(prev => ({ ...prev, [personalId]: [] }));
+        } finally {
+            setLoadingDetalleId(null);
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -204,22 +229,80 @@ export default function RegistroHorasDashboard() {
                                         const horario = e.hora_ingreso_min && e.hora_egreso_max
                                             ? `${e.hora_ingreso_min} – ${e.hora_egreso_max}`
                                             : '—';
+                                        const isExpanded = expandedPrestadorId === e.personal_id;
+                                        const detalleRows = detalleByPrestador[e.personal_id] || [];
+                                        const isLoadingDetail = loadingDetalleId === e.personal_id;
                                         return (
-                                            <tr key={e.personal_id} className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="px-4 py-2.5 text-white font-medium">
-                                                    {e.apellido ? `${e.apellido}, ${e.nombre}` : e.nombre}
-                                                </td>
-                                                <td className="px-3 py-2.5 text-center text-slate-300">{e.dias}</td>
-                                                <td className="px-3 py-2.5 text-right text-slate-500">
-                                                    {prev ? `${prev.total_horas}h` : '—'}
-                                                </td>
-                                                <td className="px-3 py-2.5 text-right font-semibold text-blue-400">{e.total_horas}h</td>
-                                                <td className={`px-3 py-2.5 text-right font-medium ${dif === null ? 'text-slate-600' : dif > 0 ? 'text-emerald-400' : dif < 0 ? 'text-red-400' : 'text-slate-500'}`}>
-                                                    {dif === null ? '—' : `${dif > 0 ? '+' : ''}${Math.round(dif * 10) / 10}h`}
-                                                </td>
-                                                <td className="px-3 py-2.5 text-right text-slate-300">{e.prom_horas_dia}h</td>
-                                                <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-[10px]">{horario}</td>
-                                            </tr>
+                                            <Fragment key={e.personal_id}>
+                                                <tr className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="px-4 py-2.5">
+                                                        <button
+                                                            onClick={() => { void toggleDetallePrestador(e.personal_id); }}
+                                                            className="text-left group"
+                                                        >
+                                                            <p className="text-white font-medium group-hover:text-blue-300 transition-colors">
+                                                                {e.apellido ? `${e.apellido}, ${e.nombre}` : e.nombre}
+                                                            </p>
+                                                            <p className="text-[11px] text-slate-500 group-hover:text-slate-300 transition-colors">
+                                                                {isExpanded ? 'Ocultar horarios' : 'Ver detalle de horarios'}
+                                                            </p>
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center text-slate-300">{e.dias}</td>
+                                                    <td className="px-3 py-2.5 text-right text-slate-500">
+                                                        {prev ? `${prev.total_horas}h` : '—'}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right font-semibold text-blue-400">{e.total_horas}h</td>
+                                                    <td className={`px-3 py-2.5 text-right font-medium ${dif === null ? 'text-slate-600' : dif > 0 ? 'text-emerald-400' : dif < 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                                                        {dif === null ? '—' : `${dif > 0 ? '+' : ''}${Math.round(dif * 10) / 10}h`}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right text-slate-300">{e.prom_horas_dia}h</td>
+                                                    <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-[10px]">{horario}</td>
+                                                </tr>
+
+                                                {isExpanded && (
+                                                    <tr className="bg-slate-900/60">
+                                                        <td colSpan={7} className="px-4 py-3 border-t border-slate-800/70">
+                                                            {isLoadingDetail ? (
+                                                                <div className="text-xs text-slate-400 flex items-center gap-2 py-3">
+                                                                    <RefreshCw size={12} className="animate-spin" /> Cargando horarios...
+                                                                </div>
+                                                            ) : detalleRows.length === 0 ? (
+                                                                <div className="text-xs text-slate-500 py-3">No hay registros de horarios para este prestador en {mesLabel(mes)}.</div>
+                                                            ) : (
+                                                                <div className="max-h-56 overflow-auto rounded-lg border border-slate-800">
+                                                                    <table className="w-full text-[11px]">
+                                                                        <thead className="bg-slate-900/90 sticky top-0">
+                                                                            <tr className="text-slate-400">
+                                                                                <th className="text-left px-3 py-2 font-medium">Fecha</th>
+                                                                                <th className="text-left px-3 py-2 font-medium">Ingreso</th>
+                                                                                <th className="text-left px-3 py-2 font-medium">Egreso</th>
+                                                                                <th className="text-right px-3 py-2 font-medium">Horas</th>
+                                                                                <th className="text-left px-3 py-2 font-medium">Estado</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-slate-800/70">
+                                                                            {[...detalleRows]
+                                                                                .sort((a, b) => a.fecha.localeCompare(b.fecha))
+                                                                                .map((reg) => (
+                                                                                    <tr key={reg.id} className="text-slate-300 hover:bg-slate-800/40">
+                                                                                        <td className="px-3 py-1.5">
+                                                                                            {new Date(`${reg.fecha}T12:00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-1.5 font-mono">{reg.hora_ingreso || '--:--'}</td>
+                                                                                        <td className="px-3 py-1.5 font-mono">{reg.hora_egreso || '--:--'}</td>
+                                                                                        <td className="px-3 py-1.5 text-right">{Number(reg.horas || 0).toFixed(2)}h</td>
+                                                                                        <td className="px-3 py-1.5">{reg.estado || '—'}</td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </Fragment>
                                         );
                                     })}
                                 </tbody>
