@@ -12,7 +12,8 @@ import {
     buscarPacientes,
 } from '@/app/actions/prestaciones';
 import type {
-    TarifarioItem,
+    PrestacionCatalogoItem,
+    RegistrarPrestacionInput,
 } from '@/app/actions/prestaciones';
 
 interface Profesional {
@@ -24,7 +25,7 @@ interface Profesional {
 
 interface Props {
     profesionales: Profesional[];
-    prestacionesCatalogo: TarifarioItem[];
+    prestacionesCatalogo: PrestacionCatalogoItem[];
 }
 
 interface PacienteOption {
@@ -42,15 +43,15 @@ interface BulkEntry {
     moneda_cobro: 'ARS' | 'USD';
     fecha_realizacion: string;
     paciente_nombre: string;
-    paciente_id: string | null;
+    paciente_id?: string;
 }
 
 function today() {
     return new Date().toISOString().slice(0, 10);
 }
 
-function groupByArea(items: TarifarioItem[]) {
-    const map: Record<string, TarifarioItem[]> = {};
+function groupByArea(items: PrestacionCatalogoItem[]) {
+    const map: Record<string, PrestacionCatalogoItem[]> = {};
     for (const item of items) {
         if (!map[item.area_nombre]) map[item.area_nombre] = [];
         map[item.area_nombre].push(item);
@@ -79,7 +80,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
         setPacientes(res);
     };
 
-    const handleAddToBulk = (item: TarifarioItem) => {
+    const handleAddToBulk = (item: PrestacionCatalogoItem) => {
         if (!selectedProfId) {
             toast.error('Selecciona un doctor primero');
             return;
@@ -96,7 +97,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
             moneda_cobro: item.moneda,
             fecha_realizacion: fecha,
             paciente_nombre: selectedPaciente ? `${selectedPaciente.nombre} ${selectedPaciente.apellido}` : '',
-            paciente_id: selectedPaciente?.id_paciente || null,
+            paciente_id: selectedPaciente?.id_paciente || undefined,
             };
 
             return [...prev, newEntry];
@@ -114,9 +115,15 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
         startSubmit(async () => {
             try {
                 // Ensure all entries have the current global date if they haven't been customized
-                const finalizedItems = bulkEntries.map(entry => ({
-                    ...entry,
-                    fecha_realizacion: fecha, // Always pulse global date for now to keep it simple
+                const finalizedItems: RegistrarPrestacionInput[] = bulkEntries.map(entry => ({
+                    profesional_id: entry.profesional_id,
+                    tarifario_id: entry.tarifario_id,
+                    prestacion_nombre: entry.prestacion_nombre,
+                    monto_honorarios: entry.monto_honorarios,
+                    moneda_cobro: entry.moneda_cobro,
+                    fecha_realizacion: fecha,
+                    paciente_nombre: entry.paciente_nombre,
+                    paciente_id: entry.paciente_id,
                 }));
 
                 const res = await registrarMultiplesPrestaciones(finalizedItems);

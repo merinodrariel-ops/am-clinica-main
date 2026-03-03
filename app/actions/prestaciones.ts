@@ -46,6 +46,8 @@ export interface TarifarioItem {
     terminos?: string;
 }
 
+export type PrestacionCatalogoItem = TarifarioItem;
+
 export interface UpdateTarifarioItemInput {
     id: string;
     nombre?: string;
@@ -53,6 +55,8 @@ export interface UpdateTarifarioItemInput {
     moneda?: 'ARS' | 'USD';
     terminos?: string;
 }
+
+export type UpdatePrestacionCatalogoItemInput = UpdateTarifarioItemInput;
 
 export interface PrestacionRealizada {
     id: string;
@@ -146,6 +150,13 @@ export async function getTarifarioParaDoctor(personalId: string): Promise<{
     };
 }
 
+export async function getPrestacionesCatalogoParaDoctor(personalId: string): Promise<{
+    items: PrestacionCatalogoItem[];
+    areas: string[];
+}> {
+    return getTarifarioParaDoctor(personalId);
+}
+
 /** Tarifario completo para admin (todas las áreas) */
 export async function getTarifarioCompleto(): Promise<TarifarioItem[]> {
     const admin = getAdminClient();
@@ -157,6 +168,10 @@ export async function getTarifarioCompleto(): Promise<TarifarioItem[]> {
         .order('nombre');
 
     return (data || []) as TarifarioItem[];
+}
+
+export async function getPrestacionesCatalogoCompleto(): Promise<PrestacionCatalogoItem[]> {
+    return getTarifarioCompleto();
 }
 
 export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Promise<TarifarioItem> {
@@ -220,6 +235,10 @@ export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Prom
     revalidatePath('/portal/prestaciones');
 
     return data as TarifarioItem;
+}
+
+export async function updatePrestacionCatalogoItem(input: UpdatePrestacionCatalogoItemInput): Promise<PrestacionCatalogoItem> {
+    return updateTarifarioItem(input);
 }
 
 // ─── Registrar ────────────────────────────────────────────────────────────────

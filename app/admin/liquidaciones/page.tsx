@@ -2,11 +2,13 @@
 
 import { Fragment, useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import {
     Wallet, RefreshCw, ChevronLeft, ChevronRight,
     CheckCircle2, Clock, Banknote, AlertTriangle, XCircle, Play,
     DollarSign, TrendingUp, Users, FileVideo, FileSpreadsheet, ListChecks,
     Search, PencilLine, ChevronDown, ChevronUp, Download, Printer, CalendarDays,
+    Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -22,7 +24,11 @@ import {
     LiquidacionResult,
     UpdateLiquidacionManualInput,
 } from '@/app/actions/liquidaciones';
-import { getTarifarioCompleto, TarifarioItem, updateTarifarioItem } from '@/app/actions/prestaciones';
+import {
+    getPrestacionesCatalogoCompleto,
+    updatePrestacionCatalogoItem,
+} from '@/app/actions/prestaciones';
+import type { PrestacionCatalogoItem } from '@/app/actions/prestaciones';
 import { getRegistrosHorasMes, RegistroHoras } from '@/app/actions/registro-horas';
 
 const ProsoftImporter = dynamic(() => import('@/components/portal/ProsoftImporter'), { ssr: false });
@@ -904,10 +910,10 @@ function HorasDetalleModal({
     );
 }
 
-// ─── TarifarioView ────────────────────────────────────────────────────────────
+// ─── PrestacionesCatalogoView ────────────────────────────────────────────────
 
-function TarifarioView({ items }: { items: TarifarioItem[] }) {
-    const [localItems, setLocalItems] = useState<TarifarioItem[]>(items);
+function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }) {
+    const [localItems, setLocalItems] = useState<PrestacionCatalogoItem[]>(items);
     const [query, setQuery] = useState('');
     const [monedaFilter, setMonedaFilter] = useState<'all' | 'ARS' | 'USD'>('all');
     const [areaFilter, setAreaFilter] = useState<string>('all');
@@ -943,13 +949,13 @@ function TarifarioView({ items }: { items: TarifarioItem[] }) {
         return haystack.includes(queryText);
     });
 
-    const byArea: Record<string, TarifarioItem[]> = {};
+    const byArea: Record<string, PrestacionCatalogoItem[]> = {};
     for (const item of filtered) {
         if (!byArea[item.area_nombre]) byArea[item.area_nombre] = [];
         byArea[item.area_nombre].push(item);
     }
 
-    function startEditing(item: TarifarioItem) {
+    function startEditing(item: PrestacionCatalogoItem) {
         setEditingId(item.id);
         setDraft({
             nombre: item.nombre,
@@ -973,7 +979,7 @@ function TarifarioView({ items }: { items: TarifarioItem[] }) {
 
         setSavingId(itemId);
         try {
-            const updated = await updateTarifarioItem({
+            const updated = await updatePrestacionCatalogoItem({
                 id: itemId,
                 nombre: draft.nombre,
                 precio_base: precio,
@@ -1217,7 +1223,7 @@ export default function LiquidacionesPage() {
     const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     const [tab, setTab] = useState<'liquidaciones' | 'prosoft' | 'prestaciones' | 'horas'>('liquidaciones');
-    const [prestacionesCatalogo, setPrestacionesCatalogo] = useState<TarifarioItem[]>([]);
+    const [prestacionesCatalogo, setPrestacionesCatalogo] = useState<PrestacionCatalogoItem[]>([]);
     const [mes, setMes] = useState(defaultMes);
     const [rows, setRows] = useState<LiquidacionAdminRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1251,7 +1257,7 @@ export default function LiquidacionesPage() {
 
     useEffect(() => {
         if (tab === 'prestaciones' && prestacionesCatalogo.length === 0) {
-            getTarifarioCompleto().then(setPrestacionesCatalogo);
+            getPrestacionesCatalogoCompleto().then(setPrestacionesCatalogo);
         }
     }, [tab, prestacionesCatalogo.length]);
 
@@ -1814,7 +1820,21 @@ export default function LiquidacionesPage() {
             )}
 
             {tab === 'prestaciones' && (
-                <TarifarioView items={prestacionesCatalogo} />
+                <div className="space-y-4">
+                    <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <p className="text-sm text-indigo-100">
+                            Este catálogo define las <span className="font-semibold">prestaciones de doctores/profesionales</span>. Para personal no profesional, usar la pestaña <span className="font-semibold">Horas (No profesionales)</span>.
+                        </p>
+                        <Link
+                            href="/admin/prestaciones"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+                        >
+                            <Plus size={14} />
+                            Cargar prestaciones
+                        </Link>
+                    </div>
+                    <PrestacionesCatalogoView items={prestacionesCatalogo} />
+                </div>
             )}
 
             {tab === 'horas' && (

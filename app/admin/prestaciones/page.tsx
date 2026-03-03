@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getProfesionales, getTarifarioCompleto } from '@/app/actions/prestaciones';
+import { getProfesionales, getPrestacionesCatalogoCompleto } from '@/app/actions/prestaciones';
 import AdminPrestacionesClient from './AdminPrestacionesClient';
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default async function AdminPrestacionesPage() {
     const [profesionales, prestacionesCatalogo] = await Promise.all([
         getProfesionales(),
-        getTarifarioCompleto(),
+        getPrestacionesCatalogoCompleto(),
     ]);
 
     return (
