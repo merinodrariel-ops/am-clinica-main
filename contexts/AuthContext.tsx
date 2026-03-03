@@ -1,13 +1,10 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client';
 
-const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient();
 
 type Role = 'owner' | 'admin' | 'pricing_manager' | 'reception' | 'partner_viewer' | 'developer' | 'laboratorio' | 'asistente' | 'odontologo' | 'recaptacion';
 

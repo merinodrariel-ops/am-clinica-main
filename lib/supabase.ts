@@ -1,12 +1,30 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+declare global {
+    var __amSupabaseClient: ReturnType<typeof createSupabaseClient> | undefined;
+}
+
+function createUniversalSupabaseClient() {
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+
+    if (typeof window !== 'undefined') {
+        if (!globalThis.__amSupabaseClient) {
+            globalThis.__amSupabaseClient = createSupabaseClient(supabaseUrl, supabaseAnonKey);
+        }
+        return globalThis.__amSupabaseClient;
+    }
+
+    return createSupabaseClient(supabaseUrl, supabaseAnonKey);
+}
+
+const fallbackSupabaseClient = createSupabaseClient('http://localhost:3000', 'dummy-key');
+const universalSupabaseClient = createUniversalSupabaseClient();
+
 // Fail gracefully during build if env vars are missing
-export const supabase = (supabaseUrl && supabaseAnonKey)
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : {} as ReturnType<typeof createClient>;
+export const supabase = universalSupabaseClient ?? fallbackSupabaseClient;
 
 
 // Types for Caja Recepción Module
