@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, BellOff, CheckCircle2, Circle, Clock, AlertTriangle, X } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import clsx from 'clsx';
 import { format, parseISO } from 'date-fns';
@@ -37,10 +37,7 @@ const PRIORITY_LABEL: Record<string, string> = {
 const LAST_SEEN_KEY = 'todos_bell_last_seen';
 
 export default function NotificationBell({ userId }: { userId: string }) {
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = createClient();
 
     const [open, setOpen] = useState(false);
     const [placement, setPlacement] = useState<'top' | 'bottom'>('top');
