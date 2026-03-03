@@ -3,7 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getSilentPatients, type SilentPatient } from '@/app/actions/silent-patients';
 import Link from 'next/link'; // Added Link import
-import { AlertTriangle, MessageCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, MessageCircle, RefreshCw, ChevronDown, ChevronUp, X } from 'lucide-react';
+
+const PANEL_OPEN_KEY = 'dashboard:silent-patients:open';
+const PANEL_HIDDEN_KEY = 'dashboard:silent-patients:hidden';
 
 function normalizePhone(tel: string): string {
     const d = tel.replace(/\D/g, '');
@@ -34,18 +37,37 @@ function DaysBadge({ days }: { days: number }) {
 export default function SilentPatientsPanel() {
     const [patients, setPatients] = useState<SilentPatient[]>([]);
     const [loading, setLoading] = useState(true);
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem(PANEL_OPEN_KEY) === '1';
+    });
+    const [hidden, setHidden] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem(PANEL_HIDDEN_KEY) === '1';
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        localStorage.setItem(PANEL_OPEN_KEY, open ? '1' : '0');
+    }, [open]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        localStorage.setItem(PANEL_HIDDEN_KEY, hidden ? '1' : '0');
+    }, [hidden]);
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
             const data = await getSilentPatients();
             setPatients(data);
-            setOpen(data.length > 0);
+            if (!hidden && data.length > 0) {
+                setOpen(prev => prev || data.length <= 3);
+            }
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [hidden]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -56,6 +78,25 @@ export default function SilentPatientsPanel() {
     }
 
     if (patients.length === 0) return null;
+
+    if (hidden) {
+        return (
+            <div className="mb-4 rounded-xl border border-amber-300/40 dark:border-amber-800/40 bg-amber-50/70 dark:bg-amber-900/10 px-3 py-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle size={14} className="text-amber-500 flex-shrink-0" />
+                    <p className="text-xs text-amber-800 dark:text-amber-300 truncate">
+                        Pacientes en silencio oculto ({patients.length})
+                    </p>
+                </div>
+                <button
+                    onClick={() => setHidden(false)}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-200/70 hover:bg-amber-200 text-amber-800 dark:bg-amber-800/40 dark:hover:bg-amber-800/60 dark:text-amber-200 transition-colors"
+                >
+                    Mostrar
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="mb-6 rounded-2xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/10 overflow-hidden">
@@ -86,6 +127,16 @@ export default function SilentPatientsPanel() {
                     >
                         <RefreshCw size={13} />
                     </span>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setHidden(true);
+                        }}
+                        className="p-1 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors text-amber-600"
+                        title="Ocultar panel"
+                    >
+                        <X size={13} />
+                    </button>
                     {open
                         ? <ChevronUp size={15} className="text-amber-500" />
                         : <ChevronDown size={15} className="text-amber-500" />

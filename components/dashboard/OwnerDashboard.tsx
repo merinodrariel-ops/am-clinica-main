@@ -224,7 +224,7 @@ function SortableCard({
                     }}
                 />
             )}
-            {isEditing && (
+            {isDragEnabled && (
                 <button
                     className="absolute top-2 left-2 z-10 p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all touch-none bg-white/5 hover:bg-white/10 text-slate-400"
                     aria-label="Arrastrar tarjeta"
@@ -287,7 +287,7 @@ function KpiCard({
 
     return (
         <div
-            className={`glass-card rounded-2xl p-6 transition-all duration-300 relative border border-white/5 ${isGiant ? 'col-span-1 md:col-span-2' : ''
+            className={`glass-card rounded-2xl p-6 transition-all duration-300 relative border border-white/5 min-h-[170px] ${isGiant ? 'col-span-1 md:col-span-2' : ''
                 } ${isHidden ? 'opacity-40 bg-black/40' : 'bg-black/20'} ${isEditing ? 'ring-1 ring-white/10' : ''} ${cardClassName}`}
         >
             {isEditing && (
@@ -572,7 +572,7 @@ export default function OwnerDashboard() {
     const [overCardId, setOverCardId] = useState<CardId | null>(null);
     const [recentlyDroppedCardId, setRecentlyDroppedCardId] = useState<CardId | null>(null);
     const droppedPulseTimeoutRef = useRef<number | null>(null);
-    const isDragEnabled = isEditing && activeTab === 'dashboard';
+    const isDragEnabled = activeTab === 'dashboard';
 
     const currentMonth = MONTH_NAMES[new Date().getMonth()];
 
@@ -768,7 +768,7 @@ export default function OwnerDashboard() {
             gradient: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(224 76% 48%))',
             iconBg: 'hsla(217, 91%, 60%, 0.15)',
             iconColor: 'hsl(217 91% 65%)',
-            isGiant: true,
+            isLarge: true,
         },
         'primera-vez': {
             id: 'primera-vez',
@@ -781,8 +781,8 @@ export default function OwnerDashboard() {
             iconBg: 'hsla(165, 100%, 42%, 0.15)',
             iconColor: 'hsl(165 85% 50%)',
             isLarge: true,
-            cardClassName: 'min-h-[360px] md:min-h-[430px]',
-            alwaysExpanded: true,
+            cardClassName: '',
+            alwaysExpanded: false,
             expandContent: (
                 <NewPatientsTrendDetail
                     monthly={stats.primeraVezMensual}
