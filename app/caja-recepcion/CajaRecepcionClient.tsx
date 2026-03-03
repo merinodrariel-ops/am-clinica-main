@@ -333,7 +333,7 @@ function CajaRecepcionContent() {
 
             // Add transfers adapted to Movimiento interface
             if (transRaw) {
-                const transMovs: Movimiento[] = transRaw.map(t => ({
+                const transMovs: Movimiento[] = transRaw.map((t: any) => ({
                     id: t.id,
                     fecha_hora: t.fecha_hora,
                     fecha_movimiento: t.fecha_hora.split('T')[0],
@@ -364,7 +364,7 @@ function CajaRecepcionContent() {
                         .select('id_paciente, nombre, apellido, telefono, email, financ_estado, financ_monto_total, financ_cuotas_total');
 
                     if (allPacientes) {
-                        const enrichedMovs = allMovs.map(m => {
+                        const enrichedMovs = allMovs.map((m: Movimiento) => {
                             if (m.paciente?.id_paciente === 'e5193b04-5e9d-43c2-a35b-8abc5a4a0f59') {
                                 const concepto = m.concepto_nombre.toLowerCase().trim();
 
@@ -372,7 +372,7 @@ function CajaRecepcionContent() {
                                 if (concepto.includes('cierre') || concepto.includes('inicio')) return m;
 
                                 // Try to find a patient whose name + apellido or vice versa is in concepto_nombre
-                                const found = allPacientes.find(p => {
+                                const found = allPacientes.find((p: any) => {
                                     const fullName = `${p.nombre} ${p.apellido}`.toLowerCase();
                                     const reverseName = `${p.apellido} ${p.nombre}`.toLowerCase();
                                     const lastName = p.apellido.toLowerCase();

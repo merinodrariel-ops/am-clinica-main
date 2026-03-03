@@ -674,19 +674,19 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     .lte("fecha_movimiento", today)
     .neq("estado", "anulado");
 
-  const pagadosHoy = (movHoy || []).filter((m) => m.estado !== "anulado");
-  const pendientesHoy = (movHoy || []).filter((m) => m.estado === "pendiente");
+  const pagadosHoy = (movHoy || []).filter((m: any) => m.estado !== "anulado");
+  const pendientesHoy = (movHoy || []).filter((m: any) => m.estado === "pendiente");
 
   // Aggregate by method
   const porMetodo: Record<string, number> = {};
-  pagadosHoy.forEach((m) => {
+  pagadosHoy.forEach((m: any) => {
     const metodo = m.metodo_pago as string;
     porMetodo[metodo] = (porMetodo[metodo] || 0) + (m.usd_equivalente || 0);
   });
 
   // Aggregate by category
   const porCategoria: Record<string, number> = {};
-  pagadosHoy.forEach((m) => {
+  pagadosHoy.forEach((m: any) => {
     if (m.categoria) {
       const cat = m.categoria as string;
       porCategoria[cat] = (porCategoria[cat] || 0) + (m.usd_equivalente || 0);
@@ -833,9 +833,9 @@ export async function getCurrentBalanceRecepcion(): Promise<{
   const movs = movimientos || [];
 
   // Filter for Cash (Efectivo) only
-  const cashMovs = movs.filter((m) => m.metodo_pago === "Efectivo");
+  const cashMovs = movs.filter((m: any) => m.metodo_pago === "Efectivo");
 
-  cashMovs.forEach((m) => {
+  cashMovs.forEach((m: any) => {
     if (m.moneda === "ARS") saldoArs += m.monto;
     if (m.moneda === "USD") saldoUsd += m.monto;
   });

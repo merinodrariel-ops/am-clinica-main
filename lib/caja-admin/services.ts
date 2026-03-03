@@ -187,7 +187,7 @@ export async function createMovimiento(
     }
 
     // Insert lines
-    const lineasWithMovId = lineas.map(l => ({
+    const lineasWithMovId = lineas.map((l: any) => ({
         cuenta_id: l.cuenta_id,
         importe: l.importe,
         moneda: l.moneda,
@@ -1061,7 +1061,7 @@ export async function getObservadosSlaSummary(mes?: string): Promise<{ total: nu
     let warn = 0;
     let critical = 0;
 
-    data.forEach((row) => {
+    data.forEach((row: any) => {
         const parsed = new Date((row as { created_at?: string; fecha: string }).created_at || (row as { fecha: string }).fecha);
         const createdAtMs = Number.isNaN(parsed.getTime())
             ? new Date(`${(row as { fecha: string }).fecha}T00:00:00`).getTime()
@@ -1105,7 +1105,7 @@ export async function getObservadosCriticalLeaders(
     const criticalThreshold = Date.now() - 48 * 60 * 60 * 1000;
     const grouped = new Map<string, { personal_id: string; nombre: string; apellido: string; critical_count: number }>();
 
-    data.forEach((row) => {
+    data.forEach((row: any) => {
         const typed = row as {
             personal_id: string;
             created_at?: string;
@@ -1395,8 +1395,8 @@ export async function updateMovimientoAdminWithLines(
         return { success: false, error: `Error leyendo lineas actuales: ${currentLinesError.message}` };
     }
 
-    const existingLines = sanitizedLines.filter((line) => Boolean(line.id));
-    const newLines = sanitizedLines.filter((line) => !line.id);
+    const existingLines = sanitizedLines.filter((line: any) => Boolean(line.id));
+    const newLines = sanitizedLines.filter((line: any) => !line.id);
 
     const incomingLineIds = new Set(
         existingLines
@@ -1405,8 +1405,8 @@ export async function updateMovimientoAdminWithLines(
     );
 
     const linesToDelete = (currentLineRows || [])
-        .map((row) => row.id)
-        .filter((rowId): rowId is string => typeof rowId === 'string' && !incomingLineIds.has(rowId));
+        .map((row: any) => row.id)
+        .filter((rowId: any): rowId is string => typeof rowId === 'string' && !incomingLineIds.has(rowId));
 
     if (linesToDelete.length > 0) {
         const { error: deleteLinesError } = await getSupabase()
@@ -1527,7 +1527,7 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
         try {
             // Get accounts to identify currency
             const cuentas = await getCuentas(sucursal.id);
-            const efectivoCuentas = cuentas.filter(c => c.tipo_cuenta === 'EFECTIVO');
+            const efectivoCuentas = cuentas.filter((c: any) => c.tipo_cuenta === 'EFECTIVO');
 
             if (efectivoCuentas.length === 0) continue;
 
@@ -1535,7 +1535,7 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
             const saldos = closure?.saldos_finales || {};
 
             // Initial balance from closure
-            efectivoCuentas.forEach(c => {
+            efectivoCuentas.forEach((c: any) => {
                 const val = saldos[c.id] || 0;
                 if (c.moneda === 'ARS') totalArs += val;
                 if (c.moneda === 'USD') totalUsd += val;
@@ -1557,7 +1557,7 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
                 .eq('is_deleted', false);
 
             if (pendingMovs) {
-                pendingMovs.forEach(m => {
+                pendingMovs.forEach((m: any) => {
                     const tipo = m.tipo_movimiento;
                     let multiplier = 0;
                     if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') multiplier = 1;
@@ -1568,7 +1568,7 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
 
                     if (multiplier !== 0) {
                         m.caja_admin_movimiento_lineas.forEach((l: { cuenta_id: string; importe?: number | null }) => {
-                            const cuenta = efectivoCuentas.find(ec => ec.id === l.cuenta_id);
+                            const cuenta = efectivoCuentas.find((ec: any) => ec.id === l.cuenta_id);
                             if (cuenta) {
                                 if (cuenta.moneda === 'ARS') totalArs += Number(l.importe || 0) * multiplier;
                                 if (cuenta.moneda === 'USD') totalUsd += Number(l.importe || 0) * multiplier;
@@ -1602,13 +1602,13 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
     // Get Cash Accounts
     const cuentas = await getCuentas(sucursalId);
-    const efectivas = cuentas.filter(c => c.tipo_cuenta === 'EFECTIVO');
-    const idsArs = new Set(efectivas.filter(c => c.moneda === 'ARS').map(c => c.id));
-    const idsUsd = new Set(efectivas.filter(c => c.moneda === 'USD').map(c => c.id));
+    const efectivas = cuentas.filter((c: any) => c.tipo_cuenta === 'EFECTIVO');
+    const idsArs = new Set(efectivas.filter((c: any) => c.moneda === 'ARS').map((c: any) => c.id));
+    const idsUsd = new Set(efectivas.filter((c: any) => c.moneda === 'USD').map((c: any) => c.id));
 
     // Initialize balances per account
     const saldosPorCuenta: Record<string, number> = {};
-    efectivas.forEach(c => {
+    efectivas.forEach((c: any) => {
         saldosPorCuenta[c.id] = 0;
     });
 

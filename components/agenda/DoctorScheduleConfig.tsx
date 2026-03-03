@@ -45,9 +45,9 @@ interface NotificationRule {
 
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const CHANNELS = [
-    { value: 'email',     label: 'Email' },
-    { value: 'whatsapp',  label: 'WhatsApp' },
-    { value: 'both',      label: 'Ambos' },
+    { value: 'email', label: 'Email' },
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'both', label: 'Ambos' },
 ];
 const STATUSES_OPTIONS = ['confirmed', 'pending', 'arrived', 'in_progress', 'completed', 'cancelled'];
 
@@ -160,8 +160,8 @@ function NotificationRuleRow({
                         {rule.trigger_offset_hours < 0
                             ? `${Math.abs(rule.trigger_offset_hours)}h antes`
                             : rule.trigger_offset_hours > 0
-                            ? `${rule.trigger_offset_hours}h después`
-                            : 'Al momento'}
+                                ? `${rule.trigger_offset_hours}h después`
+                                : 'Al momento'}
                     </p>
                 </div>
                 <div>
@@ -202,13 +202,13 @@ function NotificationRuleRow({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DoctorScheduleConfig() {
-    const [doctors, setDoctors]               = useState<Doctor[]>([]);
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [activeDoctorId, setActiveDoctorId] = useState<string>('');
-    const [schedules, setSchedules]           = useState<DoctorSchedule[]>([]);
-    const [rules, setRules]                   = useState<NotificationRule[]>([]);
-    const [loading, setLoading]               = useState(true);
-    const [saving, setSaving]                 = useState(false);
-    const [savingRules, setSavingRules]       = useState(false);
+    const [schedules, setSchedules] = useState<DoctorSchedule[]>([]);
+    const [rules, setRules] = useState<NotificationRule[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [savingRules, setSavingRules] = useState(false);
 
     const supabase = createClient();
 
@@ -226,7 +226,7 @@ export default function DoctorScheduleConfig() {
             setRules((data ?? []) as NotificationRule[]);
         }
         Promise.all([loadDoctors(), loadRules()]).then(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -236,8 +236,8 @@ export default function DoctorScheduleConfig() {
             .select('*')
             .eq('doctor_id', activeDoctorId)
             .order('day_of_week')
-            .then(({ data }) => setSchedules((data ?? []) as DoctorSchedule[]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+            .then(({ data }: { data: any }) => setSchedules((data ?? []) as DoctorSchedule[]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeDoctorId]);
 
     const addScheduleDay = () => {
@@ -323,11 +323,10 @@ export default function DoctorScheduleConfig() {
                         <button
                             key={doc.id}
                             onClick={() => setActiveDoctorId(doc.id)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
-                                activeDoctorId === doc.id
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition-all ${activeDoctorId === doc.id
                                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                                     : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-400'
-                            }`}
+                                }`}
                         >
                             <UserCircle2 size={16} />
                             {doc.full_name}
@@ -447,9 +446,9 @@ export default function DoctorScheduleConfig() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
-                        { name: 'Google Calendar', key: 'GOOGLE_SERVICE_ACCOUNT_EMAIL',    desc: 'Importación histórica + sync incremental' },
-                        { name: 'Calendly Webhook', key: 'CALENDLY_WEBHOOK_SECRET',         desc: 'Endpoint: /api/webhooks/calendly' },
-                        { name: 'WhatsApp (Twilio)', key: 'TWILIO_ACCOUNT_SID',             desc: 'Recordatorios y encuestas post-turno' },
+                        { name: 'Google Calendar', key: 'GOOGLE_SERVICE_ACCOUNT_EMAIL', desc: 'Importación histórica + sync incremental' },
+                        { name: 'Calendly Webhook', key: 'CALENDLY_WEBHOOK_SECRET', desc: 'Endpoint: /api/webhooks/calendly' },
+                        { name: 'WhatsApp (Twilio)', key: 'TWILIO_ACCOUNT_SID', desc: 'Recordatorios y encuestas post-turno' },
                     ].map(item => (
                         <div key={item.name} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
                             <div className="flex items-center gap-2 mb-1">
