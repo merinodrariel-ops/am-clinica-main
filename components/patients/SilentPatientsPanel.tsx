@@ -127,16 +127,25 @@ export default function SilentPatientsPanel() {
                     >
                         <RefreshCw size={13} />
                     </span>
-                    <button
+                    <span
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => {
                             e.stopPropagation();
                             setHidden(true);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setHidden(true);
+                            }
                         }}
                         className="p-1 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors text-amber-600"
                         title="Ocultar panel"
                     >
                         <X size={13} />
-                    </button>
+                    </span>
                     {open
                         ? <ChevronUp size={15} className="text-amber-500" />
                         : <ChevronDown size={15} className="text-amber-500" />
