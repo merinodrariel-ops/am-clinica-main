@@ -196,9 +196,9 @@ export const admissionSubmissionSchema = z.object({
     referencia_recomendado_por: optionalText,
     health_alerts: z.array(z.string()).default([]),
     health_notes: optionalText,
-    consentimiento_privacidad: z.literal(true),
-    consentimiento_tratamiento: z.literal(true),
-    firma_data_url: z.string().min(100),
+    consentimiento_privacidad: z.boolean().default(true),
+    consentimiento_tratamiento: z.boolean().default(true),
+    firma_data_url: z.string().optional(),
     mode: admissionModeSchema,
 });
 
