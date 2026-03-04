@@ -20,15 +20,11 @@ import {
     MessageCircle,
     CreditCard,
     MapPin,
-    Navigation,
-    Eraser,
-    ShieldCheck,
-    ClipboardCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAdmissionTriggers } from '@/hooks/useAdmissionTriggers';
 import { submitAdmissionAction, upsertAdmissionLeadAction } from '@/app/actions/admission';
-import { QRCodeCanvas } from 'qrcode.react';
+
 
 // --- Types ---
 type FormData = {
@@ -91,6 +87,33 @@ const DISCOVERY_SOURCES = [
 
 // --- Components ---
 
+const fadeInBlur = {
+    initial: { opacity: 0, y: 20, filter: 'blur(10px)' },
+    animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+    exit: { opacity: 0, y: -20, filter: 'blur(10px)' },
+    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+};
+
+const slideInBlur = {
+    initial: (direction: number) => ({
+        opacity: 0,
+        x: direction > 0 ? 50 : -50,
+        filter: 'blur(10px)'
+    }),
+    animate: {
+        opacity: 1,
+        x: 0,
+        filter: 'blur(0px)',
+        transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+    },
+    exit: (direction: number) => ({
+        opacity: 0,
+        x: direction > 0 ? -50 : 50,
+        filter: 'blur(10px)',
+        transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
+    })
+};
+
 const InputField = ({
     icon: Icon,
     type,
@@ -121,7 +144,7 @@ const InputField = ({
                         if (type === 'date' && !e.target.value) setInputType('text');
                         if (onBlur) onBlur(e);
                     }}
-                    className={`w-full bg-transparent border-b-2 py-4 pl-10 text-lg font-light text-white placeholder:text-zinc-600 focus:outline-none transition-colors ${showError ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-white'} ${type === 'date' ? '[&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 invert' : ''}`}
+                    className={`w-full bg-transparent border-b-2 py-4 pl-10 text-lg font-light text-white placeholder:text-zinc-600 focus:outline-none transition-colors ${showError ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-white font-sans'} ${type === 'date' ? '[&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 invert' : ''}`}
                     {...props}
                 />
             </div>
@@ -131,7 +154,7 @@ const InputField = ({
                         initial={{ opacity: 0, y: -5, height: 0 }}
                         animate={{ opacity: 1, y: 0, height: 'auto' }}
                         exit={{ opacity: 0, y: -5, height: 0 }}
-                        className="text-red-500 text-sm font-medium pl-10 pt-1"
+                        className="text-red-500 text-sm font-medium pl-10 pt-1 font-sans"
                     >
                         {error}
                     </motion.div>
@@ -140,6 +163,7 @@ const InputField = ({
         </div>
     );
 };
+
 
 const ProgressBar = ({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) => {
     const progress = (currentStep / (totalSteps - 1)) * 100;
@@ -214,44 +238,16 @@ export default function PremiumAdmissionForm() {
         }
     };
 
-    const nextStep = async () => {
-        // If we're moving from personal, medical or reason step, we try to save lead
-        if (step === 1 || step === 3) {
-            await persistLead();
-        }
+    const nextStep = () => {
         setDirection(1);
         setStep((s) => Math.min(s + 1, totalSteps - 1));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const prevStep = () => {
         setDirection(-1);
         setStep((s) => Math.max(s - 1, 0));
-    };
-
-    const pageVariants = {
-        initial: (direction: number) => ({
-            opacity: 0,
-            x: direction > 0 ? 40 : -40,
-            filter: 'blur(8px)',
-            scale: 0.98
-        }),
-        animate: {
-            opacity: 1,
-            x: 0,
-            filter: 'blur(0px)',
-            scale: 1
-        },
-        exit: (direction: number) => ({
-            opacity: 0,
-            x: direction < 0 ? 40 : -40,
-            filter: 'blur(8px)',
-            scale: 0.98
-        })
-    };
-
-    const pageTransition = {
-        duration: 0.8,
-        ease: [0.22, 1, 0.36, 1]
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleSubmit = async () => {
@@ -271,9 +267,6 @@ export default function PremiumAdmissionForm() {
             referencia_origen: DISCOVERY_SOURCES.find(s => s.id === formData.discoverySource)?.label || formData.discoverySource,
             health_alerts: healthAlerts,
             health_notes: healthAlerts.join('\n'),
-            consentimiento_privacidad: true as const,
-            consentimiento_tratamiento: true as const,
-            firma_data_url: 'N/A (Basic Admission)',
             mode: 'online' as const,
             // Existing schema might not have all these but we send them
             ciudad: 'CABA',
@@ -336,48 +329,40 @@ export default function PremiumAdmissionForm() {
         <motion.div
             key="welcome"
             custom={direction}
-            variants={pageVariants}
+            variants={slideInBlur}
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={pageTransition}
-            className="flex flex-col items-center justify-center text-center max-w-3xl mx-auto px-6 h-full min-h-[80vh]"
+            className="flex flex-col items-center justify-center text-center max-w-4xl mx-auto px-6 py-12 h-full min-h-[80vh]"
         >
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.2, duration: 1 }}
-                className="mb-10 relative"
+                className="mb-8"
             >
-                <div className="absolute inset-0 bg-gradient-to-tr from-zinc-500/20 to-zinc-800/20 rounded-full blur-3xl opacity-50 animate-pulse"></div>
-                <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-full bg-[#0a0a0a] border border-white/10 flex items-center justify-center shadow-2xl shadow-black/80 overflow-hidden group">
-                    <img
-                        src="/logo.png"
-                        alt="AM Estética Dental"
-                        className="w-full h-full object-cover rounded-full transition-transform duration-700 group-hover:scale-105"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9.9 16.2 1.5-4.5"/><path d="m15 16.2-1.5-4.5"/><path d="m12 11.7-1.5 4.5"/><path d="M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0"/><path d="m8.4 16.2 3.6-10.8 3.6 10.8"/></svg>';
-                        }}
-                    />
-                    <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/10 pointer-events-none"></div>
+                <div className="w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6 mx-auto">
+                    <Sparkles className="w-10 h-10 text-white" />
                 </div>
+                <h1 className="font-serif text-5xl md:text-7xl font-light mb-6 tracking-tight text-white leading-tight">
+                    Bienvenido a la <br /><span className="italic">Experiencia AM</span>
+                </h1>
+                <p className="text-zinc-400 text-lg md:text-xl font-light max-w-xl mx-auto leading-relaxed">
+                    Comencemos con tu proceso de admisión. Te tomará menos de 2 minutos completar tu información básica.
+                </p>
             </motion.div>
-            <h1 className="font-serif text-5xl md:text-7xl font-light tracking-tight mb-6 leading-tight text-white">
-                AM Estética <br />
-                <span className="italic text-zinc-400">Ficha de Paciente</span>
-            </h1>
-            <p className="text-zinc-500 text-lg md:text-xl font-light max-w-xl mb-12 leading-relaxed">
-                Te damos la bienvenida. Por favor, completa este formulario con tus datos antes de la consulta. La información es estrictamente confidencial.
-            </p>
-            <button
+
+            <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.6 }}
                 onClick={nextStep}
-                className="group relative inline-flex items-center justify-center px-8 py-4 font-medium text-white bg-white/5 border border-white/10 rounded-full overflow-hidden transition-all duration-500 hover:bg-white hover:text-black hover:scale-105 active:scale-95"
+                className="group relative px-12 py-5 bg-white text-black rounded-full font-medium text-lg uppercase tracking-widest overflow-hidden transition-all hover:scale-105 active:scale-95"
             >
-                <span className="relative z-10 flex items-center gap-2 tracking-wide text-sm uppercase">
-                    Comenzar <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                <span className="relative z-10 flex items-center gap-3">
+                    Empezar Registro <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
-            </button>
+            </motion.button>
         </motion.div>
     );
 
@@ -386,19 +371,16 @@ export default function PremiumAdmissionForm() {
 
         return (
             <motion.div
-                key="personal"
+                variants={slideInBlur}
                 custom={direction}
-                variants={pageVariants}
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                transition={pageTransition}
-                className="flex flex-col max-w-2xl mx-auto px-6 py-20 w-full"
+                className="flex flex-col max-w-2xl mx-auto px-6 py-12 w-full"
             >
                 <div className="mb-12">
-                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold">Paso 01</p>
-                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white">Datos Personales</h2>
-                    <p className="text-zinc-400 font-light">Información básica para tu expediente clínico.</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold font-sans">Paso 01</p>
+                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white italic">Información Personal</h2>
                 </div>
 
                 <div className="space-y-8">
@@ -545,19 +527,18 @@ export default function PremiumAdmissionForm() {
 
         return (
             <motion.div
-                key="medical"
+                variants={slideInBlur}
                 custom={direction}
-                variants={pageVariants}
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                transition={pageTransition}
-                className="flex flex-col max-w-2xl mx-auto px-6 py-20 w-full"
+                className="flex flex-col max-w-2xl mx-auto px-6 py-12 w-full"
             >
                 <div className="mb-12">
-                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold">Paso 02</p>
-                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white">Historial Médico</h2>
+                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold font-sans">Paso 02</p>
+                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white italic">Historial Médico</h2>
                 </div>
+
 
                 <div className="space-y-10">
                     <div>
@@ -652,19 +633,18 @@ export default function PremiumAdmissionForm() {
 
         return (
             <motion.div
-                key="dental"
+                variants={slideInBlur}
                 custom={direction}
-                variants={pageVariants}
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                transition={pageTransition}
-                className="flex flex-col max-w-2xl mx-auto px-6 py-20 w-full"
+                className="flex flex-col max-w-2xl mx-auto px-6 py-12 w-full"
             >
                 <div className="mb-12">
-                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold">Paso 03</p>
-                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white">Motivo de Consulta</h2>
+                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold font-sans">Paso 03</p>
+                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white italic">¿Qué te trae por aquí?</h2>
                 </div>
+
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {REASONS.map((reason) => {
@@ -710,19 +690,18 @@ export default function PremiumAdmissionForm() {
 
         return (
             <motion.div
-                key="discovery"
+                variants={slideInBlur}
                 custom={direction}
-                variants={pageVariants}
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                transition={pageTransition}
-                className="flex flex-col max-w-3xl mx-auto px-6 py-20 w-full"
+                className="flex flex-col max-w-2xl mx-auto px-6 py-12 w-full"
             >
                 <div className="mb-12">
-                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold">Paso 04</p>
-                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white">¿Cómo te enteraste de nosotros?</h2>
+                    <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold font-sans">Paso 04</p>
+                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white italic">¿Cómo te enteraste de nosotros?</h2>
                 </div>
+
 
                 <div className="grid grid-cols-1 gap-4">
                     {DISCOVERY_SOURCES.map((source) => {
@@ -773,15 +752,14 @@ export default function PremiumAdmissionForm() {
 
     const renderSuccess = () => (
         <motion.div
-            key="success"
+            variants={slideInBlur}
             custom={direction}
-            variants={pageVariants}
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={pageTransition}
-            className="flex flex-col items-center justify-center text-center max-w-2xl mx-auto px-6 h-full min-h-[80vh] py-12"
+            className="flex flex-col items-center justify-center text-center max-w-2xl mx-auto px-6 h-full min-h-[70vh] py-12"
         >
+
             <motion.div
                 initial={{ scale: 0, rotate: -180 }}
                 animate={{ scale: 1, rotate: 0 }}
@@ -850,9 +828,15 @@ export default function PremiumAdmissionForm() {
     );
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white selection:bg-white/30 font-sans relative overflow-hidden flex flex-col">
-            <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-white/[0.02] blur-[120px] pointer-events-none" />
-            <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-white/[0.02] blur-[120px] pointer-events-none" />
+        <div className="min-h-screen bg-[#000000] text-white selection:bg-white/30 font-sans relative overflow-hidden flex flex-col">
+            {/* Background Effects */}
+            <div className="fixed inset-0 bg-noise pointer-events-none z-0" />
+            <div className="fixed inset-0 bg-grid-white opacity-[0.03] pointer-events-none z-0" />
+
+            <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '8s' }} />
+            <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '12s' }} />
+            <div className="fixed top-[20%] right-[10%] w-[30%] h-[30%] rounded-full bg-emerald-500/5 blur-[100px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '10s' }} />
+
 
             {step > 0 && step < totalSteps - 1 && (
                 <ProgressBar currentStep={step} totalSteps={totalSteps - 1} />
