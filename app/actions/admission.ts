@@ -253,32 +253,60 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
 
             const logoUrl = "https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png";
             const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-          <div style="background: #000; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-            <img src="${logoUrl}" height="40" alt="AM Estética Dental">
-          </div>
-          <div style="padding: 20px;">
-            <h2 style="color: #1e293b;">¡Hola ${data.nombre}!</h2>
-            <p style="color: #475569; line-height: 1.6;">Estamos felices de recibirte en AM Estética Dental. Para confirmar tu cita, por favor sigue estos pasos:</p>
-            
-            <div style="margin: 30px 0; padding: 20px; background: #f8fafc; border-radius: 12px; border-left: 4px solid #2563eb;">
-              <p style="margin: 0 0 10px 0;"><strong>1. Realiza el pago:</strong></p>
-              <a href="${paymentLink}" style="display: inline-block; padding: 12px 24px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">${buttonText}</a>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            .container { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; background-color: #050505; color: #ffffff; border-radius: 24px; overflow: hidden; }
+            .header { background: #000000; padding: 40px 20px; text-align: center; border-bottom: 1px solid #1a1a1a; }
+            .content { padding: 40px; }
+            .welcome { font-size: 24px; font-weight: 300; margin-bottom: 24px; letter-spacing: -0.02em; }
+            .text { color: #a1a1aa; line-height: 1.8; font-size: 16px; font-weight: 300; }
+            .card { margin: 32px 0; padding: 32px; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 20px; }
+            .card-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: #71717a; margin-bottom: 20px; font-weight: 600; }
+            .button { display: inline-block; padding: 16px 32px; background: #ffffff; color: #000000; text-decoration: none; border-radius: 100px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s ease; }
+            .link { color: #ffffff; font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
+            .footer { padding: 40px; text-align: center; border-top: 1px solid #1a1a1a; font-size: 12px; color: #52525b; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <img src="${logoUrl}" height="35" alt="AM Estética Dental">
             </div>
+            <div class="content">
+              <h1 class="welcome">Hola, <span style="font-style: italic;">${data.nombre}</span></h1>
+              <p class="text">Es un placer darte la bienvenida a AM Estética Dental. Hemos recibido tu ficha clínica correctamente.</p>
+              
+              <p class="text" style="margin-top: 24px;">Para asegurar la excelencia en tu atención y confirmar tu espacio en nuestra agenda, por favor completa los siguientes pasos:</p>
 
-            <div style="margin: 20px 0; padding: 20px; background: #f8fafc; border-radius: 12px; border-left: 4px solid #2563eb;">
-              <p style="margin: 0 0 10px 0;"><strong>2. Reserva tu horario:</strong></p>
-              <a href="${agendaLink}" style="display: inline-block; color: #2563eb; font-weight: bold; text-decoration: underline;">Ver disponibilidad en el calendario</a>
+              <div class="card">
+                <p class="card-title">1. Confirmación de Cita</p>
+                <p class="text" style="margin-bottom: 24px;">Realiza el pago de la consulta para validar tu turno:</p>
+                <a href="${paymentLink}" class="button">${buttonText}</a>
+              </div>
+
+              <div class="card">
+                <p class="card-title">2. Selección de Horario</p>
+                <p class="text">Si aún no has elegido tu horario, puedes hacerlo aquí:</p>
+                <p style="margin-top: 16px;"><a href="${agendaLink}" class="link">Ver disponibilidad en calendario</a></p>
+              </div>
+
+              <p class="text" style="font-size: 14px; margin-top: 40px; text-align: center;">Estamos a tu disposición para cualquier consulta adicional.</p>
             </div>
-
-            <p style="color: #64748b; font-size: 0.875rem; margin-top: 30px;">Si tienes alguna duda, puedes responder a este email.</p>
+            <div class="footer">
+              &copy; ${new Date().getFullYear()} AM Estética Dental &middot; Dr. Ariel Merino<br>
+              Excelencia y Minimalismo en Odontología Estética
+            </div>
           </div>
-        </div>
+        </body>
+        </html>
       `;
 
             await sendEmail({
                 to: data.email,
-                subject: "Confirma tu consulta en AM Estética Dental",
+                subject: "Bienvenido a AM Estética Dental",
                 html: html
             });
         } catch (emailErr) {

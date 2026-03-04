@@ -7,7 +7,9 @@ import {
     Search,
     RefreshCw,
     Loader2,
-    UserPlus
+    UserPlus,
+    Copy,
+    Check
 } from 'lucide-react';
 import Link from 'next/link';
 import PatientList from '@/components/patients/PatientList';
@@ -27,6 +29,19 @@ export default function PatientsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
     const [syncing, setSyncing] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyAdmissionLink = async () => {
+        try {
+            // Point to the internal admission route
+            const admissionUrl = `${window.location.origin}/admision`;
+            await navigator.clipboard.writeText(admissionUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy admission link:', err);
+        }
+    };
 
     const loadPatients = useCallback(async () => {
         setLoading(true);
@@ -107,13 +122,17 @@ export default function PatientsPage() {
                     {/* Registration Buttons - Protected */}
                     {canEdit('pacientes') && (
                         <div className="flex items-center gap-3">
-                            <Link
-                                href="/admision"
-                                className="flex items-center gap-2 px-4 py-2.5 border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-lg font-medium transition-colors"
+                            <button
+                                onClick={handleCopyAdmissionLink}
+                                className={`flex items-center gap-2 px-4 py-2.5 border transition-all rounded-lg font-medium ${copied
+                                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
+                                    : 'border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
+                                    }`}
+                                title="Copiar link del formulario de admisión para pacientes"
                             >
-                                <UserPlus size={18} />
-                                Formulario Admisión
-                            </Link>
+                                {copied ? <Check size={18} /> : <Copy size={18} />}
+                                {copied ? '¡Link Copiado!' : 'Copiar Link de Admisión'}
+                            </button>
                             <button
                                 onClick={() => handleSyncSheets(false)}
                                 disabled={syncing}

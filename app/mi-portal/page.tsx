@@ -127,13 +127,12 @@ export default function PatientPortalAccess() {
 
                                 <div className="mt-12 pt-8 border-t border-white/[0.05] text-center">
                                     <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-4">¿No tenés cuenta?</p>
-                                    <a
-                                        href="/admision"
-                                        className="inline-flex items-center gap-2 text-white hover:text-blue-400 text-sm font-black transition-all group/link"
+                                    <Link
+                                        href="https://am-clinica-admision.vercel.app/"
+                                        className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-6 text-sm font-semibold text-white transition-all hover:bg-slate-800"
                                     >
                                         Registrarme como Paciente
-                                        <ArrowRight size={14} className="group-hover/link:translate-x-1 transition-transform" />
-                                    </a>
+                                    </Link>
                                 </div>
                             </motion.div>
                         )}

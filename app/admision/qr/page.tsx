@@ -9,10 +9,7 @@ export default function AdmissionQrPage() {
         typeof window !== 'undefined' ? window.location.origin : '',
     );
 
-    const admissionUrl = useMemo(() => {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || runtimeBaseUrl;
-        return baseUrl ? `${baseUrl.replace(/\/$/, '')}/admision?mode=online` : '';
-    }, [runtimeBaseUrl]);
+    const admissionUrl = 'https://am-clinica-admision.vercel.app/';
 
     const whatsappShareUrl = useMemo(() => {
         if (!admissionUrl) return '';

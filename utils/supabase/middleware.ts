@@ -61,7 +61,8 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/api/workflows/') ||
         path === '/api/setup-sucursales' ||
         path === '/api/check-sucursales' ||
-        path === '/api/check-profiles';
+        path === '/api/check-profiles' ||
+        path === '/api/admission';
 
     // NOTE: If '/' is the landing page and public, keep it here. 
     // If '/' is expected to be protected (redirect to dashboard), remove it from public.

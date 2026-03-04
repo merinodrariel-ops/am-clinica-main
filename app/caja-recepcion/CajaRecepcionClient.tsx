@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users, Wallet, Loader2 } from 'lucide-react';
+import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users, Wallet, Loader2, MapPin, Star } from 'lucide-react';
 import { ComprobanteLink } from '@/components/caja/ComprobanteLink';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -201,7 +201,17 @@ const PAYMENT_DATA: Record<string, PaymentMethod> = {
     },
 };
 
-const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
+const HELP_LINKS = {
+    maps: 'https://bit.ly/Clínica-AM-Google-Maps',
+    waze: 'https://bit.ly/ClínicaAM-Waze',
+    mp_consulta_am: 'https://mpago.la/2rjmF2W',
+    mp_consulta_staff: 'https://mpago.la/2MJhrW6',
+    mp_pago_libre: 'https://link.mercadopago.com.ar/amesteticadental',
+    whatsapp: 'https://wa.link/zolb52',
+    google_opinion: 'https://bit.ly/AM-DejanosTuOpinion'
+};
+
+const GOOGLE_REVIEW_LINK = HELP_LINKS.google_opinion;
 
 import { Suspense } from 'react';
 
@@ -1785,27 +1795,190 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                 {copiedKey === 'msg' && <CheckCircle size={14} className="inline ml-2 text-green-500" />}
                                             </div>
 
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4 mb-2">Links útiles (copiar y pegar):</p>
-                                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
-                                                <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">Referencia Google</p>
-                                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 break-all">{GOOGLE_REVIEW_LINK}</p>
-                                                <div className="mt-2 flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => copyToClipboard('google_review_link', GOOGLE_REVIEW_LINK)}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                                    >
-                                                        {copiedKey === 'google_review_link' ? <CheckCircle size={13} className="text-green-500" /> : <Copy size={13} />}
-                                                        {copiedKey === 'google_review_link' ? 'Copiado' : 'Copiar link'}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => window.open(getWhatsappLink(`Gracias por confiar en AM Clinica Dental. Tu experiencia es muy importante para nosotros. Si querés, podés dejarnos tu referencia acá: ${GOOGLE_REVIEW_LINK}`), '_blank')}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-                                                    >
-                                                        <MessageCircle size={13} />
-                                                        Compartir por WhatsApp
-                                                    </button>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4 mb-4">Muestrario de links (copiar y pegar):</p>
+
+                                            <div className="space-y-6">
+                                                {/* Cómo Llegar */}
+                                                <div>
+                                                    <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                                        <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                                            <MapPin size={18} className="text-blue-600 dark:text-blue-400" />
+                                                        </div>
+                                                        ¿CÓMO LLEGAR?
+                                                    </h4>
+                                                    <div className="space-y-2 pl-5">
+                                                        {[
+                                                            { id: 'maps', label: 'Google Maps', val: HELP_LINKS.maps, wa: `📍 Ubicación estratégica para tu comodidad.\n👉 Google Maps: ${HELP_LINKS.maps}` },
+                                                            { id: 'waze', label: 'Waze', val: HELP_LINKS.waze, wa: `📍 Waze (Tránsito en vivo): ${HELP_LINKS.waze}` }
+                                                        ].map((item) => (
+                                                            <div key={item.id} className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+                                                                <div className="flex-1 cursor-pointer" onClick={() => copyToClipboard(item.id, item.val)}>
+                                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{item.label}</p>
+                                                                    <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{item.val}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            window.open(getWhatsappLink(item.wa), '_blank');
+                                                                        }}
+                                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                        title="Enviar por WhatsApp"
+                                                                    >
+                                                                        <MessageCircle size={18} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            copyToClipboard(item.id, item.val);
+                                                                        }}
+                                                                        className={clsx(
+                                                                            "p-2 rounded-lg transition-colors",
+                                                                            copiedKey === item.id ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                        )}
+                                                                        title="Copiar link"
+                                                                    >
+                                                                        {copiedKey === item.id ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Gestión de Pagos */}
+                                                <div>
+                                                    <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                                        <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                                                            <CreditCard size={18} className="text-indigo-600 dark:text-indigo-400" />
+                                                        </div>
+                                                        GESTIÓN DE PAGOS (MP)
+                                                    </h4>
+                                                    <div className="space-y-2 pl-5">
+                                                        {[
+                                                            { id: 'mp_am', label: 'Consulta AM ($100k)', val: HELP_LINKS.mp_consulta_am, wa: `Reserva tu turno de forma rápida (Consulta AM $100k):\n👉 ${HELP_LINKS.mp_consulta_am}` },
+                                                            { id: 'mp_staff', label: 'Consulta Staff ($50k)', val: HELP_LINKS.mp_consulta_staff, wa: `Reserva tu turno de forma rápida (Consulta Staff $50k):\n👉 ${HELP_LINKS.mp_consulta_staff}` },
+                                                            { id: 'mp_libre', label: 'Pago Libre', val: HELP_LINKS.mp_pago_libre, wa: `✨ Pago Libre (Cualquier monto):\n👉 ${HELP_LINKS.mp_pago_libre}` }
+                                                        ].map((item) => (
+                                                            <div key={item.id} className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+                                                                <div className="flex-1 cursor-pointer" onClick={() => copyToClipboard(item.id, item.val)}>
+                                                                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{item.label}</p>
+                                                                    <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{item.val}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            window.open(getWhatsappLink(`💳 ${item.wa}`), '_blank');
+                                                                        }}
+                                                                        className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                        title="Enviar por WhatsApp"
+                                                                    >
+                                                                        <MessageCircle size={18} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            copyToClipboard(item.id, item.val);
+                                                                        }}
+                                                                        className={clsx(
+                                                                            "p-2 rounded-lg transition-colors",
+                                                                            copiedKey === item.id ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                        )}
+                                                                        title="Copiar link"
+                                                                    >
+                                                                        {copiedKey === item.id ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Opinión */}
+                                                <div>
+                                                    <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                                        <div className="p-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                                                            <Star size={18} className="text-yellow-600 dark:text-yellow-400" />
+                                                        </div>
+                                                        TU OPINIÓN NOS IMPORTA
+                                                    </h4>
+                                                    <div className="space-y-2 pl-5">
+                                                        <div className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+                                                            <div className="flex-1 cursor-pointer" onClick={() => copyToClipboard('opinion', HELP_LINKS.google_opinion)}>
+                                                                <p className="font-medium text-sm text-gray-900 dark:text-gray-100">Dejanos tu opinión</p>
+                                                                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{HELP_LINKS.google_opinion}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        window.open(getWhatsappLink(`⭐ ¿Ya nos visitaste? Tu reseña nos ayuda a seguir creciendo:\n📝 Dejanos tu opinión aquí: ${HELP_LINKS.google_opinion}`), '_blank');
+                                                                    }}
+                                                                    className="p-2 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                    title="Enviar por WhatsApp"
+                                                                >
+                                                                    <MessageCircle size={18} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        copyToClipboard('opinion', HELP_LINKS.google_opinion);
+                                                                    }}
+                                                                    className={clsx(
+                                                                        "p-2 rounded-lg transition-colors",
+                                                                        copiedKey === 'opinion' ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                    )}
+                                                                    title="Copiar link"
+                                                                >
+                                                                    {copiedKey === 'opinion' ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* WhatsApp Directo */}
+                                                <div>
+                                                    <h4 className="flex items-center gap-2 font-medium text-gray-900 dark:text-white mb-3">
+                                                        <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                                                            <MessageCircle size={18} className="text-green-600 dark:text-green-400" />
+                                                        </div>
+                                                        CONTACTO DIRECTO
+                                                    </h4>
+                                                    <div className="space-y-2 pl-5">
+                                                        <div className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+                                                            <div className="flex-1 cursor-pointer" onClick={() => copyToClipboard('wa_link', HELP_LINKS.whatsapp)}>
+                                                                <p className="font-medium text-sm text-gray-900 dark:text-gray-100">Link WhatsApp</p>
+                                                                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{HELP_LINKS.whatsapp}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        window.open(HELP_LINKS.whatsapp, '_blank');
+                                                                    }}
+                                                                    className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                                    title="Abrir link"
+                                                                >
+                                                                    <ExternalLink size={18} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        copyToClipboard('wa_link', HELP_LINKS.whatsapp);
+                                                                    }}
+                                                                    className={clsx(
+                                                                        "p-2 rounded-lg transition-colors",
+                                                                        copiedKey === 'wa_link' ? "text-green-500 bg-green-50 dark:bg-green-900/20" : "text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                    )}
+                                                                    title="Copiar link"
+                                                                >
+                                                                    {copiedKey === 'wa_link' ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
