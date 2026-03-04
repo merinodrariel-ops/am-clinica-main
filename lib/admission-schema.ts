@@ -49,9 +49,6 @@ const admissionDraftShape = {
     salud_condiciones_detalle: optionalText,
     salud_medicacion: z.boolean(),
     salud_medicacion_detalle: optionalText,
-    consentimiento_privacidad: z.boolean(),
-    consentimiento_tratamiento: z.boolean(),
-    firma_data_url: z.string().optional(),
 };
 
 export const admissionDraftBaseObject = z.object(admissionDraftShape);
@@ -113,30 +110,6 @@ export const admissionDraftSchema = admissionDraftBaseObject
                 path: ['salud_medicacion_detalle'],
             });
         }
-
-        if (!data.consentimiento_privacidad) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'Debes aceptar privacidad',
-                path: ['consentimiento_privacidad'],
-            });
-        }
-
-        if (!data.consentimiento_tratamiento) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'Debes aceptar términos de admisión',
-                path: ['consentimiento_tratamiento'],
-            });
-        }
-
-        if (!data.firma_data_url || data.firma_data_url.length < 100) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'La firma digital es obligatoria',
-                path: ['firma_data_url'],
-            });
-        }
     });
 
 export const admissionIdentityStepSchema = z.object({
@@ -174,11 +147,7 @@ export const admissionObjectiveStepSchema = z.object({
     profesional: admissionDraftShape.profesional,
 });
 
-export const admissionConsentStepSchema = z.object({
-    consentimiento_privacidad: admissionDraftShape.consentimiento_privacidad,
-    consentimiento_tratamiento: admissionDraftShape.consentimiento_tratamiento,
-    firma_data_url: admissionDraftShape.firma_data_url,
-});
+export const admissionConsentStepSchema = z.object({});
 
 export const admissionSubmissionSchema = z.object({
     id_paciente: z.string().uuid().optional(),
@@ -196,10 +165,11 @@ export const admissionSubmissionSchema = z.object({
     referencia_recomendado_por: optionalText,
     health_alerts: z.array(z.string()).default([]),
     health_notes: optionalText,
-    consentimiento_privacidad: z.boolean().default(true),
-    consentimiento_tratamiento: z.boolean().default(true),
-    firma_data_url: z.string().optional(),
     mode: admissionModeSchema,
+    // Add optional fields for compatibility if old data is being sent
+    consentimiento_privacidad: z.any().optional(),
+    consentimiento_tratamiento: z.any().optional(),
+    firma_data_url: z.string().optional(),
 });
 
 export type AdmissionDraft = z.infer<typeof admissionDraftSchema>;
@@ -232,7 +202,4 @@ export const admissionDefaultValues: AdmissionDraft = {
     salud_condiciones_detalle: '',
     salud_medicacion: false,
     salud_medicacion_detalle: '',
-    consentimiento_privacidad: false,
-    consentimiento_tratamiento: false,
-    firma_data_url: '',
 };
