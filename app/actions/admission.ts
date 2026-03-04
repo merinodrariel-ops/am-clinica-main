@@ -64,9 +64,6 @@ function composeClinicalNotes(data: AdmissionSubmission) {
         sections.push(`Alertas de salud: ${data.health_notes}`);
     }
 
-    sections.push(`Consentimiento digital: privacidad=${data.consentimiento_privacidad ? 'si' : 'no'}, admision=${data.consentimiento_tratamiento ? 'si' : 'no'}`);
-    sections.push(`Firma digital: ${data.firma_data_url ? 'capturada' : 'no capturada'}`);
-
     return sections.join('\n');
 }
 

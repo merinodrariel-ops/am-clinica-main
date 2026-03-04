@@ -91,7 +91,7 @@ const fadeInBlur = {
     initial: { opacity: 0, y: 20, filter: 'blur(10px)' },
     animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
     exit: { opacity: 0, y: -20, filter: 'blur(10px)' },
-    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as const }
 };
 
 const slideInBlur = {
@@ -104,13 +104,13 @@ const slideInBlur = {
         opacity: 1,
         x: 0,
         filter: 'blur(0px)',
-        transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+        transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as const }
     },
     exit: (direction: number) => ({
         opacity: 0,
         x: direction > 0 ? -50 : 50,
         filter: 'blur(10px)',
-        transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
+        transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const }
     })
 };
 
@@ -261,14 +261,15 @@ export default function PremiumAdmissionForm() {
             nombre: formData.firstName,
             apellido: formData.lastName,
             dni: formData.dni,
+            cuit: undefined,
             email: formData.email,
             telefono: `${formData.countryCode}${formData.phone.replace(/\D/g, '')}`,
             motivo_consulta: REASONS.find(r => r.id === formData.dentalReason)?.label || formData.dentalReason,
             referencia_origen: DISCOVERY_SOURCES.find(s => s.id === formData.discoverySource)?.label || formData.discoverySource,
+            referencia_recomendado_por: undefined,
             health_alerts: healthAlerts,
             health_notes: healthAlerts.join('\n'),
             mode: 'online' as const,
-            // Existing schema might not have all these but we send them
             ciudad: 'CABA',
             zona_barrio: 'No especificado',
             profesional: 'Consulta con Dr. Ariel Merino'
