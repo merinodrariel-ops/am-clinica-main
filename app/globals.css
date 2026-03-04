@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
 
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -142,7 +141,7 @@
 
 @theme inline {
   --font-sans: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
-  --font-serif: 'Cormorant Garamond', serif;
+  --font-serif: var(--font-cormorant), 'Cormorant Garamond', serif;
   --font-mono: var(--font-geist-mono);
 
   --color-background: hsl(var(--background));
