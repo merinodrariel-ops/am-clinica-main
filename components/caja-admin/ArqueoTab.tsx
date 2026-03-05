@@ -174,7 +174,7 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
         }
     }
 
-    const { role, profile, user } = useAuth();
+    const { categoria: role, profile, user } = useAuth();
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando...</div>;
 

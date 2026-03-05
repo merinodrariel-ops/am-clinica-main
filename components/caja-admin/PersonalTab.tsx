@@ -92,7 +92,7 @@ const DEFAULT_PROVIDER_TYPE_OPTIONS: ProviderTypeOption[] = [
 ];
 
 export default function PersonalTab({ tcBna, initialTab, initialObservedPersonalId }: Props) {
-    const { role } = useAuth();
+    const { categoria: role } = useAuth();
     const [activeTab, setActiveTab] = useState<MainTab>(initialTab || 'equipo');
     const [activeProviderCategory, setActiveProviderCategory] = useState<ProviderCategory>('odontologos');
     const [observadosCount, setObservadosCount] = useState(0);

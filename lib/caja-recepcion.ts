@@ -8,7 +8,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { getLocalISODate } from "@/lib/local-date";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/database-types";
+
 
 const getSupabase = () => createClient();
 
@@ -184,7 +184,7 @@ export async function getMovimientosDelDia(
 
 export async function getMovimientosPorPaciente(
   pacienteId: string,
-  supabase?: SupabaseClient<Database>
+  supabase?: SupabaseClient
 ): Promise<CajaMovimiento[]> {
   const client = supabase || getSupabase();
   const { data, error } = await client

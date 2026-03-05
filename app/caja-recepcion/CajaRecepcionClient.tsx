@@ -217,7 +217,7 @@ import { Suspense } from 'react';
 
 function CajaRecepcionContent() {
     const searchParams = useSearchParams();
-    const { role } = useAuth();
+    const { categoria: role } = useAuth();
     const [stats, setStats] = useState<Stats | null>(null);
     const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
     const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);

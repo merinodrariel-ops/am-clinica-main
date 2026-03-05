@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { sendInvitationEmail } from '@/lib/emailjs';
+import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
 
 // Initialize Admin Client securely
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -104,7 +105,7 @@ export async function getUsers() {
                 last_sign_in_at: authUser?.last_sign_in_at,
                 created_at: authUser?.created_at || profile.created_at,
                 full_name: profile.full_name || '',
-                categoria: profile.categoria || 'user',
+                categoria: normalizeCategoriaAlias(profile.categoria || '') || 'user',
                 estado: profile.estado || 'inactivo',
             };
         });
@@ -138,7 +139,8 @@ function getAppPublicUrl() {
 export async function inviteUser(formData: FormData) {
     const email = formData.get('email') as string;
     const fullName = formData.get('fullName') as string;
-    const categoria = formData.get('role') as string || formData.get('categoria') as string;
+    const rawCategoria = (formData.get('role') as string) || (formData.get('categoria') as string);
+    const categoria = normalizeCategoriaAlias(rawCategoria) || 'partner_viewer';
     const whatsapp = formData.get('whatsapp') as string;
 
     const publicUrl = getAppPublicUrl();
@@ -241,14 +243,18 @@ interface UpdateUserData {
 
 export async function updateUser(userId: string, data: UpdateUserData) {
     try {
-        if (typeof data.categoria === 'string' && PROVIDER_MANAGED_CATEGORIES.has(data.categoria)) {
+        const normalizedCategoria = typeof data.categoria === 'string'
+            ? (normalizeCategoriaAlias(data.categoria) || undefined)
+            : undefined;
+
+        if (typeof normalizedCategoria === 'string' && PROVIDER_MANAGED_CATEGORIES.has(normalizedCategoria)) {
             throw new Error('Las altas y cambios de categoría de prestadores se gestionan desde Prestadores / Personal.');
         }
 
         const profilePatch: Record<string, unknown> = {
             full_name: data.full_name,
             whatsapp: data.whatsapp,
-            categoria: data.categoria,
+            categoria: normalizedCategoria,
         };
 
         if (typeof data.estado === 'string') {
@@ -274,9 +280,9 @@ export async function updateUser(userId: string, data: UpdateUserData) {
         // Also update Auth Metadata if needed for consistency
         const authPatch: Record<string, unknown> = {};
 
-        if (data.categoria || data.full_name) {
+        if (normalizedCategoria || data.full_name) {
             authPatch.user_metadata = {
-                categoria: data.categoria,
+                categoria: normalizedCategoria,
                 full_name: data.full_name
             };
         }

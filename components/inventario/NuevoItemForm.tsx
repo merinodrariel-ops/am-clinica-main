@@ -14,7 +14,7 @@ interface NuevoItemFormProps {
 }
 
 export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemFormProps) {
-    const { role, user } = useAuth();
+    const { categoria: role, user } = useAuth();
     const isLabUser = role === 'laboratorio';
     const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({

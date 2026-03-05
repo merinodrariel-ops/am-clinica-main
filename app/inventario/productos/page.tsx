@@ -43,7 +43,7 @@ export default function InventoryProductsPage() {
 }
 
 function ProductsScreen() {
-    const { role } = useAuth();
+    const { categoria: role } = useAuth();
     const isAdmin = role === 'owner' || role === 'admin';
 
     const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -345,8 +345,8 @@ function ProductsScreen() {
                                             {product.color ? ` - ${product.color}` : ''}
                                         </p>
                                         <div className="mt-2 text-xs text-gray-500 space-y-0.5">
-                                            <p>Barcode: {product.barcode || 'N/D'}</p>
-                                            <p>QR: {product.qr_code || 'N/D'}</p>
+                                            <p>Barcode: {product.notes || 'N/D'}</p>
+                                            <p>QR: {product.link || 'N/D'}</p>
                                         </div>
                                     </div>
                                 </div>

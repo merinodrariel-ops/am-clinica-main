@@ -44,7 +44,7 @@ function getRoleConfig(rol: string) {
 export default async function WorkerDashboard() {
     // Owner/admin see the Commander View instead of their personal portal
     const userProfile = await getUserAppProfile();
-    if (['owner', 'admin'].includes(userProfile?.role || '')) {
+    if (['owner', 'admin'].includes(userProfile?.categoria || '')) {
         return (
             <div className="p-6 lg:p-8">
                 <CommanderView />
@@ -80,7 +80,7 @@ export default async function WorkerDashboard() {
     }
 
     const today = new Date();
-    const roleConfig = getRoleConfig(worker.rol);
+    const roleConfig = getRoleConfig(worker.categoria);
     const RoleIcon = roleConfig.icon;
 
     const [stats, achievements, logs, liquidations, goals, progressList] = await Promise.all([
@@ -88,7 +88,7 @@ export default async function WorkerDashboard() {
         getWorkerAchievements(worker.id),
         getWorkerLogs(worker.id),
         getWorkerLiquidations(worker.id),
-        getAllGoals(worker.rol),
+        getAllGoals(worker.categoria),
         getGoalProgress(worker.id),
     ]);
 
@@ -121,7 +121,7 @@ export default async function WorkerDashboard() {
 
                 <div className="flex items-center gap-2 self-start md:self-center">
                     <div className="px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-[10px] md:text-[11px] font-bold text-indigo-400 uppercase tracking-widest">
-                        {worker.rol}
+                        {worker.categoria}
                     </div>
                     <div className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full ${worker.activo !== false ? 'bg-emerald-500' : 'bg-slate-600'} shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
                 </div>

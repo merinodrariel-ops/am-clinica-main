@@ -69,7 +69,7 @@ function InventarioContent() {
     const [smartFilter, setSmartFilter] = useState<'ALL' | 'LOW_STOCK'>('ALL');
 
     // Add useAuth
-    const { loading: authLoading, role, canEdit } = useAuth();
+    const { loading: authLoading, categoria: role, canEdit } = useAuth();
     const isLabUser = role === 'laboratorio';
     const canEditInventario = canEdit('inventario');
 

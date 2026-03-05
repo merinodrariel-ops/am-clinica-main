@@ -689,7 +689,7 @@ export default function StaffListPage() {
                     </div>
                     <div className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">
                         {([
-                            ['category', 'Por categoría'],
+                            ['role', 'Por categoría'],
                             ['company', 'Por empresa'],
                             ['access', 'Por acceso'],
                             ['compliance', 'Por docs'],
@@ -869,10 +869,10 @@ export default function StaffListPage() {
                     <motion.div layout className="flex items-start gap-4 min-w-max">
                         <AnimatePresence initial={false}>
                             {boardColumns.map((column) => {
-                                const isRoleColumn = groupMode === 'role' && column.isRoleColumn;
-                                const isDropTarget = isRoleColumn && dragOverWorkerRole === column.key;
-                                const isRoleDropTarget = isRoleColumn && dragOverRoleColumn === column.key;
-                                const isRoleDragging = isRoleColumn && draggingRoleColumn === column.key;
+                                const isRoleColumn = groupMode === 'role' && column.isCategoryColumn;
+                                const isDropTarget = isRoleColumn && dragOverWorkerCategory === column.key;
+                                const isRoleDropTarget = isRoleColumn && dragOverCategoryColumn === column.key;
+                                const isRoleDragging = isRoleColumn && draggingCategoryColumn === column.key;
 
                                 return (
                                     <motion.div
@@ -883,17 +883,17 @@ export default function StaffListPage() {
                                         transition={{ duration: 0.2 }}
                                         key={column.key}
                                         draggable={isRoleColumn}
-                                        onDragStart={() => isRoleColumn && onRoleColumnDragStart(column.key)}
-                                        onDragEnd={() => isRoleColumn && onRoleColumnDragEnd()}
+                                        onDragStart={() => isRoleColumn && onCategoryColumnDragStart(column.key)}
+                                        onDragEnd={() => isRoleColumn && onCategoryColumnDragEnd()}
                                         onDragOver={(e) => {
                                             if (!isRoleColumn) return;
-                                            onRoleColumnDragOver(e, column.key);
-                                            onDragOverRole(e, column.key);
+                                            onCategoryColumnDragOver(e, column.key);
+                                            onDragOverCategory(e, column.key);
                                         }}
                                         onDrop={(e) => {
                                             if (!isRoleColumn) return;
-                                            onRoleColumnDrop(e, column.key);
-                                            onDropRole(e, column.key);
+                                            onCategoryColumnDrop(e, column.key);
+                                            onDropCategory(e, column.key);
                                         }}
                                         className={`w-[350px] rounded-2xl border p-3 transition-all ${isRoleDragging ? 'opacity-40 scale-[0.98]' : ''
                                             } ${isDropTarget
@@ -922,7 +922,7 @@ export default function StaffListPage() {
                                                     const accessStatus = getAccessStatus(worker);
                                                     const badge = ACCESS_BADGE[accessStatus];
                                                     const isDragging = draggingWorkerId === worker.id;
-                                                    const isUpdating = updatingRole === worker.id;
+                                                    const isUpdating = updatingCategory === worker.id;
 
                                                     return (
                                                         <motion.div
@@ -956,7 +956,7 @@ export default function StaffListPage() {
                                                                         {isRoleColumn && <GripVertical size={13} className="text-slate-600 shrink-0" />}
                                                                     </div>
                                                                     <p className="text-[10px] text-indigo-300 uppercase tracking-[0.14em] font-bold truncate mt-0.5">
-                                                                        {worker.especialidad || worker.rol || 'Sin rol'}
+                                                                        {worker.especialidad || worker.area || 'Sin área'}
                                                                     </p>
                                                                     {worker.email && (
                                                                         <p className="text-[11px] text-slate-500 truncate mt-1 flex items-center gap-1.5">

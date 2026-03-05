@@ -29,7 +29,7 @@ interface EditarItemModalProps {
 }
 
 export default function EditarItemModal({ isOpen, onClose, onSuccess, item }: EditarItemModalProps) {
-    const { role, user } = useAuth();
+    const { categoria: role, user } = useAuth();
     const isLabUser = role === 'laboratorio';
 
     const [saving, setSaving] = useState(false);

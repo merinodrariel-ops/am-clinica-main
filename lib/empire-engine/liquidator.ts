@@ -43,9 +43,9 @@ export async function calculateDoctorLiquidation(
 
     if (taskError) throw taskError;
 
-    const performanceItems: PerformanceItem[] = (prestations || []).map(p => {
+    const performanceItems: PerformanceItem[] = (prestations || []).map((p: any) => {
         // Simple matching logic for now: check if there's a task for this patient/date
-        const relatedTask = tasks?.find(t =>
+        const relatedTask = tasks?.find((t: any) =>
             t.title.includes((p.paciente as any)?.nombre) ||
             t.description?.includes(p.id)
         );
@@ -62,8 +62,8 @@ export async function calculateDoctorLiquidation(
         };
     });
 
-    const totalUsd = performanceItems.reduce((sum, item) => sum + item.usdValue, 0);
-    const allTasksDone = performanceItems.every(item => item.isTaskDone && item.hasSlidesUrl);
+    const totalUsd = performanceItems.reduce((sum: number, item: PerformanceItem) => sum + item.usdValue, 0);
+    const allTasksDone = performanceItems.every((item: PerformanceItem) => item.isTaskDone && item.hasSlidesUrl);
 
     return {
         providerId,
@@ -89,7 +89,7 @@ export async function processStaffLiquidation(
     // Filter records for the specific staff (by DNI or Name matching)
     // For now, we sum all hours from the file if it's a per-person upload,
     // or filter if it's a bulk upload.
-    const totalHours = records.reduce((sum, r) => sum + r.horasNetas, 0);
+    const totalHours = records.reduce((sum: number, r: { horasNetas: number }) => sum + r.horasNetas, 0);
 
     return {
         staffId,

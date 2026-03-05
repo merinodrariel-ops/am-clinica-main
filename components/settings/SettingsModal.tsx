@@ -15,7 +15,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const [activeTab, setActiveTab] = useState<'general' | 'data' | 'system'>('general');
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
-    const { role, isRealOwner } = useAuth();
+    const { categoria: role, isRealOwner } = useAuth();
 
     // Prevent hydration mismatch
     useEffect(() => {

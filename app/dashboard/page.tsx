@@ -39,7 +39,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function DashboardPage() {
-    const { role, loading } = useAuth();
+    const { categoria: role, loading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {

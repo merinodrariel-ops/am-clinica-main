@@ -42,7 +42,7 @@ interface PatientDriveTabProps {
 }
 
 export default function PatientDriveTab({ patientId, patientName, motherFolderUrl }: PatientDriveTabProps) {
-    const { role } = useAuth();
+    const { categoria: role } = useAuth();
     const canUpload = UPLOAD_ROLES.has(role || '');
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');

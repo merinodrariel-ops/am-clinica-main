@@ -1,5 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Database } from '@/lib/database-types';
+import { createAdminClient } from '@/utils/supabase/admin';
+
+const supabase = createAdminClient();
 
 // =============================================
 // Types
@@ -80,7 +82,7 @@ export interface PlanTratamiento {
 // =============================================
 
 export async function getPacientes(
-    supabase: SupabaseClient<Database>,
+    supabase: SupabaseClient,
     options?: {
         search?: string;
         estado?: string;
@@ -122,7 +124,7 @@ export async function getPacientes(
 }
 
 export async function getTotalPatientsCount(
-    supabase: SupabaseClient<Database>,
+    supabase: SupabaseClient,
     options?: {
         search?: string;
         estado?: string;
@@ -158,7 +160,7 @@ export async function getTotalPatientsCount(
 }
 
 export async function getPacienteById(
-    supabase: SupabaseClient<Database>,
+    supabase: SupabaseClient,
     id: string
 ): Promise<Paciente | null> {
     const { data, error } = await supabase
@@ -176,7 +178,7 @@ export async function getPacienteById(
 }
 
 export async function createPaciente(
-    supabase: SupabaseClient<Database>,
+    supabase: SupabaseClient,
     paciente: Partial<Paciente>
 ): Promise<{ data: Paciente | null; error: Error | null }> {
     // Construct WhatsApp E164 format
@@ -317,7 +319,7 @@ export async function softDeletePaciente(
 // =============================================
 
 export async function getHistoriaClinica(
-    supabase: SupabaseClient<Database>,
+    supabase: SupabaseClient,
     pacienteId: string
 ): Promise<HistoriaClinica[]> {
     const { data, error } = await supabase
@@ -357,7 +359,7 @@ export async function createHistoriaEntry(entry: Partial<HistoriaClinica>): Prom
 // =============================================
 
 export async function getPlanesTratamiento(
-    supabase: SupabaseClient<Database>,
+    supabase: SupabaseClient,
     pacienteId: string
 ): Promise<PlanTratamiento[]> {
     const { data, error } = await supabase

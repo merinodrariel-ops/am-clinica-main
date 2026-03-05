@@ -65,12 +65,11 @@ export default function ProductEditorModal({
         category: product?.category || 'Insumos Clinicos',
         color: product?.color || '',
         unit: product?.unit || 'unidad',
-        barcode: product?.barcode || '',
-        qrCode: product?.qr_code || '',
+        barcode: product?.link || '',
+        qrCode: '',
         thresholdMin: product?.threshold_min ?? 0,
         stockInitial: mode === 'create' ? 0 : (product?.stock_current ?? 0),
         notes: product?.notes || '',
-        isActive: product?.is_active ?? true,
     }));
 
     const title = mode === 'create' ? 'Nuevo producto' : 'Editar producto';
@@ -83,12 +82,11 @@ export default function ProductEditorModal({
             category: product?.category || 'Insumos Clinicos',
             color: product?.color || '',
             unit: product?.unit || 'unidad',
-            barcode: product?.barcode || '',
-            qrCode: product?.qr_code || '',
+            barcode: product?.link || '',
+            qrCode: '',
             thresholdMin: product?.threshold_min ?? 0,
             stockInitial: mode === 'create' ? 0 : (product?.stock_current ?? 0),
             notes: product?.notes || '',
-            isActive: product?.is_active ?? true,
         });
         setImagePayload(null);
         setPreviewUrl(null);
@@ -157,12 +155,10 @@ export default function ProductEditorModal({
             category: form.category,
             color: form.color,
             unit: form.unit,
-            barcode: form.barcode,
-            qrCode: form.qrCode,
+            link: form.barcode,
             notes: form.notes,
             thresholdMin: form.thresholdMin ? Number(form.thresholdMin) : 0,
             imagePayload: serverImagePayload,
-            isActive: form.isActive,
         };
 
         setSaving(true);
@@ -401,14 +397,6 @@ export default function ProductEditorModal({
                         )}
                     </div>
 
-                    <label className="inline-flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            checked={form.isActive}
-                            onChange={(event) => setForm(prev => ({ ...prev, isActive: event.target.checked }))}
-                        />
-                        Producto activo
-                    </label>
                 </form>
 
                 <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">

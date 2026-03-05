@@ -16,7 +16,7 @@ export default async function GoalsPage() {
     if (!worker) return <div className="p-12 text-center text-slate-500">Perfil no encontrado.</div>;
 
     const [goals, progressList, totalXP] = await Promise.all([
-        getAllGoals(worker.rol),
+        getAllGoals(worker.categoria),
         getGoalProgress(worker.id),
         getWorkerXP(worker.id),
     ]);

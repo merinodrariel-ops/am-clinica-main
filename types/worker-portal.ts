@@ -1,6 +1,6 @@
 export type PaymentModel = 'hourly' | 'commission' | 'fixed' | 'hybrid';
 
-export type WorkerCategory = 'owner' | 'admin' | 'socio' | 'contador' | 'reception' | 'dentist' | 'assistant' | 'asistente' | 'technician' | 'laboratorio' | 'lab' | 'recaptacion' | 'cleaning' | 'marketing' | 'developer' | 'pricing_manager' | 'partner_viewer' | 'other';
+export type WorkerCategory = 'owner' | 'admin' | 'socio' | 'contador' | 'reception' | 'dentist' | 'odontologo' | 'assistant' | 'asistente' | 'technician' | 'laboratorio' | 'lab' | 'recaptacion' | 'cleaning' | 'marketing' | 'developer' | 'pricing_manager' | 'partner_viewer' | 'other';
 
 export type WorkLogType = 'shift' | 'procedure' | 'task' | 'bonus' | 'deduction';
 

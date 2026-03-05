@@ -58,7 +58,7 @@ export async function calculateMonthlyLeaderboard(period: LiquidationPeriod): Pr
         totalAppts: number;
     }>();
 
-    profiles?.forEach(p => {
+    profiles?.forEach((p: { id: string }) => {
         userStats.set(p.id, {
             points: 0,
             taskCount: 0,
@@ -73,12 +73,12 @@ export async function calculateMonthlyLeaderboard(period: LiquidationPeriod): Pr
         });
     });
 
-    prestations?.forEach(p => {
+    prestations?.forEach((p: { profesional_id: string }) => {
         const stats = userStats.get(p.profesional_id);
         if (stats) stats.points += 10;
     });
 
-    hourRecords?.forEach(h => {
+    hourRecords?.forEach((h: { personal_id: string; horas: number; hora_ingreso: string | null; hora_egreso: string | null }) => {
         const stats = userStats.get(h.personal_id);
         if (stats) {
             stats.totalHours += h.horas;
@@ -89,7 +89,7 @@ export async function calculateMonthlyLeaderboard(period: LiquidationPeriod): Pr
         }
     });
 
-    appointments?.forEach(a => {
+    appointments?.forEach((a: { doctor_id: string | null; status: string }) => {
         if (!a.doctor_id) return;
         const stats = userStats.get(a.doctor_id);
         if (stats) {
@@ -98,7 +98,7 @@ export async function calculateMonthlyLeaderboard(period: LiquidationPeriod): Pr
         }
     });
 
-    tasks?.forEach(t => {
+    tasks?.forEach((t: { assigned_to_id: string | null; created_by: string; status: string; updated_at: string; due_date: string | null; title: string; description: string | null }) => {
         const userId = t.assigned_to_id || t.created_by;
         if (!userId) return;
         const stats = userStats.get(userId);
@@ -120,7 +120,7 @@ export async function calculateMonthlyLeaderboard(period: LiquidationPeriod): Pr
 
     // 3. Award Badges (Meritocratic)
     const leaderboard: LeaderboardEntry[] = Array.from(userStats.entries()).map(([id, stats]) => {
-        const profile = profiles?.find(p => p.id === id);
+        const profile = profiles?.find((p: { id: string; nombre: string }) => p.id === id);
         const badges: string[] = [];
 
         // 1. Asistencia Perfecta: 100% attended, min 10 appts

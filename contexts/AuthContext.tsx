@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
+import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
 
 const supabase = createClient();
 
@@ -42,8 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const ownerEmail = (process.env.NEXT_PUBLIC_OWNER_EMAIL || 'dr.arielmerinopersonal@gmail.com').toLowerCase();
     const isHardcodedOwner = user?.email?.toLowerCase() === ownerEmail;
-    const isRealOwner = isHardcodedOwner || profile?.categoria === 'owner';
-    const metadataCategoria = user?.user_metadata?.categoria as WorkerCategory | undefined;
+    const metadataCategoria = normalizeCategoriaAlias(user?.user_metadata?.categoria as string | undefined) as WorkerCategory | null;
+    const profileCategoria = normalizeCategoriaAlias(profile?.categoria as string | undefined) as WorkerCategory | null;
+    const isRealOwner = isHardcodedOwner || profileCategoria === 'owner';
 
     // Calculate effective category:
     // 1. If impersonating, use that.
@@ -51,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 3. Otherwise use profile categoria or metadata.
     const effectiveCategoria = (isRealOwner && impersonatedCategoria)
         ? impersonatedCategoria
-        : (isHardcodedOwner ? 'owner' : (profile?.categoria || metadataCategoria || null));
+        : (isHardcodedOwner ? 'owner' : (profileCategoria || metadataCategoria || null));
 
     const signOut = async () => {
         await supabase.auth.signOut();
@@ -78,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         id: user.id,
                         email: user.email || null,
                         full_name: (user.user_metadata?.full_name as string) || null,
-                        categoria: (user.user_metadata?.categoria as WorkerCategory) || 'partner_viewer',
+                        categoria: (normalizeCategoriaAlias(user.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
                         is_active: true
                     });
                 }
@@ -89,7 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     window.location.href = '/login?error=account_disabled';
                     return;
                 }
-                setProfile(data as Profile);
+                setProfile({
+                    ...(data as Profile),
+                    categoria: (normalizeCategoriaAlias((data as Profile).categoria) as WorkerCategory) || 'partner_viewer',
+                });
             }
         } catch (error) {
             console.error('Unexpected error fetching profile:', error);
@@ -122,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     id: currentUser.id,
                     email: currentUser.email || null,
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
-                    categoria: (currentUser.user_metadata?.categoria as WorkerCategory) || 'partner_viewer',
+                    categoria: (normalizeCategoriaAlias(currentUser.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
                     is_active: true
                 });
                 fetchProfile(currentUser.id);
@@ -143,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     id: currentUser.id,
                     email: currentUser.email || null,
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
-                    categoria: (currentUser.user_metadata?.categoria as WorkerCategory) || 'partner_viewer',
+                    categoria: (normalizeCategoriaAlias(currentUser.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
                     is_active: true
                 });
                 fetchProfile(currentUser.id);

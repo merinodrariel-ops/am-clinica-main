@@ -66,7 +66,7 @@ export default function HistorialMovimientosModal({ isOpen, onClose }: Historial
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={loadHistory} className="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-full transition-colors text-gray-400">
+                        <button onClick={handleLoadHistory} className="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-full transition-colors text-gray-400">
                             <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
                         </button>
                         <button onClick={onClose} className="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-full transition-colors text-gray-400">

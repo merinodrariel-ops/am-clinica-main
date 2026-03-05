@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WorkerProfile, WorkerRole } from '@/types/worker-portal';
+import { WorkerProfile, WorkerCategory } from '@/types/worker-portal';
 import { updateWorkerProfileAdmin, getAppUsers, getProviderCompanies, createProviderCompany } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 import { Save, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2 } from 'lucide-react';
@@ -14,7 +14,7 @@ interface StaffEditFormProps {
 
 export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEditFormProps) {
     const [isSaving, setIsSaving] = useState(false);
-    const [appUsers, setAppUsers] = useState<{ id: string, full_name: string, email: string, role: string }[]>([]);
+    const [appUsers, setAppUsers] = useState<{ id: string, full_name: string, email: string, categoria: string }[]>([]);
     const [linkedUserId, setLinkedUserId] = useState(worker.user_id || '');
     const [providerCompanyId, setProviderCompanyId] = useState(worker.empresa_prestadora_id || '');
     const [companies, setCompanies] = useState<Array<{ id: string; nombre: string }>>([]);
@@ -42,7 +42,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     const selectedLinkedUser = linkedUserId
         ? appUsers.find((u) => u.id === linkedUserId)
         : null;
-    const linkedAppRole = selectedLinkedUser?.role;
+    const linkedAppRole = selectedLinkedUser?.categoria;
     const linkedAppRoleLabel = linkedAppRole ? (APP_ROLE_LABELS[linkedAppRole] || linkedAppRole) : 'Sin rol de app';
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -56,7 +56,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             email: fd.get('email') as string,
             whatsapp: fd.get('whatsapp') as string,
             documento: fd.get('documento') as string,
-            rol: fd.get('rol') as string,
+            categoria: fd.get('rol') as string,
             especialidad: fd.get('especialidad') as string,
             direccion: fd.get('direccion') as string,
             barrio_localidad: fd.get('barrio_localidad') as string,
@@ -79,7 +79,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
         }
     };
 
-    const ROLES: WorkerRole[] = ['dentist', 'assistant', 'technician', 'cleaning', 'admin', 'reception', 'lab', 'marketing', 'other'];
+    const ROLES: WorkerCategory[] = ['dentist', 'assistant', 'technician', 'cleaning', 'admin', 'reception', 'lab', 'marketing', 'other'];
 
     async function handleCreateCompany() {
         const nombre = newCompanyName.trim();
@@ -182,7 +182,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-500 uppercase ml-1">Rol en Clínica</label>
-                            <select name="rol" defaultValue={worker.rol} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-white outline-none transition-all appearance-none">
+                            <select name="rol" defaultValue={worker.categoria} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-white outline-none transition-all appearance-none">
                                 {ROLES.map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
                             </select>
                         </div>

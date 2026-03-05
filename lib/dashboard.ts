@@ -46,7 +46,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             .eq('is_deleted', false);
 
         if (tError) throw tError;
-        const todayIncome = todayMovs?.reduce((sum, m) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
+        const todayIncome = todayMovs?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
 
         // Monthly Income (Reception)
         const { data: monthMovs, error: mError } = await supabase
@@ -57,7 +57,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             .eq('is_deleted', false);
 
         if (mError) throw mError;
-        const monthIncome = monthMovs?.reduce((sum, m) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
+        const monthIncome = monthMovs?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
 
         // 3. New Patients This Month
         const { count: newPatientsCount, error: npError } = await supabase
@@ -106,7 +106,7 @@ export async function getReferralStats(): Promise<ReferralStat[]> {
         if (error) throw error;
 
         const counts: Record<string, number> = {};
-        data?.forEach((p) => {
+        data?.forEach((p: { referencia_origen?: string | null }) => {
             const raw = p.referencia_origen || 'Otro / Desconocido';
             // Clean up common variations (lower case, trim)
             const clean = raw.trim();
@@ -190,7 +190,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             return acc;
         }, {});
 
-        const primerasConsultasRecientes = (primeraVezData || []).map((p) => {
+        const primerasConsultasRecientes = (primeraVezData || []).map((p: { id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha?: string | null }) => {
             const monthKey = (p.primera_consulta_fecha || '').slice(0, 7);
             if (monthKey in monthlyCounts) {
                 monthlyCounts[monthKey] += 1;
@@ -210,8 +210,8 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
         }));
 
         const listaPrimeraVez = primerasConsultasRecientes
-            .filter((p) => p.monthKey === currentMonthKey)
-            .map((p) => ({
+            .filter((p: { monthKey: string }) => p.monthKey === currentMonthKey)
+            .map((p: { monthKey: string; id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha?: string | null }) => ({
                 id_paciente: p.id_paciente,
                 nombre: p.nombre,
                 apellido: p.apellido,
@@ -230,7 +230,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             .lt('fecha_movimiento', nextMonthStart);
 
         const ingresosMesUsd = incomeData?.reduce(
-            (sum, m) => sum + (Number(m.usd_equivalente) || 0), 0
+            (sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0
         ) || 0;
 
         // 4. Monthly Expenses (Admin) — EGRESO type, not annulled
@@ -244,7 +244,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             .lt('fecha_movimiento', nextMonthStart);
 
         const egresosMesUsd = expenseData?.reduce(
-            (sum, m) => sum + (Number(m.usd_equivalente_total) || 0), 0
+            (sum: number, m: { usd_equivalente_total: unknown }) => sum + (Number(m.usd_equivalente_total) || 0), 0
         ) || 0;
 
         // 5 & 6. Financing plans — active count + total debt
@@ -255,7 +255,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
 
         const personasEnFinanciacion = financData?.length || 0;
         const deudaTotalUsd = financData?.reduce(
-            (sum, p) => sum + (Number(p.saldo_restante_usd) || 0), 0
+            (sum: number, p: { saldo_restante_usd: unknown }) => sum + (Number(p.saldo_restante_usd) || 0), 0
         ) || 0;
 
         return {

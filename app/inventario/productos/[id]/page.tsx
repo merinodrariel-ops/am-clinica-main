@@ -43,14 +43,14 @@ function ProductDetailScreen() {
 
     const inLast = useMemo(() => {
         return movements
-            .filter(movement => movement.type === 'IN')
-            .reduce((sum, movement) => sum + Number(movement.qty || 0), 0);
+            .filter(movement => movement.tipo_movimiento === 'ENTRADA')
+            .reduce((sum, movement) => sum + Number(movement.cantidad || 0), 0);
     }, [movements]);
 
     const outLast = useMemo(() => {
         return movements
-            .filter(movement => movement.type === 'OUT')
-            .reduce((sum, movement) => sum + Number(movement.qty || 0), 0);
+            .filter(movement => movement.tipo_movimiento === 'SALIDA')
+            .reduce((sum, movement) => sum + Number(movement.cantidad || 0), 0);
     }, [movements]);
 
     const load = useCallback(async () => {
@@ -136,9 +136,9 @@ function ProductDetailScreen() {
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-4">
                 <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 space-y-3">
                     <div className="w-full h-56 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-hidden flex items-center justify-center">
-                        {product.image_full_url || product.image_thumb_url ? (
+                        {product.image_thumb_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={product.image_full_url || product.image_thumb_url || ''} alt={product.name} className="w-full h-full object-cover" />
+                            <img src={product.image_thumb_url || ''} alt={product.name} className="w-full h-full object-cover" />
                         ) : (
                             <Package size={34} className="text-gray-400" />
                         )}
@@ -149,9 +149,9 @@ function ProductDetailScreen() {
                         <DataCell label="Color" value={product.color || 'Sin color'} />
                         <DataCell label="Marca" value={product.brand || 'Sin marca'} />
                         <DataCell label="Unidad" value={product.unit} />
-                        <DataCell label="Estado" value={product.is_active ? 'Activo' : 'Inactivo'} />
-                        <DataCell label="Barcode" value={product.barcode || 'N/D'} />
-                        <DataCell label="QR" value={product.qr_code || 'N/D'} />
+                        <DataCell label="Estado" value={'Activo'} />
+                        <DataCell label="Barcode" value={product.notes || 'N/D'} />
+                        <DataCell label="QR" value={product.link || 'N/D'} />
                     </div>
 
                     {product.notes && (
@@ -209,18 +209,18 @@ function ProductDetailScreen() {
                                                 <td className="px-4 py-2">
                                                     <span className={clsx(
                                                         'text-[11px] px-2 py-0.5 rounded-full font-semibold',
-                                                        movement.type === 'IN' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-                                                        movement.type === 'OUT' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-                                                        movement.type === 'ADJUST' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                        movement.tipo_movimiento === 'ENTRADA' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+                                                        movement.tipo_movimiento === 'SALIDA' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                                                        movement.tipo_movimiento === 'AJUSTE' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                                                     )}>
-                                                        {movement.type}
+                                                        {movement.tipo_movimiento}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-2 font-semibold">
-                                                    {movement.qty} {product.unit}
+                                                    {movement.cantidad} {product.unit}
                                                 </td>
-                                                <td className="px-4 py-2 text-xs text-gray-500">{movement.created_by_label}</td>
-                                                <td className="px-4 py-2 text-xs text-gray-500">{movement.note || '-'}</td>
+                                                <td className="px-4 py-2 text-xs text-gray-500">{movement.usuario}</td>
+                                                <td className="px-4 py-2 text-xs text-gray-500">{movement.motivo || '-'}</td>
                                             </tr>
                                         ))}
                                     </tbody>

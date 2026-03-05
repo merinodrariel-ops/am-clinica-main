@@ -21,7 +21,7 @@ import { CommanderView } from '@/components/portal-empire/CommanderView';
 import { BadgeDisplay } from '@/components/portal-empire/BadgeDisplay';
 
 export default function PortalDashboard() {
-    const { profile, role, user, signOut } = useAuth();
+    const { profile, categoria: role, user, signOut } = useAuth();
     const [appointments, setAppointments] = useState<any[]>([]);
     const [liquidation, setLiquidation] = useState<any>(null);
     const [leaderboard, setLeaderboard] = useState<any[]>([]);

@@ -132,7 +132,7 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                         </label>
                     </div>
                     <h4 className="text-base md:text-lg font-bold text-white leading-tight">{worker.nombre} {worker.apellido}</h4>
-                    <p className="text-indigo-400 font-bold text-[10px] uppercase tracking-widest mt-1">{worker.rol}</p>
+                    <p className="text-indigo-400 font-bold text-[10px] uppercase tracking-widest mt-1">{worker.categoria}</p>
                     {worker.especialidad && (
                         <p className="text-slate-500 text-[11px] mt-0.5">{worker.especialidad}</p>
                     )}

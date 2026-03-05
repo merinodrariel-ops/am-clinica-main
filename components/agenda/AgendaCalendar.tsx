@@ -129,7 +129,7 @@ export default function AgendaCalendar() {
     const [voiceOpen, setVoiceOpen] = useState(false);
     const [dropConfirm, setDropConfirm] = useState<DropConfirmData | null>(null);
     const [isNotifying, setIsNotifying] = useState(false);
-    const { role } = useAuth();
+    const { categoria: role } = useAuth();
     const router = useRouter();
 
     // Load doctors for filter bar

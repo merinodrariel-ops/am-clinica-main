@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
                 .lt('fecha_movimiento', endIso);
 
             if (incomeError) console.error(`[predictive-pulse] Income fetch error for ${monthLabel}:`, incomeError);
-            const income = incomeData?.reduce((sum, m) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
+            const income = incomeData?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
 
             // Expenses - sum usd_equivalente_total
             const { data: expenseData, error: expenseError } = await supabase
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
                 .lt('fecha_movimiento', endIso);
 
             if (expenseError) console.error(`[predictive-pulse] Expense fetch error for ${monthLabel}:`, expenseError);
-            const expenses = expenseData?.reduce((sum, m) => sum + (Number(m.usd_equivalente_total) || 0), 0) || 0;
+            const expenses = expenseData?.reduce((sum: number, m: { usd_equivalente_total: unknown }) => sum + (Number(m.usd_equivalente_total) || 0), 0) || 0;
 
             // New Patients
             const { count: newPatients, error: patientError } = await supabase

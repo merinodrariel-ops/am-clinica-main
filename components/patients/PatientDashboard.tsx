@@ -92,7 +92,7 @@ const PAYMENT_TABS = new Set(['finanzas']);
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [] }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { role } = useAuth();
+    const { categoria: role } = useAuth();
     const isOdontologo = role === 'odontologo';
     const isRecaptacion = role === 'recaptacion';
     const hidePaymentTabs = isOdontologo || isRecaptacion;

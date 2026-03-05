@@ -92,7 +92,7 @@ export default function NewPatientsCard() {
                     return acc;
                 }, {});
 
-                (pacientesMeses || []).forEach((paciente) => {
+                (pacientesMeses || []).forEach((paciente: { primera_consulta_fecha?: string | null }) => {
                     if (!paciente.primera_consulta_fecha) return;
                     const key = paciente.primera_consulta_fecha.slice(0, 7);
                     if (key in countsByMonth) {
@@ -123,7 +123,7 @@ export default function NewPatientsCard() {
 
                 let sinSeguimientoTemp = 0;
                 if (pacientesPotenciales && pacientesPotenciales.length > 0) {
-                    const ids = pacientesPotenciales.map(p => p.id_paciente);
+                    const ids = pacientesPotenciales.map((p: { id_paciente: string }) => p.id_paciente);
                     const hace60Dias = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
                     const { data: conMovimientos } = await supabase
                         .from('caja_recepcion_movimientos')
@@ -133,14 +133,14 @@ export default function NewPatientsCard() {
                         .eq('is_deleted', false)
                         .gte('fecha_hora', hace60Dias);
 
-                    const idsConMovimientos = new Set(conMovimientos?.map(m => m.paciente_id) || []);
-                    sinSeguimientoTemp = ids.filter(id => !idsConMovimientos.has(id)).length;
+                    const idsConMovimientos = new Set(conMovimientos?.map((m: { paciente_id: string }) => m.paciente_id) || []);
+                    sinSeguimientoTemp = ids.filter((id: string) => !idsConMovimientos.has(id)).length;
                 }
 
                 setSinSeguimiento(sinSeguimientoTemp);
 
                 // Fetch more for the monthly lists
-                const recentIds = (pacientesMeses || []).map((p) => p.id_paciente);
+                const recentIds = (pacientesMeses || []).map((p: { id_paciente: string }) => p.id_paciente);
 
                 let idsConMovimientosRecientes = new Set<string>();
                 if (recentIds.length > 0) {
@@ -153,12 +153,12 @@ export default function NewPatientsCard() {
 
                     idsConMovimientosRecientes = new Set(
                         (movimientosRecientes || [])
-                            .map((movimiento) => movimiento.paciente_id)
-                            .filter((id): id is string => Boolean(id))
+                            .map((movimiento: { paciente_id: string | null }) => movimiento.paciente_id)
+                            .filter((id: string | null): id is string => Boolean(id))
                     );
                 }
 
-                const recentInfo = (pacientesMeses || []).map((paciente) => ({
+                const recentInfo = (pacientesMeses || []).map((paciente: { id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha?: string | null }) => ({
                     id: paciente.id_paciente,
                     nombre: `${paciente.nombre} ${paciente.apellido}`,
                     fechaISO: paciente.primera_consulta_fecha,

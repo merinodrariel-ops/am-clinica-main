@@ -377,7 +377,7 @@ function ScannerScreen() {
             return;
         }
 
-        const nextStock = result.stock_current ?? selectedProduct.stock_current;
+        const nextStock = (result as { stock_current?: number }).stock_current ?? selectedProduct.stock_current;
         setSelectedProduct({
             ...selectedProduct,
             stock_current: Number(nextStock),

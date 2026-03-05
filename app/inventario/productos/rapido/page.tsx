@@ -155,7 +155,7 @@ function QuickProductScreen() {
                 color: form.color,
                 unit: form.unit,
                 brand: form.brand,
-                barcode: form.barcode,
+                link: form.barcode,
                 stockInitial: Number(form.stockInitial || 0),
                 notes: form.notes,
                 imagePayload: serverImagePayload,

@@ -19,7 +19,7 @@ import {
     type StockMovementRecord,
 } from '@/app/actions/inventory-stock';
 
-type MovementTypeFilter = 'ALL' | 'IN' | 'OUT' | 'ADJUST';
+type MovementTypeFilter = 'ALL' | 'ENTRADA' | 'SALIDA' | 'AJUSTE';
 
 export default function InventoryMovementsPage() {
     return (
@@ -77,9 +77,9 @@ function InventoryMovementsScreen() {
     const totals = useMemo(() => {
         return movements.reduce(
             (acc, movement) => {
-                if (movement.type === 'IN') acc.in += Number(movement.qty || 0);
-                if (movement.type === 'OUT') acc.out += Number(movement.qty || 0);
-                if (movement.type === 'ADJUST') acc.adjust += Number(movement.qty || 0);
+                if (movement.tipo_movimiento === 'ENTRADA') acc.in += Number(movement.cantidad || 0);
+                if (movement.tipo_movimiento === 'SALIDA') acc.out += Number(movement.cantidad || 0);
+                if (movement.tipo_movimiento === 'AJUSTE') acc.adjust += Number(movement.cantidad || 0);
                 return acc;
             },
             { in: 0, out: 0, adjust: 0 }
@@ -126,33 +126,17 @@ function InventoryMovementsScreen() {
         ];
 
         const rows = movements.map(movement => {
-            const source = typeof movement.device_info?.source === 'string' ? movement.device_info.source : '';
-            const matchMode =
-                typeof movement.device_info?.['match_mode'] === 'string'
-                    ? movement.device_info['match_mode']
-                    : '';
-            const visualScore =
-                typeof movement.device_info?.['visual_score'] === 'number'
-                    ? movement.device_info['visual_score']
-                    : '';
-            const visualConfidence =
-                typeof movement.device_info?.['visual_confidence'] === 'string'
-                    ? movement.device_info['visual_confidence']
-                    : '';
             return [
                 movement.created_at,
-                movement.product_id,
-                movement.product?.name || '',
-                movement.product?.category || '',
-                movement.type,
-                movement.qty,
-                movement.product?.unit || '',
-                movement.created_by_label,
-                movement.note || '',
-                source,
-                matchMode,
-                visualScore,
-                visualConfidence,
+                movement.item_id,
+                movement.item?.nombre || '',
+                movement.item?.categoria || '',
+                movement.tipo_movimiento,
+                movement.cantidad,
+                movement.item?.unidad_medida || '',
+                movement.usuario,
+                movement.motivo || '',
+                '', '', '',
             ].map(escapeCsvValue).join(',');
         });
 
@@ -224,9 +208,9 @@ function InventoryMovementsScreen() {
                         className="px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
                     >
                         <option value="ALL">Tipo: Todos</option>
-                        <option value="IN">Solo IN</option>
-                        <option value="OUT">Solo OUT</option>
-                        <option value="ADJUST">Solo ADJUST</option>
+                        <option value="ENTRADA">Solo IN</option>
+                        <option value="SALIDA">Solo OUT</option>
+                        <option value="AJUSTE">Solo ADJUST</option>
                     </select>
 
                     <input
@@ -297,9 +281,9 @@ function InventoryMovementsScreen() {
                                             })}
                                         </td>
                                         <td className="px-4 py-2">
-                                            {movement.product ? (
-                                                <Link href={`/inventario/productos/${movement.product.id}`} className="font-semibold text-gray-900 dark:text-white hover:underline">
-                                                    {movement.product.name}
+                                            {movement.item ? (
+                                                <Link href={`/inventario/productos/${movement.item.id}`} className="font-semibold text-gray-900 dark:text-white hover:underline">
+                                                    {movement.item.nombre}
                                                 </Link>
                                             ) : (
                                                 <span className="text-gray-500">Producto N/D</span>
@@ -308,16 +292,16 @@ function InventoryMovementsScreen() {
                                         <td className="px-4 py-2">
                                             <span className={clsx(
                                                 'text-[11px] px-2 py-0.5 rounded-full font-semibold',
-                                                movement.type === 'IN' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-                                                movement.type === 'OUT' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-                                                movement.type === 'ADJUST' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                movement.tipo_movimiento === 'ENTRADA' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+                                                movement.tipo_movimiento === 'SALIDA' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                                                movement.tipo_movimiento === 'AJUSTE' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                                             )}>
-                                                {movement.type}
+                                                {movement.tipo_movimiento}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-2 font-semibold">{movement.qty}</td>
-                                        <td className="px-4 py-2 text-xs text-gray-500">{movement.created_by_label}</td>
-                                        <td className="px-4 py-2 text-xs text-gray-500 max-w-[280px] truncate">{movement.note || '-'}</td>
+                                        <td className="px-4 py-2 font-semibold">{movement.cantidad}</td>
+                                        <td className="px-4 py-2 text-xs text-gray-500">{movement.usuario}</td>
+                                        <td className="px-4 py-2 text-xs text-gray-500 max-w-[280px] truncate">{movement.motivo || '-'}</td>
                                     </tr>
                                 ))}
                             </tbody>

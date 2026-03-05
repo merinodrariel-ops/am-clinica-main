@@ -85,7 +85,7 @@ const TIPOS_MOVIMIENTO = [
 ];
 
 export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props) {
-  const { role } = useAuth();
+  const { categoria: role } = useAuth();
   const canEditAdminAmounts = role === "owner" || role === "admin";
   const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
   const [transfers, setTransfers] = useState<any[]>([]);

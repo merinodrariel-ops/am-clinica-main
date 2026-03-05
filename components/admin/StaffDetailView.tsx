@@ -106,7 +106,7 @@ export default function StaffDetailView({
                                 <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
                                     {worker.nombre} {worker.apellido}
                                 </h1>
-                                <p className="text-indigo-400 font-bold text-xs md:text-sm uppercase tracking-widest mt-1">{worker.rol}</p>
+                                <p className="text-indigo-400 font-bold text-xs md:text-sm uppercase tracking-widest mt-1">{worker.categoria}</p>
                                 {worker.especialidad && (
                                     <p className="text-slate-400 text-xs md:text-sm mt-0.5">{worker.especialidad}</p>
                                 )}
