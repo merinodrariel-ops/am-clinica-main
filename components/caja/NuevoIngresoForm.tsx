@@ -384,6 +384,32 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
             if (error) throw error;
 
+            // Sync planes_financiacion when a cuota payment is registered
+            if (formData.es_cuota && formData.paciente_id) {
+                const { data: plan } = await supabase
+                    .from('planes_financiacion')
+                    .select('id, cuotas_pagadas, cuotas_total, monto_cuota_usd, saldo_restante_usd')
+                    .eq('paciente_id', formData.paciente_id)
+                    .eq('estado', 'En curso')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (plan) {
+                    const nuevasCuotasPagadas = (plan.cuotas_pagadas || 0) + 1;
+                    const nuevoSaldo = Math.max(0, (plan.saldo_restante_usd || 0) - (plan.monto_cuota_usd || usdEquivalente));
+                    const nuevoEstado = nuevasCuotasPagadas >= plan.cuotas_total ? 'Finalizado' : 'En curso';
+                    await supabase
+                        .from('planes_financiacion')
+                        .update({
+                            cuotas_pagadas: nuevasCuotasPagadas,
+                            saldo_restante_usd: nuevoSaldo,
+                            estado: nuevoEstado,
+                        })
+                        .eq('id', plan.id);
+                }
+            }
+
             // Auto-generate receipt in background (never blocks payment flow)
             if (insertedMovement?.id) {
                 try {
