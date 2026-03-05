@@ -20,6 +20,16 @@
 > 4. **NUNCA importar `{ supabase }` de `@/lib/supabase`** — ese export ya no existe. Ese archivo es sólo para tipos.
 > 5. **La columna correcta para roles es `categoria`**, NO `role`. Usa `categoria` en TODO SQL, RLS, y código TypeScript que toque la tabla `profiles`.
 
+## Documentación para agentes (leer en este orden)
+
+1. `docs/AGENT_GUARDRAILS.md` — reglas críticas, checklist pre-entrega, formato de handoff
+2. `docs/AGENT_ROUTING.md` — qué agente usar según el módulo, template de handoff entre agentes
+3. `docs/OWNERSHIP.md` — quién decide en cada módulo, protocolo de lock/unlock
+4. `docs/TASK_CONTRACT.md` — template de scope + DoD antes de implementar
+5. `docs/AGENT_PROMPT.md` — prompt maestro copy/paste para iniciar cualquier sesión
+
+---
+
 ## Stack
 - Next.js 16 App Router + React 19 + TypeScript 5
 - Supabase (PostgreSQL + RLS + Auth via Google OAuth)
