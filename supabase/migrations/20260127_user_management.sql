@@ -13,13 +13,14 @@ ALTER TABLE public.profiles ADD CONSTRAINT profiles_estado_check CHECK (estado I
 
 -- 3. Update Role Constraint
 -- First, normalize existing data to avoid errors
-UPDATE public.profiles SET role = 'reception' WHERE role = 'partner_viewer';
-UPDATE public.profiles SET role = 'admin' WHERE role = 'pricing_manager';
+UPDATE public.profiles SET categoria = 'reception' WHERE categoria = 'partner_viewer';
+UPDATE public.profiles SET categoria = 'admin' WHERE categoria = 'pricing_manager';
 -- If any other unknown, default to reception
-UPDATE public.profiles SET role = 'reception' WHERE role NOT IN ('owner', 'admin', 'reception', 'developer');
+UPDATE public.profiles SET categoria = 'reception' WHERE categoria NOT IN ('owner', 'admin', 'reception', 'developer');
 
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
-ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('owner', 'admin', 'reception', 'developer'));
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_categoria_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_categoria_check CHECK (categoria IN ('owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo', 'laboratorio', 'socio', 'contadores', 'recaptacion'));
 
 -- 4. Create trigger to update ultimo_login on profiles (Optional, but useful for pure SQL queries)
 -- Actually, maintaining this via the App logic or Auth Hook is safer.

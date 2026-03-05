@@ -49,7 +49,7 @@ SELECT
         ELSE NULL
     END                                                                  AS apellido,
     pr.email,
-    CASE pr.role
+    CASE pr.categoria
         WHEN 'owner'           THEN 'Dirección'
         WHEN 'admin'           THEN 'Administración'
         WHEN 'reception'       THEN 'Recepción'
@@ -60,7 +60,7 @@ SELECT
         WHEN 'partner_viewer'  THEN 'Administración'
         ELSE                        'General'
     END                                                                  AS area,
-    CASE WHEN pr.role IN ('owner', 'odontologo') THEN 'profesional' ELSE 'prestador' END  AS tipo,
+    CASE WHEN pr.categoria IN ('owner', 'odontologo') THEN 'profesional' ELSE 'prestador' END  AS tipo,
     true                                                                 AS activo,
     pr.id                                                                AS user_id,
     0                                                                    AS valor_hora_ars
@@ -103,8 +103,8 @@ BEGIN
         ELSE NULL
     END;
 
-    -- Map role → area
-    v_area := CASE NEW.role
+    -- Map categoria → area
+    v_area := CASE NEW.categoria
         WHEN 'owner'           THEN 'Dirección'
         WHEN 'admin'           THEN 'Administración'
         WHEN 'reception'       THEN 'Recepción'
@@ -117,11 +117,11 @@ BEGIN
         ELSE                        'General'
     END;
 
-    -- Map role → tipo
-    v_tipo := CASE WHEN NEW.role IN ('owner', 'odontologo') THEN 'profesional' ELSE 'empleado' END;
+    -- Map categoria → tipo
+    v_tipo := CASE WHEN NEW.categoria IN ('owner', 'odontologo') THEN 'profesional' ELSE 'empleado' END;
 
-    -- Map role → rol (display label, NOT NULL in personal)
-    v_rol := CASE NEW.role
+    -- Map categoria → rol (display label, NOT NULL in personal)
+    v_rol := CASE NEW.categoria
         WHEN 'owner'           THEN 'Director/a'
         WHEN 'admin'           THEN 'Administrativo/a'
         WHEN 'reception'       THEN 'Recepcionista'
@@ -179,7 +179,7 @@ $$;
 DROP TRIGGER IF EXISTS trg_sync_profile_to_personal ON public.profiles;
 
 CREATE TRIGGER trg_sync_profile_to_personal
-    AFTER INSERT OR UPDATE OF full_name, email, role
+    AFTER INSERT OR UPDATE OF full_name, email, categoria
     ON public.profiles
     FOR EACH ROW
     EXECUTE FUNCTION public.sync_profile_to_personal();
