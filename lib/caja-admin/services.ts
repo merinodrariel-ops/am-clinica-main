@@ -67,6 +67,47 @@ export async function deleteCategoria(id: string) {
 
 const getSupabase = () => createClient();
 
+function normalizeWhatsAppE164(value?: string | null): string | null {
+    if (!value) return null;
+
+    const raw = value.trim();
+    if (!raw) return null;
+
+    let digits = raw.replace(/\D/g, '');
+    if (!digits) return null;
+
+    if (!raw.startsWith('+')) {
+        // Default local numbers to Argentina country code.
+        digits = `54${digits}`;
+    }
+
+    if (digits.startsWith('54')) {
+        let rest = digits.slice(2).replace(/^0+/, '');
+
+        if (!rest.startsWith('9')) {
+            rest = `9${rest}`;
+        }
+
+        let local = rest.slice(1).replace(/^0+/, '');
+
+        // Remove local mobile prefix "15" after area code (common AR input mistake).
+        for (let areaLen = 2; areaLen <= 4; areaLen += 1) {
+            if (local.length > areaLen + 5 && local.slice(areaLen, areaLen + 2) === '15') {
+                local = `${local.slice(0, areaLen)}${local.slice(areaLen + 2)}`;
+                break;
+            }
+        }
+
+        digits = `549${local}`;
+    }
+
+    if (digits.length < 10 || digits.length > 15) {
+        return null;
+    }
+
+    return `+${digits}`;
+}
+
 
 // =============================================
 // Sucursales
@@ -696,12 +737,18 @@ export async function updatePersonalArea(id: string, updates: Partial<PersonalAr
 
 export async function createPersonal(input: CreatePersonalInput): Promise<{ data: Personal | null; error: Error | null }> {
     const normalizedTipo = input.tipo === 'profesional' ? 'odontologo' : input.tipo;
+    const normalizedWhatsapp = normalizeWhatsAppE164(input.whatsapp || null);
+
+    if (input.whatsapp && !normalizedWhatsapp) {
+        return { data: null, error: new Error('WhatsApp inválido. Usá código país (ej: +549...) y sin 0/15.') };
+    }
 
     const { data, error } = await getSupabase()
         .from('personal')
         .insert({
             ...input,
             tipo: normalizedTipo,
+            whatsapp: normalizedWhatsapp,
             rol: input.rol || (normalizedTipo === 'odontologo' ? 'Odontólogo' : 'Prestador'),
             valor_hora_ars: input.valor_hora_ars || 0,
             activo: true,
@@ -720,9 +767,28 @@ export async function updatePersonal(
     id: string,
     updates: Partial<Personal>
 ): Promise<{ success: boolean; error?: string }> {
+    let normalizedWhatsapp: string | null | undefined;
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'whatsapp')) {
+        if (typeof updates.whatsapp === 'string') {
+            const trimmed = updates.whatsapp.trim();
+            if (!trimmed) {
+                normalizedWhatsapp = null;
+            } else {
+                normalizedWhatsapp = normalizeWhatsAppE164(trimmed);
+                if (!normalizedWhatsapp) {
+                    return { success: false, error: 'WhatsApp inválido. Usá código país (ej: +549...) y sin 0/15.' };
+                }
+            }
+        } else if (updates.whatsapp === null) {
+            normalizedWhatsapp = null;
+        }
+    }
+
     const nextUpdates = {
         ...updates,
         tipo: updates.tipo === 'profesional' ? 'odontologo' : updates.tipo,
+        ...(normalizedWhatsapp !== undefined ? { whatsapp: normalizedWhatsapp } : {}),
     };
 
     const { error } = await getSupabase()

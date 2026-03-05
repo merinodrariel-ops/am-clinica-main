@@ -24,6 +24,7 @@ import {
     BadgeCheck,
     ChevronDown,
     Trash2,
+    MessageCircle,
 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -174,6 +175,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     function isOdontologoTipo(tipo?: string | null) {
         return tipo === 'odontologo' || tipo === 'profesional';
+    }
+
+    function getWhatsAppLink(phone?: string | null) {
+        if (!phone) return null;
+        const digits = phone.replace(/\D/g, '');
+        if (!digits) return null;
+        return `https://wa.me/${digits}`;
     }
 
     async function loadData() {
@@ -341,8 +349,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             return;
         }
 
-        const porcentaje = profesional.porcentaje_honorarios || 0;
-        const honorarios = (prestacionForm.valor_cobrado * porcentaje) / 100;
+        const honorarios = prestacionForm.valor_cobrado;
         const finalPrestacionNombre = prestacion?.nombre || manualName;
 
         const { error } = await registrarPrestacionRealizada({
@@ -353,7 +360,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             fecha_realizacion: new Date().toISOString(),
             valor_cobrado: prestacionForm.valor_cobrado,
             moneda_cobro: prestacionForm.moneda,
-            porcentaje_honorarios: porcentaje,
+            porcentaje_honorarios: 100,
             monto_honorarios: honorarios,
             estado_pago: 'pendiente',
             notas: prestacionForm.notas,
@@ -1044,29 +1051,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     </div>
 
                                     {/* Payment Info */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {formData.tipo !== 'odontologo' && (
+                                    {formData.tipo !== 'odontologo' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div className="md:col-span-2 p-3 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400">
                                                 El valor hora se configura globalmente en Liquidaciones → Configuración de Valores.
                                             </div>
-                                        )}
-                                        {formData.tipo === 'odontologo' && (
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                    % Honorarios
-                                                </label>
-                                                <Input
-                                                    type="number"
-                                                    value={formData.porcentaje_honorarios}
-                                                    onChange={(e) => setFormData({ ...formData, porcentaje_honorarios: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                                    placeholder="0"
-                                                    min="0"
-                                                    max="100"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
 
                                     {/* Odontólogo specific fields */}
                                     {formData.tipo === 'odontologo' && (
@@ -1373,9 +1364,23 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         </div>
                                     )}
                                     {p.whatsapp && (
-                                        <div className="flex items-center gap-2 text-slate-500">
-                                            <Phone className="w-4 h-4" />
-                                            <span>{p.whatsapp}</span>
+                                        <div className="flex items-center justify-between gap-2 text-slate-500">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <Phone className="w-4 h-4" />
+                                                <span className="truncate">{p.whatsapp}</span>
+                                            </div>
+                                            {getWhatsAppLink(p.whatsapp) && (
+                                                <a
+                                                    href={getWhatsAppLink(p.whatsapp)!}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    title="Contactar por WhatsApp"
+                                                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors text-xs font-medium"
+                                                >
+                                                    <MessageCircle className="w-4 h-4" />
+                                                    <span>Contactar</span>
+                                                </a>
+                                            )}
                                         </div>
                                     )}
                                     {p.condicion_afip && (
@@ -1540,9 +1545,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-sm text-slate-500">{isProfesional ? '% Honorarios' : 'Esquema'}</p>
+                                                <p className="text-sm text-slate-500">{isProfesional ? 'Modelo' : 'Esquema'}</p>
                                                 <p className="text-xl font-bold text-green-600">
-                                                    {isProfesional ? `${p.porcentaje_honorarios}%` : 'Global'}
+                                                    {isProfesional ? 'Por prestacion' : 'Global'}
                                                 </p>
                                             </div>
                                         </div>
