@@ -1,23 +1,16 @@
 import { sendEmail } from '@/lib/nodemailer';
+import { generatePremiumWelcomeEmail, generatePaymentConfirmationEmail } from '@/lib/email-templates';
 
 export async function sendWelcomeEmail(toName: string, toEmail: string, whatsapp?: string) {
     try {
-        const whatsappLink = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, '')}` : '';
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <body>
-                <h2>Bienvenido a AM Clínica</h2>
-                <p>Hola ${toName},</p>
-                <p>Estamos felices de acompañarte en tu tratamiento.</p>
-                ${whatsappLink ? `<p>WhatsApp: <a href="${whatsappLink}">${whatsappLink}</a></p>` : ''}
-            </body>
-            </html>
-        `;
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://clinica.arielmerino.com';
+        const portalUrl = `${siteUrl}/portal`;
+
+        const html = generatePremiumWelcomeEmail(toName, portalUrl);
 
         const response = await sendEmail({
             to: toEmail,
-            subject: 'Bienvenido a AM Clínica',
+            subject: 'Bienvenido a AM Estética Dental — Excelencia y Minimalismo',
             html
         });
 
@@ -36,22 +29,11 @@ export async function sendWelcomeEmail(toName: string, toEmail: string, whatsapp
 
 export async function sendPaymentEmail(toName: string, toEmail: string, amountUsd: number, description?: string) {
     try {
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <body>
-                <h2>Confirmación de Pago</h2>
-                <p>Hola ${toName},</p>
-                <p>Hemos recibido tu pago de <strong>USD ${amountUsd}</strong>.</p>
-                ${description ? `<p>Concepto: ${description}</p>` : ''}
-                <p>Gracias por confiar en nosotros.</p>
-            </body>
-            </html>
-        `;
+        const html = generatePaymentConfirmationEmail(toName, amountUsd, description);
 
         const response = await sendEmail({
             to: toEmail,
-            subject: 'Comprobante de Pago - AM Clínica',
+            subject: 'Comprobante de Pago Confirmado — AM Clínica',
             html
         });
 

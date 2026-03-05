@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { X, Search, User, Loader2, Calendar, FlaskConical, Stethoscope, Landmark, Plus } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import MoneyInput from '@/components/ui/MoneyInput';
 
 

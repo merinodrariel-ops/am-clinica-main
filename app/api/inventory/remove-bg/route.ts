@@ -199,11 +199,11 @@ export async function POST(request: Request) {
 
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('categoria')
             .eq('id', user.id)
             .maybeSingle();
 
-        const role = (profile?.role || user.user_metadata?.role || '').toLowerCase();
+        const role = (profile?.categoria || user.user_metadata?.role || '').toLowerCase();
         if (!['owner', 'admin', 'developer'].includes(role)) {
             return NextResponse.json({ error: 'Sin permisos para quitar fondo' }, { status: 403 });
         }

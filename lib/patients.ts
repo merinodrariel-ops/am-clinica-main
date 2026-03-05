@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/database-types';
 
 // =============================================
 // Types
@@ -78,12 +79,15 @@ export interface PlanTratamiento {
 // CRUD Operations
 // =============================================
 
-export async function getPacientes(options?: {
-    search?: string;
-    estado?: string;
-    ciudad?: string;
-    limit?: number;
-}): Promise<Paciente[]> {
+export async function getPacientes(
+    supabase: SupabaseClient<Database>,
+    options?: {
+        search?: string;
+        estado?: string;
+        ciudad?: string;
+        limit?: number;
+    }
+): Promise<Paciente[]> {
     let query = supabase
         .from('pacientes')
         .select('*')
@@ -117,11 +121,14 @@ export async function getPacientes(options?: {
     return data || [];
 }
 
-export async function getTotalPatientsCount(options?: {
-    search?: string;
-    estado?: string;
-    ciudad?: string;
-}): Promise<number> {
+export async function getTotalPatientsCount(
+    supabase: SupabaseClient<Database>,
+    options?: {
+        search?: string;
+        estado?: string;
+        ciudad?: string;
+    }
+): Promise<number> {
     let query = supabase
         .from('pacientes')
         .select('*', { count: 'exact', head: true })
@@ -150,7 +157,10 @@ export async function getTotalPatientsCount(options?: {
     return count || 0;
 }
 
-export async function getPacienteById(id: string): Promise<Paciente | null> {
+export async function getPacienteById(
+    supabase: SupabaseClient<Database>,
+    id: string
+): Promise<Paciente | null> {
     const { data, error } = await supabase
         .from('pacientes')
         .select('*')
@@ -165,7 +175,10 @@ export async function getPacienteById(id: string): Promise<Paciente | null> {
     return data;
 }
 
-export async function createPaciente(paciente: Partial<Paciente>): Promise<{ data: Paciente | null; error: Error | null }> {
+export async function createPaciente(
+    supabase: SupabaseClient<Database>,
+    paciente: Partial<Paciente>
+): Promise<{ data: Paciente | null; error: Error | null }> {
     // Construct WhatsApp E164 format
     const whatsappE164 = paciente.whatsapp_numero
         ? `${paciente.whatsapp_pais_code || '+54'}${paciente.whatsapp_numero.replace(/\D/g, '')}`
@@ -303,7 +316,10 @@ export async function softDeletePaciente(
 // Historia Clínica
 // =============================================
 
-export async function getHistoriaClinica(pacienteId: string): Promise<HistoriaClinica[]> {
+export async function getHistoriaClinica(
+    supabase: SupabaseClient<Database>,
+    pacienteId: string
+): Promise<HistoriaClinica[]> {
     const { data, error } = await supabase
         .from('historia_clinica')
         .select('*')
@@ -340,7 +356,10 @@ export async function createHistoriaEntry(entry: Partial<HistoriaClinica>): Prom
 // Planes de Tratamiento
 // =============================================
 
-export async function getPlanesTratamiento(pacienteId: string): Promise<PlanTratamiento[]> {
+export async function getPlanesTratamiento(
+    supabase: SupabaseClient<Database>,
+    pacienteId: string
+): Promise<PlanTratamiento[]> {
     const { data, error } = await supabase
         .from('planes_tratamiento')
         .select('*')

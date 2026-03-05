@@ -1,12 +1,11 @@
 'use server';
 
 import { sendEmail } from '@/lib/nodemailer';
-import { generateWelcomeMessage, generateInvitationMessage } from '@/lib/email-templates';
+import { generateInvitationMessage } from '@/lib/email-templates';
 
 export async function sendWelcomeEmailAction(toName: string, toEmail: string) {
     try {
-        // Use the template generator if available, or fallback to simple HTML
-        const html = generateWelcomeMessage(toName);
+        const html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px"><h2>Bienvenido/a, ${toName}</h2><p>Tu cuenta en AM Clínica fue creada exitosamente.</p></div>`;
 
         const response = await sendEmail({
             to: toEmail,

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Users, Banknote, BarChart3, Wallet } from 'lucide-react';
-import { getDashboardStats, DashboardStats } from '@/lib/dashboard';
+import { getDashboardStatsAction as getDashboardStats } from '@/app/actions/dashboard';
+import type { DashboardStats } from '@/lib/dashboard';
 
 export default function StatsGrid() {
     const [stats, setStats] = useState<DashboardStats | null>(null);

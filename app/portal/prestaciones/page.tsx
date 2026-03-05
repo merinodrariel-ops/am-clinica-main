@@ -1,7 +1,14 @@
-import { getCurrentWorkerProfile } from '@/app/actions/worker-portal';
-import { getTarifarioParaDoctor, getMisPrestaciones } from '@/app/actions/prestaciones';
+import { getCurrentWorkerProfile, getUserAppProfile } from '@/app/actions/worker-portal';
+import {
+    getTarifarioCompleto,
+    getMisPrestaciones,
+    getProfesionales,
+} from '@/app/actions/prestaciones';
 import PrestacionesClient from './PrestacionesClient';
 import { Stethoscope, AlertCircle } from 'lucide-react';
+
+// Categorías que pueden REGISTRAR prestaciones para otros (admin staff)
+const REGISTRO_CATEGORIAS = ['owner', 'admin', 'reception', 'asistente', 'developer'];
 
 export default async function PrestacionesPage() {
     let worker;
@@ -23,17 +30,31 @@ export default async function PrestacionesPage() {
         );
     }
 
-    let tarifarioData = { items: [] as Awaited<ReturnType<typeof getTarifarioParaDoctor>>['items'], areas: [] as string[] };
+    // Use profiles.categoria (not personal.tipo) to determine mode.
+    // The trigger maps owner → personal.tipo='odontologo' which is wrong for this decision.
+    const appProfile = await getUserAppProfile();
+    const categoria = appProfile?.categoria ?? '';
+    const isRegistroMode = REGISTRO_CATEGORIAS.includes(categoria);
+    const viewMode = isRegistroMode ? 'registro' : 'readonly';
+
+    let tarifario: Awaited<ReturnType<typeof getTarifarioCompleto>> = [];
     let resumen: Awaited<ReturnType<typeof getMisPrestaciones>> = {
         prestaciones: [], total_ars: 0, total_usd: 0, validadas: 0, pendientes: 0,
     };
+    let profesionales: Awaited<ReturnType<typeof getProfesionales>> = [];
     let loadError: string | null = null;
 
     try {
-        [tarifarioData, resumen] = await Promise.all([
-            getTarifarioParaDoctor(worker.id),
-            getMisPrestaciones(worker.id),
-        ]);
+        if (!isRegistroMode) {
+            // Odontólogo: solo ve sus propias prestaciones, sin tarifario
+            resumen = await getMisPrestaciones(worker.id);
+        } else {
+            // Admin/asistente/owner: carga el tarifario completo y la lista de profesionales
+            [tarifario, profesionales] = await Promise.all([
+                getTarifarioCompleto(),
+                getProfesionales(),
+            ]);
+        }
     } catch (err) {
         console.error('[PrestacionesPage] Error loading data:', err);
         loadError = err instanceof Error ? err.message : 'Error al cargar datos';
@@ -47,9 +68,6 @@ export default async function PrestacionesPage() {
                 <p className="text-sm mt-2 text-slate-400 font-mono bg-slate-900 rounded p-3 max-w-lg mx-auto">
                     {loadError}
                 </p>
-                <p className="text-sm mt-4 text-slate-500">
-                    Verificá que la migración <code>20260226_prestaciones_hc.sql</code> fue aplicada en Supabase.
-                </p>
             </div>
         );
     }
@@ -57,9 +75,10 @@ export default async function PrestacionesPage() {
     return (
         <PrestacionesClient
             worker={worker}
-            tarifario={tarifarioData.items}
-            areasAsignadas={tarifarioData.areas}
+            viewMode={viewMode}
+            tarifario={tarifario}
             resumenInicial={resumen}
+            profesionales={isRegistroMode ? profesionales : undefined}
         />
     );
 }

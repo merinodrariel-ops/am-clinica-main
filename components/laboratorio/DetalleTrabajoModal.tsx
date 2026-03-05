@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { X, CheckCircle2, Ban, FlaskConical, Calendar, User, Stethoscope, Landmark, DollarSign } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import clsx from 'clsx';
 
 interface Trabajo {

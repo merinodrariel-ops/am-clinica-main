@@ -1,4 +1,5 @@
-import { supabase } from '../supabase';
+import { createAdminClient } from '@/utils/supabase/admin';
+const supabase = createAdminClient();
 import { fetchBNADolarVenta } from '../bna';
 import { PerformanceItem, DoctorLiquidation, StaffLiquidation, LiquidationPeriod } from './types';
 import { parseProsoftExcel } from './prosoft-parser';

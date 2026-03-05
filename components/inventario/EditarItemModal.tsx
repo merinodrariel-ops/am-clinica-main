@@ -5,7 +5,7 @@ import { X, Package, Loader2, Save, Tag, BarChart3, AlertCircle } from 'lucide-r
 import clsx from 'clsx';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { useAuth } from '@/contexts/AuthContext';
-import { actualizarItem } from '@/app/actions/inventory-update';
+import { updateInventoryProduct } from '@/app/actions/inventory-products';
 
 interface Item {
     id: string;
@@ -96,19 +96,17 @@ export default function EditarItemModal({ isOpen, onClose, onSuccess, item }: Ed
         setError(null);
 
         try {
-            const result = await actualizarItem({
+            const result = await updateInventoryProduct({
                 id: item.id,
-                nombre: formData.nombre,
-                categoria: formData.categoria,
-                stock_actual: formData.stock_actual,
-                unidad_medida: formData.unidad_medida,
-                stock_minimo: formData.stock_minimo,
-                area: formData.area,
-                marca: formData.marca,
-                proveedor: formData.proveedor,
-                descripcion: formData.descripcion,
-                link: formData.link,
-                userId: user.id
+                name: formData.nombre,
+                category: formData.categoria,
+                unit: formData.unidad_medida,
+                thresholdMin: formData.stock_minimo,
+                color: formData.area,
+                brand: formData.marca,
+                supplier: formData.proveedor,
+                notes: formData.descripcion,
+                link: formData.link
             });
 
             if (!result.success) {

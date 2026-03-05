@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { UserX, Clock, ArrowRight } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import Link from 'next/link';
 
 interface UserAlert {

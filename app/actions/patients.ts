@@ -1,13 +1,9 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/server';
 import { Paciente } from '@/lib/patients';
 import { syncPatientToSheet } from '@/lib/google-sheets';
 import { sendWelcomeEmailAction } from '@/app/actions/email';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Must use Service Role for rls bypass if needed, or consistent server access
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface UpsertPatientResult {
     success: boolean;
@@ -17,9 +13,97 @@ export interface UpsertPatientResult {
     message?: string;
 }
 
+export interface ListPatientsFilters {
+    search?: string;
+    estado?: string;
+    ciudad?: string;
+    limit?: number;
+    offset?: number;
+}
+
+export async function listPatientsAction(filters: ListPatientsFilters = {}) {
+    try {
+        const supabase = await createClient();
+
+        let query = supabase
+            .from('pacientes')
+            .select('*')
+            .eq('is_deleted', false)
+            .order('apellido', { ascending: true });
+
+        if (filters.search) {
+            const term = `%${filters.search}%`;
+            query = query.or(`apellido.ilike.${term},nombre.ilike.${term},email.ilike.${term},documento.ilike.${term},whatsapp.ilike.${term}`);
+        }
+
+        if (filters.estado) {
+            query = query.eq('estado_paciente', filters.estado);
+        }
+
+        if (filters.limit) {
+            query = query.limit(filters.limit);
+        }
+
+        if (filters.offset) {
+            query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return { success: true, data: data as Paciente[] };
+    } catch (error) {
+        console.error('Error listing patients:', error);
+        return { success: false, error: 'No se pudieron cargar los pacientes' };
+    }
+}
+
+export async function getPatientsCountAction(filters: ListPatientsFilters = {}) {
+    try {
+        const supabase = await createClient();
+
+        let query = supabase
+            .from('pacientes')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_deleted', false);
+
+        if (filters.search) {
+            const term = `%${filters.search}%`;
+            query = query.or(`apellido.ilike.${term},nombre.ilike.${term},email.ilike.${term},documento.ilike.${term},whatsapp.ilike.${term}`);
+        }
+
+        if (filters.estado) {
+            query = query.eq('estado_paciente', filters.estado);
+        }
+
+        const { count, error } = await query;
+        if (error) throw error;
+
+        return { success: true, count: count || 0 };
+    } catch (error) {
+        console.error('Error counting patients:', error);
+        return { success: false, count: 0 };
+    }
+}
+
 export async function upsertPatientAction(patientData: Partial<Paciente>): Promise<UpsertPatientResult> {
     try {
+        const supabase = await createClient();
         console.log('Starting upsertPatientAction', patientData.email, patientData.documento);
+
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: 'Sesión no autorizada. Por favor, inicia sesión.' };
+        }
+
+        const { data: profile } = await supabase.from('profiles').select('categoria').eq('id', user.id).maybeSingle();
+        const role = profile?.categoria || '';
+        const allowedRoles = ['admin', 'owner', 'reception', 'asistente', 'dr', 'developer'];
+
+        if (!allowedRoles.includes(role.toLowerCase())) {
+            return { success: false, error: 'No tienes permisos para gestionar pacientes.' };
+        }
 
         // 1. Check for duplicates
         let existingId: string | null = null;
@@ -29,58 +113,31 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             .from('pacientes')
             .select('*')
             .eq('is_deleted', false)
-            .or(`documento.eq.${patientData.documento || 'nonexistent'},email.eq.${patientData.email || 'nonexistent'},cuit.eq.${patientData.cuit || 'nonexistent'}`);
+            .or(`documento.eq.${patientData.documento || 'nonexistent'},email.eq.${patientData.email || 'nonexistent'}`);
 
         if (searchError) throw new Error(searchError.message);
 
-        // Refine duplicate check
         const normalization = (s: string | undefined | null) => s?.toString().trim().toLowerCase() || '';
 
-        // Priority 1: DNI
         if (patientData.documento) {
             const byDni = duplicates?.find(p => normalization(p.documento) === normalization(patientData.documento));
             if (byDni) {
                 existingId = byDni.id_paciente;
-                existingData = byDni;
+                existingData = byDni as Paciente;
             }
         }
 
-        // Priority 2: Email (if no DNI match yet)
         if (!existingId && patientData.email) {
             const byEmail = duplicates?.find(p => normalization(p.email) === normalization(patientData.email));
             if (byEmail) {
                 existingId = byEmail.id_paciente;
-                existingData = byEmail;
-            }
-        }
-
-        // Priority 3: Name + Surname + Phone (need separate query if not covered by OR above)
-        if (!existingId && !patientData.documento && !patientData.email) {
-            const { data: nameDuplicates } = await supabase
-                .from('pacientes')
-                .select('*')
-                .eq('is_deleted', false)
-                .ilike('nombre', patientData.nombre || '')
-                .ilike('apellido', patientData.apellido || '');
-
-            if (nameDuplicates && nameDuplicates.length > 0) {
-                const byPhone = nameDuplicates.find(p => normalization(p.whatsapp) === normalization(patientData.whatsapp));
-                if (byPhone) {
-                    existingId = byPhone.id_paciente;
-                    existingData = byPhone;
-                }
+                existingData = byEmail as Paciente;
             }
         }
 
         if (existingId && existingData) {
-            // UPDATE
-            console.log('Duplicate found. Updating:', existingId);
-
-            // Smart Merge Logic
             const updates: any = {};
             let hasChanges = false;
-
-            // Fields to check
             const fields: (keyof Paciente)[] = [
                 'nombre', 'apellido', 'documento', 'fecha_nacimiento',
                 'email', 'whatsapp', 'cuit', 'ciudad', 'zona_barrio', 'direccion',
@@ -91,12 +148,6 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             for (const key of fields) {
                 const newValue = patientData[key];
                 const oldValue = existingData[key];
-
-                // Logic:
-                // 1. If new value is empty, IGNORE (keep old value).
-                // 2. If new value is NOT empty:
-                //    - If old value was empty, UPDATE.
-                //    - If old value was different, UPDATE (most recent wins).
                 if (newValue !== undefined && newValue !== null && newValue !== '') {
                     if (newValue !== oldValue) {
                         updates[key] = newValue;
@@ -105,7 +156,6 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
                 }
             }
 
-            // Always update updated_at
             updates.updated_at = new Date().toISOString();
 
             if (hasChanges) {
@@ -118,44 +168,23 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
 
                 if (updateError) throw new Error(updateError.message);
 
-                // Audit Log (Update)
-                await supabase.from('audit_log').insert({
-                    modulo: 'Pacientes',
-                    accion: 'UPDATE_SMART',
-                    entidad_id: existingId,
-                    entidad_tipo: 'paciente',
-                    resumen_cambios: { updates },
-                    fecha_hora: new Date().toISOString()
-                });
-
-                // Sync to Sheets
                 await syncPatientToSheet(updated);
 
                 return {
                     success: true,
-                    data: updated,
+                    data: updated as Paciente,
                     action: 'updated',
-                    message: `Paciente actualizado correctamente (se detectó duplicado y se unificaron datos).`
+                    message: `Paciente actualizado correctamente.`
                 };
             } else {
-                // No changes needed, but sync to sheets just in case sheet is outdated
-                await syncPatientToSheet(existingData);
                 return {
                     success: true,
                     data: existingData,
                     action: 'updated',
-                    message: 'Paciente ya existe con datos idénticos. Sincronizado.'
+                    message: 'Paciente ya existe con datos idénticos.'
                 };
             }
-
         } else {
-            // CREATE
-            console.log('No duplicate found. Creating new patient.');
-            // Construct Helper fields if not present (though NuevoPacienteForm sends them)
-            // ... Logic inferred from input. 
-            // We just pass what we got.
-
-            // Standardize some fields
             const newPatientData = {
                 ...patientData,
                 fecha_alta: new Date().toISOString(),
@@ -171,7 +200,6 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
 
             if (createError) throw new Error(createError.message);
 
-            // NEW: Create Google Drive hierarchy for new patients
             try {
                 const { ensureStandardPatientFolders } = await import('@/lib/google-drive');
                 const driveResult = await ensureStandardPatientFolders(
@@ -181,70 +209,42 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
                 );
 
                 if (driveResult.motherFolderUrl) {
-                    // Update patient with the link
                     await supabase
                         .from('pacientes')
                         .update({ link_historia_clinica: driveResult.motherFolderUrl })
                         .eq('id_paciente', created.id_paciente);
-
-                    // Update the 'created' object for the return data
                     created.link_historia_clinica = driveResult.motherFolderUrl;
                 }
             } catch (driveErr) {
-                console.error('Error creating Drive folder for new patient:', driveErr);
-                // We don't throw here to avoid failing patient creation due to Drive issues
+                console.error('Error Drive:', driveErr);
             }
 
-            // Audit Log (Create)
-            await supabase.from('audit_log').insert({
-                modulo: 'Pacientes',
-                accion: 'CREATE_SMART',
-                entidad_id: created.id_paciente,
-                entidad_tipo: 'paciente',
-                resumen_cambios: { created: newPatientData },
-                fecha_hora: new Date().toISOString()
-            });
-
-            // Send Welcome Email
             if (patientData.consentimiento_comunicacion && created.email) {
                 try {
                     const emailResult = await sendWelcomeEmailAction(
                         `${created.nombre} ${created.apellido}`,
                         created.email
                     );
-
-                    // Log Email
-                    await supabase.from('email_log').insert({
-                        paciente_id: created.id_paciente,
-                        tipo: 'Bienvenida',
-                        estado: emailResult.success ? 'Enviado' : 'Fallido',
-                        error: emailResult.error ? String(emailResult.error) : undefined,
-                        fecha_hora: new Date().toISOString()
-                    });
-
                     if (emailResult.success) {
                         await supabase
                             .from('pacientes')
                             .update({ welcome_email_sent: true })
                             .eq('id_paciente', created.id_paciente);
                     }
-
                 } catch (e) {
-                    console.error('Email send execution error', e);
+                    console.error('Email error:', e);
                 }
             }
 
-            // Sync to Sheets
             await syncPatientToSheet(created);
 
             return {
                 success: true,
-                data: created,
+                data: created as Paciente,
                 action: 'created',
-                message: 'Paciente creado exitosamente y sincronizado.'
+                message: 'Paciente creado exitosamente.'
             };
         }
-
     } catch (error) {
         console.error('Error in upsertPatientAction:', error);
         return {

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAdmissionTriggers } from '@/hooks/useAdmissionTriggers';
-import { submitAdmissionAction, upsertAdmissionLeadAction } from '@/app/actions/admission';
+import { submitAdmissionAction, upsertAdmissionLeadAction, checkAdmissionIdentityAction } from '@/app/actions/admission';
 
 
 // --- Types ---
@@ -213,6 +213,7 @@ export default function PremiumAdmissionForm() {
     const [touched, setTouched] = useState<FormTouched>({});
     const [submitAttempted, setSubmitAttempted] = useState(false);
     const [direction, setDirection] = useState(1);
+    const [isValidating, setIsValidating] = useState(false);
 
     const {
         isOnline,
@@ -559,17 +560,40 @@ export default function PremiumAdmissionForm() {
                         <ArrowLeft className="w-4 h-4" /> Volver
                     </button>
                     <button
-                        onClick={() => {
+                        disabled={isValidating}
+                        onClick={async () => {
                             setSubmitAttempted(true);
                             setTouched({ firstName: true, lastName: true, dni: true, dob: true, city: true, neighborhood: true, email: true, phone: true });
-                            if (isStepValid) nextStep();
+                            if (isStepValid) {
+                                setIsValidating(true);
+                                try {
+                                    const res = await checkAdmissionIdentityAction({ dni: formData.dni, email: formData.email });
+                                    if (res.exists) {
+                                        toast.error('Este DNI o correo ya se encuentra registrado.', {
+                                            description: 'Si ya sos paciente, por favor contactanos por WhatsApp para agendar tu cita.'
+                                        });
+                                        setIsValidating(false);
+                                        return;
+                                    }
+                                    nextStep();
+                                } catch (error) {
+                                    toast.error('Error al validar los datos. Por favor intentá nuevamente.');
+                                    console.error(error);
+                                } finally {
+                                    setIsValidating(false);
+                                }
+                            }
                         }}
-                        className={`px-8 py-3 rounded-full text-sm uppercase tracking-wider transition-all duration-500 flex items-center gap-2 ${isStepValid
+                        className={`px-8 py-3 rounded-full text-sm uppercase tracking-wider transition-all duration-500 flex items-center gap-2 ${isStepValid && !isValidating
                             ? 'bg-white text-black hover:scale-105'
-                            : 'bg-white/5 text-zinc-600'
+                            : 'bg-white/5 text-zinc-600 cursor-not-allowed'
                             }`}
                     >
-                        Siguiente <ArrowRight className="w-4 h-4" />
+                        {isValidating ? (
+                            <>Validando...</>
+                        ) : (
+                            <>Siguiente <ArrowRight className="w-4 h-4" /></>
+                        )}
                     </button>
                 </div>
             </motion.div>
@@ -837,21 +861,21 @@ export default function PremiumAdmissionForm() {
                 <div className="space-y-3">
                     <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider ml-1">1. Realiza el pago</p>
 
-                    <a href="https://mpago.la/2rjmF2W" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-blue-500/50 hover:bg-blue-500/10 transition-all group">
+                    <a href="https://mpago.la/2rjmF2W" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group">
                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center shrink-0"><User className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><User className="w-5 h-5" /></div>
                             <div>
-                                <h4 className="text-base font-medium text-white group-hover:text-blue-400 transition-colors">Consulta Dr. Merino</h4>
+                                <h4 className="text-base font-medium text-white group-hover:text-zinc-300 transition-colors">Consulta Dr. Merino</h4>
                                 <p className="text-zinc-500 text-xs mt-0.5">Abonar mediante MercadoPago</p>
                             </div>
                         </div>
                     </a>
 
-                    <a href="https://mpago.la/2MJhrW6" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-purple-500/50 hover:bg-purple-500/10 transition-all group">
+                    <a href="https://mpago.la/2MJhrW6" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group">
                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></div>
                             <div>
-                                <h4 className="text-base font-medium text-white group-hover:text-purple-400 transition-colors">Consulta Staff Médico</h4>
+                                <h4 className="text-base font-medium text-white group-hover:text-zinc-300 transition-colors">Consulta Staff Médico</h4>
                                 <p className="text-zinc-500 text-xs mt-0.5">Abonar mediante MercadoPago</p>
                             </div>
                         </div>
@@ -860,21 +884,21 @@ export default function PremiumAdmissionForm() {
 
                 <div className="space-y-3 pt-4">
                     <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider ml-1">2. Reserva tu horario</p>
-                    <a href="https://calendar.app.google/oc4VZPzsDkhwB3r58" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all group">
+                    <a href="https://calendar.app.google/oc4VZPzsDkhwB3r58" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group">
                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center shrink-0"><Calendar className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><Calendar className="w-5 h-5" /></div>
                             <div>
-                                <h4 className="text-base font-medium text-white group-hover:text-emerald-400 transition-colors">Agendar turno online</h4>
+                                <h4 className="text-base font-medium text-white group-hover:text-zinc-300 transition-colors">Agendar turno online</h4>
                                 <p className="text-zinc-500 text-xs mt-0.5">Presencial o videollamada</p>
                             </div>
                         </div>
                     </a>
 
-                    <a href="https://wa.link/zolb52" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-green-500/50 hover:bg-green-500/10 transition-all group">
+                    <a href="https://wa.link/zolb52" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group">
                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center shrink-0"><MessageCircle className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><MessageCircle className="w-5 h-5" /></div>
                             <div>
-                                <h4 className="text-base font-medium text-white group-hover:text-green-400 transition-colors">Agendar por WhatsApp</h4>
+                                <h4 className="text-base font-medium text-white group-hover:text-zinc-300 transition-colors">Agendar por WhatsApp</h4>
                                 <p className="text-zinc-500 text-xs mt-0.5">Habla con una ejecutiva</p>
                             </div>
                         </div>
@@ -884,16 +908,16 @@ export default function PremiumAdmissionForm() {
                 <div className="space-y-3 pt-4">
                     <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider ml-1">3. Cómo llegar</p>
                     <div className="grid grid-cols-2 gap-3">
-                        <a href="https://maps.app.goo.gl/MF3w2f2qPGMgUwKx5" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-red-500/50 hover:bg-red-500/10 transition-all group text-center">
+                        <a href="https://maps.app.goo.gl/MF3w2f2qPGMgUwKx5" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group text-center">
                             <div className="flex flex-col items-center gap-2">
-                                <div className="w-10 h-10 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center shrink-0"><MapPin className="w-5 h-5" /></div>
-                                <h4 className="text-sm font-medium text-white group-hover:text-red-400 transition-colors">Google Maps</h4>
+                                <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><MapPin className="w-5 h-5" /></div>
+                                <h4 className="text-sm font-medium text-white group-hover:text-zinc-300 transition-colors">Google Maps</h4>
                             </div>
                         </a>
-                        <a href="https://waze.com/ul/hd1uy2s0h8" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group text-center">
+                        <a href="https://waze.com/ul/hd1uy2s0h8" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group text-center">
                             <div className="flex flex-col items-center gap-2">
-                                <div className="w-10 h-10 bg-cyan-500/20 text-cyan-400 rounded-full flex items-center justify-center shrink-0"><Navigation className="w-5 h-5" /></div>
-                                <h4 className="text-sm font-medium text-white group-hover:text-cyan-400 transition-colors">Waze</h4>
+                                <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><Navigation className="w-5 h-5" /></div>
+                                <h4 className="text-sm font-medium text-white group-hover:text-zinc-300 transition-colors">Waze</h4>
                             </div>
                         </a>
                     </div>
@@ -908,9 +932,7 @@ export default function PremiumAdmissionForm() {
             <div className="fixed inset-0 bg-noise pointer-events-none z-0" />
             <div className="fixed inset-0 bg-grid-white opacity-[0.03] pointer-events-none z-0" />
 
-            <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '8s' }} />
-            <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '12s' }} />
-            <div className="fixed top-[20%] right-[10%] w-[30%] h-[30%] rounded-full bg-emerald-500/5 blur-[100px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '10s' }} />
+            <div className="fixed top-[0%] left-[20%] w-[60%] h-[60%] rounded-full bg-white/5 blur-[120px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '10s' }} />
 
 
             {step > 0 && step < totalSteps - 1 && (

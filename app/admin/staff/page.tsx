@@ -153,7 +153,7 @@ const STAFF_CATEGORY_ORDER_KEY = 'am.staff.category-order';
 const STAFF_GROUP_KEY = 'am.staff.group-mode';
 const STAFF_DENSE_KEY = 'am.staff.dense-mode';
 
-type GroupMode = 'category' | 'company' | 'access' | 'compliance';
+type GroupMode = 'role' | 'company' | 'access' | 'compliance';
 
 type InlineDraft = {
     email: string;
@@ -175,7 +175,7 @@ export default function StaffListPage() {
     const [onlyActive, setOnlyActive] = useState(false);
     const [viewMode, setViewMode] = useState<'board' | 'table'>('board');
     const [categoryOrderPreference, setCategoryOrderPreference] = useState<string[]>([]);
-    const [groupMode, setGroupMode] = useState<GroupMode>('category');
+    const [groupMode, setGroupMode] = useState<GroupMode>('role');
     const [denseMode, setDenseMode] = useState(false);
     const [prefsReady, setPrefsReady] = useState(false);
     const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>({});
@@ -219,7 +219,7 @@ export default function StaffListPage() {
         }
 
         const savedGroup = window.localStorage.getItem(STAFF_GROUP_KEY);
-        if (savedGroup === 'category' || savedGroup === 'company' || savedGroup === 'access' || savedGroup === 'compliance') {
+        if (savedGroup === 'role' || savedGroup === 'company' || savedGroup === 'access' || savedGroup === 'compliance') {
             setGroupMode(savedGroup);
         }
 
@@ -489,7 +489,7 @@ export default function StaffListPage() {
     }, [groupedByCategory.dynamicCategories]);
 
     const boardColumns = useMemo(() => {
-        if (groupMode === 'category') {
+        if (groupMode === 'role') {
             return orderedCategories.map((cat) => ({
                 key: cat,
                 label: getCategoryLabel(cat),
@@ -714,7 +714,7 @@ export default function StaffListPage() {
                         {denseMode ? 'Compacto ON' : 'Compacto OFF'}
                     </button>
                     <div className="text-xs text-slate-500 lg:ml-auto">
-                        {filteredWorkers.length} resultados · {groupMode === 'category' ? 'Drag de tarjetas/columnas habilitado' : 'Drag disponible al agrupar por categoría'}
+                        {filteredWorkers.length} resultados · {groupMode === 'role' ? 'Drag de tarjetas/columnas habilitado' : 'Drag disponible al agrupar por categoría'}
                     </div>
                 </div>
             </div>

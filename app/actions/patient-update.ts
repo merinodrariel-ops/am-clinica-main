@@ -1,6 +1,6 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 // Fields we consider "updatable" — the ones old patients may be missing
 const UPDATABLE_FIELDS = [
@@ -67,6 +67,7 @@ export async function lookupPatient(
     input: string,
     method: SearchMethod = 'auto'
 ): Promise<PatientLookupResult> {
+    const supabase = await createClient();
     const trimmed = input.trim();
     if (!trimmed || trimmed.length < 3) {
         return { found: false, error: 'Ingresá al menos tu DNI, WhatsApp o email' };
@@ -195,6 +196,7 @@ function buildPatientResult(patient: Record<string, unknown>): PatientLookupResu
 
 // Direct lookup by id (for disambiguation selection)
 export async function lookupPatientById(id: string): Promise<PatientLookupResult> {
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from('pacientes')
         .select('id_paciente, nombre, apellido, fecha_nacimiento, ciudad, zona_barrio, email, whatsapp')
@@ -218,6 +220,7 @@ export async function updatePatientData(
     id_paciente: string,
     updates: Partial<Record<UpdatableField, string>>
 ): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createClient();
     if (!id_paciente) {
         return { success: false, error: 'ID de paciente no proporcionado' };
     }

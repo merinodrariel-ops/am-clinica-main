@@ -2,7 +2,9 @@
 // Redesigned version v1.2 - Added patient profile links
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import { UserPlus, TrendingUp, AlertCircle, ArrowRight, ChevronLeft, ChevronRight, User, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import {

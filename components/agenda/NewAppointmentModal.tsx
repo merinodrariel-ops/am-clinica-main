@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 
-import { supabase, type TarifarioItem } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+import { type TarifarioItem } from '@/lib/supabase';
 
 interface Patient {
     id: string;
@@ -44,6 +45,7 @@ interface NewAppointmentModalProps {
 }
 
 export default function NewAppointmentModal({ isOpen, onClose, onSave, initialData, initialDate }: NewAppointmentModalProps) {
+    const supabase = createClient();
     const [loading, setLoading] = useState(false);
     const [doctors, setDoctors] = useState<Doctor[]>([]);
 

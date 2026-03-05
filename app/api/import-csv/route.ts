@@ -41,11 +41,11 @@ export async function POST(request: NextRequest) {
         // Check user role
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('categoria')
             .eq('id', user.id)
             .single();
 
-        if (!profile || !['owner', 'admin'].includes(profile.role)) {
+        if (!profile || !['owner', 'admin'].includes(profile.categoria)) {
             return NextResponse.json({ error: 'Sin permisos de importación' }, { status: 403 });
         }
 

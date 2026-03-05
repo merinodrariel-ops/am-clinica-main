@@ -183,7 +183,7 @@ export async function getDoctors() {
 
     const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, role')
+        .select('id, full_name, categoria')
         .in('id', userIds);
 
     if (profilesError) {
@@ -202,7 +202,7 @@ export async function getDoctors() {
             return {
                 id: profile.id,
                 full_name: profile.full_name || fallbackName || 'Odontólogo',
-                role: profile.role,
+                role: profile.categoria,
             };
         })
         .filter((doctor): doctor is { id: string; full_name: string; role: string } => Boolean(doctor))

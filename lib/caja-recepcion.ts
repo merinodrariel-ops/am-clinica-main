@@ -7,6 +7,8 @@ import {
 } from "./supabase";
 import { createClient } from "@/utils/supabase/client";
 import { getLocalISODate } from "@/lib/local-date";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "@/lib/database-types";
 
 const getSupabase = () => createClient();
 
@@ -182,8 +184,10 @@ export async function getMovimientosDelDia(
 
 export async function getMovimientosPorPaciente(
   pacienteId: string,
+  supabase?: SupabaseClient<Database>
 ): Promise<CajaMovimiento[]> {
-  const { data, error } = await getSupabase()
+  const client = supabase || getSupabase();
+  const { data, error } = await client
     .from("caja_recepcion_movimientos")
     .select("*")
     .eq("paciente_id", pacienteId)

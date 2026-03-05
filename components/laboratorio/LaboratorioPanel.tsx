@@ -12,7 +12,9 @@ import {
     Loader2,
     Package,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import clsx from 'clsx';
 import Link from 'next/link';
 import NuevoTrabajoForm from '@/components/laboratorio/NuevoTrabajoForm';

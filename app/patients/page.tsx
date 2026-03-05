@@ -3,32 +3,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     Plus,
-    ExternalLink,
     Search,
     RefreshCw,
     Loader2,
-    UserPlus,
     Copy,
     Check
 } from 'lucide-react';
 import Link from 'next/link';
 import PatientList from '@/components/patients/PatientList';
-import NuevoPacienteForm from '@/components/patients/NuevoPacienteForm';
-import { getPacientes, getTotalPatientsCount, Paciente } from '@/lib/patients';
+import { listPatientsAction, getPatientsCountAction } from '@/app/actions/patients';
+import { type Paciente } from '@/lib/patients';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import { useAuth } from '@/contexts/AuthContext';
-
-const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSexSoCAmFdYp1k8WOIZoMAXVVSnGvI70rjr2_u3hA2LoUuKAw/viewform';
 
 export default function PatientsPage() {
     const { canEdit } = useAuth();
     const [patients, setPatients] = useState<Paciente[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
-    const [syncing, setSyncing] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const handleCopyAdmissionLink = async () => {
@@ -46,19 +40,25 @@ export default function PatientsPage() {
     const loadPatients = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await getPacientes({
+            const res = await listPatientsAction({
                 search: searchTerm || undefined,
                 estado: estadoFilter || undefined,
                 limit: 1000,
             });
-            setPatients(data);
+
+            if (res.success && res.data) {
+                setPatients(res.data);
+            }
 
             // Get accurate count
-            const count = await getTotalPatientsCount({
+            const countRes = await getPatientsCountAction({
                 search: searchTerm || undefined,
                 estado: estadoFilter || undefined,
             });
-            setTotalCount(count);
+
+            if (countRes.success) {
+                setTotalCount(countRes.count);
+            }
         } catch (error) {
             console.error('Error loading patients:', error);
         } finally {
@@ -66,37 +66,9 @@ export default function PatientsPage() {
         }
     }, [searchTerm, estadoFilter]);
 
-    const handleSyncSheets = useCallback(async (silent = false) => {
-        setSyncing(true);
-        try {
-            const res = await fetch('/api/sync-pacientes-sheets');
-            const data = await res.json();
-            if (data.success || data.stats) {
-                if (!silent) {
-                    const message = `Sincronización finalizada:\n- Nuevos: ${data.stats.newlyImported}\n- Duplicados saltados: ${data.stats.skippedDuplicates}\n- Errores: ${data.stats.errors}`;
-                    alert(message);
-                }
-                loadPatients();
-            } else if (!silent) {
-                alert(`Error en sincronización: ${data.error || 'Error desconocido'}`);
-            }
-        } catch (error) {
-            console.error('Error syncing:', error);
-            if (!silent) alert('Error de conexión al sincronizar con Google Sheets');
-        } finally {
-            setSyncing(false);
-        }
-    }, [loadPatients]);
-
     // Initial load only on mount
     useEffect(() => {
         loadPatients();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Intentionally only on mount
-
-    // Trigger silent sync only once on first mount
-    useEffect(() => {
-        handleSyncSheets(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Intentionally only on mount
 
@@ -124,40 +96,24 @@ export default function PatientsPage() {
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={handleCopyAdmissionLink}
-                                className={`flex items-center gap-2 px-4 py-2.5 border transition-all rounded-l-lg font-medium ${copied
+                                className={`flex items-center gap-2 px-4 py-2.5 border transition-all rounded-lg font-medium ${copied
                                     ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
-                                    : 'border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
+                                    : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
                                     }`}
                                 title="Copiar link del formulario de admisión para pacientes"
                             >
                                 {copied ? <Check size={18} /> : <Copy size={18} />}
-                                {copied ? '¡Link Copiado!' : 'Copiar Link de Admisión'}
+                                {copied ? '¡Copiado!' : 'Copiar Formulario'}
                             </button>
-                            <a
+                            <Link
                                 href="/admision"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center px-2.5 py-2.5 border border-l-0 border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-r-lg transition-colors"
-                                title="Abrir formulario en nueva ventana"
-                            >
-                                <ExternalLink size={18} />
-                            </a>
-                            <button
-                                onClick={() => handleSyncSheets(false)}
-                                disabled={syncing}
-                                className="flex items-center gap-2 px-4 py-2.5 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg font-medium transition-colors disabled:opacity-50"
-                                title="Sincronizar directamente con las respuestas de Google Form"
-                            >
-                                <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
-                                {syncing ? 'Sincronizando...' : 'Sincronizar Google Form'}
-                            </button>
-                            <button
-                                onClick={() => setShowNuevoPaciente(true)}
                                 className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-400 text-white rounded-lg font-medium transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] hover:opacity-90 border-none"
                             >
                                 <Plus size={20} />
                                 Agregar Paciente
-                            </button>
+                            </Link>
                         </div>
                     )}
                 </div>
@@ -215,13 +171,6 @@ export default function PatientsPage() {
                 ) : (
                     <PatientList patients={patients} onRefresh={loadPatients} />
                 )}
-
-                {/* Nuevo Paciente Modal */}
-                <NuevoPacienteForm
-                    isOpen={showNuevoPaciente}
-                    onClose={() => setShowNuevoPaciente(false)}
-                    onSuccess={loadPatients}
-                />
             </div>
         </CategoriaGuard>
     );

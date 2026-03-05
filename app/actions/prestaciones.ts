@@ -191,11 +191,11 @@ export async function createTarifarioItem(input: CreateTarifarioItemInput): Prom
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['owner', 'admin'].includes(profile.role)) {
+    if (!profile || !['owner', 'admin'].includes(profile.categoria)) {
         throw new Error('No autorizado para crear prestaciones');
     }
 
@@ -250,11 +250,11 @@ export async function deactivateTarifarioItem(id: string): Promise<{ success: tr
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['owner', 'admin'].includes(profile.role)) {
+    if (!profile || !['owner', 'admin'].includes(profile.categoria)) {
         throw new Error('No autorizado para desactivar prestaciones');
     }
 
@@ -296,11 +296,11 @@ export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Prom
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['owner', 'admin'].includes(profile.role)) {
+    if (!profile || !['owner', 'admin'].includes(profile.categoria)) {
         throw new Error('No autorizado para editar tarifario');
     }
 
@@ -590,12 +590,13 @@ export async function buscarPacientes(q: string): Promise<
     { id_paciente: string; nombre: string; apellido: string }[]
 > {
     if (!q || q.length < 2) return [];
-    const supabase = await createClient();
-    const { data } = await supabase
+    // Use admin client so all portal roles (asistente, etc.) can search patients
+    const admin = getAdminClient();
+    const { data } = await admin
         .from('pacientes')
         .select('id_paciente, nombre, apellido')
         .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%`)
-        .limit(8);
+        .limit(10);
 
     return data || [];
 }

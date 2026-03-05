@@ -14,7 +14,7 @@
 import { NextResponse } from 'next/server';
 import {
     generateTreatmentTimelineEmail,
-    generateWelcomeMessage,
+    generatePremiumWelcomeEmail,
     generatePatientMagicLinkEmail,
     generateInvitationMessage,
 } from '@/lib/email-templates';
@@ -96,7 +96,7 @@ function getTemplateHtml(template: string, currentStage: number): string {
             });
 
         case 'welcome':
-            return generateWelcomeMessage('Valentina');
+            return generatePremiumWelcomeEmail('Valentina', `${appUrl}/mi-clinica`);
 
         case 'magic-link':
             return generatePatientMagicLinkEmail('Valentina', `${appUrl}/mi-clinica/TOKEN_DE_EJEMPLO`);

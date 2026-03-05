@@ -151,6 +151,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         observaciones: '',
     });
     const [submitting, setSubmitting] = useState(false);
+    const [normalizingWhatsapps, setNormalizingWhatsapps] = useState(false);
     const [hourConfig, setHourConfig] = useState({
         cleaningHourValue: 0,
         staffGeneralHourValue: 0,
@@ -177,11 +178,87 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         return tipo === 'odontologo' || tipo === 'profesional';
     }
 
-    function getWhatsAppLink(phone?: string | null) {
-        if (!phone) return null;
-        const digits = phone.replace(/\D/g, '');
+    function normalizeWhatsAppE164(value?: string | null): string | null {
+        if (!value) return null;
+
+        const raw = value.trim();
+        if (!raw) return null;
+
+        let digits = raw.replace(/\D/g, '');
         if (!digits) return null;
-        return `https://wa.me/${digits}`;
+
+        if (!raw.startsWith('+')) {
+            digits = `54${digits}`;
+        }
+
+        if (digits.startsWith('54')) {
+            let rest = digits.slice(2).replace(/^0+/, '');
+
+            if (!rest.startsWith('9')) {
+                rest = `9${rest}`;
+            }
+
+            let local = rest.slice(1).replace(/^0+/, '');
+
+            for (let areaLen = 2; areaLen <= 4; areaLen += 1) {
+                if (local.length > areaLen + 5 && local.slice(areaLen, areaLen + 2) === '15') {
+                    local = `${local.slice(0, areaLen)}${local.slice(areaLen + 2)}`;
+                    break;
+                }
+            }
+
+            digits = `549${local}`;
+        }
+
+        if (digits.length < 10 || digits.length > 15) {
+            return null;
+        }
+
+        return `+${digits}`;
+    }
+
+    function getWhatsAppLink(phone?: string | null) {
+        const normalized = normalizeWhatsAppE164(phone);
+        if (!normalized) return null;
+        return `https://wa.me/${normalized.replace(/\D/g, '')}`;
+    }
+
+    async function handleNormalizeExistingWhatsapps() {
+        if (normalizingWhatsapps) return;
+
+        const candidates = personal
+            .filter((p) => Boolean(p.whatsapp))
+            .map((p) => ({
+                id: p.id,
+                current: p.whatsapp || '',
+                normalized: normalizeWhatsAppE164(p.whatsapp),
+            }))
+            .filter((item) => item.normalized && item.current !== item.normalized) as Array<{ id: string; current: string; normalized: string }>;
+
+        if (candidates.length === 0) {
+            alert('No hay numeros para corregir.');
+            return;
+        }
+
+        setNormalizingWhatsapps(true);
+        try {
+            let updated = 0;
+
+            for (const item of candidates) {
+                const result = await updatePersonal(item.id, { whatsapp: item.normalized });
+                if (result.success) {
+                    updated += 1;
+                }
+            }
+
+            if (updated > 0) {
+                await loadData();
+            }
+
+            alert(`WhatsApp corregidos: ${updated} de ${candidates.length}.`);
+        } finally {
+            setNormalizingWhatsapps(false);
+        }
     }
 
     async function loadData() {
@@ -283,13 +360,24 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             return;
         }
 
+        const normalizedWhatsapp = normalizeWhatsAppE164(formData.whatsapp || '');
+        if (formData.whatsapp && !normalizedWhatsapp) {
+            alert('WhatsApp inválido. Usá formato internacional con código de país (ej: +549...) y sin 0/15.');
+            return;
+        }
+
+        const payload = {
+            ...formData,
+            whatsapp: normalizedWhatsapp || '',
+        };
+
         setSubmitting(true);
         try {
             if (editingPersonal) {
                 // Cast to Partial<Personal> for update compatibility
-                await updatePersonal(editingPersonal.id, formData as unknown as Parameters<typeof updatePersonal>[1]);
+                await updatePersonal(editingPersonal.id, payload as unknown as Parameters<typeof updatePersonal>[1]);
             } else {
-                await createPersonal(formData);
+                await createPersonal(payload);
             }
             setShowForm(false);
             setEditingPersonal(null);
@@ -812,15 +900,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 );
                             })}
                         </div>
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700 max-w-md">
-                            <Search className="w-5 h-5 text-slate-400" />
-                            <Input
-                                type="text"
-                                placeholder={`Buscar en ${activeProviderLabel.toLowerCase()}...`}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-transparent border-none outline-none text-sm flex-1 focus-visible:ring-0 shadow-none h-auto p-0"
-                            />
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700 max-w-md flex-1 min-w-[240px]">
+                                <Search className="w-5 h-5 text-slate-400" />
+                                <Input
+                                    type="text"
+                                    placeholder="Buscar..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="bg-transparent border-none outline-none text-sm flex-1 focus-visible:ring-0 shadow-none h-auto p-0"
+                                />
+                            </div>
                         </div>
                         {hiddenUserPlaceholdersCount > 0 && (
                             <p className="text-xs text-slate-500 px-1">
@@ -996,9 +1086,18 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             type="tel"
                                             value={formData.whatsapp}
                                             onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                                            onBlur={() => {
+                                                const normalized = normalizeWhatsAppE164(formData.whatsapp || '');
+                                                if (normalized) {
+                                                    setFormData((prev) => ({ ...prev, whatsapp: normalized }));
+                                                }
+                                            }}
                                             className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                            placeholder="1123456789"
+                                            placeholder="+5491123456789"
                                         />
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Formato internacional. Inclui codigo de pais y no uses 0 ni 15.
+                                        </p>
                                     </div>
                                 </div>
 
@@ -1065,14 +1164,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                     <BadgeCheck className="w-4 h-4 inline mr-1" />
-                                                    Matrícula Provincial
+                                                    Matricula nacional
                                                 </label>
                                                 <Input
                                                     type="text"
                                                     value={formData.matricula_provincial}
                                                     onChange={(e) => setFormData({ ...formData, matricula_provincial: e.target.value })}
                                                     className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                                                    placeholder="MP-12345"
+                                                    placeholder="MN-12345"
                                                 />
                                             </div>
                                             <div>

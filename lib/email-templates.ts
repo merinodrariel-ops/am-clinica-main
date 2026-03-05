@@ -1,50 +1,163 @@
-export function generateWelcomeMessage(nombre: string): string {
-  return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head><meta charset="UTF-8"></head>
-    <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
-      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f4f4;">
-        <tr><td align="center">
-          <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; margin: 20px 0;">
-            <tr><td align="center" style="background-color: #000000; padding: 20px 0;">
-              <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="Logo AM Estética Dental" height="50" style="display: block; height: 50px;">
-            </td></tr>
-            <tr><td style="padding: 30px;">
-              <h2 style="color: #333333;">¡Hola, ${nombre}!</h2>
-              <p style="color: #555555; line-height: 1.6;">Gracias por completar tu ficha. Estás a solo dos pasos de confirmar tu cita en AM Estética Dental - Puerto Madero.</p>
-              
-              <h3 style="color: #333333; border-bottom: 1px solid #eeeeee; padding-bottom: 10px;">Paso 1: Realiza el pago</h3>
-              <p style="color: #555555;">Para poder acceder a la agenda, primero es necesario completar el pago a través del siguiente enlace:</p>
-              <p style="text-align: center; margin: 20px 0;">
-                <a href="https://mpago.la/2rjmF2W" style="background-color: #111111; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 16px;">Pagar Consulta Dr. Merino</a>
-              </p>
+export function generatePremiumWelcomeEmail(nombre: string, portalUrl?: string): string {
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenido a AM Clínica</title>
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000;padding:40px 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#050505;border:1px solid rgba(201,169,110,0.15);border-radius:4px;overflow:hidden;">
+                    
+                    <!-- Top Ribbon -->
+                    <tr>
+                        <td height="4" style="background:linear-gradient(90deg, transparent, #C9A96E, transparent);"></td>
+                    </tr>
 
-              <h3 style="color: #333333; border-bottom: 1px solid #eeeeee; padding-bottom: 10px;">Paso 2: Elige tu turno</h3>
-              <p style="color: #555555;">Una vez realizado el pago, haz clic aquí para ver la disponibilidad y seleccionar tu horario:</p>
-              <p style="text-align: center; margin: 20px 0;">
-                <a href="https://calendar.app.google/oc4VZPzsDkhwB3r58" style="background-color: #111111; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 16px;">Ver Disponibilidad y Agendar</a>
-              </p>
-              <p style="font-size: 14px; text-align: center; color: #777777;">¿No encuentras un horario? <a href="https://wa.link/zolb52" style="color: #111111;">Contáctanos por WhatsApp</a>.</p>
-            </td></tr>
-            <tr><td style="background-color: #f8f8f8; padding: 20px 30px;">
-              <h4 style="color: #333333; margin-top: 0;">Información Importante</h4>
-              <p style="color: #555555; font-size: 14px; line-height: 1.8;">
-                <strong>Dirección:</strong> Camila O'Gorman 412, Piso 17, Depto. 1701, Puerto Madero. <a href="https://maps.app.goo.gl/4uU7dtb4Q1RYHeVw8" style="color: #111111;">Ver mapa</a>.<br>
-                <strong>Tolerancia:</strong> 15 minutos. Luego, el turno se cancela.<br>
-                <strong>Acompañantes:</strong> No está permitido concurrir con acompañantes.<br>
-                <strong>Cancelación:</strong> Debe ser con 24hs de anticipación para reasignar sin cargo.
-              </p>
-            </td></tr>
-          </table>
-        </td></tr>
-      </table>
-    </body>
-    </html>`;
+                    <!-- Logo Section -->
+                    <tr>
+                        <td align="center" style="padding:40px 0 20px;">
+                            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM Clínica" height="35" style="display:block;height:35px;filter:brightness(0) invert(1);">
+                        </td>
+                    </tr>
+
+                    <!-- Key Visual -->
+                    <tr>
+                        <td align="center" style="padding:10px 0 30px;">
+                            <div style="width:70px;height:70px;background-color:rgba(201,169,110,0.05);border-radius:50%;border:1px solid rgba(201,169,110,0.2);display:inline-block;padding:15px;box-shadow: 0 0 20px rgba(201,169,110,0.1);">
+                                <img src="https://cdn-icons-png.flaticon.com/512/3596/3596165.png" width="40" style="filter:invert(84%) sepia(21%) saturate(798%) hue-rotate(345deg) brightness(88%) contrast(85%);" alt="Welcome">
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Content Section -->
+                    <tr>
+                        <td align="center" style="padding:0 50px 30px;">
+                            <p style="margin:0 0 12px;color:#C9A96E;font-size:10px;letter-spacing:5px;text-transform:uppercase;font-weight:700;">Admisión Completada</p>
+                            <h1 style="margin:0 0 24px;font-size:28px;font-weight:300;letter-spacing:-0.5px;line-height:1.2;color:#ffffff;font-family:'Times New Roman',serif;">
+                                Bienvenido, <br><span style="color:#C9A96E;font-weight:700;">${nombre}.</span>
+                            </h1>
+                            <p style="margin:0 0 30px;color:rgba(255,255,255,0.6);font-size:15px;line-height:1.7;font-weight:400;">
+                                Gracias por completar tu ficha clínica. Estás a solo dos pasos de confirmar tu experiencia en <strong>AM Estética Dental</strong>.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Steps Container -->
+                    <tr>
+                        <td style="padding:0 40px 40px;">
+                            
+                            <!-- Step 1 -->
+                            <div style="background-color:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:30px;border-radius:4px;margin-bottom:20px;">
+                                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td width="50" valign="top">
+                                            <div style="width:36px;height:36px;border-radius:50%;background-color:rgba(201,169,110,0.1);color:#C9A96E;font-weight:bold;text-align:center;line-height:36px;font-size:16px;border:1px solid rgba(201,169,110,0.3);">1</div>
+                                        </td>
+                                        <td>
+                                            <h3 style="margin:0 0 10px;color:#ffffff;font-size:16px;font-weight:600;">Reserva tu lugar</h3>
+                                            <p style="margin:0 0 20px;color:rgba(255,255,255,0.5);font-size:14px;line-height:1.6;">Abona la consulta para habilitar el calendario de turnos. Solo trabajamos con reservas confirmadas por estricto orden de agenda.</p>
+                                            <a href="https://mpago.la/2rjmF2W" style="display:inline-block;padding:12px 25px;background-color:#111;border:1px solid #C9A96E;color:#C9A96E;text-decoration:none;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;border-radius:2px;transition:all 0.3s ease;">
+                                                Abonar Consulta
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Step 2 -->
+                            <div style="background-color:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:30px;border-radius:4px;">
+                                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td width="50" valign="top">
+                                            <div style="width:36px;height:36px;border-radius:50%;background-color:rgba(255,255,255,0.05);color:#fff;font-weight:bold;text-align:center;line-height:36px;font-size:16px;border:1px solid rgba(255,255,255,0.1);">2</div>
+                                        </td>
+                                        <td>
+                                            <h3 style="margin:0 0 10px;color:#ffffff;font-size:16px;font-weight:600;">Elige tu horario</h3>
+                                            <p style="margin:0 0 20px;color:rgba(255,255,255,0.5);font-size:14px;line-height:1.6;">Una vez acreditado el pago, podrás acceder al calendario en tiempo real y seleccionar la ventana horaria que prefieras.</p>
+                                            <a href="https://calendar.app.google/oc4VZPzsDkhwB3r58" style="display:inline-block;padding:12px 25px;background-color:#C9A96E;color:#000;text-decoration:none;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;border-radius:2px;">
+                                                Ver Disponibilidad
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                        </td>
+                    </tr>
+
+                    <!-- Important Info Section -->
+                    <tr>
+                        <td style="padding:40px;background-color:#0a0a0a;border-top:1px solid rgba(255,255,255,0.05);">
+                            <h4 style="margin:0 0 20px;color:#C9A96E;font-size:12px;letter-spacing:2px;text-transform:uppercase;text-align:center;">Detalles Importantes</h4>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:15px;">
+                                <tr>
+                                    <td width="30" valign="top" style="color:rgba(255,255,255,0.3);padding-top:2px;font-size:16px;">📍</td>
+                                    <td style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.5;">
+                                        <strong>Location:</strong> Camila O'Gorman 412, Piso 17, Dpto. 1701, Puerto Madero. <br>
+                                        <a href="https://maps.app.goo.gl/4uU7dtb4Q1RYHeVw8" style="color:#C9A96E;text-decoration:none;font-size:12px;">Cómo llegar &rarr;</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:15px;">
+                                <tr>
+                                    <td width="30" valign="top" style="color:rgba(255,255,255,0.3);padding-top:2px;font-size:16px;">⏱️</td>
+                                    <td style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.5;">
+                                        <strong>Tolerancia:</strong> Máximo 15 minutos. Luego de ese tiempo, el turno se cancela automáticamente por respeto al siguiente paciente.
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:15px;">
+                                <tr>
+                                    <td width="30" valign="top" style="color:rgba(255,255,255,0.3);padding-top:2px;font-size:16px;">👥</td>
+                                    <td style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.5;">
+                                        <strong>Acompañantes:</strong> Para mantener la exclusividad y tranquilidad del espacio, no está permitido concurrir con acompañantes.
+                                    </td>
+                                </tr>
+                            </table>
+
+                             <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td width="30" valign="top" style="color:rgba(255,255,255,0.3);padding-top:2px;font-size:16px;">📅</td>
+                                    <td style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.5;">
+                                        <strong>Cancelaciones:</strong> Deben realizarse con 24 horas de anticipación para poder reasignar el turno sin cargo.
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <div style="text-align:center;margin-top:35px;">
+                                <p style="margin:0;color:rgba(255,255,255,0.3);font-size:12px;">¿Necesitas ayuda personalizada?</p>
+                                <a href="https://wa.link/zolb52" style="display:inline-block;margin-top:10px;color:#C9A96E;text-decoration:none;font-size:13px;font-weight:600;">Contactar vía WhatsApp</a>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Institutional Footer -->
+                <table width="600" cellpadding="0" cellspacing="0" border="0" style="margin-top:40px;">
+                    <tr>
+                        <td align="center">
+                            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:10px;letter-spacing:1px;text-transform:uppercase;">
+                                AM Clínica Dental · Excellence in Puerto Madero
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
 }
 
 export function generatePatientMagicLinkEmail(nombre: string, link: string): string {
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -135,35 +248,35 @@ export function generatePatientMagicLinkEmail(nombre: string, link: string): str
 }
 
 export function generateTreatmentTimelineEmail(params: {
-  nombre: string;
-  workflowName: string;
-  currentStageName: string;
-  currentStageOrder: number;
-  allStages: Array<{ name: string; order_index: number }>;
-  portalUrl: string;
-  nextAppointmentDate?: string | null;
+    nombre: string;
+    workflowName: string;
+    currentStageName: string;
+    currentStageOrder: number;
+    allStages: Array<{ name: string; order_index: number }>;
+    portalUrl: string;
+    nextAppointmentDate?: string | null;
 }): string {
-  const { nombre, workflowName, currentStageName, currentStageOrder, allStages, portalUrl, nextAppointmentDate } = params;
+    const { nombre, workflowName, currentStageName, currentStageOrder, allStages, portalUrl, nextAppointmentDate } = params;
 
-  const totalStages = allStages.length || 1;
-  const progressPercent = Math.min(100, Math.round((currentStageOrder / totalStages) * 100));
+    const totalStages = allStages.length || 1;
+    const progressPercent = Math.min(100, Math.round((currentStageOrder / totalStages) * 100));
 
-  const stagesHtml = allStages
-    .sort((a, b) => a.order_index - b.order_index)
-    .map((stage, idx) => {
-      const isDone = stage.order_index < currentStageOrder;
-      const isCurrent = stage.order_index === currentStageOrder;
-      const isLast = idx === allStages.length - 1;
+    const stagesHtml = allStages
+        .sort((a, b) => a.order_index - b.order_index)
+        .map((stage, idx) => {
+            const isDone = stage.order_index < currentStageOrder;
+            const isCurrent = stage.order_index === currentStageOrder;
+            const isLast = idx === allStages.length - 1;
 
-      const dotBg = isDone ? '#C9A96E' : isCurrent ? '#1e1a12' : '#1a1a1a';
-      const dotBorder = isDone || isCurrent ? '#C9A96E' : '#2e2e2e';
-      const dotLabel = isDone ? '&#10003;' : isCurrent ? '&#9679;' : '';
-      const dotColor = isDone ? '#000000' : '#C9A96E';
-      const textColor = isDone ? 'rgba(255,255,255,0.35)' : isCurrent ? '#ffffff' : 'rgba(255,255,255,0.22)';
-      const textDecoration = isDone ? 'line-through' : 'none';
-      const connectorColor = isDone ? 'rgba(201,169,110,0.35)' : 'rgba(255,255,255,0.07)';
+            const dotBg = isDone ? '#C9A96E' : isCurrent ? '#1e1a12' : '#1a1a1a';
+            const dotBorder = isDone || isCurrent ? '#C9A96E' : '#2e2e2e';
+            const dotLabel = isDone ? '&#10003;' : isCurrent ? '&#9679;' : '';
+            const dotColor = isDone ? '#000000' : '#C9A96E';
+            const textColor = isDone ? 'rgba(255,255,255,0.35)' : isCurrent ? '#ffffff' : 'rgba(255,255,255,0.22)';
+            const textDecoration = isDone ? 'line-through' : 'none';
+            const connectorColor = isDone ? 'rgba(201,169,110,0.35)' : 'rgba(255,255,255,0.07)';
 
-      return `
+            return `
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td valign="top" width="30" style="padding-right:14px;">
@@ -183,10 +296,10 @@ export function generateTreatmentTimelineEmail(params: {
                 </td>
               </tr>
             </table>`;
-    })
-    .join('');
+        })
+        .join('');
 
-  const appointmentRow = nextAppointmentDate ? `
+    const appointmentRow = nextAppointmentDate ? `
         <tr>
           <td style="background:#111111;padding:0 40px 24px;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -204,7 +317,7 @@ export function generateTreatmentTimelineEmail(params: {
           </td>
         </tr>` : '';
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -324,7 +437,7 @@ export function generateTreatmentTimelineEmail(params: {
 }
 
 export function generateInvitationMessage(nombre: string, link: string): string {
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -406,110 +519,67 @@ export function generateInvitationMessage(nombre: string, link: string): string 
 </html>`;
 }
 
-export function generatePremiumWelcomeEmail(nombre: string, portalUrl: string): string {
-  return `<!DOCTYPE html>
+
+
+export function generatePaymentConfirmationEmail(nombre: string, amountUsd: number, description?: string): string {
+    return `<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bienvenid@ a la experiencia AM</title>
+    <title>Confirmación de Pago — AM Clínica</title>
 </head>
 <body style="margin:0;padding:0;background-color:#000000;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#ffffff;">
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000;padding:60px 20px;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#000000;border:1px solid rgba(221,180,44,0.1);">
-                    <!-- Top Neon Accent -->
+                <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background-color:#050505;border:1px solid rgba(201,169,110,0.15);">
+                    <!-- Header -->
                     <tr>
-                        <td align="center" style="padding:0;">
-                            <div style="height:2px;width:100%;background:linear-gradient(90deg, transparent, #ddb42c, transparent);box-shadow: 0 0 10px #ddb42c;"></div>
+                        <td align="center" style="padding:45px 0 30px;">
+                            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM Clínica" height="35" style="display:block;height:35px;filter:brightness(0) invert(1);">
                         </td>
                     </tr>
 
-                    <!-- Header / Logo -->
+                    <!-- Payment Visual -->
                     <tr>
-                        <td align="center" style="padding:50px 0 40px;">
-                            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM Clínica" height="40" style="display:block;height:40px;filter:brightness(0) invert(1);">
-                        </td>
-                    </tr>
-
-                    <!-- Hero Visual (Neon Aesthetic) -->
-                    <tr>
-                        <td style="padding:0 30px 50px;">
-                            <div style="border-radius:4px;overflow:hidden;border:1px solid #ddb42c;box-shadow: 0 0 15px rgba(221,180,44,0.3);">
-                                <img src="https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&q=80&w=1200" alt="Excellence" width="540" style="display:block;width:100%;height:auto;filter:contrast(1.2) brightness(0.8) sepia(0.2);">
+                        <td align="center" style="padding:0 40px 40px;">
+                            <div style="width:70px;height:70px;background-color:rgba(201,169,110,0.05);border-radius:50%;border:1px solid rgba(201,169,110,0.2);display:inline-block;padding:15px;box-shadow: 0 0 15px rgba(201,169,110,0.1);">
+                                <img src="https://cdn-icons-png.flaticon.com/512/2169/2169864.png" width="40" style="filter:invert(84%) sepia(21%) saturate(798%) hue-rotate(345deg) brightness(88%) contrast(85%);" alt="Payment Success">
                             </div>
                         </td>
                     </tr>
 
-                    <!-- Headline -->
+                    <!-- Content -->
                     <tr>
-                        <td align="center" style="padding:0 40px 40px;">
-                            <p style="margin:0 0 16px;color:#ddb42c;font-size:10px;letter-spacing:7px;text-transform:uppercase;font-weight:700;text-shadow: 0 0 5px rgba(221,180,44,0.5);">Premium Identity</p>
-                            <h1 style="margin:0 0 24px;font-size:38px;font-weight:300;letter-spacing:-1px;line-height:1.1;color:#ffffff;font-family:'Times New Roman',serif;">Bienvenid@ <br>a la <span style="font-weight:700;color:#ddb42c;text-shadow: 0 0 8px rgba(221,180,44,0.4);">Experiencia AM.</span></h1>
-                            <div style="height:1px;width:40px;background-color:#ddb42c;margin:0 auto 30px;box-shadow: 0 0 5px #ddb42c;"></div>
-                            <p style="margin:0 0 44px;color:rgba(255,255,255,0.7);font-size:16px;line-height:1.8;font-weight:400;max-width:420px;">
-                                Estimad@ <strong>${nombre}</strong>, es un privilegio recibirte. <br>
-                                Tu portal exclusivo está listo para brindarte un seguimiento de vanguardia con la distinción que mereces.
+                        <td align="center" style="padding:0 50px 50px;">
+                            <p style="margin:0 0 14px;color:#C9A96E;font-size:9px;letter-spacing:5px;text-transform:uppercase;font-weight:700;">Transacción Exitosa</p>
+                            <h1 style="margin:0 0 28px;font-size:30px;font-weight:300;letter-spacing:-0.5px;line-height:1.2;color:#ffffff;font-family:'Times New Roman',serif;">
+                                Pago <br><span style="color:#C9A96E;font-weight:700;">Confirmado.</span>
+                            </h1>
+                            <p style="margin:0 0 35px;color:rgba(255,255,255,0.6);font-size:15px;line-height:1.7;">
+                                Hola <strong>${nombre}</strong>, hemos recibido tu pago correctamente. <br>
+                                Tu tratamiento continúa bajo los más altos estándares de excelencia.
                             </p>
-                            
-                            <!-- Premium CTA with Glow -->
-                            <table cellpadding="0" cellspacing="0" border="0">
-                                <tr>
-                                    <td align="center" style="background-color:#ddb42c;box-shadow: 0 0 20px rgba(221,180,44,0.5);border-radius:2px;">
-                                        <a href="${portalUrl}" style="display:inline-block;padding:20px 50px;color:#000000;text-decoration:none;font-size:14px;font-weight:900;letter-spacing:3px;text-transform:uppercase;">
-                                            INGRESAR AL PORTAL
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
 
-                    <!-- Values Section -->
-                    <tr>
-                        <td style="padding:50px 0;background-color:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.05);">
-                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                                <tr>
-                                    <td align="center" width="33%" style="padding:0 10px;">
-                                        <p style="margin:0 0 8px;color:#ddb42c;font-size:18px;font-weight:700;">✦</p>
-                                        <p style="margin:0;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.5);">Privacidad</p>
-                                    </td>
-                                    <td align="center" width="33%" style="padding:0 10px;">
-                                        <p style="margin:0 0 8px;color:#ddb42c;font-size:18px;font-weight:700;">✦</p>
-                                        <p style="margin:0;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.5);">Boutique</p>
-                                    </td>
-                                    <td align="center" width="33%" style="padding:0 10px;">
-                                        <p style="margin:0 0 8px;color:#ddb42c;font-size:18px;font-weight:700;">✦</p>
-                                        <p style="margin:0;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.5);">Innovación</p>
-                                    </td>
-                                </tr>
-                            </table>
+                            <!-- Amount Box -->
+                            <div style="background-color:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:30px;border-radius:2px;margin-bottom:40px;">
+                                <p style="margin:0 0 5px;color:rgba(255,255,255,0.3);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Monto procesado</p>
+                                <p style="margin:0;color:#C9A96E;font-size:32px;font-weight:700;letter-spacing:1px;">USD ${amountUsd}</p>
+                                ${description ? `<p style="margin:15px 0 0;color:rgba(255,255,255,0.5);font-size:13px;font-style:italic;">${description}</p>` : ''}
+                            </div>
+                            
+                            <p style="margin:0;color:rgba(255,255,255,0.3);font-size:12px;line-height:1.6;">
+                                Gracias por tu puntualidad y compromiso con tu salud dental.
+                            </p>
                         </td>
                     </tr>
 
                     <!-- Footer -->
                     <tr>
-                        <td align="center" style="padding:60px 40px;background-color:#050505;">
-                            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM" height="25" style="display:block;height:25px;margin-bottom:30px;filter:grayscale(1) brightness(0.7);opacity:0.5;">
-                            <p style="margin:0 0 24px;color:rgba(255,255,255,0.3);font-size:11px;line-height:1.6;letter-spacing:0.5px;">
-                                AM Clínica Dental · Dr. Ariel Merino<br>
-                                Camila O'Gorman 412, Piso 17, Puerto Madero<br>
-                                Buenos Aires, Argentina
-                            </p>
-                            <table cellpadding="0" cellspacing="0" border="0">
-                                <tr>
-                                    <td style="padding:0 15px;">
-                                        <a href="#" style="color:rgba(255,255,255,0.4);text-decoration:none;font-size:10px;letter-spacing:1px;text-transform:uppercase;">Instagram</a>
-                                    </td>
-                                    <td style="padding:0 15px;color:rgba(255,255,255,0.1);">|</td>
-                                    <td style="padding:0 15px;">
-                                        <a href="#" style="color:rgba(255,255,255,0.4);text-decoration:none;font-size:10px;letter-spacing:1px;text-transform:uppercase;">WhatsApp</a>
-                                    </td>
-                                </tr>
-                            </table>
-                            <p style="margin:30px 0 0;color:rgba(221,180,44,0.2);font-size:9px;text-transform:uppercase;letter-spacing:2px;">
-                                © 2024 Excelencia sin Concesiones
+                        <td align="center" style="padding:40px;background-color:#0a0a0a;border-top:1px solid rgba(255,255,255,0.05);">
+                            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:9px;letter-spacing:2px;text-transform:uppercase;">
+                                AM Clínica Dental · Puerto Madero · Buenos Aires
                             </p>
                         </td>
                     </tr>
@@ -520,3 +590,4 @@ export function generatePremiumWelcomeEmail(nombre: string, portalUrl: string): 
 </body>
 </html>`;
 }
+

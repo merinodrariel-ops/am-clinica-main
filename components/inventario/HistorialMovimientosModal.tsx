@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { X, History, ArrowUpCircle, ArrowDownCircle, RefreshCw, Loader2, Calendar, User } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { listInventoryMovements } from '@/app/actions/inventory-products';
 import clsx from 'clsx';
+import { toast } from 'sonner';
 
 interface Movimiento {
     id: string;
@@ -27,23 +28,22 @@ export default function HistorialMovimientosModal({ isOpen, onClose }: Historial
 
     useEffect(() => {
         if (isOpen) {
-            loadHistory();
+            handleLoadHistory();
         }
     }, [isOpen]);
 
-    async function loadHistory() {
+    async function handleLoadHistory() {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('inventario_movimientos')
-                .select('*, item:inventario_items(nombre, unidad_medida)')
-                .order('created_at', { ascending: false })
-                .limit(50);
-
-            if (error) throw error;
-            setMovimientos((data || []) as Movimiento[]);
+            const result = await listInventoryMovements();
+            if (result.success && result.data) {
+                setMovimientos(result.data as Movimiento[]);
+            } else {
+                toast.error(result.error || 'Error al cargar historial');
+            }
         } catch (error) {
             console.error('Error loading history:', error);
+            toast.error('Error de conexión al cargar historial');
         } finally {
             setLoading(false);
         }

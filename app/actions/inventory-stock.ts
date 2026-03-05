@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import type { ProductRecord } from '@/app/actions/inventory-products';
 
+export type VisualMatchCandidate = ProductRecord & { image_full_url?: string };
+
 interface DeviceInfo {
     source?: string;
     match_mode?: 'barcode' | 'manual' | 'visual' | 'unknown';
@@ -14,105 +16,68 @@ interface DeviceInfo {
     screen?: string;
 }
 
-const VISUAL_SEARCH_LIMIT_PER_MINUTE = 12;
-const VISUAL_SEARCH_WINDOW_MS = 60_000;
-const visualSearchMemoryLog = new Map<string, number[]>();
-
-export type VisualMatchCandidate = ProductRecord;
-
 export interface StockMovementRecord {
     id: string;
-    product_id: string;
-    type: 'IN' | 'OUT' | 'ADJUST';
-    qty: number;
-    note: string | null;
-    created_by: string;
+    item_id: string;
+    tipo_movimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE';
+    cantidad: number;
+    motivo: string | null;
+    usuario: string; // email in the new schema
     created_at: string;
-    device_info: Record<string, unknown> | null;
-    product: {
+    item: {
         id: string;
-        name: string;
-        unit: string;
-        category: string;
+        nombre: string;
+        unidad_medida: string;
+        categoria: string;
     } | null;
-    created_by_label: string;
 }
 
 interface MovementFilters {
     productId?: string;
-    type?: 'IN' | 'OUT' | 'ADJUST' | 'ALL';
+    type?: 'ENTRADA' | 'SALIDA' | 'AJUSTE' | 'ALL';
     dateFrom?: string;
     dateTo?: string;
     search?: string;
     limit?: number;
 }
 
-function sanitizeCode(raw: string) {
-    return raw.trim();
+const ITEM_FIELDS = 'id, nombre, marca, categoria, area, unidad_medida, barcode, qr_code, imagen_url, descripcion, stock_actual, stock_minimo, created_at, updated_at';
+
+function mapToProductRecord(p: any): ProductRecord {
+    return {
+        id: p.id,
+        name: p.nombre,
+        brand: p.marca,
+        category: p.categoria,
+        color: p.area,
+        unit: p.unidad_medida,
+        image_thumb_url: p.imagen_url,
+        notes: p.descripcion,
+        stock_current: Number(p.stock_actual || 0),
+        threshold_min: Number(p.stock_minimo || 0),
+        supplier: p.proveedor || null,
+        link: p.link || null,
+        unit_cost: Number(p.costo_unitario || 0),
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+    };
 }
 
-function consumeVisualRateFromMemory(userId: string) {
-    const now = Date.now();
-    const recent = (visualSearchMemoryLog.get(userId) || []).filter(
-        timestamp => now - timestamp <= VISUAL_SEARCH_WINDOW_MS
-    );
+export async function listInventoryVisualMatchCandidates(limit = 80): Promise<{ success: boolean; products: ProductRecord[]; error?: string }> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('inventario_items')
+        .select(ITEM_FIELDS)
+        .not('imagen_url', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(limit);
 
-    if (recent.length >= VISUAL_SEARCH_LIMIT_PER_MINUTE) {
-        visualSearchMemoryLog.set(userId, recent);
-        return false;
+    if (error) {
+        console.error('Error fetching visual candidates:', error);
+        return { success: false, products: [], error: 'Error cargando items con imagen' };
     }
 
-    recent.push(now);
-    visualSearchMemoryLog.set(userId, recent);
-    return true;
-}
-
-async function consumeVisualRateLimit(
-    supabase: Awaited<ReturnType<typeof createClient>>,
-    userId: string
-) {
-    const fromIso = new Date(Date.now() - VISUAL_SEARCH_WINDOW_MS).toISOString();
-
-    const { count, error: countError } = await supabase
-        .from('inventory_visual_search_log')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .gte('created_at', fromIso);
-
-    if (countError) {
-        const allowedByMemory = consumeVisualRateFromMemory(userId);
-        if (!allowedByMemory) {
-            return {
-                success: false as const,
-                error: 'Demasiadas busquedas visuales. Espera 1 minuto e intenta nuevamente.',
-            };
-        }
-
-        return { success: true as const };
-    }
-
-    if ((count || 0) >= VISUAL_SEARCH_LIMIT_PER_MINUTE) {
-        return {
-            success: false as const,
-            error: 'Limite excedido: maximo 12 busquedas visuales por minuto.',
-        };
-    }
-
-    const { error: insertError } = await supabase
-        .from('inventory_visual_search_log')
-        .insert({ user_id: userId });
-
-    if (insertError) {
-        const allowedByMemory = consumeVisualRateFromMemory(userId);
-        if (!allowedByMemory) {
-            return {
-                success: false as const,
-                error: 'Demasiadas busquedas visuales. Espera 1 minuto e intenta nuevamente.',
-            };
-        }
-    }
-
-    return { success: true as const };
+    return { success: true, products: (data || []).map(mapToProductRecord) };
 }
 
 async function getAuthAndRole() {
@@ -128,86 +93,36 @@ async function getAuthAndRole() {
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .maybeSingle();
 
-    const role = (profile?.role || user.user_metadata?.role || '').toLowerCase();
+    const role = (profile?.categoria || '').toLowerCase();
     return { supabase, user, role, error: null as string | null };
 }
 
-async function fetchProductByCode(supabase: Awaited<ReturnType<typeof createClient>>, code: string) {
-    const fields = 'id, name, brand, category, color, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at';
-
+async function fetchProductByCode(supabase: any, code: string) {
     const byBarcode = await supabase
-        .from('products')
-        .select(fields)
-        .eq('is_active', true)
+        .from('inventario_items')
+        .select(ITEM_FIELDS)
         .eq('barcode', code)
         .maybeSingle();
 
     if (byBarcode.data) {
-        return byBarcode.data as ProductRecord;
+        return mapToProductRecord(byBarcode.data);
     }
 
     const byQr = await supabase
-        .from('products')
-        .select(fields)
-        .eq('is_active', true)
+        .from('inventario_items')
+        .select(ITEM_FIELDS)
         .eq('qr_code', code)
         .maybeSingle();
 
-    return (byQr.data || null) as ProductRecord | null;
-}
-
-async function buildCreatorLabels(
-    supabase: Awaited<ReturnType<typeof createClient>>,
-    rows: Array<{ created_by: string }>
-) {
-    const userIds = Array.from(new Set(rows.map(row => row.created_by).filter(Boolean)));
-    if (userIds.length === 0) return new Map<string, string>();
-
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds);
-
-    const labelMap = new Map<string, string>();
-    (profiles || []).forEach((profile: { id: string; full_name?: string | null; email?: string | null }) => {
-        labelMap.set(profile.id, profile.full_name || profile.email || profile.id.slice(0, 8));
-    });
-
-    return labelMap;
-}
-
-function inRangeByDate(value: string, dateFrom?: string, dateTo?: string) {
-    const time = new Date(value).getTime();
-    if (!Number.isFinite(time)) return false;
-
-    if (dateFrom) {
-        const fromTime = new Date(`${dateFrom}T00:00:00`).getTime();
-        if (time < fromTime) return false;
-    }
-    if (dateTo) {
-        const toTime = new Date(`${dateTo}T23:59:59`).getTime();
-        if (time > toTime) return false;
-    }
-    return true;
-}
-
-function buildSearchHaystack(movement: StockMovementRecord) {
-    return [
-        movement.product?.name || '',
-        movement.product?.category || '',
-        movement.note || '',
-        movement.created_by_label || '',
-    ]
-        .join(' ')
-        .toLowerCase();
+    return byQr.data ? mapToProductRecord(byQr.data) : null;
 }
 
 export async function lookupInventoryProductByCode(rawCode: string) {
-    const code = sanitizeCode(rawCode || '');
+    const code = (rawCode || '').trim();
     if (!code) {
         return { success: false, error: 'Codigo vacio', product: null as ProductRecord | null };
     }
@@ -239,18 +154,17 @@ export async function searchInventoryProductsQuick(search: string) {
 
     const escaped = term.replace(/,/g, ' ');
     const { data, error: queryError } = await supabase
-        .from('products')
-        .select('id, name, brand, category, color, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
-        .eq('is_active', true)
-        .or(`name.ilike.%${escaped}%,brand.ilike.%${escaped}%,category.ilike.%${escaped}%,color.ilike.%${escaped}%,barcode.ilike.%${escaped}%,qr_code.ilike.%${escaped}%`)
-        .order('name', { ascending: true })
+        .from('inventario_items')
+        .select(ITEM_FIELDS)
+        .or(`nombre.ilike.%${escaped}%,marca.ilike.%${escaped}%,categoria.ilike.%${escaped}%,area.ilike.%${escaped}%,barcode.ilike.%${escaped}%,qr_code.ilike.%${escaped}%`)
+        .order('nombre', { ascending: true })
         .limit(8);
 
     if (queryError) {
         return { success: false, error: queryError.message, products: [] as ProductRecord[] };
     }
 
-    return { success: true, products: (data || []) as ProductRecord[] };
+    return { success: true, products: (data || []).map(mapToProductRecord) };
 }
 
 export async function listInventoryStockMovements(filters: MovementFilters = {}) {
@@ -260,17 +174,17 @@ export async function listInventoryStockMovements(filters: MovementFilters = {})
     }
 
     let query = supabase
-        .from('stock_movements')
-        .select('id, product_id, type, qty, note, created_by, created_at, device_info, product:products(id, name, unit, category)')
+        .from('inventario_movimientos')
+        .select('id, item_id, tipo_movimiento, cantidad, motivo, usuario, created_at, item:inventario_items(id, nombre, unidad_medida, categoria)')
         .order('created_at', { ascending: false })
         .limit(Math.min(Math.max(Number(filters.limit || 200), 10), 800));
 
     if (filters.productId) {
-        query = query.eq('product_id', filters.productId);
+        query = query.eq('item_id', filters.productId);
     }
 
     if (filters.type && filters.type !== 'ALL') {
-        query = query.eq('type', filters.type);
+        query = query.eq('tipo_movimiento', filters.type);
     }
 
     const { data, error: queryError } = await query;
@@ -278,51 +192,43 @@ export async function listInventoryStockMovements(filters: MovementFilters = {})
         return { success: false, error: queryError.message, movements: [] as StockMovementRecord[] };
     }
 
-    const baseRows = (data || []) as Array<{
-        id: string;
-        product_id: string;
-        type: 'IN' | 'OUT' | 'ADJUST';
-        qty: number;
-        note: string | null;
-        created_by: string;
-        created_at: string;
-        device_info: Record<string, unknown> | null;
-        product:
-            | {
-                  id: string;
-                  name: string;
-                  unit: string;
-                  category: string;
-              }
-            | Array<{
-                  id: string;
-                  name: string;
-                  unit: string;
-                  category: string;
-              }>
-            | null;
-    }>;
-
-    const creatorLabels = await buildCreatorLabels(supabase, baseRows);
-
-    let movements: StockMovementRecord[] = baseRows.map(row => {
-        const product = Array.isArray(row.product) ? row.product[0] || null : row.product;
-
+    let movements: StockMovementRecord[] = (data || []).map((row: any) => {
+        const item = Array.isArray(row.item) ? row.item[0] || null : row.item;
         return {
             ...row,
-            product,
-            qty: Number(row.qty || 0),
-            created_by_label: creatorLabels.get(row.created_by) || row.created_by.slice(0, 8),
+            item,
+            cantidad: Number(row.cantidad || 0),
         };
     });
 
+    // Date filtering
     if (filters.dateFrom || filters.dateTo) {
-        movements = movements.filter(movement => inRangeByDate(movement.created_at, filters.dateFrom, filters.dateTo));
+        movements = movements.filter(m => {
+            const time = new Date(m.created_at).getTime();
+            if (filters.dateFrom) {
+                const from = new Date(`${filters.dateFrom}T00:00:00`).getTime();
+                if (time < from) return false;
+            }
+            if (filters.dateTo) {
+                const to = new Date(`${filters.dateTo}T23:59:59`).getTime();
+                if (time > to) return false;
+            }
+            return true;
+        });
     }
 
+    // Search filtering
     const search = (filters.search || '').trim().toLowerCase();
     if (search) {
-        movements = movements.filter(movement => buildSearchHaystack(movement).includes(search));
+        movements = movements.filter(m => {
+            const haystack = [
+                m.item?.nombre || '',
+                m.item?.categoria || '',
+                m.motivo || '',
+                m.usuario || '',
+            ].join(' ').toLowerCase();
+            return haystack.includes(search);
+        });
     }
 
     return { success: true, movements };
@@ -331,98 +237,27 @@ export async function listInventoryStockMovements(filters: MovementFilters = {})
 export async function getInventoryProductDetail(productId: string) {
     const { supabase, error } = await getAuthAndRole();
     if (error) {
-        return {
-            success: false,
-            error,
-            product: null as ProductRecord | null,
-            movements: [] as StockMovementRecord[],
-        };
+        return { success: false, error, product: null, movements: [] };
     }
 
-    const productRes = await supabase
-        .from('products')
-        .select('id, name, brand, category, color, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
+    const { data: product, error: productErr } = await supabase
+        .from('inventario_items')
+        .select(ITEM_FIELDS)
         .eq('id', productId)
         .maybeSingle();
 
-    if (productRes.error) {
-        return {
-            success: false,
-            error: productRes.error.message,
-            product: null as ProductRecord | null,
-            movements: [] as StockMovementRecord[],
-        };
+    if (productErr || !product) {
+        return { success: false, error: productErr?.message || 'Producto no encontrado', product: null, movements: [] };
     }
 
-    if (!productRes.data) {
-        return {
-            success: false,
-            error: 'Producto no encontrado',
-            product: null as ProductRecord | null,
-            movements: [] as StockMovementRecord[],
-        };
-    }
-
+    const mappedProduct = mapToProductRecord(product);
     const movementsRes = await listInventoryStockMovements({ productId, limit: 60 });
-    if (!movementsRes.success) {
-        return {
-            success: true,
-            product: productRes.data as ProductRecord,
-            movements: [] as StockMovementRecord[],
-            movementError: movementsRes.error,
-        };
-    }
 
     return {
         success: true,
-        product: productRes.data as ProductRecord,
-        movements: movementsRes.movements,
+        product: mappedProduct,
+        movements: movementsRes.movements || [],
     };
-}
-
-export async function listInventoryVisualMatchCandidates(limit = 80) {
-    const auth = await getAuthAndRole();
-    if (auth.error || !auth.user) {
-        return { success: false, error: auth.error || 'Sesion invalida', products: [] as VisualMatchCandidate[] };
-    }
-
-    const { supabase, role, user } = auth;
-
-    const allowed = ['owner', 'admin', 'reception', 'laboratorio', 'developer'];
-    if (!allowed.includes(role || '')) {
-        return {
-            success: false,
-            error: 'No tienes permisos para usar busqueda visual.',
-            products: [] as VisualMatchCandidate[],
-        };
-    }
-
-    const rateCheck = await consumeVisualRateLimit(supabase, user.id);
-    if (!rateCheck.success) {
-        return {
-            success: false,
-            error: rateCheck.error,
-            products: [] as VisualMatchCandidate[],
-        };
-    }
-
-    const safeLimit = Math.min(Math.max(Number(limit || 80), 10), 200);
-    const { data, error: queryError } = await supabase
-        .from('products')
-        .select('id, name, brand, category, color, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
-        .eq('is_active', true)
-        .order('updated_at', { ascending: false })
-        .limit(safeLimit);
-
-    if (queryError) {
-        return { success: false, error: queryError.message, products: [] as VisualMatchCandidate[] };
-    }
-
-    const products = ((data || []) as VisualMatchCandidate[]).filter(
-        product => Boolean(product.image_thumb_url || product.image_full_url)
-    );
-
-    return { success: true, products };
 }
 
 export async function registerInventoryIngress(input: {
@@ -433,7 +268,7 @@ export async function registerInventoryIngress(input: {
 }) {
     const qty = Number(input.qty || 0);
     if (!input.productId || qty <= 0) {
-        return { success: false, error: 'Producto y cantidad valida son obligatorios.' };
+        return { success: false, error: 'Producto y cantidad validos son obligatorios.' };
     }
 
     const { supabase, user, role, error } = await getAuthAndRole();
@@ -447,14 +282,13 @@ export async function registerInventoryIngress(input: {
     }
 
     const { error: insertError, data: inserted } = await supabase
-        .from('stock_movements')
+        .from('inventario_movimientos')
         .insert({
-            product_id: input.productId,
-            type: 'IN',
-            qty,
-            note: (input.note || '').trim() || null,
-            device_info: input.deviceInfo || {},
-            created_by: user.id,
+            item_id: input.productId,
+            tipo_movimiento: 'ENTRADA',
+            cantidad: qty,
+            motivo: (input.note || '').trim() || 'Ingreso manual',
+            usuario: user.email,
         })
         .select('id')
         .single();
@@ -463,22 +297,68 @@ export async function registerInventoryIngress(input: {
         return { success: false, error: insertError.message };
     }
 
-    const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('id, stock_current')
-        .eq('id', input.productId)
-        .single();
-
-    if (productError) {
-        return { success: true, movementId: inserted.id };
-    }
-
     revalidatePath('/inventario/productos');
-    revalidatePath('/inventario/escanear');
+    revalidatePath('/inventario');
 
     return {
         success: true,
         movementId: inserted.id,
-        stock_current: Number(product.stock_current || 0),
+    };
+}
+
+export async function registerInventoryEgress(input: {
+    productId: string;
+    qty: number;
+    note?: string;
+    deviceInfo?: DeviceInfo;
+}) {
+    const qty = Number(input.qty || 0);
+    if (!input.productId || qty <= 0) {
+        return { success: false, error: 'Producto y cantidad validos son obligatorios.' };
+    }
+
+    const { supabase, user, role, error } = await getAuthAndRole();
+    if (error || !user) {
+        return { success: false, error: error || 'Sesion invalida' };
+    }
+
+    const allowed = ['owner', 'admin', 'reception', 'laboratorio', 'developer'];
+    if (!allowed.includes(role || '')) {
+        return { success: false, error: 'No tienes permisos para registrar salidas de stock.' };
+    }
+
+    // Check availability
+    const { data: current } = await supabase
+        .from('inventario_items')
+        .select('stock_actual, nombre')
+        .eq('id', input.productId)
+        .single();
+
+    if (current && Number(current.stock_actual || 0) < qty) {
+        return { success: false, error: `Stock insuficiente para ${current.nombre}. Disponible: ${current.stock_actual}` };
+    }
+
+    const { error: insertError, data: inserted } = await supabase
+        .from('inventario_movimientos')
+        .insert({
+            item_id: input.productId,
+            tipo_movimiento: 'SALIDA',
+            cantidad: qty,
+            motivo: (input.note || '').trim() || 'Salida manual',
+            usuario: user.email,
+        })
+        .select('id')
+        .single();
+
+    if (insertError) {
+        return { success: false, error: insertError.message };
+    }
+
+    revalidatePath('/inventario/productos');
+    revalidatePath('/inventario');
+
+    return {
+        success: true,
+        movementId: inserted.id,
     };
 }

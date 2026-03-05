@@ -20,14 +20,14 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
     try {
         // Fetch patient from Supabase
-        patient = await getPacienteById(id);
+        patient = await getPacienteById(supabase, id);
 
         if (patient) {
             // Fetch related data
             const relatedData = await Promise.all([
-                getHistoriaClinica(id),
-                getPlanesTratamiento(id),
-                getMovimientosPorPaciente(id),
+                getHistoriaClinica(supabase, id),
+                getPlanesTratamiento(supabase, id),
+                getMovimientosPorPaciente(id, supabase),
                 supabase
                     .from('agenda_appointments')
                     .select('id, patient_id, doctor_id, start_time, status, type')

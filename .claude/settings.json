@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(git -C \"/Users/am/Downloads/antigravity apps/am-clinica-main\" diff components/caja/ContratosFinanciacionTab.tsx)",
-      "Bash(xargs -I {} sh -c 'grep -l \"\"CREATE TABLE.*caja_recepcion_movimientos\"\" \"\"/Users/am/Downloads/antigravity apps/am-clinica-main/supabase/migrations/{}\"\" 2>/dev/null')"
+      "Bash(xargs -I {} sh -c 'grep -l \"\"CREATE TABLE.*caja_recepcion_movimientos\"\" \"\"/Users/am/Downloads/antigravity apps/am-clinica-main/supabase/migrations/{}\"\" 2>/dev/null')",
+      "Read(//Users/am/Documents/ScreenShots/**)"
     ]
   }
 }

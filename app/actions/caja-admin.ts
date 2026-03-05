@@ -35,11 +35,11 @@ export async function updateCajaAdminMovimientoSecure(input: {
 
         const { data: profile } = await authClient
             .from('profiles')
-            .select('role')
+            .select('categoria')
             .eq('id', user.id)
             .maybeSingle();
 
-        const role = (profile?.role || user.user_metadata?.role || '').toLowerCase();
+        const role = (profile?.categoria || user.user_metadata?.role || '').toLowerCase();
         if (role !== 'owner' && role !== 'admin') {
             return { success: false, error: 'Permiso denegado: solo Admin/Dueno puede editar Caja Administracion.' };
         }

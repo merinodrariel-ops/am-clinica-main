@@ -121,8 +121,8 @@ function SortableRow({
 
 // ── Main component ──────────────────────────────────────────────────────────
 export default function ConfiguracionTab({ sucursal }: Props) {
-    const { role } = useAuth();
-    const canManageProviderStatus = role === "owner";
+    const { categoria } = useAuth();
+    const canManageProviderStatus = categoria === "owner";
     const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
     const [providerConfigTab, setProviderConfigTab] = useState<"categorias" | "prestadores" | "tipos">("categorias");
     const [personal, setPersonal] = useState<Personal[]>([]);
@@ -590,6 +590,8 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                                 <td className="px-4 py-2 text-slate-500 capitalize">
                                                     {item.tipo_personal === 'odontologo' || item.tipo_personal === 'profesional'
                                                         ? 'odontólogo'
+                                                        : item.tipo_personal === 'empleado'
+                                                        ? 'prestador'
                                                         : item.tipo_personal}
                                                 </td>
                                                 <td className="px-4 py-2 text-right">

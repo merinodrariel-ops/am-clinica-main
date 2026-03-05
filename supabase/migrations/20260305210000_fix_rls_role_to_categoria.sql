@@ -211,34 +211,6 @@ CREATE POLICY "Admins can view all profiles"
 ON public.profiles FOR SELECT
 USING (auth.uid() = id OR public.get_my_role() IN ('owner', 'admin'));
 
--- ── liquidacion_hour_values ──────────────────────────────────
-DROP POLICY IF EXISTS "liquidacion_hour_values_admin_rw" ON public.liquidacion_hour_values;
-CREATE POLICY liquidacion_hour_values_admin_rw
-ON public.liquidacion_hour_values FOR ALL TO authenticated
-USING (public.get_my_role() IN ('owner', 'admin'))
-WITH CHECK (public.get_my_role() IN ('owner', 'admin'));
-
--- ── internal_services ────────────────────────────────────────
-DROP POLICY IF EXISTS "internal_services_admin_rw" ON public.internal_services;
-CREATE POLICY internal_services_admin_rw
-ON public.internal_services FOR ALL TO authenticated
-USING (public.get_my_role() IN ('owner', 'admin'))
-WITH CHECK (public.get_my_role() IN ('owner', 'admin'));
-
--- ── provider_service_records ─────────────────────────────────
-DROP POLICY IF EXISTS "provider_service_records_admin_rw" ON public.provider_service_records;
-CREATE POLICY provider_service_records_admin_rw
-ON public.provider_service_records FOR ALL TO authenticated
-USING (public.get_my_role() IN ('owner', 'admin'))
-WITH CHECK (public.get_my_role() IN ('owner', 'admin'));
-
--- ── provider_monthly_hours ───────────────────────────────────
-DROP POLICY IF EXISTS "provider_monthly_hours_admin_rw" ON public.provider_monthly_hours;
-CREATE POLICY provider_monthly_hours_admin_rw
-ON public.provider_monthly_hours FOR ALL TO authenticated
-USING (public.get_my_role() IN ('owner', 'admin'))
-WITH CHECK (public.get_my_role() IN ('owner', 'admin'));
-
 -- ── AM-Scheduler Pro Extra Fixes ─────────────────────────────
 DROP POLICY IF EXISTS "doctor_schedules_write_staff" ON public.doctor_schedules;
 CREATE POLICY "doctor_schedules_write_staff" ON public.doctor_schedules

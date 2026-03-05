@@ -1,5 +1,13 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Project Guardrails
+
+- Before making changes, read `docs/AGENT_GUARDRAILS.md`.
+- Project memory file used by agents:
+  - `/Users/am/.claude/projects/-Users-am-Downloads-antigravity-apps-am-clinica-main/memory/MEMORY.md`
+- Critical rule: use `profiles.categoria` (never `profiles.role`).
+- Critical rule: use the correct Supabase client per runtime (client/server/admin).
+
 ## Getting Started
 
 First, run the development server:

@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ensureStandardPatientFolders, createPatientDocuments } from '@/lib/google-drive';
 import { syncPatientToSheet } from '@/lib/google-sheets';
 import { sendEmail } from '@/lib/nodemailer';
+import { generatePremiumWelcomeEmail } from '@/lib/email-templates';
 import { admissionSubmissionSchema, type AdmissionSubmission } from '@/lib/admission-schema';
 import type { Paciente } from '@/lib/patients';
 
@@ -285,66 +286,15 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
 
         try {
             const isMerino = data.profesional?.includes('Merino') ?? false;
-            const paymentLink = isMerino ? 'https://mpago.la/2rjmF2W' : 'https://mpago.la/2MJhrW6';
-            const agendaLink = isMerino ? 'https://calendar.app.google/oc4VZPzsDkhwB3r58' : 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ0dDbh9UiGp7dk-OBTfyppeCwNcooGMRJdRwt4GGLrYYRuRXhhOVQV6E-yvCkZRdkjqp5xrpjO4';
-            const buttonText = isMerino ? 'Pagar Dr. Merino' : 'Pagar Staff';
+            // The premium welcome email can include the portal URL or specific links
+            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://clinica.arielmerino.com';
+            const portalUrl = `${siteUrl}/portal`;
 
-            const logoUrl = "https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png";
-            const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            .container { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; background-color: #050505; color: #ffffff; border-radius: 24px; overflow: hidden; }
-            .header { background: #000000; padding: 40px 20px; text-align: center; border-bottom: 1px solid #1a1a1a; }
-            .content { padding: 40px; }
-            .welcome { font-size: 24px; font-weight: 300; margin-bottom: 24px; letter-spacing: -0.02em; }
-            .text { color: #a1a1aa; line-height: 1.8; font-size: 16px; font-weight: 300; }
-            .card { margin: 32px 0; padding: 32px; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 20px; }
-            .card-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: #71717a; margin-bottom: 20px; font-weight: 600; }
-            .button { display: inline-block; padding: 16px 32px; background: #ffffff; color: #000000; text-decoration: none; border-radius: 100px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s ease; }
-            .link { color: #ffffff; font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
-            .footer { padding: 40px; text-align: center; border-top: 1px solid #1a1a1a; font-size: 12px; color: #52525b; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <img src="${logoUrl}" height="35" alt="AM Estética Dental">
-            </div>
-            <div class="content">
-              <h1 class="welcome">Hola, <span style="font-style: italic;">${data.nombre}</span></h1>
-              <p class="text">Es un placer darte la bienvenida a AM Estética Dental. Hemos recibido tu ficha clínica correctamente.</p>
-              
-              <p class="text" style="margin-top: 24px;">Para asegurar la excelencia en tu atención y confirmar tu espacio en nuestra agenda, por favor completa los siguientes pasos:</p>
-
-              <div class="card">
-                <p class="card-title">1. Confirmación de Cita</p>
-                <p class="text" style="margin-bottom: 24px;">Realiza el pago de la consulta para validar tu turno:</p>
-                <a href="${paymentLink}" class="button">${buttonText}</a>
-              </div>
-
-              <div class="card">
-                <p class="card-title">2. Selección de Horario</p>
-                <p class="text">Si aún no has elegido tu horario, puedes hacerlo aquí:</p>
-                <p style="margin-top: 16px;"><a href="${agendaLink}" class="link">Ver disponibilidad en calendario</a></p>
-              </div>
-
-              <p class="text" style="font-size: 14px; margin-top: 40px; text-align: center;">Estamos a tu disposición para cualquier consulta adicional.</p>
-            </div>
-            <div class="footer">
-              &copy; ${new Date().getFullYear()} AM Estética Dental &middot; Dr. Ariel Merino<br>
-              Excelencia y Minimalismo en Odontología Estética
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
+            const html = generatePremiumWelcomeEmail(data.nombre, portalUrl);
 
             await sendEmail({
                 to: data.email,
-                subject: "Bienvenido a AM Estética Dental",
+                subject: "Bienvenido a AM Estética Dental — Excelencia y Minimalismo",
                 html: html
             });
         } catch (emailErr) {

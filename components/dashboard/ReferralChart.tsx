@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getReferralStats, ReferralStat } from '@/lib/dashboard';
+import { getReferralStatsAction as getReferralStats } from '@/app/actions/dashboard';
+import type { ReferralStat } from '@/lib/dashboard';
 import { Users } from 'lucide-react';
 
 const COLORS = ['#00d4aa', '#3b82f6', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4', '#64748b'];

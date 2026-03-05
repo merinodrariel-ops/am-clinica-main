@@ -20,7 +20,7 @@ export async function GET(request: Request) {
         // Check profiles and roles
         const { data: profiles, error: profError } = await supabase
             .from('profiles')
-            .select('id, email, full_name, role')
+            .select('id, email, full_name, categoria')
             .limit(10);
 
         return NextResponse.json({

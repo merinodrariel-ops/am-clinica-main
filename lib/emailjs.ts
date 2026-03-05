@@ -51,9 +51,9 @@ export async function sendWelcomeEmail(data: EmailData): Promise<{ success: bool
   }
 }
 
-import { generateWelcomeMessage, generateInvitationMessage } from '@/lib/email-templates';
+import { generatePremiumWelcomeEmail, generateInvitationMessage } from '@/lib/email-templates';
 
-export { generateWelcomeMessage, generateInvitationMessage }; // Re-export for compatibility if needed, but better to import directly.
+export { generatePremiumWelcomeEmail, generateInvitationMessage }; // Re-export for compatibility if needed, but better to import directly.
 
 export async function sendInvitationEmail(data: InvitationData): Promise<{ success: boolean; error?: string }> {
   const htmlMessage = generateInvitationMessage(data.to_name, data.action_link);

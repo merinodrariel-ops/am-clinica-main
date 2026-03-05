@@ -1,5 +1,7 @@
-import { supabase } from './supabase';
+import { createClient } from '@/utils/supabase/client';
 import { getGlobalAdminCashBalance } from './caja-admin';
+
+const getSupabase = () => createClient();
 
 export interface DashboardStats {
     patientsCount: number;
@@ -13,6 +15,7 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
+    const supabase = getSupabase();
     try {
         // 1. Total Patients (active)
         const { count: patientsCount, error: pError } = await supabase
@@ -93,6 +96,7 @@ export interface ReferralStat {
 }
 
 export async function getReferralStats(): Promise<ReferralStat[]> {
+    const supabase = getSupabase();
     try {
         const { data, error } = await supabase
             .from('pacientes')
@@ -145,6 +149,7 @@ export interface OwnerDashboardStats {
 }
 
 export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
+    const supabase = getSupabase();
     try {
         const now = new Date();
         const year = now.getFullYear();

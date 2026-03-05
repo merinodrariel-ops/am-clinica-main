@@ -5,7 +5,7 @@ import { X, Package, Loader2, Save, Tag, BarChart3 } from 'lucide-react';
 import clsx from 'clsx';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { useAuth } from '@/contexts/AuthContext';
-import { crearItem } from '@/app/actions/inventory-create';
+import { createInventoryProduct } from '@/app/actions/inventory-products';
 
 interface NuevoItemFormProps {
     isOpen: boolean;
@@ -65,14 +65,13 @@ export default function NuevoItemForm({ isOpen, onClose, onSuccess }: NuevoItemF
         }
 
         try {
-            const result = await crearItem({
-                nombre: formData.nombre,
-                categoria: formData.categoria,
-                stock_actual: formData.stock_actual,
-                unidad_medida: formData.unidad_medida,
-                stock_minimo: formData.stock_minimo,
-                area: isLabUser ? 'LABORATORIO' : formData.area,
-                userId: user.id
+            const result = await createInventoryProduct({
+                name: formData.nombre,
+                category: formData.categoria,
+                stockInitial: formData.stock_actual,
+                unit: formData.unidad_medida,
+                thresholdMin: formData.stock_minimo,
+                color: isLabUser ? 'LABORATORIO' : formData.area
             });
 
             if (!result.success) {

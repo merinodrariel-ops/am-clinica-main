@@ -18,7 +18,7 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
             getWorkerAchievements(worker.id),
             getWorkerLiquidations(worker.id),
             getWorkerXP(worker.id),
-            getAllGoals(worker.rol),
+            getAllGoals(worker.area),
             getGoalProgress(worker.id),
         ]);
     } catch (error) {

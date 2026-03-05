@@ -1,4 +1,5 @@
-import { supabase } from '../supabase';
+import { createAdminClient } from '@/utils/supabase/admin';
+const supabase = createAdminClient();
 import { LiquidationPeriod } from './types';
 
 export interface LeaderboardEntry {

@@ -23,7 +23,9 @@ import {
     getEgresosPorSubtipo,
     type ReporteSummary
 } from '@/lib/caja-admin';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 

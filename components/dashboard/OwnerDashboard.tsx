@@ -43,8 +43,11 @@ import {
     ChevronRight,
     Trash2,
     Plus,
+    Lock,
+    Unlock,
 } from 'lucide-react';
-import { getOwnerDashboardStats, type OwnerDashboardStats } from '@/lib/dashboard';
+import { getOwnerDashboardStatsAction as getOwnerDashboardStats } from '@/app/actions/dashboard';
+import type { OwnerDashboardStats } from '@/lib/dashboard';
 import Link from 'next/link';
 
 const STORAGE_KEY = 'owner-dashboard-layout';
@@ -54,6 +57,7 @@ type CardId = 'total-pacientes' | 'primera-vez' | 'ingresos-mes' | 'egresos-mes'
 interface LayoutConfig {
     order: CardId[];
     hidden: CardId[];
+    locked: CardId[];
 }
 
 type PresetId = 'ejecutivo' | 'finanzas' | 'operaciones';
@@ -65,6 +69,12 @@ const DEFAULT_ORDER: CardId[] = [
     'egresos-mes',
     'en-financiacion',
     'deuda-total',
+];
+
+const REQUIRED_VISIBLE_CARDS: CardId[] = [
+    'total-pacientes',
+    'primera-vez',
+    'ingresos-mes',
 ];
 
 const CARD_TITLES: Record<CardId, string> = {
@@ -83,6 +93,7 @@ const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout
         layout: {
             order: ['total-pacientes', 'primera-vez', 'ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion'],
             hidden: [],
+            locked: [],
         },
     },
     finanzas: {
@@ -91,6 +102,7 @@ const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout
         layout: {
             order: ['ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion', 'total-pacientes', 'primera-vez'],
             hidden: ['total-pacientes', 'primera-vez'],
+            locked: [],
         },
     },
     operaciones: {
@@ -99,6 +111,7 @@ const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout
         layout: {
             order: ['primera-vez', 'total-pacientes', 'en-financiacion', 'ingresos-mes', 'egresos-mes', 'deuda-total'],
             hidden: ['egresos-mes', 'deuda-total'],
+            locked: [],
         },
     },
 };
@@ -120,7 +133,7 @@ function sameLayout(a: LayoutConfig, b: LayoutConfig) {
 }
 
 function getLayout(): LayoutConfig {
-    if (typeof window === 'undefined') return { order: DEFAULT_ORDER, hidden: [] };
+    if (typeof window === 'undefined') return { order: DEFAULT_ORDER, hidden: [], locked: [] };
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
@@ -138,16 +151,29 @@ function getLayout(): LayoutConfig {
 
             const hiddenRaw = (parsed.hidden || []).filter((id: string) => allCards.has(id as CardId)) as CardId[];
             const seenHidden = new Set<CardId>();
-            const hidden = hiddenRaw.filter((id) => {
+            const hiddenDedup = hiddenRaw.filter((id) => {
                 if (seenHidden.has(id)) return false;
                 seenHidden.add(id);
                 return true;
             });
 
-            return { order, hidden };
+            const hidden = hiddenDedup.filter((id) =>
+                order.includes(id)
+                && !REQUIRED_VISIBLE_CARDS.includes(id)
+            );
+
+            const lockedRaw = (parsed.locked || []).filter((id: string) => allCards.has(id as CardId)) as CardId[];
+            const seenLocked = new Set<CardId>();
+            const locked = lockedRaw.filter((id) => {
+                if (seenLocked.has(id)) return false;
+                seenLocked.add(id);
+                return order.includes(id);
+            });
+
+            return { order, hidden, locked };
         }
     } catch { /* ignore */ }
-    return { order: DEFAULT_ORDER, hidden: [] };
+    return { order: DEFAULT_ORDER, hidden: [], locked: [] };
 }
 
 function saveLayout(layout: LayoutConfig) {
@@ -255,6 +281,7 @@ interface KpiCardProps {
     cardClassName?: string;
     isEditing: boolean;
     isHidden: boolean;
+    isLocked?: boolean;
     canRemove: boolean;
     onToggleVisibility: (id: CardId) => void;
     onRemove: (id: CardId) => void;
@@ -277,11 +304,14 @@ function KpiCard({
     cardClassName = '',
     isEditing,
     isHidden,
+    isLocked = false,
     canRemove,
     onToggleVisibility,
     onRemove,
 }: KpiCardProps) {
     const [expanded, setExpanded] = useState(alwaysExpanded);
+    const isRequiredVisible = REQUIRED_VISIBLE_CARDS.includes(id);
+    const isBlocked = isRequiredVisible || isLocked;
 
     if (isHidden && !isEditing) return null;
 
@@ -294,16 +324,17 @@ function KpiCard({
                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
                     <button
                         onClick={() => onToggleVisibility(id)}
-                        className={`p-1.5 rounded-lg transition-all hover:scale-110 ${isHidden ? 'bg-red-500/20 text-red-400' : 'bg-white/5 hover:bg-white/10 text-slate-400'}`}
-                        title={isHidden ? 'Mostrar' : 'Ocultar'}
+                        disabled={isBlocked}
+                        className={`p-1.5 rounded-lg transition-all hover:scale-110 ${isHidden ? 'bg-red-500/20 text-red-400' : 'bg-white/5 hover:bg-white/10 text-slate-400'} ${isBlocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        title={isRequiredVisible ? 'Indicador obligatorio (siempre visible)' : isLocked ? 'Tarjeta bloqueada' : isHidden ? 'Mostrar' : 'Ocultar'}
                     >
                         {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                     <button
                         onClick={() => onRemove(id)}
-                        disabled={!canRemove}
+                        disabled={!canRemove || isLocked}
                         className="p-1.5 rounded-lg transition-all hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed bg-red-500/20 text-red-500"
-                        title={canRemove ? 'Eliminar del grid' : 'Debe quedar al menos una tarjeta'}
+                        title={isLocked ? 'Tarjeta bloqueada' : canRemove ? 'Eliminar del grid' : 'Debe quedar al menos una tarjeta'}
                     >
                         <Trash2 size={14} />
                     </button>
@@ -572,7 +603,7 @@ export default function OwnerDashboard() {
     const [overCardId, setOverCardId] = useState<CardId | null>(null);
     const [recentlyDroppedCardId, setRecentlyDroppedCardId] = useState<CardId | null>(null);
     const droppedPulseTimeoutRef = useRef<number | null>(null);
-    const isDragEnabled = activeTab === 'dashboard';
+    const isDragEnabled = isEditing;
 
     const currentMonth = MONTH_NAMES[new Date().getMonth()];
 
@@ -616,13 +647,20 @@ export default function OwnerDashboard() {
     }, []);
 
     const handleDragStart = useCallback((event: DragStartEvent) => {
-        setActiveCardId(event.active.id as CardId);
-        setOverCardId(event.active.id as CardId);
-    }, []);
+        const cardId = event.active.id as CardId;
+        if (layout.locked.includes(cardId)) return;
+        setActiveCardId(cardId);
+        setOverCardId(cardId);
+    }, [layout.locked]);
 
     const handleDragOver = useCallback((event: DragOverEvent) => {
-        setOverCardId((event.over?.id as CardId | undefined) || null);
-    }, []);
+        const overId = (event.over?.id as CardId | undefined) || null;
+        if (overId && layout.locked.includes(overId)) {
+            setOverCardId(null);
+            return;
+        }
+        setOverCardId(overId);
+    }, [layout.locked]);
 
     const handleDragCancel = useCallback(() => {
         setActiveCardId(null);
@@ -640,8 +678,12 @@ export default function OwnerDashboard() {
         }
 
         setLayout(prev => {
-            const oldIndex = prev.order.indexOf(active.id as CardId);
-            const newIndex = prev.order.indexOf(over.id as CardId);
+            const activeId = active.id as CardId;
+            const overId = over.id as CardId;
+            if (prev.locked.includes(activeId) || prev.locked.includes(overId)) return prev;
+
+            const oldIndex = prev.order.indexOf(activeId);
+            const newIndex = prev.order.indexOf(overId);
             if (oldIndex < 0 || newIndex < 0) return prev;
             const newLayout = { ...prev, order: arrayMove(prev.order, oldIndex, newIndex) };
             saveLayout(newLayout);
@@ -652,7 +694,9 @@ export default function OwnerDashboard() {
 
     const toggleVisibility = useCallback((id: string) => {
         const cardId = id as CardId;
+        if (REQUIRED_VISIBLE_CARDS.includes(cardId)) return;
         setLayout(prev => {
+            if (prev.locked.includes(cardId)) return prev;
             const hidden = prev.hidden.includes(cardId)
                 ? prev.hidden.filter(h => h !== cardId)
                 : [...prev.hidden, cardId];
@@ -663,7 +707,7 @@ export default function OwnerDashboard() {
     }, []);
 
     const resetLayout = useCallback(() => {
-        const defaultLayout = { order: DEFAULT_ORDER, hidden: [] };
+        const defaultLayout = { order: DEFAULT_ORDER, hidden: [], locked: [] };
         setLayout(defaultLayout);
         saveLayout(defaultLayout);
         setIsEditing(false);
@@ -671,7 +715,7 @@ export default function OwnerDashboard() {
     }, []);
 
     const repairLayout = useCallback(() => {
-        const defaultLayout = { order: DEFAULT_ORDER, hidden: [] };
+        const defaultLayout = { order: DEFAULT_ORDER, hidden: [], locked: [] };
         try {
             localStorage.removeItem(STORAGE_KEY);
         } catch {
@@ -685,20 +729,25 @@ export default function OwnerDashboard() {
 
     const applyPreset = useCallback((presetId: PresetId) => {
         const presetLayout = GRID_PRESETS[presetId].layout;
-        const nextLayout: LayoutConfig = {
-            order: [...presetLayout.order],
-            hidden: [...presetLayout.hidden],
-        };
-        setLayout(nextLayout);
-        saveLayout(nextLayout);
+        setLayout(prev => {
+            const nextLayout: LayoutConfig = {
+                order: [...presetLayout.order],
+                hidden: presetLayout.hidden.filter((id) => !REQUIRED_VISIBLE_CARDS.includes(id)),
+                locked: prev.locked.filter((id) => presetLayout.order.includes(id)),
+            };
+            saveLayout(nextLayout);
+            return nextLayout;
+        });
     }, []);
 
     const removeCard = useCallback((id: CardId) => {
         setLayout(prev => {
             if (!prev.order.includes(id) || prev.order.length <= 1) return prev;
+            if (prev.locked.includes(id)) return prev;
             const order = prev.order.filter(cardId => cardId !== id);
             const hidden = prev.hidden.filter(cardId => cardId !== id);
-            const newLayout = { ...prev, order, hidden };
+            const locked = prev.locked.filter(cardId => cardId !== id);
+            const newLayout = { ...prev, order, hidden, locked };
             saveLayout(newLayout);
             return newLayout;
         });
@@ -719,12 +768,27 @@ export default function OwnerDashboard() {
 
     const moveCardInConfig = useCallback((id: CardId, direction: 'up' | 'down') => {
         setLayout(prev => {
+            if (prev.locked.includes(id)) return prev;
             const index = prev.order.indexOf(id);
             if (index < 0) return prev;
             const targetIndex = direction === 'up' ? index - 1 : index + 1;
             if (targetIndex < 0 || targetIndex >= prev.order.length) return prev;
             const order = arrayMove(prev.order, index, targetIndex);
             const newLayout = { ...prev, order };
+            saveLayout(newLayout);
+            return newLayout;
+        });
+    }, []);
+
+    const toggleLock = useCallback((id: CardId) => {
+        setLayout(prev => {
+            if (!prev.order.includes(id)) return prev;
+
+            const locked = prev.locked.includes(id)
+                ? prev.locked.filter((cardId) => cardId !== id)
+                : [...prev.locked, id];
+
+            const newLayout = { ...prev, locked };
             saveLayout(newLayout);
             return newLayout;
         });
@@ -948,7 +1012,7 @@ export default function OwnerDashboard() {
                             Configuración del grid
                         </p>
                         <p className="text-[11px] text-slate-500">
-                            {layout.order.length} activas • {layout.hidden.length} ocultas • {removedCards.length} eliminadas
+                            {layout.order.length} activas • {layout.hidden.length} ocultas • {layout.locked.length} bloqueadas • {removedCards.length} eliminadas
                         </p>
                     </div>
 
@@ -985,6 +1049,8 @@ export default function OwnerDashboard() {
                         {DEFAULT_ORDER.map((id) => {
                             const inGrid = layout.order.includes(id);
                             const isHidden = layout.hidden.includes(id);
+                            const isRequiredVisible = REQUIRED_VISIBLE_CARDS.includes(id);
+                            const isLocked = layout.locked.includes(id);
                             const currentIndex = layout.order.indexOf(id);
                             return (
                                 <div
@@ -994,7 +1060,13 @@ export default function OwnerDashboard() {
                                     <div>
                                         <p className="text-sm font-medium text-slate-200">{CARD_TITLES[id]}</p>
                                         <p className="text-[11px] text-slate-500">
-                                            {!inGrid ? 'Eliminada del grid' : isHidden ? 'Oculta en dashboard' : `Visible en posición ${currentIndex + 1}`}
+                                            {!inGrid
+                                                ? 'Eliminada del grid'
+                                                : isLocked
+                                                    ? `Bloqueada en posicion ${currentIndex + 1}`
+                                                    : isHidden
+                                                        ? 'Oculta en dashboard'
+                                                        : `Visible en posicion ${currentIndex + 1}`}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-1.5">
@@ -1002,7 +1074,7 @@ export default function OwnerDashboard() {
                                             <>
                                                 <button
                                                     onClick={() => moveCardInConfig(id, 'up')}
-                                                    disabled={currentIndex <= 0}
+                                                    disabled={isLocked || currentIndex <= 0}
                                                     className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed bg-white/10 hover:bg-white/20 text-slate-400"
                                                     title="Subir"
                                                 >
@@ -1010,24 +1082,32 @@ export default function OwnerDashboard() {
                                                 </button>
                                                 <button
                                                     onClick={() => moveCardInConfig(id, 'down')}
-                                                    disabled={currentIndex < 0 || currentIndex >= layout.order.length - 1}
+                                                    disabled={isLocked || currentIndex < 0 || currentIndex >= layout.order.length - 1}
                                                     className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed bg-white/10 hover:bg-white/20 text-slate-400"
                                                     title="Bajar"
                                                 >
                                                     <ChevronDown size={14} />
                                                 </button>
                                                 <button
+                                                    onClick={() => toggleLock(id)}
+                                                    className={`p-1.5 rounded-lg transition-all ${isLocked ? 'bg-teal-500/20 text-teal-400' : 'bg-white/10 hover:bg-white/20 text-slate-400'}`}
+                                                    title={isLocked ? 'Desbloquear tarjeta' : 'Bloquear tarjeta'}
+                                                >
+                                                    {isLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                                                </button>
+                                                <button
                                                     onClick={() => toggleVisibility(id)}
-                                                    className={`p-1.5 rounded-lg transition-all ${isHidden ? 'bg-red-500/20 text-red-500' : 'bg-white/10 hover:bg-white/20 text-slate-400'}`}
-                                                    title={isHidden ? 'Mostrar' : 'Ocultar'}
+                                                    disabled={isLocked || isRequiredVisible}
+                                                    className={`p-1.5 rounded-lg transition-all ${isHidden ? 'bg-red-500/20 text-red-500' : 'bg-white/10 hover:bg-white/20 text-slate-400'} ${(isRequiredVisible || isLocked) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                                    title={isRequiredVisible ? 'Indicador obligatorio (siempre visible)' : isLocked ? 'Tarjeta bloqueada' : isHidden ? 'Mostrar' : 'Ocultar'}
                                                 >
                                                     {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
                                                 </button>
                                                 <button
                                                     onClick={() => removeCard(id)}
-                                                    disabled={layout.order.length <= 1}
+                                                    disabled={isLocked || layout.order.length <= 1}
                                                     className="p-1.5 rounded-lg disabled:opacity-35 disabled:cursor-not-allowed bg-red-500/20 hover:bg-red-500/30 text-red-500"
-                                                    title="Eliminar del grid"
+                                                    title={isLocked ? 'Tarjeta bloqueada' : 'Eliminar del grid'}
                                                 >
                                                     <Trash2 size={14} />
                                                 </button>
@@ -1054,7 +1134,7 @@ export default function OwnerDashboard() {
                     className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg text-xs bg-teal-500/10 border border-teal-500/20 text-teal-400"
                 >
                     <GripVertical size={14} />
-                    Arrastrá para reordenar • Ojo para ocultar/mostrar • Basura para eliminar del grid
+                    Arrastra para reordenar • Candado para bloquear • Ojo para ocultar/mostrar • Basura para eliminar del grid
                 </div>
             )}
 
@@ -1084,6 +1164,7 @@ export default function OwnerDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {visibleCards.map(id => {
                             const card = cardData[id];
+                            const isLocked = layout.locked.includes(id);
                             if (!card) return null;
                             return (
                                 <SortableCard
@@ -1091,7 +1172,7 @@ export default function OwnerDashboard() {
                                     id={id}
                                     className={card.isGiant ? 'md:col-span-2' : ''}
                                     isEditing={isEditing}
-                                    isDragEnabled={isDragEnabled}
+                                    isDragEnabled={isDragEnabled && !isLocked}
                                     isDropTarget={overCardId === id && activeCardId !== id}
                                     isRecentlyDropped={recentlyDroppedCardId === id}
                                 >
@@ -1099,6 +1180,7 @@ export default function OwnerDashboard() {
                                         {...card}
                                         isEditing={isEditing}
                                         isHidden={layout.hidden.includes(id)}
+                                        isLocked={isLocked}
                                         canRemove={layout.order.length > 1}
                                         onToggleVisibility={toggleVisibility}
                                         onRemove={removeCard}

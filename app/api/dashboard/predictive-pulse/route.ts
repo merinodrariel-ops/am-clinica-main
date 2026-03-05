@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { supabase } from '@/lib/supabase';
+import { createAdminClient } from '@/utils/supabase/admin';
+
+const supabase = createAdminClient();
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 

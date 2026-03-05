@@ -473,7 +473,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
     const profileRoles = userIds.length > 0
         ? await admin
             .from('profiles')
-            .select('id, role')
+            .select('id, categoria')
             .in('id', userIds)
         : { data: [], error: null };
 
@@ -481,7 +481,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
         console.error('Error loading profile roles for liquidaciones:', profileRoles.error);
     }
 
-    const roleByUserId = new Map((profileRoles.data || []).map((p) => [p.id, p.role]));
+    const roleByUserId = new Map((profileRoles.data || []).map((p) => [p.id, p.categoria]));
 
     const liqMap = new Map((liquidacionesData || []).map(l => [l.personal_id, l]));
 

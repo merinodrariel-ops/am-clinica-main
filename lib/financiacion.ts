@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import { createClient } from '@/utils/supabase/client';
+const supabase = createClient();
 
 export interface PlanFinanciacion {
     id: string;

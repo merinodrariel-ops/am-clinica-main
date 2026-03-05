@@ -1,6 +1,5 @@
 'use server';
 
-import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { uploadToStorage } from '@/lib/supabase-storage';
@@ -12,14 +11,13 @@ export interface ProductRecord {
     category: string;
     color: string | null;
     unit: string;
-    barcode: string | null;
-    qr_code: string | null;
     image_thumb_url: string | null;
-    image_full_url: string | null;
     notes: string | null;
     stock_current: number;
     threshold_min: number | null;
-    is_active: boolean;
+    supplier: string | null;
+    link: string | null;
+    unit_cost: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -44,27 +42,27 @@ interface CreateProductInput {
     category: string;
     color?: string;
     unit: string;
-    barcode?: string;
-    qrCode?: string;
     notes?: string;
     thresholdMin?: number | null;
     stockInitial?: number;
-    isActive?: boolean;
+    supplier?: string;
+    link?: string;
+    unitCost?: number;
     imagePayload?: ProductImagePayload | null;
 }
 
 interface UpdateProductInput {
     id: string;
-    name: string;
+    name?: string;
     brand?: string;
-    category: string;
+    category?: string;
     color?: string;
-    unit: string;
-    barcode?: string;
-    qrCode?: string;
+    unit?: string;
     notes?: string;
     thresholdMin?: number | null;
-    isActive?: boolean;
+    supplier?: string;
+    link?: string;
+    unitCost?: number;
     imagePayload?: ProductImagePayload | null;
 }
 
@@ -94,36 +92,27 @@ function buildInternalQrCode() {
     return `INV-${stamp}-${random}`;
 }
 
-async function getSessionRole() {
+async function assertAdminAccess() {
     const supabase = await createClient();
-    const {
-        data: { user },
-        error: userError,
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-        return { error: 'Sesion invalida. Vuelve a iniciar sesion.', user: null as null, role: null as null };
+    if (!user) {
+        throw new Error('Sesion invalida. Vuelve a iniciar sesion.');
     }
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .maybeSingle();
 
-    const role = (profile?.role || user.user_metadata?.role || '').toLowerCase();
-    return { error: null as string | null, user, role };
-}
+    const role = (profile?.categoria || user.user_metadata?.role || '').toLowerCase();
 
-function getWriteClient() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-        return null;
+    if (!['owner', 'admin'].includes(role)) {
+        throw new Error('Solo Admin/Dueno puede realizar esta accion.');
     }
 
-    return createSupabaseAdminClient(supabaseUrl, serviceKey);
+    return user;
 }
 
 async function uploadProductImages(productName: string, payload: ProductImagePayload) {
@@ -160,32 +149,41 @@ async function uploadProductImages(productName: string, payload: ProductImagePay
 }
 
 export async function listInventoryProducts(filters: ProductListFilters = {}) {
-    const authClient = await createClient();
+    const supabase = await createClient();
 
-    let query = authClient
-        .from('products')
-        .select('id, name, brand, category, color, unit, barcode, qr_code, image_thumb_url, image_full_url, notes, stock_current, threshold_min, is_active, created_at, updated_at')
-        .order('name', { ascending: true })
+    let query = supabase
+        .from('inventario_items')
+        .select(`
+            id,
+            name:nombre,
+            brand:marca,
+            category:categoria,
+            color:area,
+            unit:unidad_medida,
+            image_thumb_url:imagen_url,
+            notes:descripcion,
+            stock_current:stock_actual,
+            threshold_min:stock_minimo,
+            created_at,
+            updated_at
+        `)
+        .order('nombre', { ascending: true })
         .limit(500);
 
     const search = sanitizeOptionalText(filters.search);
     if (search) {
         const escapedSearch = search.replace(/,/g, ' ');
-        query = query.or(`name.ilike.%${escapedSearch}%,brand.ilike.%${escapedSearch}%,category.ilike.%${escapedSearch}%,color.ilike.%${escapedSearch}%,barcode.ilike.%${escapedSearch}%,qr_code.ilike.%${escapedSearch}%`);
+        query = query.or(`nombre.ilike.%${escapedSearch}%,marca.ilike.%${escapedSearch}%,categoria.ilike.%${escapedSearch}%,area.ilike.%${escapedSearch}%`);
     }
 
     const category = sanitizeOptionalText(filters.category);
     if (category && category !== 'Todos') {
-        query = query.eq('category', category);
+        query = query.eq('categoria', category);
     }
 
     const color = sanitizeOptionalText(filters.color);
     if (color && color !== 'Todos') {
-        query = query.eq('color', color);
-    }
-
-    if (filters.activeOnly !== false) {
-        query = query.eq('is_active', true);
+        query = query.eq('area', color);
     }
 
     const { data, error } = await query;
@@ -193,19 +191,32 @@ export async function listInventoryProducts(filters: ProductListFilters = {}) {
         return { success: false, error: error.message, products: [] as ProductRecord[] };
     }
 
-    return { success: true, products: (data || []) as ProductRecord[] };
+    // Adapt to interface expected by UI
+    const products = (data || []).map((p: any) => ({
+        id: p.id,
+        name: p.nombre,
+        brand: p.marca,
+        category: p.categoria,
+        color: p.area,
+        unit: p.unidad_medida,
+        image_thumb_url: p.imagen_url,
+        notes: p.descripcion,
+        stock_current: Number(p.stock_actual || 0),
+        threshold_min: Number(p.stock_minimo || 0),
+        supplier: p.proveedor,
+        link: p.link,
+        unit_cost: Number(p.costo_unitario || 0),
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+    })) as ProductRecord[];
+
+    return { success: true, products };
 }
 
 export async function createInventoryProduct(input: CreateProductInput) {
     try {
-        const auth = await getSessionRole();
-        if (auth.error || !auth.user) {
-            return { success: false, error: auth.error || 'Sesion invalida' };
-        }
-
-        if (!['owner', 'admin'].includes(auth.role || '')) {
-            return { success: false, error: 'Solo Admin/Dueno puede crear productos.' };
-        }
+        const user = await assertAdminAccess();
+        const supabase = await createClient();
 
         const name = sanitizeRequiredText(input.name || '');
         const category = sanitizeRequiredText(input.category || '');
@@ -215,53 +226,40 @@ export async function createInventoryProduct(input: CreateProductInput) {
             return { success: false, error: 'Completa nombre, categoria y unidad.' };
         }
 
-        const writeClient = getWriteClient() || (await createClient());
-
-        let imageThumbUrl: string | null = null;
-        let imageFullUrl: string | null = null;
+        let imageUrl: string | null = null;
 
         if (input.imagePayload) {
             const upload = await uploadProductImages(name, input.imagePayload);
             if (!upload.success) {
                 return { success: false, error: upload.error };
             }
-
-            imageThumbUrl = upload.thumbUrl;
-            imageFullUrl = upload.fullUrl;
+            imageUrl = upload.thumbUrl;
         }
 
-        const barcode = sanitizeOptionalText(input.barcode);
-        const qrCode = sanitizeOptionalText(input.qrCode) || buildInternalQrCode();
         const stockInitial = Math.max(0, Number(input.stockInitial || 0));
 
         const insertPayload = {
-            name,
-            brand: sanitizeOptionalText(input.brand),
-            category,
-            color: sanitizeOptionalText(input.color),
-            unit,
-            barcode,
-            qr_code: qrCode,
-            image_thumb_url: imageThumbUrl,
-            image_full_url: imageFullUrl,
-            notes: sanitizeOptionalText(input.notes),
-            stock_current: stockInitial,
-            threshold_min: input.thresholdMin ?? null,
-            is_active: input.isActive !== false,
-            created_by: auth.user.id,
-            updated_by: auth.user.id,
+            nombre: name,
+            marca: sanitizeOptionalText(input.brand),
+            categoria: category,
+            area: sanitizeOptionalText(input.color),
+            unidad_medida: unit,
+            imagen_url: imageUrl,
+            descripcion: sanitizeOptionalText(input.notes),
+            stock_actual: stockInitial,
+            stock_minimo: input.thresholdMin ?? null,
+            proveedor: sanitizeOptionalText(input.supplier),
+            link: sanitizeOptionalText(input.link),
+            costo_unitario: input.unitCost ?? null,
         };
 
-        const { data, error } = await writeClient
-            .from('products')
+        const { data, error } = await supabase
+            .from('inventario_items')
             .insert(insertPayload)
             .select('id')
             .single();
 
         if (error) {
-            if (error.code === '23505') {
-                return { success: false, error: 'Ya existe un producto con ese barcode o QR.' };
-            }
             return { success: false, error: error.message };
         }
 
@@ -279,14 +277,8 @@ export async function createInventoryProduct(input: CreateProductInput) {
 
 export async function updateInventoryProduct(input: UpdateProductInput) {
     try {
-        const auth = await getSessionRole();
-        if (auth.error || !auth.user) {
-            return { success: false, error: auth.error || 'Sesion invalida' };
-        }
-
-        if (!['owner', 'admin'].includes(auth.role || '')) {
-            return { success: false, error: 'Solo Admin/Dueno puede editar productos.' };
-        }
+        const user = await assertAdminAccess();
+        const supabase = await createClient();
 
         const name = sanitizeRequiredText(input.name || '');
         const category = sanitizeRequiredText(input.category || '');
@@ -296,45 +288,35 @@ export async function updateInventoryProduct(input: UpdateProductInput) {
             return { success: false, error: 'Completa nombre, categoria y unidad.' };
         }
 
-        const writeClient = getWriteClient() || (await createClient());
-
-        let imagePatch: { image_thumb_url?: string | null; image_full_url?: string | null } = {};
+        let imageUrl: string | null = null;
         if (input.imagePayload) {
             const upload = await uploadProductImages(name, input.imagePayload);
             if (!upload.success) {
                 return { success: false, error: upload.error };
             }
-
-            imagePatch = {
-                image_thumb_url: upload.thumbUrl,
-                image_full_url: upload.fullUrl,
-            };
+            imageUrl = upload.thumbUrl;
         }
 
         const patchPayload = {
-            name,
-            brand: sanitizeOptionalText(input.brand),
-            category,
-            color: sanitizeOptionalText(input.color),
-            unit,
-            barcode: sanitizeOptionalText(input.barcode),
-            qr_code: sanitizeOptionalText(input.qrCode),
-            threshold_min: input.thresholdMin ?? null,
-            is_active: input.isActive !== false,
-            updated_by: auth.user.id,
-            notes: sanitizeOptionalText(input.notes),
-            ...imagePatch,
+            nombre: name,
+            marca: sanitizeOptionalText(input.brand),
+            categoria: category,
+            area: sanitizeOptionalText(input.color),
+            unidad_medida: unit,
+            stock_minimo: input.thresholdMin ?? null,
+            descripcion: sanitizeOptionalText(input.notes),
+            proveedor: sanitizeOptionalText(input.supplier),
+            link: sanitizeOptionalText(input.link),
+            costo_unitario: input.unitCost ?? null,
+            ...(imageUrl !== undefined ? { imagen_url: imageUrl } : {}),
         };
 
-        const { error } = await writeClient
-            .from('products')
+        const { error } = await supabase
+            .from('inventario_items')
             .update(patchPayload)
             .eq('id', input.id);
 
         if (error) {
-            if (error.code === '23505') {
-                return { success: false, error: 'Ya existe un producto con ese barcode o QR.' };
-            }
             return { success: false, error: error.message };
         }
 
@@ -355,20 +337,12 @@ export async function updateInventoryProductImage(input: {
     imagePayload: ProductImagePayload;
 }) {
     try {
-        const auth = await getSessionRole();
-        if (auth.error || !auth.user) {
-            return { success: false, error: auth.error || 'Sesion invalida' };
-        }
+        const user = await assertAdminAccess();
+        const supabase = await createClient();
 
-        if (!['owner', 'admin'].includes(auth.role || '')) {
-            return { success: false, error: 'Solo Admin/Dueno puede actualizar imagenes.' };
-        }
-
-        const writeClient = getWriteClient() || (await createClient());
-
-        const { data: current, error: currentError } = await writeClient
-            .from('products')
-            .select('id, name')
+        const { data: current, error: currentError } = await supabase
+            .from('inventario_items')
+            .select('id, nombre')
             .eq('id', input.id)
             .maybeSingle();
 
@@ -376,17 +350,15 @@ export async function updateInventoryProductImage(input: {
             return { success: false, error: currentError?.message || 'Producto no encontrado.' };
         }
 
-        const upload = await uploadProductImages(current.name || 'producto', input.imagePayload);
+        const upload = await uploadProductImages(current.nombre || 'producto', input.imagePayload);
         if (!upload.success) {
             return { success: false, error: upload.error };
         }
 
-        const { error } = await writeClient
-            .from('products')
+        const { error } = await supabase
+            .from('inventario_items')
             .update({
-                image_thumb_url: upload.thumbUrl,
-                image_full_url: upload.fullUrl,
-                updated_by: auth.user.id,
+                imagen_url: upload.thumbUrl,
             })
             .eq('id', input.id);
 
@@ -404,5 +376,26 @@ export async function updateInventoryProductImage(input: {
             success: false,
             error: error instanceof Error ? error.message : 'No se pudo actualizar imagen del producto',
         };
+    }
+}
+
+export async function listInventoryMovements() {
+    try {
+        const supabase = await createClient();
+        const { data, error } = await supabase
+            .from('inventario_movimientos')
+            .select('*, item:inventario_items(nombre, unidad_medida)')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) {
+            console.error('Error listing inventory movements:', error);
+            return { success: false, error: 'Error al cargar el historial' };
+        }
+
+        return { success: true, data };
+    } catch (err) {
+        console.error('Unexpected error listing movements:', err);
+        return { success: false, error: 'Error inesperado' };
     }
 }

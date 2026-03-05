@@ -5,7 +5,7 @@ import { X, ArrowUpCircle, ArrowDownCircle, Loader2, Save, MessageSquare } from 
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import MoneyInput from '@/components/ui/MoneyInput';
-import { registrarMovimiento } from '@/app/actions/inventory';
+import { registerInventoryIngress, registerInventoryEgress } from '@/app/actions/inventory-stock';
 
 interface Item {
     id: string;
@@ -41,12 +41,11 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
         setSaving(true);
         setError(null);
         try {
-            const result = await registrarMovimiento({
-                item_id: item.id,
-                tipo_movimiento: tipo,
-                cantidad: cantidad,
-                motivo: motivo || (tipo === 'ENTRADA' ? 'Carga de stock' : 'Consumo / Salida'),
-                userId: user.id
+            const fn = tipo === 'ENTRADA' ? registerInventoryIngress : registerInventoryEgress;
+            const result = await fn({
+                productId: item.id,
+                qty: cantidad,
+                note: motivo || (tipo === 'ENTRADA' ? 'Carga de stock' : 'Consumo / Salida'),
             });
 
             if (!result.success) {

@@ -726,9 +726,13 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
 
     // Prepare data for personal update
     const cleanData = { ...data };
+    // app_category explicitly overrides; if not provided, fall back to categoria
+    // (the staff board sends `categoria` which must also sync to profiles.categoria)
     const requestedAppCategory = typeof cleanData.app_category === 'string' && cleanData.app_category.trim().length > 0
         ? cleanData.app_category.trim()
-        : null;
+        : typeof cleanData.categoria === 'string' && cleanData.categoria.trim().length > 0
+            ? cleanData.categoria.trim()
+            : null;
 
     // If frontend sends empty string, persist NULL in personal.user_id
     if (cleanData.user_id === '') {
@@ -760,7 +764,8 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
             : (currentWorker?.user_id || null);
 
         if (!targetUserId) {
-            throw new Error('No se pudo actualizar la categoría de app: el prestador no está vinculado a un usuario.');
+            // Worker not linked to an auth user — only personal.categoria was updated, that's fine
+            return;
         }
 
         const admin = getAdminClient();

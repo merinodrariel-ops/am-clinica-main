@@ -1,0 +1,145 @@
+
+> am-clinica@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.47:3000
+- Environments: .env.local, .env
+- Experiments (use with caution):
+  · optimizePackageImports
+
+✓ Starting...
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+✓ Ready in 2.3s
+ GET /caja-admin?tab=personal 200 in 2.3s (compile: 1798ms, proxy.ts: 313ms, render: 178ms)
+ GET /api/bna-cotizacion 200 in 300ms (compile: 121ms, proxy.ts: 164ms, render: 15ms)
+ GET /caja-admin?tab=personal 200 in 331ms (compile: 5ms, proxy.ts: 260ms, render: 66ms)
+ GET /dashboard 200 in 415ms (compile: 95ms, proxy.ts: 250ms, render: 69ms)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 906ms (compile: 98ms, proxy.ts: 267ms, render: 541ms)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 702ms (compile: 41ms, proxy.ts: 221ms, render: 440ms)
+ GET /admision 200 in 3.7s (compile: 3.3s, proxy.ts: 236ms, render: 150ms)
+ GET /logo.png 404 in 309ms (compile: 221ms, render: 88ms)
+ POST /dashboard 200 in 1538ms (compile: 29ms, proxy.ts: 972ms, render: 538ms)
+ POST /dashboard 200 in 666ms (compile: 32ms, proxy.ts: 229ms, render: 404ms)
+ POST /dashboard 200 in 330ms (compile: 7ms, proxy.ts: 211ms, render: 112ms)
+ POST /dashboard 200 in 395ms (compile: 4ms, proxy.ts: 150ms, render: 242ms)
+ POST /dashboard 200 in 530ms (compile: 15ms, proxy.ts: 122ms, render: 393ms)
+ POST /dashboard 200 in 220ms (compile: 2ms, proxy.ts: 149ms, render: 69ms)
+✓ Compiled in 1731ms
+ GET /caja-admin?tab=personal 200 in 256ms (compile: 17ms, proxy.ts: 206ms, render: 32ms)
+ GET /api/bna-cotizacion 200 in 161ms (compile: 5ms, proxy.ts: 150ms, render: 5ms)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 662ms (compile: 5ms, proxy.ts: 186ms, render: 471ms)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 593ms (compile: 3ms, proxy.ts: 225ms, render: 365ms)
+ GET /caja-admin?tab=personal 200 in 238ms (compile: 6ms, proxy.ts: 203ms, render: 30ms)
+ GET /api/bna-cotizacion 200 in 140ms (compile: 3ms, proxy.ts: 134ms, render: 4ms)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 575ms (compile: 4ms, proxy.ts: 166ms, render: 406ms)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 545ms (compile: 5ms, proxy.ts: 141ms, render: 400ms)
+ GET /caja-admin?tab=personal 200 in 1672ms (compile: 160ms, proxy.ts: 943ms, render: 569ms)
+ GET /api/bna-cotizacion 200 in 383ms (compile: 20ms, proxy.ts: 241ms, render: 122ms)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 3.5s (compile: 10ms, proxy.ts: 262ms, render: 3.2s)
+⨯ Error: Could not find the table 'public.internal_services' in the schema cache
+    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
+  211 |
+  212 |     if (servicesError) {
+> 213 |         throw new Error(servicesError.message);
+      |               ^
+  214 |     }
+  215 |
+  216 |     return { {
+  digest: '2860485829'
+}
+ POST /caja-admin?tab=personal 500 in 1010ms (compile: 38ms, proxy.ts: 334ms, render: 638ms)
+ GET /patients 200 in 1618ms (compile: 1034ms, proxy.ts: 488ms, render: 96ms)
+ POST /patients 200 in 1535ms (compile: 2ms, proxy.ts: 192ms, render: 1340ms)
+ POST /patients 200 in 439ms (compile: 7ms, proxy.ts: 150ms, render: 283ms)
+ GET /caja-admin 200 in 160ms (compile: 8ms, proxy.ts: 139ms, render: 12ms)
+ GET /api/bna-cotizacion 200 in 318ms (compile: 2ms, proxy.ts: 135ms, render: 180ms)
+ GET /api/bna-cotizacion 200 in 173ms (compile: 6ms, proxy.ts: 132ms, render: 35ms)
+ GET /caja-admin?tab=personal 200 in 229ms (compile: 8ms, proxy.ts: 200ms, render: 22ms)
+ POST /caja-admin?tab=personal 200 in 437ms (compile: 3ms, proxy.ts: 174ms, render: 260ms)
+ POST /caja-admin?tab=personal 200 in 394ms (compile: 3ms, proxy.ts: 143ms, render: 247ms)
+ POST /caja-admin?tab=personal 200 in 443ms (compile: 8ms, proxy.ts: 193ms, render: 242ms)
+ POST /caja-admin?tab=personal 200 in 425ms (compile: 14ms, proxy.ts: 178ms, render: 233ms)
+ GET /caja-admin?tab=configuracion 200 in 921ms (compile: 124ms, proxy.ts: 650ms, render: 147ms)
+ GET /caja-admin?tab=personal 200 in 524ms (compile: 34ms, proxy.ts: 421ms, render: 70ms)
+ POST /caja-admin?tab=personal 200 in 485ms (compile: 11ms, proxy.ts: 169ms, render: 306ms)
+ POST /caja-admin?tab=personal 200 in 672ms (compile: 181ms, proxy.ts: 189ms, render: 302ms)
+ POST /caja-admin?tab=personal 200 in 783ms (compile: 48ms, proxy.ts: 413ms, render: 321ms)

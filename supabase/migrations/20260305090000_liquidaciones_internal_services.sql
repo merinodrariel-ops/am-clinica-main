@@ -85,7 +85,7 @@ CREATE POLICY liquidacion_hour_values_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     )
     WITH CHECK (
@@ -93,7 +93,7 @@ CREATE POLICY liquidacion_hour_values_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     );
 
@@ -107,7 +107,7 @@ CREATE POLICY internal_services_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     )
     WITH CHECK (
@@ -115,7 +115,7 @@ CREATE POLICY internal_services_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     );
 
@@ -129,7 +129,7 @@ CREATE POLICY provider_service_records_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     )
     WITH CHECK (
@@ -137,7 +137,7 @@ CREATE POLICY provider_service_records_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     );
 
@@ -151,7 +151,7 @@ CREATE POLICY provider_monthly_hours_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     )
     WITH CHECK (
@@ -159,6 +159,6 @@ CREATE POLICY provider_monthly_hours_admin_rw
             SELECT 1
             FROM public.profiles p
             WHERE p.id = auth.uid()
-              AND p.role IN ('owner', 'admin')
+              AND p.categoria IN ('owner', 'admin')
         )
     );

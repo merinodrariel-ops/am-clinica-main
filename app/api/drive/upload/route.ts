@@ -35,11 +35,11 @@ export async function POST(request: Request) {
 
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('categoria')
             .eq('id', user.id)
             .single();
 
-        if (!profile || !UPLOAD_ALLOWED_ROLES.includes(profile.role)) {
+        if (!profile || !UPLOAD_ALLOWED_ROLES.includes(profile.categoria)) {
             return NextResponse.json({ error: 'No tenés permisos para subir archivos' }, { status: 403 });
         }
 
