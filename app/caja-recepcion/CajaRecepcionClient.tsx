@@ -53,7 +53,7 @@ import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
 import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
 import { useAuth } from '@/contexts/AuthContext';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 
@@ -80,7 +80,7 @@ interface Movimiento {
         nombre: string;
         apellido: string;
         id_paciente: string;
-        telefono?: string | null;
+        whatsapp?: string | null;
         email?: string | null;
         financ_estado?: string;
         financ_monto_total?: number;
@@ -343,7 +343,7 @@ function CajaRecepcionContent() {
                         id_paciente, 
                         nombre, 
                         apellido,
-                        telefono,
+                        whatsapp,
                         email,
                         financ_estado,
                         financ_monto_total,
@@ -401,7 +401,7 @@ function CajaRecepcionContent() {
                 if (hasNotionImports) {
                     const { data: allPacientes } = await supabase
                         .from('pacientes')
-                        .select('id_paciente, nombre, apellido, telefono, email, financ_estado, financ_monto_total, financ_cuotas_total');
+                        .select('id_paciente, nombre, apellido, whatsapp, email, financ_estado, financ_monto_total, financ_cuotas_total');
 
                     if (allPacientes) {
                         const enrichedMovs = allMovs.map((m: Movimiento) => {
@@ -432,7 +432,7 @@ function CajaRecepcionContent() {
                                             id_paciente: found.id_paciente,
                                             nombre: found.nombre,
                                             apellido: found.apellido,
-                                            telefono: found.telefono,
+                                            whatsapp: found.whatsapp,
                                             email: found.email,
                                             financ_estado: found.financ_estado,
                                             financ_monto_total: found.financ_monto_total,
@@ -885,7 +885,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
     });
 
     return (
-        <RoleGuard allowedRoles={['owner', 'admin', 'reception']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception']}>
             <div className="p-6 max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
@@ -2402,7 +2402,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     </div>
                 </>)}
             </div>
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }
 

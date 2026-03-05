@@ -45,7 +45,7 @@ export interface RecallRule {
         id_paciente: string;
         nombre: string;
         apellido: string;
-        telefono: string | null;
+        whatsapp: string | null;
         whatsapp_pais_code: string | null;
         whatsapp_numero: string | null;
         email: string | null;

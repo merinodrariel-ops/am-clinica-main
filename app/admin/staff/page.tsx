@@ -8,9 +8,6 @@ import {
     UserPlus,
     Stethoscope,
     Building2,
-    FlaskConical,
-    Sparkles,
-    Wrench,
     Mail,
     Send,
     RefreshCw,
@@ -18,71 +15,106 @@ import {
     GripVertical,
     LayoutGrid,
     Rows3,
+    ShieldCheck,
+    Crown,
+    Calculator,
+    Headphones,
+    UserCheck,
+    FlaskConical,
+    Eye,
+    Code,
+    DollarSign,
+    PhoneCall,
+    Briefcase,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import Image from 'next/image';
 import Link from 'next/link';
 import { getAllWorkers, sendAccessInvite, updateWorkerProfileAdmin } from '@/app/actions/worker-portal';
 import { getStaffUiPreferences, saveStaffUiPreferences } from '@/app/actions/staff-ui-preferences';
-import { WorkerProfile, WorkerRole } from '@/types/worker-portal';
+import { WorkerProfile, WorkerCategory } from '@/types/worker-portal';
 import NewWorkerModal from '@/components/admin/NewWorkerModal';
 import { toast } from 'sonner';
 
-const ROLE_ICONS: Record<string, ReactNode> = {
+const CATEGORY_ICONS: Record<string, ReactNode> = {
+    owner: <Crown size={16} className="text-yellow-400" />,
+    admin: <ShieldCheck size={16} className="text-blue-400" />,
+    socio: <Users size={16} className="text-purple-400" />,
+    contador: <Calculator size={16} className="text-emerald-400" />,
+    reception: <Headphones size={16} className="text-pink-400" />,
     dentist: <Stethoscope size={16} className="text-indigo-300" />,
-    assistant: <Users size={16} className="text-cyan-300" />,
-    admin: <Building2 size={16} className="text-violet-300" />,
-    lab: <FlaskConical size={16} className="text-emerald-300" />,
-    cleaning: <Sparkles size={16} className="text-sky-300" />,
-    technician: <Wrench size={16} className="text-amber-300" />,
+    asistente: <UserCheck size={16} className="text-sky-300" />,
+    laboratorio: <FlaskConical size={16} className="text-emerald-300" />,
+    recaptacion: <PhoneCall size={16} className="text-orange-400" />,
+    developer: <Code size={16} className="text-slate-400" />,
+    pricing_manager: <DollarSign size={16} className="text-green-400" />,
+    partner_viewer: <Eye size={16} className="text-slate-500" />,
+    cleaning: <Users size={16} className="text-teal-300" />,
+    other: <Briefcase size={16} className="text-slate-400" />,
 };
 
-const ROLE_LABELS: Record<string, string> = {
-    dentist: 'Odontólogos',
-    assistant: 'Asistentes',
-    technician: 'Técnicos',
-    cleaning: 'Limpieza',
+const CATEGORY_LABELS: Record<string, string> = {
+    owner: 'Dueño',
     admin: 'Administración',
+    socio: 'Socio',
+    contador: 'Contabilidad',
     reception: 'Recepción',
-    lab: 'Laboratorio',
-    marketing: 'Marketing',
+    dentist: 'Odontólogos',
+    asistente: 'Asistentes',
+    laboratorio: 'Laboratorio',
+    recaptacion: 'Recaptación',
+    developer: 'Desarrollo',
+    pricing_manager: 'Gestión de Precios',
+    partner_viewer: 'Vista Socio (Lectura)',
+    cleaning: 'Limpieza',
     other: 'Otros',
 };
 
-const ROLE_ORDER: WorkerRole[] = [
-    'dentist',
-    'assistant',
-    'technician',
-    'lab',
-    'reception',
+const CATEGORY_ORDER: WorkerCategory[] = [
+    'owner',
     'admin',
+    'socio',
+    'reception',
+    'dentist',
+    'asistente',
+    'laboratorio',
+    'contador',
+    'recaptacion',
     'cleaning',
-    'marketing',
+    'developer',
+    'pricing_manager',
+    'partner_viewer',
     'other',
 ];
 
-function normalizeRole(rol?: string | null): string {
-    const value = (rol || '').trim().toLowerCase();
+function normalizeCategory(cat?: string | null): string {
+    const value = (cat || '').trim().toLowerCase();
     if (!value) return 'other';
 
-    if (value.includes('odont') || value.includes('dent')) return 'dentist';
-    if (value.includes('asist')) return 'assistant';
-    if (value.includes('tecn')) return 'technician';
-    if (value.includes('limp')) return 'cleaning';
+    // Map keywords to standard keys
+    if (value === 'owner' || value === 'dueño') return 'owner';
+    if (value === 'admin' || value === 'administrador' || value.includes('adminis')) return 'admin';
+    if (value === 'socio') return 'socio';
+    if (value.includes('contad') || value === 'contador') return 'contador';
     if (value.includes('recep')) return 'reception';
-    if (value.includes('laborat') || value === 'lab') return 'lab';
-    if (value.includes('admin')) return 'admin';
-    if (value.includes('market')) return 'marketing';
-    return value;
+    if (value.includes('odont') || value.includes('dent')) return 'dentist';
+    if (value.includes('asist')) return 'asistente';
+    if (value.includes('laborat') || value === 'lab') return 'laboratorio';
+    if (value.includes('recapt')) return 'recaptacion';
+    if (value.includes('dev') || value === 'developer' || value === 'desarrollador') return 'developer';
+    if (value.includes('price') || value.includes('precio')) return 'pricing_manager';
+    if (value.includes('viewer') || value.includes('lectura')) return 'partner_viewer';
+    if (value.includes('limp')) return 'cleaning';
+
+    return 'other';
 }
 
-function getRoleLabel(role: string): string {
-    return ROLE_LABELS[role] || role.replace(/_/g, ' ');
+function getCategoryLabel(cat: string): string {
+    return CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ');
 }
 
-function getRoleIcon(rol: string) {
-    const key = normalizeRole(rol);
-    return ROLE_ICONS[key] || <Users size={16} className="text-slate-400" />;
+function getCategoryIcon(cat: string) {
+    const key = normalizeCategory(cat);
+    return CATEGORY_ICONS[key] || <Users size={16} className="text-slate-400" />;
 }
 
 interface DocEntry {
@@ -117,15 +149,15 @@ const ACCESS_BADGE: Record<AccessStatus, { label: string; className: string }> =
 };
 
 const STAFF_VIEW_KEY = 'am.staff.view-mode';
-const STAFF_ROLE_ORDER_KEY = 'am.staff.role-order';
+const STAFF_CATEGORY_ORDER_KEY = 'am.staff.category-order';
 const STAFF_GROUP_KEY = 'am.staff.group-mode';
 const STAFF_DENSE_KEY = 'am.staff.dense-mode';
 
-type GroupMode = 'role' | 'company' | 'access' | 'compliance';
+type GroupMode = 'category' | 'company' | 'access' | 'compliance';
 
 type InlineDraft = {
     email: string;
-    rol: string;
+    categoria: string;
     activo: boolean;
 };
 
@@ -134,16 +166,16 @@ export default function StaffListPage() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [sendingInvite, setSendingInvite] = useState<string | null>(null);
-    const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+    const [updatingCategory, setUpdatingCategory] = useState<string | null>(null);
     const [draggingWorkerId, setDraggingWorkerId] = useState<string | null>(null);
-    const [dragOverWorkerRole, setDragOverWorkerRole] = useState<string | null>(null);
-    const [draggingRoleColumn, setDraggingRoleColumn] = useState<string | null>(null);
-    const [dragOverRoleColumn, setDragOverRoleColumn] = useState<string | null>(null);
+    const [dragOverWorkerCategory, setDragOverWorkerCategory] = useState<string | null>(null);
+    const [draggingCategoryColumn, setDraggingCategoryColumn] = useState<string | null>(null);
+    const [dragOverCategoryColumn, setDragOverCategoryColumn] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [onlyActive, setOnlyActive] = useState(false);
     const [viewMode, setViewMode] = useState<'board' | 'table'>('board');
-    const [roleOrderPreference, setRoleOrderPreference] = useState<string[]>([]);
-    const [groupMode, setGroupMode] = useState<GroupMode>('role');
+    const [categoryOrderPreference, setCategoryOrderPreference] = useState<string[]>([]);
+    const [groupMode, setGroupMode] = useState<GroupMode>('category');
     const [denseMode, setDenseMode] = useState(false);
     const [prefsReady, setPrefsReady] = useState(false);
     const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>({});
@@ -174,12 +206,12 @@ export default function StaffListPage() {
             setViewMode(savedView);
         }
 
-        const savedOrder = window.localStorage.getItem(STAFF_ROLE_ORDER_KEY);
+        const savedOrder = window.localStorage.getItem(STAFF_CATEGORY_ORDER_KEY);
         if (savedOrder) {
             try {
                 const parsed = JSON.parse(savedOrder);
                 if (Array.isArray(parsed)) {
-                    setRoleOrderPreference(parsed.filter((item): item is string => typeof item === 'string'));
+                    setCategoryOrderPreference(parsed.filter((item): item is string => typeof item === 'string'));
                 }
             } catch {
                 // ignore malformed persisted preference
@@ -187,7 +219,7 @@ export default function StaffListPage() {
         }
 
         const savedGroup = window.localStorage.getItem(STAFF_GROUP_KEY);
-        if (savedGroup === 'role' || savedGroup === 'company' || savedGroup === 'access' || savedGroup === 'compliance') {
+        if (savedGroup === 'category' || savedGroup === 'company' || savedGroup === 'access' || savedGroup === 'compliance') {
             setGroupMode(savedGroup);
         }
 
@@ -206,7 +238,7 @@ export default function StaffListPage() {
                 setGroupMode(prefs.groupMode);
                 setOnlyActive(prefs.onlyActive);
                 setDenseMode(prefs.denseMode);
-                setRoleOrderPreference(prefs.roleOrder);
+                setCategoryOrderPreference(prefs.roleOrder);
             } catch {
                 // keep local fallback silently
             } finally {
@@ -226,8 +258,8 @@ export default function StaffListPage() {
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        window.localStorage.setItem(STAFF_ROLE_ORDER_KEY, JSON.stringify(roleOrderPreference));
-    }, [roleOrderPreference]);
+        window.localStorage.setItem(STAFF_CATEGORY_ORDER_KEY, JSON.stringify(categoryOrderPreference));
+    }, [categoryOrderPreference]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -248,21 +280,21 @@ export default function StaffListPage() {
                 groupMode,
                 onlyActive,
                 denseMode,
-                roleOrder: roleOrderPreference,
+                roleOrder: categoryOrderPreference,
             }).catch(() => {
                 // best-effort persistence, local storage already acts as fallback
             });
         }, 450);
 
         return () => window.clearTimeout(timeout);
-    }, [denseMode, groupMode, onlyActive, prefsReady, roleOrderPreference, viewMode]);
+    }, [denseMode, groupMode, onlyActive, prefsReady, categoryOrderPreference, viewMode]);
 
     useEffect(() => {
         const next: Record<string, InlineDraft> = {};
         workers.forEach((worker) => {
             next[worker.id] = {
                 email: worker.email || '',
-                rol: normalizeRole(worker.rol),
+                categoria: normalizeCategory(worker.categoria),
                 activo: worker.activo !== false,
             };
         });
@@ -291,13 +323,13 @@ export default function StaffListPage() {
             if (!q) return true;
 
             const fullName = `${worker.nombre || ''} ${worker.apellido || ''}`.toLowerCase();
-            const rol = (worker.rol || '').toLowerCase();
+            const cat = (worker.categoria || '').toLowerCase();
             const mail = (worker.email || '').toLowerCase();
             const area = (worker.area || '').toLowerCase();
 
             return (
                 fullName.includes(q) ||
-                rol.includes(q) ||
+                cat.includes(q) ||
                 mail.includes(q) ||
                 area.includes(q)
             );
@@ -307,51 +339,51 @@ export default function StaffListPage() {
     const activeCount = workers.filter((w) => w.activo !== false).length;
     const withAccess = workers.filter((w) => w.user_id).length;
 
-    const groupedByRole = useMemo(() => {
+    const groupedByCategory = useMemo(() => {
         const gMap = new Map<string, WorkerProfile[]>();
 
         filteredWorkers.forEach((worker) => {
-            const roleKey = normalizeRole(worker.rol);
-            if (!gMap.has(roleKey)) gMap.set(roleKey, []);
-            gMap.get(roleKey)!.push(worker);
+            const categoryKey = normalizeCategory(worker.categoria);
+            if (!gMap.has(categoryKey)) gMap.set(categoryKey, []);
+            gMap.get(categoryKey)!.push(worker);
         });
 
         const grouped: Record<string, WorkerProfile[]> = Object.fromEntries(gMap);
 
         return {
             grouped,
-            dynamicRoles: Array.from(gMap.keys()).sort(),
+            dynamicCategories: Array.from(gMap.keys()).sort(),
         };
     }, [filteredWorkers]);
 
-    const orderedRoles = useMemo(() => {
-        const dynamicRoles = groupedByRole.dynamicRoles;
+    const orderedCategories = useMemo(() => {
+        const dynamicCategories = groupedByCategory.dynamicCategories;
         const baseOrder = [
-            ...ROLE_ORDER.filter((r) => dynamicRoles.includes(r)),
-            ...dynamicRoles.filter((r) => !ROLE_ORDER.includes(r as WorkerRole)),
+            ...CATEGORY_ORDER.filter((r) => dynamicCategories.includes(r)),
+            ...dynamicCategories.filter((r) => !CATEGORY_ORDER.includes(r as WorkerCategory)),
         ];
 
-        if (!roleOrderPreference.length) return baseOrder;
+        if (!categoryOrderPreference.length) return baseOrder;
 
-        const preferred = roleOrderPreference.filter((role) => baseOrder.includes(role));
-        const missing = baseOrder.filter((role) => !preferred.includes(role));
+        const preferred = categoryOrderPreference.filter((cat) => baseOrder.includes(cat));
+        const missing = baseOrder.filter((cat) => !preferred.includes(cat));
         return [...preferred, ...missing];
-    }, [groupedByRole.dynamicRoles, roleOrderPreference]);
+    }, [groupedByCategory.dynamicCategories, categoryOrderPreference]);
 
     const tableRows = useMemo(() => {
         return [...filteredWorkers].sort((a, b) => {
-            const roleA = normalizeRole(a.rol);
-            const roleB = normalizeRole(b.rol);
-            const roleIdxA = orderedRoles.indexOf(roleA);
-            const roleIdxB = orderedRoles.indexOf(roleB);
+            const catA = normalizeCategory(a.categoria);
+            const catB = normalizeCategory(b.categoria);
+            const catIdxA = orderedCategories.indexOf(catA);
+            const catIdxB = orderedCategories.indexOf(catB);
 
-            if (roleIdxA !== roleIdxB) return roleIdxA - roleIdxB;
+            if (catIdxA !== catIdxB) return catIdxA - catIdxB;
 
             const nameA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
             const nameB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
             return nameA.localeCompare(nameB);
         });
-    }, [filteredWorkers, orderedRoles]);
+    }, [filteredWorkers, orderedCategories]);
 
     function onDragStart(workerId: string) {
         setDraggingWorkerId(workerId);
@@ -359,64 +391,64 @@ export default function StaffListPage() {
 
     function onDragEnd() {
         setDraggingWorkerId(null);
-        setDragOverWorkerRole(null);
+        setDragOverWorkerCategory(null);
     }
 
-    function onDragOverRole(e: DragEvent<HTMLDivElement>, role: string) {
+    function onDragOverCategory(e: DragEvent<HTMLDivElement>, category: string) {
         e.preventDefault();
-        setDragOverWorkerRole(role);
+        setDragOverWorkerCategory(category);
     }
 
-    function onRoleColumnDragStart(role: string) {
-        setDraggingRoleColumn(role);
+    function onCategoryColumnDragStart(category: string) {
+        setDraggingCategoryColumn(category);
     }
 
-    function onRoleColumnDragOver(e: DragEvent<HTMLDivElement>, role: string) {
+    function onCategoryColumnDragOver(e: DragEvent<HTMLDivElement>, category: string) {
         e.preventDefault();
-        if (!draggingRoleColumn) return;
-        setDragOverRoleColumn(role);
+        if (!draggingCategoryColumn) return;
+        setDragOverCategoryColumn(category);
     }
 
-    function onRoleColumnDragEnd() {
-        setDraggingRoleColumn(null);
-        setDragOverRoleColumn(null);
+    function onCategoryColumnDragEnd() {
+        setDraggingCategoryColumn(null);
+        setDragOverCategoryColumn(null);
     }
 
-    function onRoleColumnDrop(e: DragEvent<HTMLDivElement>, role: string) {
+    function onCategoryColumnDrop(e: DragEvent<HTMLDivElement>, category: string) {
         e.preventDefault();
-        if (!draggingRoleColumn || draggingRoleColumn === role) {
-            onRoleColumnDragEnd();
+        if (!draggingCategoryColumn || draggingCategoryColumn === category) {
+            onCategoryColumnDragEnd();
             return;
         }
 
-        const fromIndex = orderedRoles.indexOf(draggingRoleColumn);
-        const toIndex = orderedRoles.indexOf(role);
+        const fromIndex = orderedCategories.indexOf(draggingCategoryColumn);
+        const toIndex = orderedCategories.indexOf(category);
 
         if (fromIndex < 0 || toIndex < 0) {
-            onRoleColumnDragEnd();
+            onCategoryColumnDragEnd();
             return;
         }
 
-        const next = [...orderedRoles];
+        const next = [...orderedCategories];
         const [moved] = next.splice(fromIndex, 1);
         next.splice(toIndex, 0, moved);
-        setRoleOrderPreference(next);
-        onRoleColumnDragEnd();
+        setCategoryOrderPreference(next);
+        onCategoryColumnDragEnd();
     }
 
-    async function onDropRole(e: DragEvent<HTMLDivElement>, role: string) {
+    async function onDropCategory(e: DragEvent<HTMLDivElement>, category: string) {
         e.preventDefault();
         if (!draggingWorkerId) return;
 
-        const targetRole = role;
+        const targetCategory = category;
         const current = workers.find((w) => w.id === draggingWorkerId);
         if (!current) {
             onDragEnd();
             return;
         }
 
-        const currentRole = normalizeRole(current.rol);
-        if (currentRole === targetRole) {
+        const currentCategory = normalizeCategory(current.categoria);
+        if (currentCategory === targetCategory) {
             onDragEnd();
             return;
         }
@@ -425,20 +457,20 @@ export default function StaffListPage() {
         setWorkers((prev) =>
             prev.map((worker) =>
                 worker.id === draggingWorkerId
-                    ? { ...worker, rol: targetRole }
+                    ? { ...worker, categoria: targetCategory }
                     : worker
             )
         );
 
-        setUpdatingRole(draggingWorkerId);
+        setUpdatingCategory(draggingWorkerId);
         try {
-            await updateWorkerProfileAdmin(draggingWorkerId, { rol: targetRole });
-            toast.success(`Movido a ${getRoleLabel(targetRole)}`);
+            await updateWorkerProfileAdmin(draggingWorkerId, { categoria: targetCategory });
+            toast.success(`Movido a ${getCategoryLabel(targetCategory)}`);
         } catch (error: unknown) {
             setWorkers(prevWorkers);
             toast.error(error instanceof Error ? error.message : 'No se pudo mover el prestador');
         } finally {
-            setUpdatingRole(null);
+            setUpdatingCategory(null);
             onDragEnd();
         }
     }
@@ -451,19 +483,19 @@ export default function StaffListPage() {
         return 'none';
     }
 
-    const roleOptions = useMemo(() => {
-        const next = new Set<string>([...ROLE_ORDER, ...groupedByRole.dynamicRoles]);
+    const categoryOptions = useMemo(() => {
+        const next = new Set<string>([...CATEGORY_ORDER, ...groupedByCategory.dynamicCategories]);
         return Array.from(next);
-    }, [groupedByRole.dynamicRoles]);
+    }, [groupedByCategory.dynamicCategories]);
 
     const boardColumns = useMemo(() => {
-        if (groupMode === 'role') {
-            return orderedRoles.map((role) => ({
-                key: role,
-                label: getRoleLabel(role),
-                icon: getRoleIcon(role),
-                workers: groupedByRole.grouped[role] || [],
-                isRoleColumn: true,
+        if (groupMode === 'category') {
+            return orderedCategories.map((cat) => ({
+                key: cat,
+                label: getCategoryLabel(cat),
+                icon: getCategoryIcon(cat),
+                workers: groupedByCategory.grouped[cat] || [],
+                isCategoryColumn: true,
             }));
         }
 
@@ -481,7 +513,7 @@ export default function StaffListPage() {
                     label: key,
                     icon: <Building2 size={16} className="text-cyan-300" />,
                     workers: companyMap.get(key) ?? [],
-                    isRoleColumn: false,
+                    isCategoryColumn: false,
                 }));
         }
 
@@ -492,7 +524,7 @@ export default function StaffListPage() {
                 label: ACCESS_BADGE[status].label,
                 icon: <Users size={16} className="text-indigo-300" />,
                 workers: filteredWorkers.filter((worker) => getAccessStatus(worker) === status),
-                isRoleColumn: false,
+                isCategoryColumn: false,
             }));
         }
 
@@ -508,16 +540,16 @@ export default function StaffListPage() {
             label: complianceLabel[bucket],
             icon: <CheckCircle2 size={16} className="text-emerald-300" />,
             workers: filteredWorkers.filter((worker) => getComplianceBucket(worker) === bucket),
-            isRoleColumn: false,
+            isCategoryColumn: false,
         }));
-    }, [filteredWorkers, groupMode, groupedByRole.grouped, orderedRoles]);
+    }, [filteredWorkers, groupMode, groupedByCategory.grouped, orderedCategories]);
 
     function setInlineDraft(workerId: string, patch: Partial<InlineDraft>) {
         setInlineDrafts((prev) => ({
             ...prev,
             [workerId]: {
                 email: prev[workerId]?.email || '',
-                rol: prev[workerId]?.rol || 'other',
+                categoria: prev[workerId]?.categoria || 'other',
                 activo: prev[workerId]?.activo ?? true,
                 ...patch,
             },
@@ -527,9 +559,9 @@ export default function StaffListPage() {
     function isInlineDirty(worker: WorkerProfile, draft: InlineDraft | undefined): boolean {
         if (!draft) return false;
         const sameEmail = draft.email.trim() === (worker.email || '').trim();
-        const sameRole = draft.rol === normalizeRole(worker.rol);
+        const sameCategory = draft.categoria === normalizeCategory(worker.categoria);
         const sameActive = draft.activo === (worker.activo !== false);
-        return !(sameEmail && sameRole && sameActive);
+        return !(sameEmail && sameCategory && sameActive);
     }
 
     async function saveInline(worker: WorkerProfile) {
@@ -542,7 +574,7 @@ export default function StaffListPage() {
         try {
             await updateWorkerProfileAdmin(worker.id, {
                 email: draft.email.trim(),
-                rol: draft.rol,
+                categoria: draft.categoria,
                 activo: draft.activo,
             });
 
@@ -552,7 +584,7 @@ export default function StaffListPage() {
                         ? {
                             ...item,
                             email: draft.email.trim(),
-                            rol: draft.rol,
+                            categoria: draft.categoria,
                             activo: draft.activo,
                         }
                         : item
@@ -631,8 +663,8 @@ export default function StaffListPage() {
                     <button
                         onClick={() => setOnlyActive((v) => !v)}
                         className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${onlyActive
-                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                                : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
+                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                            : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
                             }`}
                     >
                         {onlyActive ? 'Mostrando solo activos' : 'Mostrar solo activos'}
@@ -657,7 +689,7 @@ export default function StaffListPage() {
                     </div>
                     <div className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">
                         {([
-                            ['role', 'Por rol'],
+                            ['category', 'Por categoría'],
                             ['company', 'Por empresa'],
                             ['access', 'Por acceso'],
                             ['compliance', 'Por docs'],
@@ -674,23 +706,22 @@ export default function StaffListPage() {
                     </div>
                     <button
                         onClick={() => setDenseMode((v) => !v)}
-                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-                            denseMode
-                                ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
-                                : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
-                        }`}
+                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${denseMode
+                            ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                            : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
+                            }`}
                     >
                         {denseMode ? 'Compacto ON' : 'Compacto OFF'}
                     </button>
                     <div className="text-xs text-slate-500 lg:ml-auto">
-                        {filteredWorkers.length} resultados · {groupMode === 'role' ? 'Drag de tarjetas/columnas habilitado' : 'Drag disponible al agrupar por rol'}
+                        {filteredWorkers.length} resultados · {groupMode === 'category' ? 'Drag de tarjetas/columnas habilitado' : 'Drag disponible al agrupar por categoría'}
                     </div>
                 </div>
             </div>
 
             {loading ? (
                 <div className="flex items-center justify-center py-24 text-slate-500 text-sm">Cargando tablero...</div>
-            ) : orderedRoles.length === 0 ? (
+            ) : orderedCategories.length === 0 ? (
                 <div className="text-center py-24 border border-dashed border-slate-800 rounded-3xl">
                     <Users size={40} className="mx-auto text-slate-700 mb-4" />
                     <p className="text-slate-500 mb-4">No hay prestadores para los filtros actuales.</p>
@@ -709,7 +740,7 @@ export default function StaffListPage() {
                             <thead className="bg-slate-950/80 border-b border-slate-800">
                                 <tr>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Prestador</th>
-                                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Rol</th>
+                                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Categoría</th>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Email</th>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Activo</th>
                                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wider text-slate-500">Portal</th>
@@ -724,7 +755,7 @@ export default function StaffListPage() {
                                     const accessStatus = getAccessStatus(worker);
                                     const badge = ACCESS_BADGE[accessStatus];
                                     const draft = inlineDrafts[worker.id];
-                                    const role = draft?.rol || normalizeRole(worker.rol);
+                                    const category = draft?.categoria || normalizeCategory(worker.categoria);
                                     const dirty = isInlineDirty(worker, draft);
                                     const isSavingInline = savingInlineId === worker.id;
 
@@ -746,18 +777,20 @@ export default function StaffListPage() {
                                             <td className="px-4 py-3">
                                                 <div className="inline-flex items-center gap-1.5">
                                                     <div className="h-7 w-7 rounded-lg border border-slate-700 bg-slate-900 flex items-center justify-center">
-                                                        {getRoleIcon(role)}
+                                                        {getCategoryIcon(category)}
                                                     </div>
-                                                    <select
-                                                        value={role}
-                                                        onChange={(e) => setInlineDraft(worker.id, { rol: e.target.value })}
-                                                        className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200"
-                                                    >
-                                                        {roleOptions.map((option) => (
-                                                            <option key={option} value={option}>{getRoleLabel(option)}</option>
-                                                        ))}
-                                                    </select>
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <select
+                                                    value={category}
+                                                    onChange={(e) => setInlineDraft(worker.id, { categoria: e.target.value })}
+                                                    className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200"
+                                                >
+                                                    {categoryOptions.map((option) => (
+                                                        <option key={option} value={option}>{getCategoryLabel(option)}</option>
+                                                    ))}
+                                                </select>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <input
@@ -771,8 +804,8 @@ export default function StaffListPage() {
                                                 <button
                                                     onClick={() => setInlineDraft(worker.id, { activo: !(draft?.activo ?? (worker.activo !== false)) })}
                                                     className={`inline-flex items-center gap-2 px-2 py-1 rounded-full border text-xs font-semibold ${(draft?.activo ?? (worker.activo !== false))
-                                                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                                                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                                                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                                        : 'bg-slate-800 text-slate-400 border-slate-700'
                                                         }`}
                                                 >
                                                     {(draft?.activo ?? (worker.activo !== false)) ? <CheckCircle2 size={12} /> : <Circle size={12} />}
@@ -934,8 +967,8 @@ export default function StaffListPage() {
                                                                 </div>
 
                                                                 <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${worker.activo !== false
-                                                                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                                                                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                                                                    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                                                    : 'bg-slate-800 text-slate-500 border-slate-700'
                                                                     }`}>
                                                                     {worker.activo !== false ? <CheckCircle2 size={10} /> : <Circle size={10} />}
                                                                     {worker.activo !== false ? 'Activo' : 'Inactivo'}

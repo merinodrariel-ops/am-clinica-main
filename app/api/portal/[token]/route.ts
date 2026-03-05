@@ -45,7 +45,7 @@ export async function GET(
     ] = await Promise.all([
         supabase
             .from('pacientes')
-            .select('id_paciente, nombre, apellido, email, telefono, estado_paciente')
+            .select('id_paciente, nombre, apellido, email, whatsapp, estado_paciente')
             .eq('id_paciente', patientId)
             .single(),
 

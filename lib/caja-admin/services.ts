@@ -581,7 +581,7 @@ export async function createPrestacion(
 // =============================================
 
 export async function getPersonal(options?: {
-    tipo?: 'prestador' | 'profesional';
+    tipo?: 'prestador' | 'odontologo' | 'profesional';
     area?: string;
     includeInactive?: boolean;
 }): Promise<Personal[]> {
@@ -595,7 +595,11 @@ export async function getPersonal(options?: {
         query = query.eq('activo', true);
     }
     if (options?.tipo) {
-        query = query.eq('tipo', options.tipo);
+        if (options.tipo === 'odontologo' || options.tipo === 'profesional') {
+            query = query.in('tipo', ['odontologo', 'profesional']);
+        } else {
+            query = query.eq('tipo', options.tipo);
+        }
     }
     if (options?.area) {
         query = query.eq('area', options.area);
@@ -625,12 +629,17 @@ export async function getPersonalById(id: string): Promise<Personal | null> {
     return data;
 }
 
-export async function getPersonalAreas(): Promise<PersonalArea[]> {
-    const { data, error } = await getSupabase()
+export async function getPersonalAreas(options?: { includeInactive?: boolean }): Promise<PersonalArea[]> {
+    let query = getSupabase()
         .from('personal_areas')
         .select('*')
-        .eq('activo', true)
         .order('orden');
+
+    if (!options?.includeInactive) {
+        query = query.eq('activo', true);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         console.error('Error fetching personal areas:', error);
@@ -639,12 +648,61 @@ export async function getPersonalAreas(): Promise<PersonalArea[]> {
     return data || [];
 }
 
+export async function createPersonalArea(input: Partial<PersonalArea>): Promise<{ success: boolean; data?: PersonalArea; error?: string }> {
+    const payload = {
+        nombre: (input.nombre || '').trim(),
+        descripcion: input.descripcion || null,
+        tipo_personal: input.tipo_personal === 'profesional' ? 'odontologo' : (input.tipo_personal || 'prestador'),
+        color: input.color || '#6366f1',
+        icono: input.icono || 'User',
+        activo: input.activo ?? true,
+        orden: Number(input.orden || 0),
+    };
+
+    if (!payload.nombre) {
+        return { success: false, error: 'Nombre obligatorio' };
+    }
+
+    const { data, error } = await getSupabase()
+        .from('personal_areas')
+        .insert(payload)
+        .select('*')
+        .single();
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data as PersonalArea };
+}
+
+export async function updatePersonalArea(id: string, updates: Partial<PersonalArea>): Promise<{ success: boolean; error?: string }> {
+    const nextUpdates = {
+        ...updates,
+        tipo_personal: updates.tipo_personal === 'profesional' ? 'odontologo' : updates.tipo_personal,
+    };
+
+    const { error } = await getSupabase()
+        .from('personal_areas')
+        .update(nextUpdates)
+        .eq('id', id);
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+
+    return { success: true };
+}
+
 export async function createPersonal(input: CreatePersonalInput): Promise<{ data: Personal | null; error: Error | null }> {
+    const normalizedTipo = input.tipo === 'profesional' ? 'odontologo' : input.tipo;
+
     const { data, error } = await getSupabase()
         .from('personal')
         .insert({
             ...input,
-            rol: input.rol || (input.tipo === 'profesional' ? 'Profesional' : 'Prestador'),
+            tipo: normalizedTipo,
+            rol: input.rol || (normalizedTipo === 'odontologo' ? 'Odontólogo' : 'Prestador'),
             valor_hora_ars: input.valor_hora_ars || 0,
             activo: true,
             fecha_ingreso: input.fecha_ingreso || new Date().toISOString().split('T')[0],
@@ -662,9 +720,14 @@ export async function updatePersonal(
     id: string,
     updates: Partial<Personal>
 ): Promise<{ success: boolean; error?: string }> {
+    const nextUpdates = {
+        ...updates,
+        tipo: updates.tipo === 'profesional' ? 'odontologo' : updates.tipo,
+    };
+
     const { error } = await getSupabase()
         .from('personal')
-        .update(updates)
+        .update(nextUpdates)
         .eq('id', id);
 
     if (error) {
@@ -1050,7 +1113,7 @@ export async function getObservadosSlaSummary(mes?: string): Promise<{ total: nu
 
     const { data, error } = await query;
     if (error || !data) {
-        if (error) console.error('Error fetching observados SLA summary:', error);
+        if (error) console.error('Error fetching observados SLA summary:', error.message, error.code, error.details);
         return { total: 0, warn: 0, critical: 0 };
     }
 
@@ -1335,14 +1398,14 @@ export async function updateMovimientoAdminWithLines(
         return { success: false, error: 'Sesion invalida. Vuelve a iniciar sesion.' };
     }
 
-    const metadataRole = authData.user.user_metadata?.role as string | undefined;
+    const metadataRole = authData.user.user_metadata?.categoria as string | undefined;
     const { data: profileData } = await getSupabase()
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', authData.user.id)
         .maybeSingle();
 
-    const effectiveRole = (profileData?.role || metadataRole || '').toLowerCase();
+    const effectiveRole = (profileData?.categoria || metadataRole || '').toLowerCase();
     if (effectiveRole !== 'owner' && effectiveRole !== 'admin') {
         return { success: false, error: 'Permiso denegado: solo Admin/Dueno puede editar montos de Caja Administracion.' };
     }

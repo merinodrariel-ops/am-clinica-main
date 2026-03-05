@@ -48,25 +48,25 @@ export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
     return data as WorkerProfile;
 }
 
-export async function getUserAppProfile(): Promise<{ role: string | null } | null> {
+export async function getUserAppProfile(): Promise<{ categoria: string | null } | null> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .single();
 
     return profile;
 }
 
-export async function getAppUsers(): Promise<{ id: string, full_name: string, email: string, role: string }[]> {
+export async function getAppUsers(): Promise<{ id: string, full_name: string, email: string, categoria: string }[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role')
+        .select('id, full_name, email, categoria')
         .order('full_name');
 
     if (error) {
@@ -324,7 +324,7 @@ export async function getWorkerXP(personalId: string): Promise<number> {
 // GOALS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getAllGoals(workerRole?: string): Promise<ProviderGoal[]> {
+export async function getAllGoals(workerCategory?: string): Promise<ProviderGoal[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -334,10 +334,10 @@ export async function getAllGoals(workerRole?: string): Promise<ProviderGoal[]> 
 
     if (error) { console.error('Error fetching goals:', error); return []; }
 
-    // Filter by role: include goals for this role or goals for all roles (role_target is null)
+    // Filter by category: include goals for this category or goals for all (category_target is null)
     const goals = data as ProviderGoal[];
-    if (!workerRole) return goals;
-    return goals.filter(g => !g.role_target || g.role_target === workerRole);
+    if (!workerCategory) return goals;
+    return goals.filter(g => !g.category_target || g.category_target === workerCategory);
 }
 
 export async function getGoalProgress(personalId: string): Promise<GoalProgress[]> {
@@ -457,9 +457,9 @@ export async function getWorkerMonthlyStats(personalId: string, month: number, y
 export interface CreateWorkerInput {
     nombre: string;
     apellido?: string;
-    rol: string;
+    categoria: string;
     area?: string;
-    tipo?: 'prestador' | 'profesional';
+    tipo?: 'prestador' | 'odontologo' | 'profesional';
     email?: string;
     whatsapp?: string;
     documento?: string;
@@ -485,8 +485,9 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
     const adminSupabase = getAdminClient();
 
     // Map business tipo → auth role and DB tipo
-    const authRole = data.tipo === 'profesional' ? 'odontologo' : 'asistente';
-    const dbTipo = data.tipo === 'profesional' ? 'profesional' : 'empleado';
+    const isOdontologo = data.tipo === 'odontologo' || data.tipo === 'profesional';
+    const authRole = isOdontologo ? 'odontologo' : 'asistente';
+    const dbTipo = isOdontologo ? 'odontologo' : 'prestador';
 
     // 1. Generate invite link via Supabase Auth admin
     const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
@@ -496,7 +497,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
             redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/callback?next=/auth/update-password`,
             data: {
                 full_name: `${data.nombre} ${data.apellido || ''}`.trim(),
-                role: authRole,
+                categoria: authRole,
             },
         },
     });
@@ -524,7 +525,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
         id: userId,
         email: data.email,
         full_name: `${data.nombre} ${data.apellido || ''}`.trim(),
-        role: authRole,
+        categoria: authRole,
         estado: 'invitado',
         invitation_sent_at: new Date().toISOString(),
     });
@@ -536,7 +537,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
             user_id: userId,
             nombre: data.nombre,
             apellido: data.apellido || null,
-            rol: data.rol,
+            categoria: data.categoria,
             area: data.area || 'general',
             tipo: dbTipo,
             email: data.email,
@@ -586,11 +587,11 @@ export async function createProviderCompany(input: {
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['owner', 'admin'].includes(profile.role || '')) {
+    if (!profile || !['owner', 'admin'].includes(profile.categoria || '')) {
         throw new Error('Acceso denegado: solo admin/owner pueden crear empresas prestadoras');
     }
 
@@ -626,7 +627,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
     if (fetchError || !worker) throw new Error('Prestador no encontrado');
     if (!worker.email) throw new Error('El prestador no tiene email registrado');
 
-    const authRole = worker.tipo === 'profesional' ? 'odontologo' : 'asistente';
+    const authRole = worker.tipo === 'odontologo' || worker.tipo === 'profesional' ? 'odontologo' : 'asistente';
 
     const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
         type: 'invite',
@@ -635,7 +636,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
             redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/callback?next=/auth/update-password`,
             data: {
                 full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
-                role: authRole,
+                categoria: authRole,
             },
         },
     });
@@ -715,18 +716,18 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
     // Role check - Check app profiles instead of personal records
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('categoria')
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['admin', 'owner'].includes(profile.role || '')) {
+    if (!profile || !['admin', 'owner'].includes(profile.categoria || '')) {
         throw new Error('Acceso denegado: Se requieren permisos de administrador o dueño');
     }
 
     // Prepare data for personal update
     const cleanData = { ...data };
-    const requestedAppRole = typeof cleanData.app_role === 'string' && cleanData.app_role.trim().length > 0
-        ? cleanData.app_role.trim()
+    const requestedAppCategory = typeof cleanData.app_category === 'string' && cleanData.app_category.trim().length > 0
+        ? cleanData.app_category.trim()
         : null;
 
     // If frontend sends empty string, persist NULL in personal.user_id
@@ -735,7 +736,7 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
     }
 
     delete (cleanData as any).full_name; // Computed or handled elsewhere
-    delete (cleanData as any).app_role;
+    delete (cleanData as any).app_category;
 
     // Resolve current linked auth user (before/after potential relink)
     const { data: currentWorker, error: currentWorkerError } = await supabase
@@ -753,30 +754,30 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
 
     if (error) throw new Error(error.message);
 
-    if (requestedAppRole) {
+    if (requestedAppCategory) {
         const targetUserId = (data.user_id && data.user_id.trim().length > 0)
             ? data.user_id
             : (currentWorker?.user_id || null);
 
         if (!targetUserId) {
-            throw new Error('No se pudo actualizar el rol de app: el prestador no está vinculado a un usuario.');
+            throw new Error('No se pudo actualizar la categoría de app: el prestador no está vinculado a un usuario.');
         }
 
         const admin = getAdminClient();
 
-        const { error: profileRoleError } = await admin
+        const { error: profileCategoryError } = await admin
             .from('profiles')
-            .update({ role: requestedAppRole })
+            .update({ categoria: requestedAppCategory })
             .eq('id', targetUserId);
 
-        if (profileRoleError) throw new Error(profileRoleError.message);
+        if (profileCategoryError) throw new Error(profileCategoryError.message);
 
         const { data: authUserData, error: getAuthUserError } = await admin.auth.admin.getUserById(targetUserId);
         if (getAuthUserError) throw new Error(getAuthUserError.message);
 
         const nextMetadata = {
             ...(authUserData.user?.user_metadata || {}),
-            role: requestedAppRole,
+            categoria: requestedAppCategory,
         };
 
         const { error: authRoleError } = await admin.auth.admin.updateUserById(targetUserId, {

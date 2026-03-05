@@ -1204,19 +1204,6 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
         </div>
       </div>
 
-      {!isCajaAbierta && !loading && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-center gap-3 text-amber-700 dark:text-amber-400"
-        >
-          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-          <div className="text-sm">
-            <span className="font-semibold">Caja Cerrada:</span> No puedes registrar nuevos movimientos porque la caja administrativa de hoy aún no ha sido iniciada o ya fue cerrada. Dirígete a la pestaña <b>Inicio / Cierre</b> para comenzar.
-          </div>
-        </motion.div>
-      )}
-
       {/* New Movement Form */}
       {showForm && (
         <motion.div

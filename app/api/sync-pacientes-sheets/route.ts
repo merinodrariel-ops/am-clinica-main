@@ -15,7 +15,7 @@ interface ExistingPatientRow {
     nombre: string;
     apellido: string;
     email: string | null;
-    telefono: string | null;
+    whatsapp: string | null;
     ciudad: string | null;
     link_google_slides: string | null;
     observaciones_generales: string | null;
@@ -69,7 +69,7 @@ export async function GET() {
                 const nombreCompleto = findValue(row, ['nombre', 'apellido', 'paciente']) || '';
                 const dni = findValue(row, ['dni', 'documento', 'id']) || '';
                 const email = (findValue(row, ['correo', 'email']) || '').toLowerCase().trim();
-                const telefono = findValue(row, ['teléfono', 'whatsapp', 'celular']) || '';
+                const whatsapp = findValue(row, ['teléfono', 'whatsapp', 'celular']) || '';
                 const ciudad = findValue(row, ['barrio', 'ciudad', 'vive']) || '';
                 const motivo = findValue(row, ['motivo', 'consulta', 'consulta']) || '';
                 const doctor = findValue(row, ['doctor', 'profesional', 'asignado']) || '';
@@ -104,7 +104,7 @@ export async function GET() {
                 if (dni) {
                     const { data, error } = await supabase
                         .from('pacientes')
-                        .select('id_paciente, nombre, apellido, email, telefono, ciudad, link_google_slides, observaciones_generales, documento')
+                        .select('id_paciente, nombre, apellido, email, whatsapp, ciudad, link_google_slides, observaciones_generales, documento')
                         .eq('documento', dni)
                         .eq('is_deleted', false)
                         .limit(1);
@@ -118,7 +118,7 @@ export async function GET() {
                 if (!existing && email) {
                     const { data, error } = await supabase
                         .from('pacientes')
-                        .select('id_paciente, nombre, apellido, email, telefono, ciudad, link_google_slides, observaciones_generales, documento')
+                        .select('id_paciente, nombre, apellido, email, whatsapp, ciudad, link_google_slides, observaciones_generales, documento')
                         .eq('email', email)
                         .eq('is_deleted', false)
                         .limit(1);
@@ -132,7 +132,7 @@ export async function GET() {
                 if (!existing && nombre && apellido) {
                     const { data, error } = await supabase
                         .from('pacientes')
-                        .select('id_paciente, nombre, apellido, email, telefono, ciudad, link_google_slides, observaciones_generales, documento')
+                        .select('id_paciente, nombre, apellido, email, whatsapp, ciudad, link_google_slides, observaciones_generales, documento')
                         .eq('nombre', nombre)
                         .eq('apellido', apellido)
                         .eq('is_deleted', false)
@@ -161,7 +161,7 @@ export async function GET() {
                     updateIfBetter('nombre', nombre);
                     updateIfBetter('apellido', apellido);
                     updateIfBetter('email', email); // only if not primary key for search? It's fine.
-                    updateIfBetter('telefono', telefono);
+                    updateIfBetter('whatsapp', whatsapp);
                     updateIfBetter('ciudad', ciudad);
                     updateIfBetter('link_google_slides', slidesLink);
 
@@ -201,7 +201,7 @@ export async function GET() {
                         apellido,
                         documento: dni || null,
                         email: email || null,
-                        telefono: telefono || null,
+                        whatsapp: whatsapp || null,
                         ciudad: ciudad || null,
                         link_google_slides: slidesLink || null,
                         observaciones_generales: observaciones,

@@ -2,7 +2,7 @@ export interface PatientProfileSignal {
     id_paciente: string;
     nombre: string;
     apellido: string;
-    telefono?: string | null;
+    whatsapp?: string | null;
     email?: string | null;
     estado_paciente?: string | null;
     financ_estado?: string | null;
@@ -127,7 +127,7 @@ export function buildPatientPlaybook(input: BuildPlaybookInput): PatientPlaybook
     const daysSinceLastAppointment = daysSince(lastAppointmentDate);
     const daysSinceLastTouchpoint = Math.min(daysSinceLastPayment, daysSinceLastAppointment);
 
-    const hasContactChannel = Boolean(input.patient.telefono || input.patient.email);
+    const hasContactChannel = Boolean(input.patient.whatsapp || input.patient.email);
 
     let score = 16;
     const reasons: string[] = [];
@@ -164,7 +164,7 @@ export function buildPatientPlaybook(input: BuildPlaybookInput): PatientPlaybook
     if (!hasContactChannel) {
         score += 10;
         reasons.push('No tiene canal de contacto completo');
-        actions.push('Actualizar telefono/email antes del proximo hito clinico');
+        actions.push('Actualizar whatsapp/email antes del proximo hito clinico');
     }
 
     if (normalizeStatus(input.patient.estado_paciente) === 'inactivo') {

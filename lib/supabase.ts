@@ -144,7 +144,7 @@ export interface Paciente {
     id_paciente: string;
     nombre: string;
     apellido: string;
-    telefono: string | null;
+    whatsapp: string | null;
     email: string | null;
     documento: string | null;
     referencia_origen?: string | null;

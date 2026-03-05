@@ -16,8 +16,8 @@ function normalizePhone(tel: string): string {
     return '549' + d;
 }
 
-function waLink(telefono: string, nombre: string, workflow: string): string {
-    const num = normalizePhone(telefono);
+function waLink(whatsapp: string, nombre: string, workflow: string): string {
+    const num = normalizePhone(whatsapp);
     const msg = `Hola ${nombre}! 👋 Vimos que hace un tiempo no pasás por la clínica. Tu tratamiento de ${workflow} está en progreso y no queremos que pierdas el avance. ¿Cuándo te queda bien pasar? Te coordinamos un horario 😊`;
     return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
 }
@@ -183,13 +183,13 @@ export default function SilentPatientsPanel() {
                             <DaysBadge days={p.daysSilent} />
 
                             {/* WhatsApp */}
-                            {p.telefono && (
+                            {p.whatsapp && (
                                 <div
                                     role="button"
                                     onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        window.open(waLink(p.telefono!, p.nombre, p.workflowName), '_blank');
+                                        window.open(waLink(p.whatsapp!, p.nombre, p.workflowName), '_blank');
                                     }}
                                     className="flex-shrink-0 p-1.5 rounded-lg bg-green-100 hover:bg-green-200 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 transition-colors"
                                     title="Enviar WhatsApp de re-enganche"

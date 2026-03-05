@@ -13,29 +13,31 @@ interface User {
     id: string;
     email: string;
     full_name: string;
-    role: string;
+    categoria: string;
     estado: string;
-    telefono?: string;
+    whatsapp?: string;
     created_at: string;
     last_sign_in_at?: string;
     invitation_sent_at?: string;
 }
 
-const APP_ROLE_OPTIONS = [
-    { value: 'partner_viewer', label: 'Solo Lectura' },
+const APP_CATEGORY_OPTIONS = [
+    { value: 'owner', label: 'Dueño' },
+    { value: 'admin', label: 'Administrador' },
+    { value: 'socio', label: 'Socio' },
+    { value: 'contador', label: 'Contador' },
+    { value: 'developer', label: 'Desarrollador' },
     { value: 'reception', label: 'Recepción' },
     { value: 'recaptacion', label: 'Recaptación' },
-    { value: 'laboratorio', label: 'Laboratorio' },
+    { value: 'dentist', label: 'Odontólogo' },
     { value: 'asistente', label: 'Asistente' },
-    { value: 'odontologo', label: 'Odontólogo' },
+    { value: 'laboratorio', label: 'Laboratorio' },
     { value: 'pricing_manager', label: 'Gestor de Precios' },
-    { value: 'developer', label: 'Desarrollador' },
-    { value: 'admin', label: 'Administrador' },
-    { value: 'owner', label: 'Dueño' },
+    { value: 'partner_viewer', label: 'Solo Lectura' },
 ];
 
-function roleLabel(role: string) {
-    return APP_ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
+function categoryLabel(cat: string) {
+    return APP_CATEGORY_OPTIONS.find((option) => option.value === cat)?.label || cat;
 }
 
 export default function UserManagementClient({ initialUsers }: { initialUsers: User[] }) {
@@ -86,8 +88,8 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
         const formData = new FormData(form);
         const data = {
             full_name: formData.get('fullName') as string,
-            telefono: formData.get('telefono') as string,
-            role: formData.get('role') as string
+            whatsapp: formData.get('whatsapp') as string,
+            categoria: formData.get('categoria') as string
         };
 
         const success = await handleAction(() => updateUser(selectedUser.id, data));
@@ -109,7 +111,7 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gestión de Usuarios</h1>
-                    <p className="text-gray-500">Administra el acceso y roles del personal</p>
+                    <p className="text-gray-500">Administra el acceso y categorías del personal</p>
                 </div>
                 <button
                     onClick={() => setShowInviteModal(true)}
@@ -141,7 +143,7 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                     <thead>
                         <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                             <th className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm">Usuario</th>
-                            <th className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm">Rol</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm">Categoría</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm">Estado</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm">Actividad</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm text-right">Acciones</th>
@@ -158,9 +160,9 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                                         <div>
                                             <p className="font-medium text-gray-900 dark:text-white">{user.full_name}</p>
                                             <p className="text-sm text-gray-500">{user.email}</p>
-                                            {user.telefono && (
+                                            {user.whatsapp && (
                                                 <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                                                    <Phone size={10} /> {user.telefono}
+                                                    <Phone size={10} /> {user.whatsapp}
                                                 </p>
                                             )}
                                         </div>
@@ -168,10 +170,10 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                                 </td>
                                 <td className="p-4">
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                                        ${user.role === 'owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-                                            user.role === 'admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                        ${user.categoria === 'owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                            user.categoria === 'admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
                                                 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
-                                        {roleLabel(user.role)}
+                                        {categoryLabel(user.categoria)}
                                     </span>
                                 </td>
                                 <td className="p-4">
@@ -265,14 +267,14 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                                 <input name="fullName" type="text" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Teléfono (Opcional)</label>
-                                <input name="telefono" type="tel" className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
+                                <label className="block text-sm font-medium mb-1">WhatsApp (Opcional)</label>
+                                <input name="whatsapp" type="tel" className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Rol</label>
-                                <select name="role" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
-                                    {APP_ROLE_OPTIONS.map((roleOption) => (
-                                        <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                <label className="block text-sm font-medium mb-1">Categoría</label>
+                                <select name="categoria" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
+                                    {APP_CATEGORY_OPTIONS.map((catOption) => (
+                                        <option key={catOption.value} value={catOption.value}>{catOption.label}</option>
                                     ))}
                                 </select>
                             </div>
@@ -298,14 +300,14 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                                 <input name="fullName" defaultValue={selectedUser.full_name} type="text" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Teléfono</label>
-                                <input name="telefono" defaultValue={selectedUser.telefono || ''} type="tel" className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
+                                <label className="block text-sm font-medium mb-1">WhatsApp</label>
+                                <input name="whatsapp" defaultValue={selectedUser.whatsapp || ''} type="tel" className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Rol</label>
-                                <select name="role" defaultValue={selectedUser.role} required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
-                                    {APP_ROLE_OPTIONS.map((roleOption) => (
-                                        <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                <label className="block text-sm font-medium mb-1">Categoría</label>
+                                <select name="categoria" defaultValue={selectedUser.categoria} required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
+                                    {APP_CATEGORY_OPTIONS.map((catOption) => (
+                                        <option key={catOption.value} value={catOption.value}>{catOption.label}</option>
                                     ))}
                                 </select>
                             </div>

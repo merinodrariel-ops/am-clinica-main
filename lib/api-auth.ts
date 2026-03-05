@@ -8,7 +8,7 @@ export async function authorizeRequest(request: Request | NextRequest) {
 
     // 1. Check Cron Secret (for automated jobs)
     if (CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`) {
-        return { authorized: true, role: 'admin' };
+        return { authorized: true, categoria: 'admin' };
     }
 
     // 2. Check User Session (for manual triggering from UI)
@@ -19,24 +19,24 @@ export async function authorizeRequest(request: Request | NextRequest) {
         return { authorized: false, error: 'Unauthorized' };
     }
 
-    // 3. Check Role
-    let role = user.user_metadata?.role;
+    // 3. Check Categoria
+    let categoria = user.user_metadata?.categoria;
 
     // Optional: fetch from profiles if needed, but metadata is usually faster for middleware-like checks
-    if (!role) {
+    if (!categoria) {
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('categoria')
             .eq('id', user.id)
             .maybeSingle();
-        role = profile?.role;
+        categoria = profile?.categoria;
     }
 
-    const effectiveRole = (role || '').toLowerCase();
+    const effectiveCategoria = (categoria || '').toLowerCase();
 
-    if (effectiveRole === 'admin' || effectiveRole === 'owner') {
-        return { authorized: true, role: effectiveRole, user };
+    if (effectiveCategoria === 'admin' || effectiveCategoria === 'owner') {
+        return { authorized: true, categoria: effectiveCategoria, user };
     }
 
-    return { authorized: false, error: 'Forbidden: Admin role required' };
+    return { authorized: false, error: 'Forbidden: Admin category required' };
 }

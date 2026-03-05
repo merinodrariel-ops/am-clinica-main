@@ -46,13 +46,13 @@ export async function scanCalendarForRecalls() {
     console.log('Fetching patients from database...');
     const { data: patientsData } = await supabase
         .from('pacientes')
-        .select('id_paciente, nombre, apellido, email, telefono, dni, direccion')
+        .select('id_paciente, nombre, apellido, email, whatsapp, dni, direccion')
         .eq('is_deleted', false);
 
     const patients = (patientsData || []).map(p => {
         let score = 0;
         if (p.email) score += 2;
-        if (p.telefono) score += 2;
+        if (p.whatsapp) score += 2;
         if (p.dni) score += 1;
         if (p.direccion) score += 1;
         return {

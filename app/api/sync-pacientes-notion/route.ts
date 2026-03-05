@@ -17,7 +17,7 @@ interface NotionPatient {
     nombre: string;
     apellido: string;
     email: string | null;
-    telefono: string | null;
+    whatsapp: string | null;
     documento: string | null;
     ciudad: string | null;
     localidad: string | null;
@@ -97,7 +97,7 @@ function parseNotionPatient(page: Record<string, unknown>): NotionPatient | null
 
         // Phone/WhatsApp
         const whatsappProp = props['WhatsApp'] as { phone_number?: string } | undefined;
-        const telefono = extractPhone(whatsappProp?.phone_number);
+        const whatsapp = extractPhone(whatsappProp?.phone_number);
 
         // DNI/Documento
         const dniProp = props['DNI'] as { rich_text?: unknown } | undefined;
@@ -130,7 +130,7 @@ function parseNotionPatient(page: Record<string, unknown>): NotionPatient | null
             nombre: nombre || '',
             apellido: apellido || '',
             email: email && email.includes('@') ? email : null,
-            telefono,
+            whatsapp,
             documento,
             ciudad,
             localidad,
@@ -175,15 +175,15 @@ async function findExistingPatient(patient: NotionPatient, supabase: any): Promi
     }
 
     // Check by phone number (if exists and is substantial)
-    if (patient.telefono && patient.telefono.length >= 8) {
+    if (patient.whatsapp && patient.whatsapp.length >= 8) {
         const { data } = await supabase
             .from('pacientes')
             .select('id_paciente')
-            .or(`telefono.ilike.%${patient.telefono}%,whatsapp_numero.ilike.%${patient.telefono}%`)
+            .or(`whatsapp.ilike.%${patient.whatsapp}%,whatsapp_numero.ilike.%${patient.whatsapp}%`)
             .limit(1);
 
         if (data && data.length > 0) {
-            return { exists: true, reason: `telefono: ${patient.telefono}` };
+            return { exists: true, reason: `whatsapp: ${patient.whatsapp}` };
         }
     }
 
@@ -210,7 +210,7 @@ async function insertPatient(patient: NotionPatient, supabase: any): Promise<{ s
         nombre: patient.nombre || 'Sin nombre',
         apellido: patient.apellido || '',
         email: patient.email,
-        telefono: patient.telefono,
+        whatsapp: patient.whatsapp,
         documento: patient.documento,
         ciudad: patient.ciudad,
         zona_barrio: patient.localidad,

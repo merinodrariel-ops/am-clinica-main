@@ -83,7 +83,7 @@ export interface RecentFinancingSelectionPatient {
     cuit: string | null;
     fecha_nacimiento: string | null;
     email: string | null;
-    telefono: string | null;
+    whatsapp: string | null;
     direccion: string | null;
     presupuesto_total: number | null;
 }
@@ -630,7 +630,7 @@ export async function listRecentFinancingSelectionsAction(input?: {
 
         const { data: patients, error: patientError } = await supabase
             .from('pacientes')
-            .select('id_paciente, nombre, apellido, documento, cuit, fecha_nacimiento, email, telefono, direccion, presupuesto_total, is_deleted')
+            .select('id_paciente, nombre, apellido, documento, cuit, fecha_nacimiento, email, whatsapp, direccion, presupuesto_total, is_deleted')
             .in('id_paciente', patientIds)
             .eq('is_deleted', false);
 
@@ -648,7 +648,7 @@ export async function listRecentFinancingSelectionsAction(input?: {
                 cuit: patient.cuit || null,
                 fecha_nacimiento: patient.fecha_nacimiento || null,
                 email: patient.email || null,
-                telefono: patient.telefono || null,
+                whatsapp: patient.whatsapp || null,
                 direccion: patient.direccion || null,
                 presupuesto_total: patient.presupuesto_total ? Number(patient.presupuesto_total) : null,
             });

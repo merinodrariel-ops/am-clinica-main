@@ -49,6 +49,8 @@ export async function updateSession(request: NextRequest) {
         path === '/' ||
         path === '/admision' ||
         path.startsWith('/admision/') ||
+        path === '/actualizar-datos' ||
+        path.startsWith('/actualizar-datos/') ||
         path === '/mi-portal' ||
         path.startsWith('/mi-portal/') ||
         path.startsWith('/sonrisa/comparador') ||
@@ -91,22 +93,22 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    // Bloquear rutas exclusivamente admin para roles prestadores
-    const PORTAL_ROLES = ['odontologo', 'asistente', 'laboratorio', 'recaptacion']
-    let userRole = (user?.user_metadata?.role ?? '') as string
+    // Bloquear rutas exclusivamente admin para categorías de portal
+    const PORTAL_CATEGORIES = ['odontologo', 'asistente', 'laboratorio', 'recaptacion', 'dentist']
+    let userCategory = (user?.user_metadata?.categoria ?? user?.user_metadata?.role ?? '') as string
 
-    // Source-of-truth role comes from profiles.role (metadata can be stale).
+    // Source-of-truth category comes from profiles.categoria (metadata can be stale).
     if (user) {
         const { data: currentProfile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('categoria')
             .eq('id', user.id)
             .single()
-        if (currentProfile?.role) {
-            userRole = currentProfile.role
+        if (currentProfile?.categoria) {
+            userCategory = currentProfile.categoria
         }
     }
-    if (user && PORTAL_ROLES.includes(userRole)) {
+    if (user && PORTAL_CATEGORIES.includes(userCategory)) {
         const ADMIN_ONLY_PATHS = [
             '/caja-admin',
             '/caja-recepcion',

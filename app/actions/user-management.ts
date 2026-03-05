@@ -42,11 +42,40 @@ interface Profile {
     last_sign_in_at?: string;
     created_at: string;
     full_name?: string;
-    role?: string;
-    telefono?: string;
+    categoria?: string;
+    whatsapp?: string;
     estado?: string;
     invitation_sent_at?: string;
     [key: string]: unknown; // Allow other props for now to be safe
+}
+
+const PROVIDER_MANAGED_CATEGORIES = new Set(['odontologo', 'laboratorio', 'asistente', 'dentist']);
+
+function getErrorMessage(error: unknown, fallback = 'Error desconocido') {
+    if (error instanceof Error && error.message) return error.message;
+
+    if (typeof error === 'string' && error.trim()) return error;
+
+    if (error && typeof error === 'object') {
+        const maybe = error as Record<string, unknown>;
+        const message = typeof maybe.message === 'string' ? maybe.message : '';
+        const details = typeof maybe.details === 'string' ? maybe.details : '';
+        const hint = typeof maybe.hint === 'string' ? maybe.hint : '';
+        const code = typeof maybe.code === 'string' ? maybe.code : '';
+
+        const composed = [message, details, hint].filter(Boolean).join(' | ');
+        if (composed) {
+            return code ? `${composed} (code: ${code})` : composed;
+        }
+
+        try {
+            return JSON.stringify(error);
+        } catch {
+            return fallback;
+        }
+    }
+
+    return fallback;
 }
 
 export async function getUsers() {
@@ -75,7 +104,7 @@ export async function getUsers() {
                 last_sign_in_at: authUser?.last_sign_in_at,
                 created_at: authUser?.created_at || profile.created_at,
                 full_name: profile.full_name || '',
-                role: profile.role || 'user',
+                categoria: profile.categoria || 'user',
                 estado: profile.estado || 'inactivo',
             };
         });
@@ -109,10 +138,17 @@ function getAppPublicUrl() {
 export async function inviteUser(formData: FormData) {
     const email = formData.get('email') as string;
     const fullName = formData.get('fullName') as string;
-    const role = formData.get('role') as string;
-    const telefono = formData.get('telefono') as string;
+    const categoria = formData.get('role') as string || formData.get('categoria') as string;
+    const whatsapp = formData.get('whatsapp') as string;
 
     const publicUrl = getAppPublicUrl();
+
+    if (PROVIDER_MANAGED_CATEGORIES.has(categoria)) {
+        return {
+            success: false,
+            error: 'Las altas de prestadores se gestionan desde Prestadores / Personal. Este módulo no permite asignar esta categoría.',
+        };
+    }
 
     try {
         // 1. Generate Invite Link (Manual)
@@ -120,7 +156,7 @@ export async function inviteUser(formData: FormData) {
             type: 'invite',
             email: email,
             options: {
-                data: { full_name: fullName, role: role },
+                data: { full_name: fullName, categoria: categoria },
                 redirectTo: `${publicUrl}/auth/update-password`
             }
         });
@@ -155,8 +191,8 @@ export async function inviteUser(formData: FormData) {
             .from('profiles')
             .update({
                 full_name: fullName,
-                role: role,
-                telefono: telefono,
+                categoria: categoria,
+                whatsapp: whatsapp,
                 estado: 'invitado', // Explicitly set as invited
                 invitation_sent_at: new Date().toISOString()
             })
@@ -196,8 +232,8 @@ export async function resendInvitation(email: string) {
 
 interface UpdateUserData {
     full_name?: string;
-    telefono?: string;
-    role?: string;
+    whatsapp?: string;
+    categoria?: string;
     email?: string;
     estado?: string;
     is_active?: boolean;
@@ -205,10 +241,14 @@ interface UpdateUserData {
 
 export async function updateUser(userId: string, data: UpdateUserData) {
     try {
+        if (typeof data.categoria === 'string' && PROVIDER_MANAGED_CATEGORIES.has(data.categoria)) {
+            throw new Error('Las altas y cambios de categoría de prestadores se gestionan desde Prestadores / Personal.');
+        }
+
         const profilePatch: Record<string, unknown> = {
             full_name: data.full_name,
-            telefono: data.telefono,
-            role: data.role,
+            whatsapp: data.whatsapp,
+            categoria: data.categoria,
         };
 
         if (typeof data.estado === 'string') {
@@ -234,9 +274,9 @@ export async function updateUser(userId: string, data: UpdateUserData) {
         // Also update Auth Metadata if needed for consistency
         const authPatch: Record<string, unknown> = {};
 
-        if (data.role || data.full_name) {
+        if (data.categoria || data.full_name) {
             authPatch.user_metadata = {
-                role: data.role,
+                categoria: data.categoria,
                 full_name: data.full_name
             };
         }
@@ -270,29 +310,29 @@ export async function deleteUserAccount(targetUserId: string, requesterId: strin
 
         const { data: requestorProfile, error: reqError } = await supabaseAdmin
             .from('profiles')
-            .select('id, email, role')
+            .select('id, email, categoria')
             .eq('id', requesterId)
             .single();
 
-        if (reqError || !requestorProfile || !['owner', 'admin'].includes(requestorProfile.role)) {
+        if (reqError || !requestorProfile || !['owner', 'admin'].includes(requestorProfile.categoria)) {
             throw new Error('No autorizado para eliminar usuarios');
         }
 
         const { data: targetProfile } = await supabaseAdmin
             .from('profiles')
-            .select('id, role, email')
+            .select('id, categoria, email, full_name')
             .eq('id', targetUserId)
             .single();
 
-        if (targetProfile?.role === 'owner' && requestorProfile.role !== 'owner') {
+        if (targetProfile?.categoria === 'owner' && requestorProfile.categoria !== 'owner') {
             throw new Error('Solo un dueño puede eliminar otro usuario dueño');
         }
 
-        if (targetProfile?.role === 'owner') {
+        if (targetProfile?.categoria === 'owner') {
             const { count: ownersCount, error: ownersError } = await supabaseAdmin
                 .from('profiles')
                 .select('id', { count: 'exact', head: true })
-                .eq('role', 'owner');
+                .eq('categoria', 'owner');
 
             if (ownersError) throw ownersError;
             if ((ownersCount || 0) <= 1) {
@@ -306,28 +346,72 @@ export async function deleteUserAccount(targetUserId: string, requesterId: strin
             .update({ user_id: null })
             .eq('user_id', targetUserId);
 
+        let deleteMode: 'hard' | 'soft' = 'hard';
+        let deleteErrorMessage: string | null = null;
+
         const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
-        if (deleteError) throw deleteError;
+
+        if (deleteError) {
+            // Fallback: when hard delete fails due DB dependencies (FK RESTRICT, etc),
+            // perform a safe soft-delete so the user can no longer access the system.
+            deleteMode = 'soft';
+            deleteErrorMessage = deleteError.message;
+
+            const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+                ban_duration: '876000h', // 100 years
+                user_metadata: {
+                    deleted_at: new Date().toISOString(),
+                    deleted_by: requesterId,
+                    deletion_mode: 'soft',
+                },
+            });
+
+            if (banError) {
+                throw new Error(`No se pudo eliminar ni desactivar el usuario: ${deleteError.message}`);
+            }
+
+            const softEmail = `deleted+${targetUserId.slice(0, 8)}@am-clinica.local`;
+
+            // Best effort: free original email for future invites.
+            await supabaseAdmin.auth.admin.updateUserById(targetUserId, { email: softEmail });
+
+            const { error: profileSoftDeleteError } = await supabaseAdmin
+                .from('profiles')
+                .update({
+                    full_name: `Eliminado (${targetProfile?.full_name || targetUserId.slice(0, 8)})`,
+                    email: softEmail,
+                    categoria: 'partner_viewer',
+                    estado: 'eliminado',
+                    is_active: false,
+                    whatsapp: null,
+                })
+                .eq('id', targetUserId);
+
+            if (profileSoftDeleteError) throw profileSoftDeleteError;
+        }
 
         await supabaseAdmin.from('audit_logs').insert({
             user_id: requesterId,
             user_email: requestorProfile.email,
-            role: requestorProfile.role,
+            categoria: requestorProfile.categoria,
             action: 'delete_user_account',
             table_name: 'auth.users',
             record_id: targetUserId,
             metadata: {
-                target_role: targetProfile?.role || null,
+                target_categoria: targetProfile?.categoria || null,
                 target_email: targetProfile?.email || null,
+                delete_mode: deleteMode,
+                delete_error: deleteErrorMessage,
                 deleted_at: new Date().toISOString(),
             },
         });
 
         revalidatePath('/admin-users');
         revalidatePath('/admin/users');
-        return { success: true };
+        return { success: true, mode: deleteMode };
     } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        console.error('deleteUserAccount error:', error);
+        return { success: false, error: getErrorMessage(error) };
     }
 }
 
@@ -389,7 +473,7 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
             .eq('id', ownerId)
             .single();
 
-        if (reqError || requestorProfile.role !== 'owner') {
+        if (reqError || requestorProfile.categoria !== 'owner') {
             throw new Error('Unauthorized: Only Only owners can perform this action');
         }
 
@@ -429,12 +513,13 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
         await supabaseAdmin.from('audit_logs').insert({
             user_id: ownerId,
             user_email: requestorProfile.email,
-            role: 'owner',
+            categoria: 'owner',
             action: 'resend_access_email',
             table_name: 'profiles',
             record_id: userId,
             metadata: {
                 target_email: targetUser.email,
+                target_categoria: targetUser.user_metadata?.categoria || null,
                 sub_action: actionType,
                 timestamp: new Date().toISOString()
             }
@@ -470,7 +555,7 @@ export async function setUserPassword(targetUserId: string, newPassword: string,
             .eq('id', requesterId)
             .single();
 
-        if (reqError || !['owner', 'admin'].includes(requestorProfile.role)) {
+        if (reqError || !['owner', 'admin'].includes(requestorProfile.categoria)) {
             throw new Error('Unauthorized: Only owners or admins can perform this action');
         }
 
@@ -485,7 +570,7 @@ export async function setUserPassword(targetUserId: string, newPassword: string,
         await supabaseAdmin.from('audit_logs').insert({
             user_id: requesterId,
             user_email: requestorProfile.email,
-            role: requestorProfile.role,
+            categoria: requestorProfile.categoria,
             action: 'manual_password_reset',
             table_name: 'auth.users',
             record_id: targetUserId,

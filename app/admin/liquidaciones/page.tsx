@@ -8,7 +8,7 @@ import {
     CheckCircle2, Clock, Banknote, AlertTriangle, XCircle, Play,
     DollarSign, TrendingUp, Users, FileVideo, FileSpreadsheet, ListChecks,
     Search, PencilLine, ChevronDown, ChevronUp, Download, Printer, CalendarDays,
-    Plus,
+    Plus, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -26,6 +26,8 @@ import {
 } from '@/app/actions/liquidaciones';
 import {
     getPrestacionesCatalogoCompleto,
+    createPrestacionCatalogoItem,
+    deactivatePrestacionCatalogoItem,
     updatePrestacionCatalogoItem,
 } from '@/app/actions/prestaciones';
 import type { PrestacionCatalogoItem } from '@/app/actions/prestaciones';
@@ -920,7 +922,17 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
     const [expandedAreas, setExpandedAreas] = useState<Record<string, boolean>>({});
     const [editingId, setEditingId] = useState<string | null>(null);
     const [savingId, setSavingId] = useState<string | null>(null);
+    const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
     const [draft, setDraft] = useState({
+        area_nombre: '',
+        nombre: '',
+        precio_base: '',
+        moneda: 'ARS' as 'ARS' | 'USD',
+        terminos: '',
+    });
+    const [creating, setCreating] = useState(false);
+    const [createDraft, setCreateDraft] = useState({
+        area_nombre: items[0]?.area_nombre || '',
         nombre: '',
         precio_base: '',
         moneda: 'ARS' as 'ARS' | 'USD',
@@ -934,6 +946,10 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
             nextExpanded[item.area_nombre] = true;
         }
         setExpandedAreas(nextExpanded);
+        setCreateDraft(prev => {
+            if (prev.area_nombre || items.length === 0) return prev;
+            return { ...prev, area_nombre: items[0].area_nombre };
+        });
     }, [items]);
 
     const areas = Array.from(new Set(localItems.map(i => i.area_nombre))).sort((a, b) => a.localeCompare(b));
@@ -958,6 +974,7 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
     function startEditing(item: PrestacionCatalogoItem) {
         setEditingId(item.id);
         setDraft({
+            area_nombre: item.area_nombre,
             nombre: item.nombre,
             precio_base: String(Number(item.precio_base || 0)),
             moneda: item.moneda,
@@ -981,12 +998,14 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
         try {
             const updated = await updatePrestacionCatalogoItem({
                 id: itemId,
+                area_nombre: draft.area_nombre,
                 nombre: draft.nombre,
                 precio_base: precio,
                 moneda: draft.moneda,
                 terminos: draft.terminos,
             });
             setLocalItems(prev => prev.map(item => (item.id === itemId ? updated : item)));
+            setExpandedAreas(prev => ({ ...prev, [updated.area_nombre]: true }));
             toast.success('Prestación actualizada');
             setEditingId(null);
         } catch (e: unknown) {
@@ -1001,6 +1020,72 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
         if (!Number.isFinite(current)) return;
         const next = current * (1 + percentage / 100);
         setDraft(prev => ({ ...prev, precio_base: String(Math.round((next + Number.EPSILON) * 100) / 100) }));
+    }
+
+    async function createItem() {
+        const areaNombre = createDraft.area_nombre.trim();
+        const nombre = createDraft.nombre.trim();
+        const precio = Number(createDraft.precio_base.replace(',', '.'));
+
+        if (!areaNombre) {
+            toast.error('Ingresa un area');
+            return;
+        }
+        if (!nombre) {
+            toast.error('Ingresa un nombre para la prestacion');
+            return;
+        }
+        if (!Number.isFinite(precio) || precio < 0) {
+            toast.error('Ingresa un precio valido');
+            return;
+        }
+
+        setCreating(true);
+        try {
+            const created = await createPrestacionCatalogoItem({
+                area_nombre: areaNombre,
+                nombre,
+                precio_base: precio,
+                moneda: createDraft.moneda,
+                terminos: createDraft.terminos,
+            });
+
+            setLocalItems(prev => [...prev, created]);
+            setExpandedAreas(prev => ({ ...prev, [created.area_nombre]: true }));
+            setAreaFilter('all');
+            setMonedaFilter('all');
+            setQuery('');
+            setCreateDraft(prev => ({
+                ...prev,
+                area_nombre: created.area_nombre,
+                nombre: '',
+                precio_base: '',
+                terminos: '',
+            }));
+            toast.success('Prestacion creada');
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'No se pudo crear la prestacion');
+        } finally {
+            setCreating(false);
+        }
+    }
+
+    async function deactivateItem(item: PrestacionCatalogoItem) {
+        if (!confirm(`Desactivar la prestacion "${item.nombre}"?`)) return;
+
+        setDeactivatingId(item.id);
+        try {
+            await deactivatePrestacionCatalogoItem(item.id);
+            setLocalItems(prev => prev.filter(it => it.id !== item.id));
+            if (editingId === item.id) {
+                setEditingId(null);
+            }
+            toast.success('Prestacion desactivada');
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'No se pudo desactivar la prestacion');
+        } finally {
+            setDeactivatingId(null);
+        }
     }
 
     if (items.length === 0) {
@@ -1031,6 +1116,68 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        void createItem();
+                    }}
+                    className="space-y-3"
+                >
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-slate-300 font-semibold uppercase tracking-widest">Nueva prestacion</p>
+                        <span className="text-[11px] text-slate-500">Puedes escribir un area nueva</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                        <input
+                            list="catalogo-areas"
+                            value={createDraft.area_nombre}
+                            onChange={e => setCreateDraft(prev => ({ ...prev, area_nombre: e.target.value }))}
+                            className="md:col-span-3 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                            placeholder="Area"
+                        />
+                        <datalist id="catalogo-areas">
+                            {areas.map(area => (
+                                <option key={area} value={area} />
+                            ))}
+                        </datalist>
+                        <input
+                            value={createDraft.nombre}
+                            onChange={e => setCreateDraft(prev => ({ ...prev, nombre: e.target.value }))}
+                            className="md:col-span-4 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                            placeholder="Nombre de la prestacion"
+                        />
+                        <select
+                            value={createDraft.moneda}
+                            onChange={e => setCreateDraft(prev => ({ ...prev, moneda: e.target.value as 'ARS' | 'USD' }))}
+                            className="md:col-span-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white"
+                        >
+                            <option value="ARS">ARS</option>
+                            <option value="USD">USD</option>
+                        </select>
+                        <input
+                            value={createDraft.precio_base}
+                            onChange={e => setCreateDraft(prev => ({ ...prev, precio_base: e.target.value }))}
+                            className="md:col-span-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                            inputMode="decimal"
+                            placeholder="Precio"
+                        />
+                        <button
+                            type="submit"
+                            disabled={creating}
+                            className="md:col-span-1 inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold px-3 py-2"
+                            title="Agregar prestacion"
+                        >
+                            {creating ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
+                        </button>
+                    </div>
+                    <input
+                        value={createDraft.terminos}
+                        onChange={e => setCreateDraft(prev => ({ ...prev, terminos: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        placeholder="Terminos / nota opcional"
+                    />
+                </form>
+
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative flex-1 min-w-[220px]">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -1106,6 +1253,7 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
                                     .map(item => {
                                         const isEditing = editingId === item.id;
                                         const isSaving = savingId === item.id;
+                                        const isDeactivating = deactivatingId === item.id;
 
                                         return (
                                             <div key={item.id} className="px-5 py-3 hover:bg-slate-800/30 transition-colors">
@@ -1126,17 +1274,34 @@ function PrestacionesCatalogoView({ items }: { items: PrestacionCatalogoItem[] }
                                                             <p className={`font-mono font-bold text-sm ${item.moneda === 'USD' ? 'text-emerald-400' : 'text-blue-400'}`}>
                                                                 {item.moneda === 'USD' ? 'USD ' : '$'}{Number(item.precio_base || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
                                                             </p>
-                                                            <button
-                                                                onClick={() => startEditing(item)}
-                                                                className="mt-1 inline-flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200 transition-colors"
-                                                            >
-                                                                <PencilLine size={11} /> Editar
-                                                            </button>
+                                                            <div className="mt-1 flex items-center justify-end gap-3">
+                                                                <button
+                                                                    onClick={() => startEditing(item)}
+                                                                    className="inline-flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200 transition-colors"
+                                                                >
+                                                                    <PencilLine size={11} /> Editar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => void deactivateItem(item)}
+                                                                    disabled={isDeactivating}
+                                                                    className="inline-flex items-center gap-1 text-xs text-red-300 hover:text-red-200 disabled:opacity-60 transition-colors"
+                                                                >
+                                                                    {isDeactivating ? <RefreshCw size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                                                                    Desactivar
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ) : (
                                                     <div className="space-y-3">
-                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                        <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
+                                                            <input
+                                                                list="catalogo-areas"
+                                                                value={draft.area_nombre}
+                                                                onChange={e => setDraft(prev => ({ ...prev, area_nombre: e.target.value }))}
+                                                                className="md:col-span-2 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                                                                placeholder="Area"
+                                                            />
                                                             <input
                                                                 value={draft.nombre}
                                                                 onChange={e => setDraft(prev => ({ ...prev, nombre: e.target.value }))}
@@ -1809,7 +1974,7 @@ export default function LiquidacionesPage() {
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'horas' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
                     <Clock size={14} />
-                    Horas (No profesionales)
+                    Horas (No odontólogos)
                 </button>
             </div>
 
@@ -1823,7 +1988,7 @@ export default function LiquidacionesPage() {
                 <div className="space-y-4">
                     <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <p className="text-sm text-indigo-100">
-                            Este catálogo define las <span className="font-semibold">prestaciones de doctores/profesionales</span>. Para personal no profesional, usar la pestaña <span className="font-semibold">Horas (No profesionales)</span>.
+                            Este catálogo define las <span className="font-semibold">prestaciones de odontólogos</span>. Para personal no odontólogo, usar la pestaña <span className="font-semibold">Horas (No odontólogos)</span>.
                         </p>
                         <Link
                             href="/caja-admin/prestaciones"

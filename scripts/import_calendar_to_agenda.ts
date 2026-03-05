@@ -65,7 +65,7 @@ interface Patient {
     apellido: string;
     documento?: string;
     email?: string;
-    telefono?: string;
+    whatsapp?: string;
     normFull: string;
     normNombre: string;
     normApellido: string;
@@ -101,7 +101,7 @@ function findPatientMatch(
     if (phone) {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
         if (cleanPhone.length >= 8) {
-            const match = patients.find(p => p.telefono && p.telefono.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-8)));
+            const match = patients.find(p => p.whatsapp && p.whatsapp.replace(/[^0-9]/g, '').endsWith(cleanPhone.slice(-8)));
             if (match) return { patient: match, confidence: 'high', method: 'phone' };
         }
     }
@@ -202,7 +202,7 @@ async function main() {
     console.log('🔌 Loading patients from Supabase...');
     const { data: patientsData, error: pErr } = await supabase
         .from('pacientes')
-        .select('id_paciente, nombre, apellido, documento, email, telefono')
+        .select('id_paciente, nombre, apellido, documento, email, whatsapp')
         .eq('is_deleted', false);
 
     if (pErr) { console.error('❌ Failed to load patients:', pErr.message); process.exit(1); }
@@ -311,7 +311,7 @@ async function main() {
             event.description ? `Notas originales: ${event.description.slice(0, 1000)}` : null,
             event.attendeeEmail ? `Email Calendly: ${event.attendeeEmail}` : null,
             event.extractedDNI ? `DNI extraído: ${event.extractedDNI}` : null,
-            event.extractedPhone ? `Teléfono extraído: ${event.extractedPhone}` : null,
+            event.extractedPhone ? `WhatsApp extraído: ${event.extractedPhone}` : null,
             `Match vía: ${match.method} (${match.confidence})`
         ].filter(Boolean).join('\n');
 

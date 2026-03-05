@@ -4,41 +4,41 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 
-interface RoleGuardProps {
+interface CategoriaGuardProps {
     children: React.ReactNode;
-    allowedRoles?: string[];
+    allowedCategorias?: string[];
     requireOwner?: boolean;
 }
 
-export default function RoleGuard({ children, allowedRoles, requireOwner }: RoleGuardProps) {
-    const { user, loading, role } = useAuth();
+export default function CategoriaGuard({ children, allowedCategorias, requireOwner }: CategoriaGuardProps) {
+    const { user, loading, categoria } = useAuth();
     const router = useRouter();
     const _pathname = usePathname();
 
     useEffect(() => {
-        console.log('RoleGuard state:', { loading, userEmail: user?.email, role, requireOwner });
+        console.log('CategoriaGuard state:', { loading, userEmail: user?.email, categoria, requireOwner });
         if (!loading) {
 
             if (!user) {
                 router.push('/login');
-            } else if (role) {
-                if (requireOwner && role !== 'owner') {
+            } else if (categoria) {
+                if (requireOwner && categoria !== 'owner') {
                     router.push('/dashboard?error=unauthorized');
                     return;
                 }
 
-                if (allowedRoles && role !== 'owner' && !allowedRoles.includes(role)) {
+                if (allowedCategorias && categoria !== 'owner' && !allowedCategorias.includes(categoria)) {
                     router.push('/dashboard?error=unauthorized');
                 }
-            } else if (!role && !loading) {
-                // If we have a user but no role/profile, and it's not the hardcoded owner, something is wrong
+            } else if (!categoria && !loading) {
+                // If we have a user but no categoria/profile, and it's not the hardcoded owner, something is wrong
                 const ownerEmail = (process.env.NEXT_PUBLIC_OWNER_EMAIL || 'dr.arielmerinopersonal@gmail.com').toLowerCase();
                 if (user.email?.toLowerCase() !== ownerEmail) {
                     router.push('/dashboard?error=profile_not_found');
                 }
             }
         }
-    }, [user, role, loading, requireOwner, allowedRoles, router]);
+    }, [user, categoria, loading, requireOwner, allowedCategorias, router]);
 
     if (loading) {
         return (
@@ -48,7 +48,7 @@ export default function RoleGuard({ children, allowedRoles, requireOwner }: Role
         );
     }
 
-    if (!user || (requireOwner && role !== 'owner') || (allowedRoles && role !== 'owner' && !allowedRoles.includes(role || ''))) {
+    if (!user || (requireOwner && categoria !== 'owner') || (allowedCategorias && categoria !== 'owner' && !allowedCategorias.includes(categoria || ''))) {
         return null; // Don't render content while redirecting
     }
 

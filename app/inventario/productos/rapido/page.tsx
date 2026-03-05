@@ -12,7 +12,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import {
     createInventoryProduct,
     listInventoryProducts,
@@ -28,9 +28,9 @@ const DENTAL_COLOR_OPTIONS = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 
 
 export default function InventoryQuickProductPage() {
     return (
-        <RoleGuard allowedRoles={['owner', 'admin']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin']}>
             <QuickProductScreen />
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }
 

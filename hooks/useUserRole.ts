@@ -4,26 +4,26 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export function useUserRole() {
-    const [role, setRole] = useState<string | null>(null);
+    const [categoria, setCategoria] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        async function getRole() {
+        async function getCategoria() {
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
-                    setRole(null);
+                    setCategoria(null);
                     return;
                 }
 
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('role')
+                    .select('categoria')
                     .eq('id', user.id)
                     .single();
 
                 if (!error && data) {
-                    setRole(data.role);
+                    setCategoria(data.categoria);
                 }
             } catch (e) {
                 console.error(e);
@@ -32,8 +32,8 @@ export function useUserRole() {
             }
         }
 
-        getRole();
+        getCategoria();
     }, []);
 
-    return { role, loading };
+    return { categoria, loading };
 }

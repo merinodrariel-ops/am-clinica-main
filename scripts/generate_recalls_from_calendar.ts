@@ -81,7 +81,7 @@ async function main() {
     const patients: Patient[] = (patientsData || []).map((p: any) => {
         let score = 0;
         if (p.email) score += 2;
-        if (p.telefono) score += 2;
+        if (p.whatsapp) score += 2;
         if (p.dni) score += 1;
         if (p.direccion) score += 1;
         return {

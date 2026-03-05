@@ -40,7 +40,7 @@ interface PortalData {
         nombre: string;
         apellido: string;
         email: string | null;
-        telefono: string | null;
+        whatsapp: string | null;
         estado_paciente: string | null;
     };
     treatment: {

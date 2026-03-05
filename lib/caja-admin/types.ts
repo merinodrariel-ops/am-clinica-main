@@ -81,7 +81,7 @@ export interface Profesional {
     especialidad: string;
     documento?: string;
     email?: string;
-    telefono?: string;
+    whatsapp?: string;
     activo: boolean;
 }
 
@@ -115,7 +115,7 @@ export interface Personal {
     empresa_prestadora?: EmpresaPrestadora | null;
     nombre: string;
     apellido?: string;
-    tipo: 'prestador' | 'profesional';
+    tipo: 'prestador' | 'odontologo' | 'profesional';
     area: string;
     rol: string;
     email?: string;
@@ -160,7 +160,7 @@ export interface PersonalArea {
     id: string;
     nombre: string;
     descripcion?: string;
-    tipo_personal: 'prestador' | 'profesional' | 'ambos';
+    tipo_personal: 'prestador' | 'odontologo' | 'profesional' | 'ambos';
     color: string;
     icono: string;
     activo: boolean;
@@ -249,7 +249,7 @@ export interface ResolucionData {
 export interface CreatePersonalInput {
     nombre: string;
     apellido?: string;
-    tipo: 'prestador' | 'profesional';
+    tipo: 'prestador' | 'odontologo' | 'profesional';
     area: string;
     rol?: string;
     email?: string;

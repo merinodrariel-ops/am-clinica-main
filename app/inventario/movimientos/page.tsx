@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import {
     listInventoryStockMovements,
     type StockMovementRecord,
@@ -23,9 +23,9 @@ type MovementTypeFilter = 'ALL' | 'IN' | 'OUT' | 'ADJUST';
 
 export default function InventoryMovementsPage() {
     return (
-        <RoleGuard allowedRoles={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
             <InventoryMovementsScreen />
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }
 

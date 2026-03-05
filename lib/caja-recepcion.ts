@@ -88,7 +88,7 @@ export async function getTarifarioByCategoria(): Promise<
 export async function searchPacientes(query: string): Promise<Paciente[]> {
   const { data, error } = await getSupabase()
     .from("pacientes")
-    .select("id_paciente, nombre, apellido, telefono, email, documento")
+    .select("id_paciente, nombre, apellido, whatsapp, email, documento")
     .or(
       `nombre.ilike.%${query}%,apellido.ilike.%${query}%,documento.ilike.%${query}%`,
     )
@@ -101,7 +101,7 @@ export async function searchPacientes(query: string): Promise<Paciente[]> {
 export async function getPacienteById(id: string): Promise<Paciente | null> {
   const { data, error } = await getSupabase()
     .from("pacientes")
-    .select("id_paciente, nombre, apellido, telefono, email, documento")
+    .select("id_paciente, nombre, apellido, whatsapp, email, documento")
     .eq("id_paciente", id)
     .single();
 

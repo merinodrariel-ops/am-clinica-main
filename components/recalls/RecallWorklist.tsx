@@ -205,8 +205,8 @@ function RecallCard({ rule, onAction, isDuplicate }: {
     // WhatsApp deeplink
     const waLink = patient?.whatsapp_numero
         ? `https://wa.me/${(patient.whatsapp_pais_code || '+54').replace('+', '')}${patient.whatsapp_numero}`
-        : patient?.telefono
-            ? `https://wa.me/54${patient.telefono.replace(/\D/g, '')}`
+        : patient?.whatsapp
+            ? `https://wa.me/54${patient.whatsapp.replace(/\D/g, '')}`
             : null;
 
     const handleAction = (fn: () => Promise<{ success: boolean; error?: string }>) => {
@@ -326,9 +326,9 @@ function RecallCard({ rule, onAction, isDuplicate }: {
                         )}
 
                         {/* Call */}
-                        {patient?.telefono && (
+                        {patient?.whatsapp && (
                             <a
-                                href={`tel:${patient.telefono}`}
+                                href={`tel:${patient.whatsapp}`}
                                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg
                   bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300
                   transition-colors"

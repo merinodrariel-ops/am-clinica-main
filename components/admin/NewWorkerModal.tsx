@@ -6,8 +6,10 @@ import { createProviderCompany, createWorkerWithInvite, getProviderCompanies, ty
 import { toast } from 'sonner';
 
 const AREAS = [
-    'Odontología', 'Asistente Dental', 'Recepción', 'Administración',
-    'Laboratorio', 'Limpieza', 'Dirección', 'Tecnología', 'Otro',
+    'Odontología',
+    'Laboratorio',
+    'Limpieza',
+    'Staff General',
 ];
 
 const CONDICION_AFIP = [
@@ -24,7 +26,7 @@ interface Props {
 
 export default function NewWorkerModal({ onClose, onCreated }: Props) {
     const [saving, setSaving] = useState(false);
-    const [tipo, setTipo] = useState<'prestador' | 'profesional'>('prestador');
+    const [tipo, setTipo] = useState<'prestador' | 'odontologo'>('prestador');
     const [companies, setCompanies] = useState<Array<{ id: string; nombre: string; area_default?: string | null }>>([]);
     const [newCompanyName, setNewCompanyName] = useState('');
     const [creatingCompany, setCreatingCompany] = useState(false);
@@ -32,7 +34,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
     const [form, setForm] = useState<CreateWorkerInput>({
         nombre: '',
         apellido: '',
-        rol: '',
+        categoria: '',
         area: 'Odontología',
         tipo: 'prestador',
         email: '',
@@ -79,7 +81,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
-        if (!form.email?.trim()) { toast.error('Email obligatorio: todo prestador/profesional tiene acceso al portal'); return; }
+        if (!form.email?.trim()) { toast.error('Email obligatorio: todo prestador/odontólogo tiene acceso al portal'); return; }
 
         setSaving(true);
         try {
@@ -124,17 +126,17 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
 
                     {/* Tipo toggle */}
                     <div className="flex gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl md:rounded-2xl">
-                        {(['prestador', 'profesional'] as const).map(t => (
+                        {(['prestador', 'odontologo'] as const).map(t => (
                             <button
                                 key={t}
                                 type="button"
                                 onClick={() => setTipo(t)}
                                 className={`flex-1 py-1.5 md:py-2 text-[13px] md:text-sm font-bold rounded-lg md:rounded-xl capitalize transition-all ${tipo === t
-                                        ? 'bg-indigo-600 text-white shadow'
-                                        : 'text-slate-500 hover:text-white'
+                                    ? 'bg-indigo-600 text-white shadow'
+                                    : 'text-slate-500 hover:text-white'
                                     }`}
                             >
-                                {t === 'profesional' ? 'Profesional' : 'Staff'}
+                                {t === 'odontologo' ? 'Odontólogo' : 'Staff'}
                             </button>
                         ))}
                     </div>
@@ -171,12 +173,12 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
                                 </select>
                             </Field>
-                            <Field label="Rol / Puesto">
+                            <Field label="Categoría">
                                 <input
                                     type="text"
-                                    value={form.rol}
-                                    onChange={e => setField('rol', e.target.value)}
-                                    placeholder="Ej: Odontólogo, Recepcionista..."
+                                    value={form.categoria}
+                                    onChange={e => setField('categoria', e.target.value)}
+                                    placeholder="Ej: Odontólogo, Socio, Administrativo..."
                                     className={inputClass}
                                 />
                             </Field>
@@ -190,7 +192,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     {companies.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                                 </select>
                             </Field>
-                            {tipo === 'profesional' && (
+                            {tipo === 'odontologo' && (
                                 <Field label="Especialidad">
                                     <input
                                         type="text"
@@ -290,7 +292,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     className={inputClass}
                                 />
                             </Field>
-                            {tipo === 'profesional' && (
+                            {tipo === 'odontologo' && (
                                 <Field label="% Honorarios">
                                     <input
                                         type="number"
@@ -310,7 +312,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                     <div className="rounded-2xl border p-4 bg-indigo-900/20 border-indigo-500/30">
                         <p className="text-sm font-bold text-white">Acceso al portal obligatorio</p>
                         <p className="mt-1 text-xs text-indigo-300/90">
-                            Todo prestador/profesional se crea con usuario de portal. Se enviará invitación a <strong>{form.email || 'su email'}</strong>.
+                            Todo prestador/odontólogo se crea con usuario de portal. Se enviará invitación a <strong>{form.email || 'su email'}</strong>.
                         </p>
                     </div>
 

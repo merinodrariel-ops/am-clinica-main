@@ -64,7 +64,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
                 .ilike('apellido', patientData.apellido || '');
 
             if (nameDuplicates && nameDuplicates.length > 0) {
-                const byPhone = nameDuplicates.find(p => normalization(p.telefono) === normalization(patientData.telefono));
+                const byPhone = nameDuplicates.find(p => normalization(p.whatsapp) === normalization(patientData.whatsapp));
                 if (byPhone) {
                     existingId = byPhone.id_paciente;
                     existingData = byPhone;
@@ -83,7 +83,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             // Fields to check
             const fields: (keyof Paciente)[] = [
                 'nombre', 'apellido', 'documento', 'fecha_nacimiento',
-                'email', 'telefono', 'cuit', 'ciudad', 'zona_barrio', 'direccion',
+                'email', 'whatsapp', 'cuit', 'ciudad', 'zona_barrio', 'direccion',
                 'observaciones_generales', 'estado_paciente', 'origen_registro',
                 'whatsapp_pais_code', 'whatsapp_numero', 'email_local', 'email_dominio'
             ];

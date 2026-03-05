@@ -43,11 +43,11 @@ export async function GET(req: Request) {
         }
 
         // Fetch patient details for suggestions
-        let patients: Record<string, { id: string; nombre: string; apellido: string; email: string | null; telefono: string | null }> = {};
+        let patients: Record<string, { id: string; nombre: string; apellido: string; email: string | null; whatsapp: string | null }> = {};
         if (patientIds.size > 0) {
             const { data: patientData } = await adminClient
                 .from('pacientes')
-                .select('id_paciente, nombre, apellido, email, telefono')
+                .select('id_paciente, nombre, apellido, email, whatsapp')
                 .in('id_paciente', Array.from(patientIds));
 
             if (patientData) {
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
                         nombre: p.nombre,
                         apellido: p.apellido,
                         email: p.email,
-                        telefono: p.telefono,
+                        whatsapp: p.whatsapp,
                     };
                 }
             }

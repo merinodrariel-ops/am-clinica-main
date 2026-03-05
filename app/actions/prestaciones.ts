@@ -13,13 +13,13 @@ function getAdminClient() {
 
 async function validateProfesionalIds(admin: ReturnType<typeof getAdminClient>, ids: string[]) {
     const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
-    if (uniqueIds.length === 0) return { ok: false, error: 'Profesional no informado' };
+    if (uniqueIds.length === 0) return { ok: false, error: 'Odontólogo no informado' };
 
     const { data, error } = await admin
         .from('personal')
         .select('id')
         .in('id', uniqueIds)
-        .eq('tipo', 'profesional')
+        .in('tipo', ['odontologo', 'profesional'])
         .eq('activo', true);
 
     if (error) {
@@ -29,7 +29,7 @@ async function validateProfesionalIds(admin: ReturnType<typeof getAdminClient>, 
     const validIds = new Set((data || []).map((p) => p.id));
     const invalid = uniqueIds.find((id) => !validIds.has(id));
     if (invalid) {
-        return { ok: false, error: 'Solo se pueden registrar prestaciones para doctores/profesionales activos' };
+        return { ok: false, error: 'Solo se pueden registrar prestaciones para odontólogos activos' };
     }
 
     return { ok: true as const };
@@ -50,13 +50,23 @@ export type PrestacionCatalogoItem = TarifarioItem;
 
 export interface UpdateTarifarioItemInput {
     id: string;
+    area_nombre?: string;
     nombre?: string;
     precio_base?: number;
     moneda?: 'ARS' | 'USD';
     terminos?: string;
 }
 
+export interface CreateTarifarioItemInput {
+    area_nombre: string;
+    nombre: string;
+    precio_base: number;
+    moneda?: 'ARS' | 'USD';
+    terminos?: string;
+}
+
 export type UpdatePrestacionCatalogoItemInput = UpdateTarifarioItemInput;
+export type CreatePrestacionCatalogoItemInput = CreateTarifarioItemInput;
 
 export interface PrestacionRealizada {
     id: string;
@@ -174,6 +184,111 @@ export async function getPrestacionesCatalogoCompleto(): Promise<PrestacionCatal
     return getTarifarioCompleto();
 }
 
+export async function createTarifarioItem(input: CreateTarifarioItemInput): Promise<TarifarioItem> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile || !['owner', 'admin'].includes(profile.role)) {
+        throw new Error('No autorizado para crear prestaciones');
+    }
+
+    const areaNombre = input.area_nombre.trim();
+    const nombre = input.nombre.trim();
+    if (!areaNombre) {
+        throw new Error('El area no puede estar vacia');
+    }
+    if (!nombre) {
+        throw new Error('El nombre no puede estar vacio');
+    }
+
+    if (!Number.isFinite(input.precio_base) || input.precio_base < 0) {
+        throw new Error('Precio invalido');
+    }
+
+    const admin = getAdminClient();
+    const { data, error } = await admin
+        .from('prestaciones_lista')
+        .insert({
+            area_nombre: areaNombre,
+            nombre,
+            precio_base: Math.round((input.precio_base + Number.EPSILON) * 100) / 100,
+            moneda: input.moneda === 'USD' ? 'USD' : 'ARS',
+            terminos: typeof input.terminos === 'string' ? input.terminos.trim() || null : null,
+            activo: true,
+        })
+        .select('id, nombre, area_nombre, precio_base, moneda, terminos')
+        .single();
+
+    if (error || !data) {
+        throw new Error(error?.message || 'No se pudo crear la prestacion');
+    }
+
+    revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
+    revalidatePath('/admin/prestaciones');
+    revalidatePath('/caja-admin/prestaciones');
+    revalidatePath('/portal/prestaciones');
+
+    return data as TarifarioItem;
+}
+
+export async function createPrestacionCatalogoItem(input: CreatePrestacionCatalogoItemInput): Promise<PrestacionCatalogoItem> {
+    return createTarifarioItem(input);
+}
+
+export async function deactivateTarifarioItem(id: string): Promise<{ success: true }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile || !['owner', 'admin'].includes(profile.role)) {
+        throw new Error('No autorizado para desactivar prestaciones');
+    }
+
+    const itemId = id.trim();
+    if (!itemId) {
+        throw new Error('ID de prestacion invalido');
+    }
+
+    const admin = getAdminClient();
+    const { error } = await admin
+        .from('prestaciones_lista')
+        .update({
+            activo: false,
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', itemId);
+
+    if (error) {
+        throw new Error(error.message || 'No se pudo desactivar la prestacion');
+    }
+
+    revalidatePath('/admin/liquidaciones');
+    revalidatePath('/caja-admin/liquidaciones');
+    revalidatePath('/admin/prestaciones');
+    revalidatePath('/caja-admin/prestaciones');
+    revalidatePath('/portal/prestaciones');
+
+    return { success: true };
+}
+
+export async function deactivatePrestacionCatalogoItem(id: string): Promise<{ success: true }> {
+    return deactivateTarifarioItem(id);
+}
+
 export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Promise<TarifarioItem> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -203,6 +318,12 @@ export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Prom
         const nombre = input.nombre.trim();
         if (!nombre) throw new Error('El nombre no puede estar vacío');
         patch.nombre = nombre;
+    }
+
+    if (typeof input.area_nombre === 'string') {
+        const areaNombre = input.area_nombre.trim();
+        if (!areaNombre) throw new Error('El area no puede estar vacia');
+        patch.area_nombre = areaNombre;
     }
 
     if (typeof input.precio_base === 'number') {
@@ -480,14 +601,14 @@ export async function buscarPacientes(q: string): Promise<
 }
 
 /**
- * Retorna la lista de profesionales activos para uso administrativo.
+ * Retorna la lista de odontólogos activos para uso administrativo.
  */
 export async function getProfesionales(): Promise<Array<{ id: string; nombre: string; apellido?: string; area?: string }>> {
     const admin = getAdminClient();
     const { data } = await admin
         .from('personal')
         .select('id, nombre, apellido, area')
-        .eq('tipo', 'profesional')
+        .in('tipo', ['odontologo', 'profesional'])
         .eq('activo', true)
         .order('nombre');
     return data || [];

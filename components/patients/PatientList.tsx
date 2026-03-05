@@ -131,12 +131,12 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
     }
 
     function getWhatsAppNumber(patient: Paciente): string | null {
-        // Try whatsapp_numero first, then telefono
+        // Try whatsapp_numero first, then whatsapp
         if (patient.whatsapp_numero) {
             return `${patient.whatsapp_pais_code || '+54'}${patient.whatsapp_numero.replace(/\D/g, '')}`;
         }
-        if (patient.telefono) {
-            return patient.telefono;
+        if (patient.whatsapp) {
+            return patient.whatsapp;
         }
         return null;
     }

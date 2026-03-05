@@ -346,6 +346,10 @@ export default function NewPatientsCard() {
                                 fillOpacity={1}
                                 fill="url(#colorCount)"
                                 filter="url(#glow)"
+                                isAnimationActive={true}
+                                animationBegin={300}
+                                animationDuration={1800}
+                                animationEasing="ease-in-out"
                             />
                         </AreaChart>
                     </ResponsiveContainer>

@@ -14,7 +14,7 @@ export interface Paciente {
     cuit: string | null;
     fecha_nacimiento: string | null;
     email?: string | null;
-    telefono?: string | null;
+    whatsapp?: string | null;
     fecha_alta?: string | null;
     etiquetas?: string[];
     link_historia_clinica?: string | null;
@@ -92,7 +92,7 @@ export async function getPacientes(options?: {
 
     if (options?.search) {
         const searchTerm = `%${options.search}%`;
-        query = query.or(`apellido.ilike.${searchTerm},nombre.ilike.${searchTerm},email.ilike.${searchTerm},documento.ilike.${searchTerm},telefono.ilike.${searchTerm}`);
+        query = query.or(`apellido.ilike.${searchTerm},nombre.ilike.${searchTerm},email.ilike.${searchTerm},documento.ilike.${searchTerm},whatsapp.ilike.${searchTerm}`);
     }
 
     if (options?.estado) {
@@ -129,7 +129,7 @@ export async function getTotalPatientsCount(options?: {
 
     if (options?.search) {
         const searchTerm = `%${options.search}%`;
-        query = query.or(`apellido.ilike.${searchTerm},nombre.ilike.${searchTerm},email.ilike.${searchTerm},documento.ilike.${searchTerm},telefono.ilike.${searchTerm}`);
+        query = query.or(`apellido.ilike.${searchTerm},nombre.ilike.${searchTerm},email.ilike.${searchTerm},documento.ilike.${searchTerm},whatsapp.ilike.${searchTerm}`);
     }
 
     if (options?.estado) {
@@ -181,7 +181,7 @@ export async function createPaciente(paciente: Partial<Paciente>): Promise<{ dat
         .insert({
             ...paciente,
             email: emailCompleto,
-            telefono: whatsappE164 || paciente.telefono,
+            whatsapp: whatsappE164 || paciente.whatsapp,
             fecha_alta: new Date().toISOString(),
             estado_paciente: paciente.estado_paciente || 'Activo',
             origen_registro: paciente.origen_registro || 'Recepción',

@@ -42,7 +42,7 @@ type AdmissionIdentityMatch = {
     apellido: string | null;
     documento: string | null;
     email: string | null;
-    telefono: string | null;
+    whatsapp: string | null;
     cuit: string | null;
     ciudad: string | null;
     zona_barrio: string | null;
@@ -134,7 +134,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         }
 
         const data = parsed.data;
-        console.log('Starting admission process for:', data.nombre, data.apellido);
+        console.log('Starting admission process for:', data.nombre, data.apellido, 'DOB:', data.fecha_nacimiento, 'Keys:', Object.keys(data).join(', '));
 
         const patientUUID = data.id_paciente || undefined;
         const clinicalNotes = composeClinicalNotes(data);
@@ -147,12 +147,14 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 apellido: data.apellido,
                 documento: data.dni || null,
                 email: data.email,
-                telefono: data.telefono,
+                whatsapp: data.whatsapp,
                 cuit: data.cuit,
                 ciudad: data.ciudad,
                 zona_barrio: data.zona_barrio,
+                fecha_nacimiento: data.fecha_nacimiento || null,
                 observaciones_generales: clinicalNotes,
                 referencia_origen: data.referencia_origen,
+                origen_registro: 'Admisión Directa',
                 fecha_alta: patientUUID ? undefined : new Date().toISOString(), // Only set on create
                 is_deleted: false,
             })
@@ -166,21 +168,60 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         let docResult: PatientDocumentsResult | null = null;
 
         try {
+            console.log('Starting Drive folder creation for:', data.apellido, data.nombre);
             const driveResult = await ensureStandardPatientFolders(
                 data.apellido,
                 data.nombre,
                 created.link_historia_clinica || undefined
             );
+            console.log('Drive result:', JSON.stringify(driveResult));
             if (driveResult.motherFolderId && driveResult.motherFolderUrl) {
                 driveLink = driveResult.motherFolderUrl;
                 triggers.drive = { ok: true, detail: 'Carpeta de paciente creada/validada' };
+
+                console.log('Creating patient documents in folder:', driveResult.motherFolderId);
+
+                // Calculate age from DOB
+                let edad = '-';
+                if (data.fecha_nacimiento) {
+                    const dob = new Date(data.fecha_nacimiento);
+                    const today = new Date();
+                    let age = today.getFullYear() - dob.getFullYear();
+                    const monthDiff = today.getMonth() - dob.getMonth();
+                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                        age--;
+                    }
+                    edad = `${age} años`;
+                }
+
+                // Build health alert strings
+                const alertParts: string[] = [];
+                if (data.health_alerts?.length) {
+                    alertParts.push(...data.health_alerts);
+                }
+                const alergiaAlert = data.health_alerts?.find(a => a.toLowerCase().includes('alergia'));
+                const medicacionAlert = data.health_alerts?.find(a => a.toLowerCase().includes('medicaci'));
 
                 docResult = await createPatientDocuments(driveResult.motherFolderId, {
                     nombre: data.nombre,
                     apellido: data.apellido,
                     dni: data.dni || '-',
                     fecha: new Date().toLocaleDateString('es-AR'),
+                    fechaNacimiento: data.fecha_nacimiento
+                        ? new Date(data.fecha_nacimiento).toLocaleDateString('es-AR')
+                        : undefined,
+                    edad,
+                    whatsapp: data.whatsapp,
+                    email: data.email,
+                    ciudad: data.ciudad || undefined,
+                    barrio: data.zona_barrio || undefined,
+                    motivoConsulta: data.motivo_consulta || undefined,
+                    comoNosConocio: data.referencia_origen || undefined,
+                    alergias: alergiaAlert || undefined,
+                    medicacion: medicacionAlert || undefined,
+                    observacionesGenerales: data.health_notes || clinicalNotes || undefined,
                 });
+                console.log('Documents result:', JSON.stringify(docResult));
 
                 if (docResult?.fichaUrl || docResult?.presupuestoUrl) {
                     triggers.slides = { ok: true, detail: 'Presentación diagnóstica generada desde template' };
@@ -211,9 +252,9 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 apellido: data.apellido,
                 documento: data.dni || null,
                 email: data.email,
-                telefono: data.telefono,
+                whatsapp: data.whatsapp,
                 cuit: data.cuit || null,
-                fecha_nacimiento: null,
+                fecha_nacimiento: data.fecha_nacimiento || null,
                 ciudad: data.ciudad || undefined,
                 observaciones_generales: clinicalNotes,
                 link_google_slides: docResult?.fichaUrl || null,
@@ -345,7 +386,7 @@ export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
                 apellido: data.apellido,
                 documento: data.dni || null,
                 email: data.email,
-                telefono: data.telefono,
+                whatsapp: data.whatsapp,
                 observaciones_generales: data.motivo_consulta,
                 referencia_origen: data.referencia_origen,
                 cuit: data.cuit,
@@ -387,7 +428,7 @@ export async function checkAdmissionIdentityAction(params: {
 
         let query = supabase
             .from('pacientes')
-            .select('id_paciente, nombre, apellido, documento, email, telefono, cuit, ciudad, zona_barrio')
+            .select('id_paciente, nombre, apellido, documento, email, whatsapp, cuit, ciudad, zona_barrio')
             .eq('is_deleted', false)
             .or(filters.join(','))
             .limit(6);
@@ -433,7 +474,7 @@ export async function searchAdmissionPatientsAction(query: string) {
 
         const { data, error } = await supabase
             .from('pacientes')
-            .select('id_paciente, nombre, apellido, documento, email, telefono, cuit, ciudad, zona_barrio')
+            .select('id_paciente, nombre, apellido, documento, email, whatsapp, cuit, ciudad, zona_barrio')
             .eq('is_deleted', false)
             .or(`nombre.ilike.${filter},apellido.ilike.${filter},documento.ilike.${filter},email.ilike.${filter}`)
             .order('fecha_alta', { ascending: false })

@@ -12,7 +12,7 @@ import {
     ScanLine,
 } from 'lucide-react';
 import clsx from 'clsx';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import {
     getInventoryProductDetail,
     type StockMovementRecord,
@@ -21,9 +21,9 @@ import type { ProductRecord } from '@/app/actions/inventory-products';
 
 export default function InventoryProductDetailPage() {
     return (
-        <RoleGuard allowedRoles={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
             <ProductDetailScreen />
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }
 

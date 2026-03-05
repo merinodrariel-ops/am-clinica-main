@@ -443,12 +443,12 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     {/* Doctor & Type Row */}
                     <div className="grid grid-cols-2 gap-5">
                         <div className="relative">
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Doctor / Profesional</label>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Odontologo</label>
                             <div className="relative">
                                 <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <Input
                                     type="text"
-                                    placeholder="Buscar doctor..."
+                                    placeholder="Buscar odontologo..."
                                     className="block w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                     value={doctorSearch}
                                     onChange={(e) => {

@@ -1,6 +1,6 @@
 export type PaymentModel = 'hourly' | 'commission' | 'fixed' | 'hybrid';
 
-export type WorkerRole = 'dentist' | 'assistant' | 'technician' | 'cleaning' | 'admin' | 'reception' | 'lab' | 'marketing' | 'other';
+export type WorkerCategory = 'owner' | 'admin' | 'socio' | 'contador' | 'reception' | 'dentist' | 'assistant' | 'asistente' | 'technician' | 'laboratorio' | 'lab' | 'recaptacion' | 'cleaning' | 'marketing' | 'developer' | 'pricing_manager' | 'partner_viewer' | 'other';
 
 export type WorkLogType = 'shift' | 'procedure' | 'task' | 'bonus' | 'deduction';
 
@@ -13,12 +13,12 @@ export type GoalCategory = 'compliance' | 'attendance' | 'performance' | 'growth
 export interface WorkerProfile {
     id: string;
     user_id?: string;
-    app_role?: string;
+    app_category?: string;
     empresa_prestadora_id?: string | null;
     empresa_prestadora_nombre?: string | null;
     nombre: string;
     apellido?: string;
-    rol: string;
+    categoria: string;
     area?: string;
     tipo?: string;
     especialidad?: string;
@@ -113,7 +113,7 @@ export interface ProviderGoal {
     title: string;
     description?: string;
     category: GoalCategory;
-    role_target?: string | null; // null = all roles
+    category_target?: string | null; // null = all categories
     target_value: number;
     unit: string; // 'count', 'hours', 'pesos', '%'
     xp_reward: number;

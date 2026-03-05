@@ -57,7 +57,7 @@ async function forceReset() {
         email_confirm: true,
         user_metadata: {
             full_name: 'Dr. Ariel Merino (Owner)',
-            role: 'owner'
+            categoria: 'owner'
         }
     });
 

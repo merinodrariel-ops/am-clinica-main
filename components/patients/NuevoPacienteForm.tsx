@@ -147,7 +147,7 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                 email_local: form.email_local || undefined,
                 email_dominio: form.email_dominio === 'otro' ? form.email_custom_domain : form.email_dominio,
                 email: emailCompleto || undefined,
-                telefono: whatsappE164 || undefined,
+                whatsapp: whatsappE164 || undefined,
                 ciudad: form.ciudad || undefined,
                 zona_barrio: form.zona_barrio || undefined,
                 direccion: form.direccion || undefined,

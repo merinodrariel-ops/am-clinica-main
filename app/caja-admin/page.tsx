@@ -9,7 +9,6 @@ import {
     Receipt,
     Archive,
     Users,
-    Clock,
     BarChart3,
     ExternalLink,
     RefreshCw,
@@ -19,17 +18,15 @@ import {
 import { getObservadosCriticalLeaders, getObservadosSlaSummary, getSucursales, type Sucursal } from '@/lib/caja-admin';
 import MovimientosTab from '@/components/caja-admin/MovimientosTab';
 import ArqueoTab from '@/components/caja-admin/ArqueoTab';
-import ProfesionalesTab from '@/components/caja-admin/ProfesionalesTab';
 import PersonalTab from '@/components/caja-admin/PersonalTab';
 import ReportesTab from '@/components/caja-admin/ReportesTab';
 import ConfiguracionTab from '@/components/caja-admin/ConfiguracionTab';
-import RoleGuard from "@/components/auth/RoleGuard";
+import CategoriaGuard from "@/components/auth/CategoriaGuard";
 
 const TABS = [
     { id: 'movimientos', label: 'Movimientos', icon: Receipt },
     { id: 'arqueo', label: 'Inicio / Cierre', icon: Archive },
-    { id: 'profesionales', label: 'Prestaciones (Caja)', icon: Users },
-    { id: 'personal', label: 'Horas / Personal', icon: Clock },
+    { id: 'personal', label: 'Prestadores', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
 ] as const;
@@ -137,9 +134,9 @@ function CajaAdminContent() {
         if (!selectedSucursal) return null;
 
         const requestedSubTab = searchParams.get('subtab');
-        const validPersonalSubTabs = new Set(['equipo', 'profesionales', 'registros', 'observados']);
+        const validPersonalSubTabs = new Set(['equipo', 'registros', 'observados']);
         const initialSubTab = requestedSubTab && validPersonalSubTabs.has(requestedSubTab)
-            ? requestedSubTab as 'equipo' | 'profesionales' | 'registros' | 'observados'
+            ? requestedSubTab as 'equipo' | 'registros' | 'observados'
             : undefined;
         const initialObservedPersonalId = requestedSubTab === 'observados'
             ? (searchParams.get('observado_personal_id') || undefined)
@@ -156,8 +153,6 @@ function CajaAdminContent() {
                 );
             case 'arqueo':
                 return <ArqueoTab sucursal={selectedSucursal} tcBna={tcBna} />;
-            case 'profesionales':
-                return <ProfesionalesTab sucursal={selectedSucursal} tcBna={tcBna} />;
             case 'personal':
                 return (
                     <PersonalTab
@@ -205,7 +200,7 @@ function CajaAdminContent() {
     }
 
     return (
-        <RoleGuard allowedRoles={['admin', 'owner']}>
+        <CategoriaGuard allowedCategorias={['admin', 'owner']}>
             <div className="min-h-screen relative">
                 {/* Ambient Glows */}
                 <div className="absolute top-0 left-1/4 w-[40rem] h-[30rem] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
@@ -278,24 +273,12 @@ function CajaAdminContent() {
 
                     <div className="mb-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
                         <p className="text-xs uppercase tracking-widest text-indigo-300 mb-3">Caja Administración Unificada</p>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <Link
-                                href="/caja-admin/prestaciones"
-                                className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 hover:border-indigo-400 hover:text-white transition-colors"
-                            >
-                                Prestaciones (Doctores)
-                            </Link>
+                        <div className="grid grid-cols-1 gap-3">
                             <Link
                                 href="/caja-admin/liquidaciones"
                                 className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 hover:border-indigo-400 hover:text-white transition-colors"
                             >
                                 Liquidaciones
-                            </Link>
-                            <Link
-                                href="/caja-admin/personal"
-                                className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 hover:border-indigo-400 hover:text-white transition-colors"
-                            >
-                                Prestadores / Personal
                             </Link>
                         </div>
                     </div>
@@ -380,7 +363,7 @@ function CajaAdminContent() {
                     </AnimatePresence>
                 </div>
             </div>
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }
 

@@ -15,7 +15,7 @@ import Link from 'next/link';
 import PatientList from '@/components/patients/PatientList';
 import NuevoPacienteForm from '@/components/patients/NuevoPacienteForm';
 import { getPacientes, getTotalPatientsCount, Paciente } from '@/lib/patients';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import { useAuth } from '@/contexts/AuthContext';
 
 const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSexSoCAmFdYp1k8WOIZoMAXVVSnGvI70rjr2_u3hA2LoUuKAw/viewform';
@@ -106,7 +106,7 @@ export default function PatientsPage() {
     }
 
     return (
-        <RoleGuard allowedRoles={['reception', 'admin', 'recaptacion']}>
+        <CategoriaGuard allowedCategorias={['reception', 'admin', 'recaptacion']}>
             <div className="p-6 max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
@@ -124,7 +124,7 @@ export default function PatientsPage() {
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={handleCopyAdmissionLink}
-                                className={`flex items-center gap-2 px-4 py-2.5 border transition-all rounded-lg font-medium ${copied
+                                className={`flex items-center gap-2 px-4 py-2.5 border transition-all rounded-l-lg font-medium ${copied
                                     ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
                                     : 'border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
                                     }`}
@@ -133,6 +133,15 @@ export default function PatientsPage() {
                                 {copied ? <Check size={18} /> : <Copy size={18} />}
                                 {copied ? '¡Link Copiado!' : 'Copiar Link de Admisión'}
                             </button>
+                            <a
+                                href="/admision"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center px-2.5 py-2.5 border border-l-0 border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-r-lg transition-colors"
+                                title="Abrir formulario en nueva ventana"
+                            >
+                                <ExternalLink size={18} />
+                            </a>
                             <button
                                 onClick={() => handleSyncSheets(false)}
                                 disabled={syncing}
@@ -164,7 +173,7 @@ export default function PatientsPage() {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-white/10 bg-navy-900/50 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500/50 transition-colors backdrop-blur-sm"
-                                placeholder="Buscar por nombre, apellido, email, teléfono o documento..."
+                                placeholder="Buscar por nombre, apellido, email, WhatsApp o documento..."
                             />
                         </div>
                         <div className="flex gap-2">
@@ -214,6 +223,6 @@ export default function PatientsPage() {
                     onSuccess={loadPatients}
                 />
             </div>
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }

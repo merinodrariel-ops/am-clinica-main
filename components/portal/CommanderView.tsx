@@ -189,7 +189,7 @@ export default async function CommanderView() {
                         <div className="bg-slate-900/40 border border-slate-800/40 rounded-2xl p-4 text-center">
                             <TrendingUp size={18} className="text-violet-400 mx-auto mb-1" />
                             <p className="text-xl font-bold text-white">
-                                {rows.filter(r => r.tipo === 'profesional').length}
+                                {rows.filter(r => r.tipo === 'odontologo' || r.tipo === 'profesional').length}
                             </p>
                             <p className="text-xs text-slate-500">Doctores activos</p>
                         </div>

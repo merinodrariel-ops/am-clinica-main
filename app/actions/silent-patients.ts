@@ -6,7 +6,7 @@ export interface SilentPatient {
     patientId: string;
     nombre: string;
     apellido: string;
-    telefono: string | null;
+    whatsapp: string | null;
     fullName: string;
     workflowName: string;
     stageName: string | null;
@@ -27,7 +27,7 @@ export async function getSilentPatients(dayThreshold = 45): Promise<SilentPatien
         .select(`
             patient_id,
             last_stage_change,
-            patient:patient_id ( full_name, nombre, apellido, telefono ),
+            patient:patient_id ( full_name, nombre, apellido, whatsapp ),
             workflow:workflow_id ( name ),
             stage:current_stage_id ( name )
         `)
@@ -67,7 +67,7 @@ export async function getSilentPatients(dayThreshold = 45): Promise<SilentPatien
                 patientId: t.patient_id,
                 nombre: p?.nombre ?? '',
                 apellido: p?.apellido ?? '',
-                telefono: p?.telefono ?? null,
+                whatsapp: p?.whatsapp ?? null,
                 fullName: p?.full_name ?? `${p?.nombre ?? ''} ${p?.apellido ?? ''}`.trim(),
                 workflowName: w?.name ?? 'Tratamiento',
                 stageName: s?.name ?? null,

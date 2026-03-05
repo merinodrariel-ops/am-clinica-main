@@ -94,7 +94,7 @@ const MENU_ITEMS = [
 
 export default function Sidebar() {
     const pathname = usePathname();
-    const { role, profile, signOut, user, isRealOwner, impersonatedRole, setImpersonatedRole } = useAuth();
+    const { categoria, profile, signOut, user, isRealOwner, impersonatedCategoria, setImpersonatedCategoria } = useAuth();
     const [collapsed, setCollapsed] = useState(() => readSidebarCollapsed());
     const [mobileOpen, setMobileOpen] = useState(false);
     const [isDesktop, setIsDesktop] = useState(() =>
@@ -151,7 +151,7 @@ export default function Sidebar() {
     // Hide sidebar on login page or if not authenticated
     if (!user || pathname === '/login' || pathname.startsWith('/portal-profesional')) return null;
 
-    const userRole = role || 'partner_viewer';
+    const userCategoria = categoria || 'partner_viewer';
 
     function toggleCollapsed() {
         const next = !collapsed;
@@ -248,9 +248,8 @@ export default function Sidebar() {
                     )}
                 </div>
 
-                {/* Navigation */}
                 <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-                    {MENU_ITEMS.filter(item => item.roles.includes(userRole)).map((item) => {
+                    {MENU_ITEMS.filter(item => item.roles.includes(userCategoria)).map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname.startsWith(item.href);
 
@@ -305,7 +304,7 @@ export default function Sidebar() {
                     </button>
 
                     {/* Admin users link */}
-                    {(isRealOwner || userRole === 'owner' || userRole === 'admin') && (
+                    {(isRealOwner || userCategoria === 'owner' || userCategoria === 'admin') && (
                         <Link
                             href="/admin-users"
                             className={clsx(
@@ -324,9 +323,9 @@ export default function Sidebar() {
                     )}
 
                     {/* Stop Impersonating Button */}
-                    {impersonatedRole && (
+                    {impersonatedCategoria && (
                         <button
-                            onClick={() => setImpersonatedRole(null)}
+                            onClick={() => setImpersonatedCategoria(null)}
                             className={clsx(
                                 'w-full flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden text-amber-500 border border-amber-500/30 hover:shadow-[0_0_15px_rgba(245,158,11,0.2)] hover:bg-amber-500/10',
                                 compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5'
@@ -356,8 +355,8 @@ export default function Sidebar() {
                                     {profile?.full_name || user.email?.split('@')[0]}
                                 </p>
                                 <p className="text-xs capitalize truncate text-emerald-400 font-medium">
-                                    {userRole.replace('_', ' ')}
-                                    {impersonatedRole && <span className="ml-1 text-amber-500">(Imitando)</span>}
+                                    {userCategoria.replace('_', ' ')}
+                                    {impersonatedCategoria && <span className="ml-1 text-amber-500">(Imitando)</span>}
                                 </p>
                             </div>
                         )}

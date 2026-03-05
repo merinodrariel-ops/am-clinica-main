@@ -37,15 +37,15 @@ export async function GET(request: Request) {
 
             if (bdays) {
                 for (const patient of bdays) {
-                    if (!patient.telefono && !patient.email) continue;
+                    if (!patient.whatsapp && !patient.email) continue;
 
                     await sendNotification({
                         appointmentId: '00000000-0000-0000-0000-000000000000', // Dummy UUID for non-appointment notifications
                         templateKey: 'birthday_greeting',
-                        channel: patient.telefono ? 'whatsapp' : 'email',
+                        channel: patient.whatsapp ? 'whatsapp' : 'email',
                         patientName: patient.nombre || patient.full_name || 'Paciente',
                         patientEmail: patient.email || undefined,
-                        patientPhone: patient.telefono || undefined,
+                        patientPhone: patient.whatsapp || undefined,
                         startTime: new Date().toISOString(),
                         endTime: new Date().toISOString()
                     });
@@ -79,15 +79,15 @@ export async function GET(request: Request) {
                     const patient = Array.isArray(apt.patient) ? apt.patient[0] : apt.patient;
                     const doctor = Array.isArray(apt.doctor) ? apt.doctor[0] : apt.doctor;
 
-                    if (!patient || (!patient.telefono && !patient.email)) continue;
+                    if (!patient || (!patient.whatsapp && !patient.email)) continue;
 
                     await sendNotification({
                         appointmentId: apt.id,
                         templateKey: 'post_treatment_followup',
-                        channel: patient.telefono ? 'whatsapp' : 'email', // Prefer WhatsApp for quick follow-up
+                        channel: patient.whatsapp ? 'whatsapp' : 'email', // Prefer WhatsApp for quick follow-up
                         patientName: patient.nombre || patient.full_name || 'Paciente',
                         patientEmail: patient.email || undefined,
-                        patientPhone: patient.telefono || undefined,
+                        patientPhone: patient.whatsapp || undefined,
                         doctorName: doctor?.full_name || undefined,
                         startTime: apt.start_time,
                         endTime: apt.end_time
@@ -138,15 +138,15 @@ export async function GET(request: Request) {
                     // If count is 0, they have no future appointments -> Send recall
                     if (count === 0) {
                         const patient = Array.isArray(apt.patient) ? apt.patient[0] : apt.patient;
-                        if (!patient || (!patient.telefono && !patient.email)) continue;
+                        if (!patient || (!patient.whatsapp && !patient.email)) continue;
 
                         await sendNotification({
                             appointmentId: apt.id, // Using their last appointment ID as reference
                             templateKey: 'recall_6_months',
-                            channel: patient.telefono ? 'whatsapp' : 'email',
+                            channel: patient.whatsapp ? 'whatsapp' : 'email',
                             patientName: patient.nombre || patient.full_name || 'Paciente',
                             patientEmail: patient.email || undefined,
-                            patientPhone: patient.telefono || undefined,
+                            patientPhone: patient.whatsapp || undefined,
                             startTime: new Date().toISOString(),
                             endTime: new Date().toISOString()
                         });

@@ -67,7 +67,7 @@ export async function syncPatientToSheet(patient: Paciente) {
         const patientName = `${patient.nombre} ${patient.apellido}`.trim();
         const patientDni = patient.documento ? norm(patient.documento) : '';
         const patientEmail = patient.email ? norm(patient.email) : '';
-        const patientPhone = patient.telefono ? norm(patient.telefono) : '';
+        const patientPhone = patient.whatsapp ? norm(patient.whatsapp) : '';
 
         // Skip header
         for (let i = 1; i < rows.length; i++) {
@@ -102,7 +102,7 @@ export async function syncPatientToSheet(patient: Paciente) {
             nombreCompleto,
             patient.documento || '',
             patient.email || '',
-            patient.telefono || '',
+            patient.whatsapp || '',
             patient.ciudad || '',
             patient.observaciones_generales || '',
             '', // Doctor - not in patient object directly usually, unless assigned

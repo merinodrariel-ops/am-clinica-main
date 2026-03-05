@@ -7,7 +7,7 @@ interface PatientRow {
     id_paciente: string;
     nombre: string;
     apellido: string;
-    telefono?: string | null;
+    whatsapp?: string | null;
     email?: string | null;
     estado_paciente?: string | null;
     financ_estado?: string | null;
@@ -184,7 +184,7 @@ export async function getExecutiveIntelligence(): Promise<ExecutiveIntelligenceS
     const [patientsRes, paymentsRes, appointmentsRes, profilesRes] = await Promise.all([
         supabase
             .from('pacientes')
-            .select('id_paciente, nombre, apellido, telefono, email, estado_paciente, financ_estado, financ_monto_total, financ_cuotas_total')
+            .select('id_paciente, nombre, apellido, whatsapp, email, estado_paciente, financ_estado, financ_monto_total, financ_cuotas_total')
             .eq('is_deleted', false)
             .limit(2500),
         supabase

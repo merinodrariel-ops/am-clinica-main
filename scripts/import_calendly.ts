@@ -145,7 +145,7 @@ interface Patient {
     nombre: string;
     apellido: string;
     email: string | null;
-    telefono: string | null;
+    whatsapp: string | null;
 }
 
 type ActionType =
@@ -162,7 +162,7 @@ interface ProcessedRow {
     action: ActionType;
     calendly: CalendlyRow;
     patient?: Patient;
-    patchFields?: { email?: string; telefono?: string };
+    patchFields?: { email?: string; whatsapp?: string };
     interest?: string;
     notes?: string;
 }
@@ -296,7 +296,7 @@ async function main() {
 
     const { data: patientsRaw, error: pErr } = await supabase
         .from('pacientes')
-        .select('id_paciente, nombre, apellido, email, telefono')
+        .select('id_paciente, nombre, apellido, email, whatsapp')
         .eq('is_deleted', false);
     if (pErr) { console.error('❌', pErr.message); process.exit(1); }
     const patients: Patient[] = patientsRaw || [];
@@ -349,9 +349,9 @@ async function main() {
             }
             if (enrolledIds.has(pid)) {
                 // Check if we should patch missing contact
-                const patchFields: { email?: string; telefono?: string } = {};
+                const patchFields: { email?: string; whatsapp?: string } = {};
                 if (!patient.email && cal.email) patchFields.email = cal.email;
-                if (!patient.telefono && cal.phone) patchFields.telefono = cal.phone;
+                if (!patient.whatsapp && cal.phone) patchFields.whatsapp = cal.phone;
                 if (Object.keys(patchFields).length > 0) {
                     processed.push({ action: 'patch_contact', calendly: cal, patient, patchFields, interest });
                 } else {
@@ -365,9 +365,9 @@ async function main() {
             }
 
             // In DB, not enrolled, no active treatment
-            const patchFields: { email?: string; telefono?: string } = {};
+            const patchFields: { email?: string; whatsapp?: string } = {};
             if (!patient.email && cal.email) patchFields.email = cal.email;
-            if (!patient.telefono && cal.phone) patchFields.telefono = cal.phone;
+            if (!patient.whatsapp && cal.phone) patchFields.whatsapp = cal.phone;
 
             processed.push({ action: 'enroll', calendly: cal, patient, patchFields, interest });
 
@@ -515,7 +515,7 @@ async function main() {
                 nombre: firstName,
                 apellido: lastName,
                 email: email,
-                telefono: phone || null,
+                whatsapp: phone || null,
                 origen_registro: 'calendly',
                 fecha_alta: new Date().toISOString().slice(0, 10),
                 estado_paciente: 'prospecto',

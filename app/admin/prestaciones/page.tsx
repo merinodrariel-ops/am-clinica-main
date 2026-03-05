@@ -3,8 +3,8 @@ import { getProfesionales, getPrestacionesCatalogoCompleto } from '@/app/actions
 import AdminPrestacionesClient from './AdminPrestacionesClient';
 
 export const metadata: Metadata = {
-    title: 'Prestaciones de Doctores | Admin',
-    description: 'Carga rápida de prestaciones realizadas por profesionales odontólogos.',
+    title: 'Prestaciones de Odontologos | Admin',
+    description: 'Carga rapida de prestaciones realizadas por odontologos.',
 };
 
 export default async function AdminPrestacionesPage() {

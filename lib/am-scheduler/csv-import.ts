@@ -88,10 +88,10 @@ export async function correlatePatient(
 
     const queries = [];
     if (email) {
-        queries.push(supabase.from('pacientes').select('id_paciente, email, telefono, nombre, apellido').ilike('email', email).eq('is_deleted', false));
+        queries.push(supabase.from('pacientes').select('id_paciente, email, whatsapp, nombre, apellido').ilike('email', email).eq('is_deleted', false));
     }
     if (phone && phone.length >= 8) {
-        queries.push(supabase.from('pacientes').select('id_paciente, email, telefono, nombre, apellido').ilike('telefono', `%${phone}%`).eq('is_deleted', false));
+        queries.push(supabase.from('pacientes').select('id_paciente, email, whatsapp, nombre, apellido').ilike('whatsapp', `%${phone}%`).eq('is_deleted', false));
     }
 
     // If we have an exact email or phone match
@@ -108,7 +108,7 @@ export async function correlatePatient(
         if (parts.length >= 2) {
             const { data } = await supabase
                 .from('pacientes')
-                .select('id_paciente, email, telefono, nombre, apellido')
+                .select('id_paciente, email, whatsapp, nombre, apellido')
                 .ilike('nombre', `%${parts[0]}%`)
                 .ilike('apellido', `%${parts[parts.length - 1]}%`)
                 .eq('is_deleted', false);
@@ -117,7 +117,7 @@ export async function correlatePatient(
             // Just one name provided
             const { data } = await supabase
                 .from('pacientes')
-                .select('id_paciente, email, telefono, nombre, apellido')
+                .select('id_paciente, email, whatsapp, nombre, apellido')
                 .ilike('nombre', `%${name}%`)
                 .eq('is_deleted', false);
             if (data) candidates.push(...data);
@@ -139,7 +139,7 @@ export async function correlatePatient(
         }
 
         // 2. Phone Match (High Weight)
-        const candPhone = normalizePhone(candidate.telefono);
+        const candPhone = normalizePhone(candidate.whatsapp);
         if (phone && candPhone && (phone.includes(candPhone) || candPhone.includes(phone))) {
             score += 70;
             reasons.push('phone_match');

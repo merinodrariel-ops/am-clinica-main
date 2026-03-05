@@ -12,7 +12,7 @@
 1. Intentar entrar a `/dashboard` sin login -> Debe redirigir a `/login`.
 2. Intentar entrar a `/caja-admin` sin login -> Debe redirigir a `/login`.
 3. Loguear con usuario "Recepción":
-    - Intentar entrar a `/caja-admin` -> Debe redirigir a `/no-access` o `/dashboard`. (Nota: actualmente el middleware protege autenticación, la protección por rol es Client-Side en `RoleGuard` o Server-Side en Page).
+    - Intentar entrar a `/caja-admin` -> Debe redirigir a `/no-access` o `/dashboard`. (Nota: actualmente el middleware protege autenticación, la protección por categoria es Client-Side en `CategoriaGuard` o Server-Side en Page).
     - Verificar que no ve el botón de "Caja Admin" en el sidebar.
 
 ## 3. RLS (Row Level Security)

@@ -249,7 +249,7 @@ async function main() {
             emailIndex.get(email)!.push(id);
         }
 
-        const phone = normalizePhone(p.telefono);
+        const phone = normalizePhone(p.whatsapp);
         if (phone.length >= 7) {
             if (!phoneIndex.has(phone)) phoneIndex.set(phone, []);
             phoneIndex.get(phone)!.push(id);

@@ -40,18 +40,18 @@ function buildGoogleAuth() {
 
 export interface SyncResult {
   imported: number;
-  updated:  number;
-  skipped:  number;
-  errors:   number;
+  updated: number;
+  skipped: number;
+  errors: number;
   nextSyncToken?: string;
 }
 
 export interface SyncOptions {
-  calendarId:    string;
-  syncToken?:    string;       // for incremental sync; omit for full import
-  timeMin?:      string;       // ISO; limit historical import
-  maxResults?:   number;
-  dryRun?:       boolean;
+  calendarId: string;
+  syncToken?: string;       // for incremental sync; omit for full import
+  timeMin?: string;       // ISO; limit historical import
+  maxResults?: number;
+  dryRun?: boolean;
 }
 
 // ─── Identity Correlation ─────────────────────────────────────────────────────
@@ -88,12 +88,12 @@ async function correlatePatient(
     const parts = displayName.trim().split(' ');
     if (parts.length >= 2) {
       const firstName = parts[0];
-      const lastName  = parts[parts.length - 1];
+      const lastName = parts[parts.length - 1];
 
       const { data } = await supabase
         .from('pacientes')
         .select('id_paciente')
-        .ilike('nombre',   `%${firstName}%`)
+        .ilike('nombre', `%${firstName}%`)
         .ilike('apellido', `%${lastName}%`)
         .eq('is_deleted', false)
         .limit(1)
@@ -110,10 +110,10 @@ async function correlatePatient(
 
 function mapStatusToAppointmentStatus(gcalStatus: string | null | undefined): string {
   switch (gcalStatus) {
-    case 'confirmed':  return 'confirmed';
-    case 'tentative':  return 'pending';
-    case 'cancelled':  return 'cancelled';
-    default:           return 'confirmed';
+    case 'confirmed': return 'confirmed';
+    case 'tentative': return 'pending';
+    case 'cancelled': return 'cancelled';
+    default: return 'confirmed';
   }
 }
 
@@ -134,24 +134,24 @@ async function mapEventToAppointment(
 ): Promise<Record<string, unknown> | null> {
   // Skip events without times (all-day events are skipped)
   const startDT = event.start?.dateTime;
-  const endDT   = event.end?.dateTime;
+  const endDT = event.end?.dateTime;
   if (!startDT || !endDT) return null;
 
-  const emails     = extractEmails(event);
-  const patientId  = await correlatePatient(emails, event.summary);
+  const emails = extractEmails(event);
+  const patientId = await correlatePatient(emails, event.summary);
 
   return {
-    title:       event.summary ?? 'Importado de Google Calendar',
-    start_time:  startDT,
-    end_time:    endDT,
-    status:      mapStatusToAppointmentStatus(event.status),
-    type:        'consulta',
-    notes:       event.description ?? null,
-    patient_id:  patientId,
-    doctor_id:   defaultDoctorId,
+    title: event.summary ?? 'Importado de Google Calendar',
+    start_time: startDT,
+    end_time: endDT,
+    status: mapStatusToAppointmentStatus(event.status),
+    type: 'consulta',
+    notes: event.description ?? null,
+    patient_id: patientId,
+    doctor_id: defaultDoctorId,
     external_id: event.id,
-    source:      'google_calendar',
-    color_tag:   event.colorId ? `gcal_${event.colorId}` : null,
+    source: 'google_calendar',
+    color_tag: event.colorId ? `gcal_${event.colorId}` : null,
   };
 }
 
@@ -167,7 +167,7 @@ export async function syncGoogleCalendar(options: SyncOptions): Promise<SyncResu
   } = options;
 
   const supabase = createAdminClient();
-  const auth     = buildGoogleAuth();
+  const auth = buildGoogleAuth();
   const calendar = google.calendar({ version: 'v3', auth });
 
   const result: SyncResult = { imported: 0, updated: 0, skipped: 0, errors: 0 };
@@ -177,7 +177,7 @@ export async function syncGoogleCalendar(options: SyncOptions): Promise<SyncResu
   const { data: ownerProfile } = await supabase
     .from('profiles')
     .select('id')
-    .eq('role', 'owner')
+    .eq('categoria', 'owner')
     .limit(1)
     .maybeSingle();
   if (ownerProfile) defaultDoctorId = ownerProfile.id;
@@ -210,9 +210,9 @@ export async function syncGoogleCalendar(options: SyncOptions): Promise<SyncResu
       throw err;
     }
 
-    const events   = eventsResponse.data.items ?? [];
-    nextSyncToken  = eventsResponse.data.nextSyncToken ?? undefined;
-    pageToken      = eventsResponse.data.nextPageToken ?? undefined;
+    const events = eventsResponse.data.items ?? [];
+    nextSyncToken = eventsResponse.data.nextSyncToken ?? undefined;
+    pageToken = eventsResponse.data.nextPageToken ?? undefined;
 
     for (const event of events) {
       try {

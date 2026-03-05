@@ -127,7 +127,7 @@ export async function generateLiquidacion(
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${mes}-${String(lastDay).padStart(2, '0')}`;
 
-    const isDoctor = worker.tipo === 'profesional';
+    const isDoctor = worker.tipo === 'odontologo' || worker.tipo === 'profesional';
     const modeloPago: 'hora_ars' | 'prestacion_usd' = isDoctor ? 'prestacion_usd' : 'hora_ars';
 
     let totalArs = 0;
@@ -493,7 +493,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
                 estado: normalizeEstado(liq.estado),
             } as LiquidacionResult)
             : undefined;
-        const isDoctor = w.tipo === 'profesional';
+        const isDoctor = w.tipo === 'odontologo' || w.tipo === 'profesional';
         return {
             personal_id: w.id,
             nombre: w.nombre,
@@ -588,7 +588,7 @@ export async function checkAndAwardBadges(personalId: string): Promise<void> {
     if (!worker) return;
 
     // Badge: master_evidencia — 10+ prestaciones with slides_url
-    if (worker.tipo === 'profesional') {
+    if (worker.tipo === 'odontologo' || worker.tipo === 'profesional') {
         const { count: slidesCount } = await admin
             .from('prestaciones_realizadas')
             .select('id', { count: 'exact', head: true })

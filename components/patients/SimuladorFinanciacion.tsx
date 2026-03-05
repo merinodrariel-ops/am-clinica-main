@@ -269,7 +269,7 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
         mode?: WhatsappMessageMode;
     }) => {
         const whatsappUrl = buildWhatsappUrl({
-            phone: patient.telefono,
+            phone: patient.whatsapp,
             patientName,
             treatment: payload.treatment,
             shareUrl: payload.shareUrl,
@@ -277,7 +277,7 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
             mode: payload.mode || messageMode,
         });
         window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-    }, [messageMode, patient.telefono, patientName]);
+    }, [messageMode, patient.whatsapp, patientName]);
 
     const handleCopyAndOpenWhatsapp = useCallback(async (simulation: FinancingSimulationRecord) => {
         try {

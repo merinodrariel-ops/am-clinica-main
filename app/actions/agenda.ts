@@ -25,7 +25,7 @@ export async function getAppointments(start: string, end: string) {
         .from('agenda_appointments')
         .select(`
             *,
-            patient_data:patient_id (nombre, apellido, telefono),
+            patient_data:patient_id (nombre, apellido, whatsapp),
             doctor_data:doctor_id (full_name)
         `)
         .gte('start_time', start)
@@ -139,7 +139,7 @@ export async function searchPatients(query: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('pacientes')
-        .select('id_paciente, nombre, apellido, telefono')
+        .select('id_paciente, nombre, apellido, whatsapp')
         .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`)
         .eq('is_deleted', false)
         .limit(10);
@@ -149,10 +149,10 @@ export async function searchPatients(query: string) {
         return [];
     }
 
-    return (data || []).map((p: { id_paciente: string; nombre: string; apellido: string; telefono: string | null }) => ({
+    return (data || []).map((p: { id_paciente: string; nombre: string; apellido: string; whatsapp: string | null }) => ({
         id: p.id_paciente,
         full_name: `${p.nombre} ${p.apellido}`,
-        phone: p.telefono || ''
+        phone: p.whatsapp || ''
     }));
 }
 
@@ -164,12 +164,12 @@ export async function getDoctors() {
         .from('personal')
         .select('user_id, nombre, apellido')
         .eq('activo', true)
-        .eq('tipo', 'profesional')
+        .in('tipo', ['odontologo', 'profesional'])
         .not('user_id', 'is', null)
         .order('nombre');
 
     if (staffError) {
-        console.error('Error fetching professional staff:', staffError);
+        console.error('Error fetching odontologos:', staffError);
         return [];
     }
 
@@ -201,7 +201,7 @@ export async function getDoctors() {
             const fallbackName = `${row.nombre || ''} ${row.apellido || ''}`.trim();
             return {
                 id: profile.id,
-                full_name: profile.full_name || fallbackName || 'Profesional',
+                full_name: profile.full_name || fallbackName || 'Odontólogo',
                 role: profile.role,
             };
         })
@@ -243,7 +243,7 @@ export async function getImportedEventTypes() {
 
     // Fetch doctor names for all unique doctor IDs
     const doctorIds = [...new Set([...groups.values()].map(g => g.doctorId).filter(Boolean))];
-    let doctorNames: Record<string, string> = {};
+    const doctorNames: Record<string, string> = {};
     if (doctorIds.length > 0) {
         const { data: profiles } = await supabase
             .from('profiles')

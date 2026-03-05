@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Pencil, Trash2, Save, X, GripVertical, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, Save, X, GripVertical, FileText, UserCheck, UserX } from "lucide-react";
 import {
     DndContext,
     closestCenter,
@@ -23,7 +23,9 @@ import {
     updateCategoria,
     deleteCategoria
 } from "@/lib/caja-admin/services";
-import { CajaAdminCategoria, Sucursal } from "@/lib/caja-admin/types";
+import { getPersonal, getPersonalAreas, createPersonalArea, togglePersonalActivo, updatePersonalArea } from "@/lib/caja-admin";
+import { CajaAdminCategoria, Sucursal, Personal } from "@/lib/caja-admin/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
     sucursal: Sucursal;
@@ -119,7 +121,19 @@ function SortableRow({
 
 // ── Main component ──────────────────────────────────────────────────────────
 export default function ConfiguracionTab({ sucursal }: Props) {
+    const { role } = useAuth();
+    const canManageProviderStatus = role === "owner";
     const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
+    const [providerConfigTab, setProviderConfigTab] = useState<"categorias" | "prestadores" | "tipos">("categorias");
+    const [personal, setPersonal] = useState<Personal[]>([]);
+    const [personalLoading, setPersonalLoading] = useState(true);
+    const [personalError, setPersonalError] = useState<string | null>(null);
+    const [updatingPersonalId, setUpdatingPersonalId] = useState<string | null>(null);
+    const [areas, setAreas] = useState<Array<{ id: string; nombre: string; tipo_personal: string; activo: boolean; orden: number }>>([]);
+    const [areasLoading, setAreasLoading] = useState(true);
+    const [newAreaName, setNewAreaName] = useState('');
+    const [newAreaTipo, setNewAreaTipo] = useState<'prestador' | 'odontologo' | 'ambos'>('prestador');
+    const [updatingAreaId, setUpdatingAreaId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [editingItem, setEditingItem] = useState<Partial<CajaAdminCategoria>>({});
@@ -129,7 +143,12 @@ export default function ConfiguracionTab({ sucursal }: Props) {
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
     );
 
-    useEffect(() => { loadData(); }, [sucursal.id]);
+    useEffect(() => {
+        loadData();
+        loadPersonal();
+        loadAreas();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sucursal.id]);
 
     async function loadData() {
         setIsLoading(true);
@@ -140,6 +159,131 @@ export default function ConfiguracionTab({ sucursal }: Props) {
             setError("Error al cargar categorías");
         } finally {
             setIsLoading(false);
+        }
+    }
+
+    function normalizeText(value?: string | null) {
+        return (value || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim();
+    }
+
+    function isProviderProfile(p: Personal) {
+        const area = normalizeText(p.area);
+        const rol = normalizeText(p.rol);
+        const especialidad = normalizeText(p.especialidad);
+        const tipo = normalizeText(p.tipo);
+
+        const isBackoffice =
+            rol.includes('owner')
+            || rol.includes('admin')
+            || area.includes('direccion')
+            || area.includes('admin')
+            || tipo === 'owner';
+
+        if (isBackoffice) return false;
+
+        if (p.tipo === "prestador" || p.tipo === "odontologo" || p.tipo === "profesional") return true;
+
+        return (
+            area.includes("odont")
+            || area.includes("limpieza")
+            || area.includes("laboratorio")
+            || area.includes("staff general")
+            || rol.includes("odont")
+            || rol.includes("limpieza")
+            || rol.includes("laboratorio")
+            || especialidad.includes("odont")
+        );
+    }
+
+    async function loadPersonal() {
+        setPersonalLoading(true);
+        setPersonalError(null);
+
+        try {
+            const data = await getPersonal({ includeInactive: true });
+            setPersonal(data.filter(isProviderProfile));
+        } catch {
+            setPersonalError("Error al cargar prestadores");
+        } finally {
+            setPersonalLoading(false);
+        }
+    }
+
+    async function loadAreas() {
+        setAreasLoading(true);
+        try {
+            const data = await getPersonalAreas({ includeInactive: true });
+            setAreas((data || []).map((item) => ({
+                id: item.id,
+                nombre: item.nombre,
+                tipo_personal: item.tipo_personal,
+                activo: item.activo,
+                orden: item.orden,
+            })));
+        } finally {
+            setAreasLoading(false);
+        }
+    }
+
+    async function handleTogglePersonalActivo(p: Personal) {
+        if (!canManageProviderStatus) return;
+
+        const accion = p.activo ? "desactivar" : "reactivar";
+        const confirmado = confirm(`¿Querés ${accion} a ${p.nombre} ${p.apellido || ""}?`);
+        if (!confirmado) return;
+
+        setUpdatingPersonalId(p.id);
+        try {
+            const result = await togglePersonalActivo(p.id, !p.activo);
+            if (!result.success) {
+                alert(result.error || "No se pudo actualizar el estado");
+                return;
+            }
+
+            setPersonal((prev) => prev.map((item) => (
+                item.id === p.id ? { ...item, activo: !p.activo } : item
+            )));
+        } finally {
+            setUpdatingPersonalId(null);
+        }
+    }
+
+    async function handleCreateArea() {
+        const nombre = newAreaName.trim();
+        if (!nombre) return;
+
+        const result = await createPersonalArea({
+            nombre,
+            tipo_personal: newAreaTipo,
+            activo: true,
+            orden: (areas.length + 1) * 10,
+        });
+
+        if (!result.success) {
+            alert(result.error || 'No se pudo crear el tipo de prestador');
+            return;
+        }
+
+        setNewAreaName('');
+        await loadAreas();
+    }
+
+    async function handleToggleArea(areaId: string, activo: boolean) {
+        setUpdatingAreaId(areaId);
+        try {
+            const result = await updatePersonalArea(areaId, { activo: !activo });
+            if (!result.success) {
+                alert(result.error || 'No se pudo actualizar el tipo de prestador');
+                return;
+            }
+
+            setAreas((prev) => prev.map((item) => item.id === areaId ? { ...item, activo: !activo } : item));
+        } finally {
+            setUpdatingAreaId(null);
         }
     }
 
@@ -210,50 +354,267 @@ export default function ConfiguracionTab({ sucursal }: Props) {
         );
     }
 
+    const sortedPersonal = [...personal].sort((a, b) => {
+        const aName = `${a.nombre || ""} ${a.apellido || ""}`.trim();
+        const bName = `${b.nombre || ""} ${b.apellido || ""}`.trim();
+        return aName.localeCompare(bName, "es", { sensitivity: "base" });
+    });
+
+    const activeProviders = sortedPersonal.filter((p) => p.activo);
+    const inactiveProviders = sortedPersonal.filter((p) => !p.activo);
+
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Categorías</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Arrastrá para reordenar · Tocá el toggle para activar/desactivar
-                    </p>
-                </div>
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
                 <button
-                    onClick={handleAdd}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm"
+                    onClick={() => setProviderConfigTab("categorias")}
+                    className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${providerConfigTab === "categorias"
+                        ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border-b-2 border-indigo-500"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
                 >
-                    <Plus className="w-4 h-4" />
-                    Nueva
+                    Categorías de Caja
+                </button>
+                <button
+                    onClick={() => setProviderConfigTab("prestadores")}
+                    className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${providerConfigTab === "prestadores"
+                        ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border-b-2 border-indigo-500"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
+                >
+                    Activación Prestadores
+                </button>
+                <button
+                    onClick={() => setProviderConfigTab("tipos")}
+                    className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${providerConfigTab === "tipos"
+                        ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border-b-2 border-indigo-500"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
+                >
+                    Tipos de Prestadores
                 </button>
             </div>
 
-            {/* List */}
-            {isLoading ? (
-                <div className="flex items-center justify-center py-12 text-slate-400 text-sm">
-                    Cargando...
-                </div>
-            ) : categorias.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-sm gap-2">
-                    <p>No hay categorías. Creá la primera.</p>
-                </div>
-            ) : (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={categorias.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                        <div className="flex flex-col gap-2">
-                            {categorias.map(cat => (
-                                <SortableRow
-                                    key={cat.id}
-                                    cat={cat}
-                                    onEdit={(c) => { setEditingItem(c); setIsEditing(true); }}
-                                    onDelete={handleDelete}
-                                    onToggle={toggleActivo}
-                                />
-                            ))}
+            {providerConfigTab === "categorias" && (
+                <>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Categorías</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                Arrastrá para reordenar · Tocá el toggle para activar/desactivar
+                            </p>
                         </div>
-                    </SortableContext>
-                </DndContext>
+                        <button
+                            onClick={handleAdd}
+                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Nueva
+                        </button>
+                    </div>
+
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-12 text-slate-400 text-sm">
+                            Cargando...
+                        </div>
+                    ) : categorias.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-sm gap-2">
+                            <p>No hay categorías. Creá la primera.</p>
+                        </div>
+                    ) : (
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                            <SortableContext items={categorias.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                                <div className="flex flex-col gap-2">
+                                    {categorias.map(cat => (
+                                        <SortableRow
+                                            key={cat.id}
+                                            cat={cat}
+                                            onEdit={(c) => { setEditingItem(c); setIsEditing(true); }}
+                                            onDelete={handleDelete}
+                                            onToggle={toggleActivo}
+                                        />
+                                    ))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
+                    )}
+                </>
+            )}
+
+            {providerConfigTab === "prestadores" && (
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Activación / desactivación de prestadores</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Útil para bajas por salida del equipo. Podés reactivar cuando vuelva a trabajar.
+                        </p>
+                        {!canManageProviderStatus && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                                Solo el usuario owner puede cambiar estados. En este perfil es solo lectura.
+                            </p>
+                        )}
+                    </div>
+
+                    {personalLoading ? (
+                        <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Cargando prestadores...</div>
+                    ) : personalError ? (
+                        <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm dark:bg-red-900/20 dark:border-red-900/40 dark:text-red-300">
+                            {personalError}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="rounded-2xl border border-green-200 dark:border-green-900/40 bg-white dark:bg-slate-900 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
+                                        <UserCheck className="w-4 h-4" /> Activos
+                                    </h3>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                                        {activeProviders.length}
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {activeProviders.length === 0 ? (
+                                        <p className="text-sm text-slate-400">No hay prestadores activos.</p>
+                                    ) : activeProviders.map((p) => (
+                                        <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{`${p.nombre} ${p.apellido || ""}`.trim()}</p>
+                                                <p className="text-xs text-slate-500 truncate">{p.area || p.rol || "Sin área"}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleTogglePersonalActivo(p)}
+                                                disabled={!canManageProviderStatus || updatingPersonalId === p.id}
+                                                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60"
+                                            >
+                                                {updatingPersonalId === p.id ? "Actualizando..." : "Desactivar"}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                        <UserX className="w-4 h-4" /> Inactivos
+                                    </h3>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                        {inactiveProviders.length}
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {inactiveProviders.length === 0 ? (
+                                        <p className="text-sm text-slate-400">No hay prestadores inactivos.</p>
+                                    ) : inactiveProviders.map((p) => (
+                                        <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{`${p.nombre} ${p.apellido || ""}`.trim()}</p>
+                                                <p className="text-xs text-slate-500 truncate">{p.area || p.rol || "Sin área"}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleTogglePersonalActivo(p)}
+                                                disabled={!canManageProviderStatus || updatingPersonalId === p.id}
+                                                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+                                            >
+                                                {updatingPersonalId === p.id ? "Actualizando..." : "Reactivar"}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {providerConfigTab === "tipos" && (
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Tipos de prestadores</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Agregá categorías libres como Contadores, Abogados, etc. para que aparezcan en el alta/edición de prestadores.
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Nuevo tipo</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input
+                                type="text"
+                                value={newAreaName}
+                                onChange={(event) => setNewAreaName(event.target.value)}
+                                placeholder="Ej: Contadores"
+                                className="md:col-span-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
+                            />
+                            <select
+                                value={newAreaTipo}
+                                onChange={(event) => setNewAreaTipo(event.target.value as 'prestador' | 'odontologo' | 'ambos')}
+                                className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
+                            >
+                                <option value="prestador">Prestador</option>
+                                <option value="odontologo">Odontólogo</option>
+                                <option value="ambos">Ambos</option>
+                            </select>
+                        </div>
+                        <button
+                            onClick={handleCreateArea}
+                            disabled={!newAreaName.trim()}
+                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 text-sm font-medium disabled:opacity-50"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Agregar tipo
+                        </button>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                        {areasLoading ? (
+                            <div className="px-4 py-8 text-center text-sm text-slate-400">Cargando tipos...</div>
+                        ) : areas.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-sm text-slate-400">No hay tipos cargados.</div>
+                        ) : (
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-500">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left">Nombre</th>
+                                        <th className="px-4 py-2 text-left">Aplica a</th>
+                                        <th className="px-4 py-2 text-right">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {areas
+                                        .slice()
+                                        .sort((a, b) => (a.orden || 0) - (b.orden || 0) || a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
+                                        .map((item) => (
+                                            <tr key={item.id} className="border-t border-slate-200 dark:border-slate-800">
+                                                <td className="px-4 py-2 text-slate-900 dark:text-slate-100">{item.nombre}</td>
+                                                <td className="px-4 py-2 text-slate-500 capitalize">
+                                                    {item.tipo_personal === 'odontologo' || item.tipo_personal === 'profesional'
+                                                        ? 'odontólogo'
+                                                        : item.tipo_personal}
+                                                </td>
+                                                <td className="px-4 py-2 text-right">
+                                                    <button
+                                                        onClick={() => handleToggleArea(item.id, item.activo)}
+                                                        disabled={updatingAreaId === item.id}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium ${item.activo
+                                                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300'
+                                                            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                                            } disabled:opacity-50`}
+                                                    >
+                                                        {updatingAreaId === item.id
+                                                            ? 'Actualizando...'
+                                                            : item.activo
+                                                                ? 'Desactivar'
+                                                                : 'Activar'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* Edit / Create modal */}

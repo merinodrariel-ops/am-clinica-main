@@ -1,2 +1,5 @@
-export { metadata } from '../../admin/prestaciones/page';
-export { default } from '../../admin/prestaciones/page';
+import { redirect } from 'next/navigation';
+
+export default function CajaAdminPrestacionesRedirect() {
+    redirect('/caja-admin/liquidaciones');
+}

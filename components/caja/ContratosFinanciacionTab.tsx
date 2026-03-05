@@ -21,7 +21,7 @@ interface Paciente {
   apellido: string;
   documento: string;
   email: string;
-  telefono: string;
+  whatsapp: string;
   cuit: string;
   direccion: string;
 }

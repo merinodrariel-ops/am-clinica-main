@@ -46,13 +46,13 @@ async function bootstrap() {
     const existing = users.find(u => u.email === email);
 
     if (existing) {
-        console.log('User already exists (ID: ' + existing.id + '). Updating role to owner...');
+        console.log('User already exists (ID: ' + existing.id + '). Updating categoria to owner...');
 
         // Ensure profile exists and update it
         // Note: Logic allows update even if profile missing (UPSERT would be better but simple update is fine for now)
         const { error: profileError } = await supabaseAdmin
             .from('profiles')
-            .update({ role: 'owner', is_active: true })
+            .update({ categoria: 'owner', is_active: true })
             .eq('id', existing.id);
 
         if (profileError) {
@@ -71,7 +71,7 @@ async function bootstrap() {
         email_confirm: true,
         user_metadata: {
             full_name: fullName,
-            role: 'owner'
+            categoria: 'owner'
         }
     });
 

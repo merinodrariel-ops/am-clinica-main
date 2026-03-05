@@ -19,12 +19,11 @@ import {
     FileText,
     Shield,
     Pencil,
-    Eye,
-    UserPlus,
     Search,
     Building2,
     BadgeCheck,
-    ChevronDown
+    ChevronDown,
+    Trash2,
 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -58,6 +57,8 @@ import {
 } from '@/lib/caja-admin-prestaciones';
 import ObservadosTab from './ObservadosTab';
 import SensitiveValue from '@/components/ui/SensitiveValue';
+import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
     sucursal: Sucursal;
@@ -66,7 +67,14 @@ interface Props {
     initialObservedPersonalId?: string;
 }
 
-type MainTab = 'equipo' | 'profesionales' | 'registros' | 'observados';
+type MainTab = 'equipo' | 'registros' | 'observados';
+type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza';
+
+type ProviderTypeOption = {
+    value: string;
+    label: string;
+    tipo: 'prestador' | 'odontologo';
+};
 
 const CONDICION_AFIP_OPTIONS = [
     { value: 'monotributista', label: 'Monotributista' },
@@ -75,8 +83,17 @@ const CONDICION_AFIP_OPTIONS = [
     { value: 'otro', label: 'Otro' },
 ];
 
+const DEFAULT_PROVIDER_TYPE_OPTIONS: ProviderTypeOption[] = [
+    { value: 'odontologo', label: 'Odontologo', tipo: 'odontologo' },
+    { value: 'staff general', label: 'Staff general', tipo: 'prestador' },
+    { value: 'limpieza', label: 'Limpieza', tipo: 'prestador' },
+    { value: 'laboratorio', label: 'Laboratorio', tipo: 'prestador' },
+];
+
 export default function PersonalTab({ tcBna, initialTab, initialObservedPersonalId }: Props) {
+    const { role } = useAuth();
     const [activeTab, setActiveTab] = useState<MainTab>(initialTab || 'equipo');
+    const [activeProviderCategory, setActiveProviderCategory] = useState<ProviderCategory>('odontologos');
     const [observadosCount, setObservadosCount] = useState(0);
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [personalAreas, setPersonalAreas] = useState<PersonalArea[]>([]);
@@ -86,6 +103,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [showForm, setShowForm] = useState(false);
     const [showHorasForm, setShowHorasForm] = useState(false);
     const [editingPersonal, setEditingPersonal] = useState<Personal | null>(null);
+    const [deletingPersonalId, setDeletingPersonalId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [mesActual, setMesActual] = useState(() => {
         const now = new Date();
@@ -132,32 +150,76 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         observaciones: '',
     });
     const [submitting, setSubmitting] = useState(false);
+    const [hourConfig, setHourConfig] = useState({
+        cleaningHourValue: 0,
+        staffGeneralHourValue: 0,
+    });
+
+    function normalizeText(value?: string | null) {
+        return (value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim();
+    }
+
+    function getConfiguredHourValue(p: Personal) {
+        const area = normalizeText(p.area);
+        const rol = normalizeText(p.rol);
+        const isCleaning = area.includes('limpieza') || rol.includes('limpieza');
+        return isCleaning
+            ? Number(hourConfig.cleaningHourValue || 0)
+            : Number(hourConfig.staffGeneralHourValue || 0);
+    }
+
+    function isOdontologoTipo(tipo?: string | null) {
+        return tipo === 'odontologo' || tipo === 'profesional';
+    }
 
     async function loadData() {
         setLoading(true);
-        const [personalData, areasData, registrosData, liquidacionesData, obsCount, prestacionesData, prestacionesMesData] = await Promise.all([
-            getPersonal(),
-            getPersonalAreas(),
-            getRegistroHoras({ mes: mesActual }),
-            getLiquidaciones({ mes: mesActual }),
-            countObservadosPendientes(mesActual),
-            getPrestacionesLista(),
-            getPrestacionesRealizadas({ mes: mesActual })
-        ]);
-        setPersonal(personalData);
-        setPersonalAreas(areasData);
-        setRegistros(registrosData);
-        setLiquidaciones(liquidacionesData);
-        setObservadosCount(obsCount);
-        setPrestacionesLista(prestacionesData);
-        setPrestacionesMes(prestacionesMesData);
+        try {
+            const [
+                personalData,
+                areasData,
+                registrosData,
+                liquidacionesData,
+                obsCount,
+                prestacionesData,
+                prestacionesMesData,
+                configData,
+            ] = await Promise.all([
+                getPersonal(),
+                getPersonalAreas(),
+                getRegistroHoras({ mes: mesActual }),
+                getLiquidaciones({ mes: mesActual }),
+                countObservadosPendientes(mesActual),
+                getPrestacionesLista(),
+                getPrestacionesRealizadas({ mes: mesActual }),
+                getLiquidacionesConfig().catch(() => null),
+            ]);
 
+            setPersonal(personalData);
+            setPersonalAreas(areasData);
+            setRegistros(registrosData);
+            setLiquidaciones(liquidacionesData);
+            setObservadosCount(obsCount);
+            setPrestacionesLista(prestacionesData);
+            setPrestacionesMes(prestacionesMesData);
 
-        if (personalData.length > 0) {
-            setHorasForm(f => ({ ...f, personal_id: personalData[0].id }));
+            if (configData?.hourValues) {
+                setHourConfig({
+                    cleaningHourValue: Number(configData.hourValues.cleaningHourValue || 0),
+                    staffGeneralHourValue: Number(configData.hourValues.staffGeneralHourValue || 0),
+                });
+            }
+
+            if (personalData.length > 0) {
+                setHorasForm(f => ({ ...f, personal_id: personalData[0].id }));
+            }
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     }
 
     useEffect(() => {
@@ -170,31 +232,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setActiveTab(initialTab);
     }, [initialTab]);
 
-    function openNewPersonalForm(tipo: 'prestador' | 'profesional') {
-        setEditingPersonal(null);
-        setFormData({
-            nombre: '',
-            apellido: '',
-            tipo,
-            area: '',
-            email: '',
-            whatsapp: '',
-            documento: '',
-            direccion: '',
-            barrio_localidad: '',
-            condicion_afip: undefined,
-            valor_hora_ars: 0,
-            descripcion: '',
-        });
-        setShowForm(true);
-    }
-
     function openEditForm(p: Personal) {
         setEditingPersonal(p);
         setFormData({
             nombre: p.nombre,
             apellido: p.apellido || '',
-            tipo: p.tipo,
+            tipo: isOdontologoTipo(p.tipo) ? 'odontologo' : 'prestador',
             area: p.area,
             email: p.email || '',
             whatsapp: p.whatsapp || '',
@@ -228,7 +271,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     async function handleSubmitPersonal() {
         if (!formData.nombre || !formData.area) {
-            alert('Por favor complete nombre y área');
+            alert('Por favor complete nombre y tipo de prestador');
             return;
         }
 
@@ -374,6 +417,30 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setSubmitting(false);
     }
 
+    async function handleDeletePersonal(p: Personal) {
+        if (role !== 'owner') return;
+
+        const confirmDelete = window.confirm(
+            `¿Eliminar a ${p.nombre} ${p.apellido || ''}?\n\nSe desactivará y dejará de aparecer en Prestadores.`
+        );
+
+        if (!confirmDelete) return;
+
+        setDeletingPersonalId(p.id);
+
+        try {
+            const result = await updatePersonal(p.id, { activo: false });
+            if (!result.success) {
+                alert(result.error || 'No se pudo eliminar el prestador.');
+                return;
+            }
+
+            await loadData();
+        } finally {
+            setDeletingPersonalId(null);
+        }
+    }
+
     function getCriticalObservadosCount(personalId: string): number {
         const criticalThreshold = Date.now() - 48 * 60 * 60 * 1000;
 
@@ -401,11 +468,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setSubmitting(true);
         const p = personal.find(pers => pers.id === personalId);
 
-        if (p?.tipo === 'profesional') {
+        if (isOdontologoTipo(p?.tipo)) {
             const prestacionesProfe = prestacionesMes.filter(pr => pr.profesional_id === personalId);
             const { error } = await generarLiquidacionProfesional(personalId, mesActual, prestacionesProfe);
             if (error) {
-                console.error('Error generando liquidación profesional:', error);
+                console.error('Error generando liquidación de odontólogo:', error);
                 alert('Error al generar liquidación: ' + error);
             }
         } else {
@@ -416,23 +483,137 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         loadData();
     }
 
+    function shouldHideFromPrestadores(p: Personal) {
+        const fullName = normalizeText(`${p.nombre || ''} ${p.apellido || ''}`);
+        const area = normalizeText(p.area);
+        const rol = normalizeText(p.rol);
+
+        const obviousTestTokens = [
+            'asd',
+            'test',
+            'prueba',
+            'demo',
+            'equipo marketing',
+            'asistente dental 1',
+            'recepcion',
+        ];
+
+        const isObviousTest = obviousTestTokens.some((token) => fullName.includes(token));
+        if (isObviousTest) return true;
+
+        const isProviderLikeArea =
+            area.includes('limpieza')
+            || area.includes('laboratorio')
+            || area.includes('odont')
+            || area.includes('staff general')
+            || rol.includes('limpieza')
+            || rol.includes('laboratorio')
+            || rol.includes('odont');
+
+        if (isProviderLikeArea) return false;
+
+        const isSystemOrBackofficeRole =
+            rol.includes('owner')
+            || rol.includes('admin')
+            || rol.includes('direccion')
+            || area.includes('direccion')
+            || area.includes('owner')
+            || area.includes('admin');
+
+        if (isSystemOrBackofficeRole) return true;
+
+        const isGenericUserRole =
+            area.includes('recepcion')
+            || area.includes('administracion')
+            || area.includes('tecnologia')
+            || area === 'general'
+            || area.includes('marketing')
+            || area.includes('asistente dental')
+            || rol.includes('recepcion')
+            || rol.includes('administr')
+            || rol.includes('asistente');
+
+        const hasOperationalData = Boolean(
+            p.documento
+            || p.whatsapp
+            || p.direccion
+            || p.barrio_localidad
+            || p.condicion_afip
+            || p.foto_url
+            || p.empresa_prestadora_id
+            || p.descripcion
+        );
+
+        return Boolean(p.user_id)
+            && Number(p.valor_hora_ars || 0) === 0
+            && isGenericUserRole
+            && !hasOperationalData;
+    }
+
+    function getPrestadorCategory(p: Personal): ProviderCategory {
+        const area = normalizeText(p.area);
+        const rol = normalizeText(p.rol);
+        const especialidad = normalizeText(p.especialidad);
+
+        if (area.includes('limpieza') || rol.includes('limpieza')) {
+            return 'limpieza';
+        }
+
+        if (area.includes('laboratorio') || rol.includes('laboratorio') || area === 'lab' || rol === 'lab') {
+            return 'lab';
+        }
+
+        if (
+            isOdontologoTipo(p.tipo)
+            || area.includes('odont')
+            || rol.includes('odont')
+            || especialidad.includes('odont')
+        ) {
+            return 'odontologos';
+        }
+
+        return 'staff-general';
+    }
+
     // Filter personal by type and search
-    const prestadores = personal.filter(p => p.tipo === 'prestador' || !p.tipo);
-    const profesionales = personal.filter(p => p.tipo === 'profesional');
+    const prestadores = personal.filter((p) => !shouldHideFromPrestadores(p));
 
-    const filteredPrestadores = prestadores.filter(p =>
-        searchTerm === '' ||
-        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.apellido?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.area?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const providerCategories: Array<{ id: ProviderCategory; label: string }> = [
+        { id: 'odontologos', label: 'Odontólogos' },
+        { id: 'lab', label: 'Lab' },
+        { id: 'staff-general', label: 'Staff general' },
+        { id: 'limpieza', label: 'Limpieza' },
+    ];
 
-    const filteredProfesionales = profesionales.filter(p =>
-        searchTerm === '' ||
-        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.apellido?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.especialidad?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const providerCounts = prestadores.reduce<Record<ProviderCategory, number>>((acc, p) => {
+        const category = getPrestadorCategory(p);
+        acc[category] += 1;
+        return acc;
+    }, {
+        odontologos: 0,
+        lab: 0,
+        'staff-general': 0,
+        limpieza: 0,
+    });
+
+    const filteredPrestadores = prestadores.filter((p) => {
+        if (getPrestadorCategory(p) !== activeProviderCategory) {
+            return false;
+        }
+
+        return (
+            searchTerm === '' ||
+            p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.apellido?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.rol?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.especialidad?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    });
+
+    const activeProviderLabel = providerCategories.find((cat) => cat.id === activeProviderCategory)?.label || 'Prestadores';
+
+    const hiddenUserPlaceholdersCount = personal.filter((p) => shouldHideFromPrestadores(p)).length;
 
     const selectedProfesional = selectedProfesionalId
         ? personal.find((p) => p.id === selectedProfesionalId)
@@ -447,9 +628,81 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         )).slice(0, 8)
         : [];
 
-    // Get areas by type for form
-    const areasForType = personalAreas.filter(a =>
-        a.tipo_personal === formData.tipo || a.tipo_personal === 'ambos'
+    const providerTypeOptions: ProviderTypeOption[] = (() => {
+        const byKey = new Map<string, ProviderTypeOption>();
+
+        for (const option of DEFAULT_PROVIDER_TYPE_OPTIONS) {
+            byKey.set(normalizeText(option.value), option);
+        }
+
+        for (const area of personalAreas) {
+            const value = (area.nombre || '').trim();
+            if (!value) continue;
+
+            const tipo = area.tipo_personal === 'odontologo' || area.tipo_personal === 'profesional'
+                ? 'odontologo'
+                : 'prestador';
+
+            const key = normalizeText(value);
+            if (!byKey.has(key)) {
+                byKey.set(key, { value, label: value, tipo });
+            }
+        }
+
+        if (!isOdontologoTipo(formData.tipo) && formData.area && !byKey.has(normalizeText(formData.area))) {
+            byKey.set(normalizeText(formData.area), {
+                value: formData.area,
+                label: formData.area,
+                tipo: 'prestador',
+            });
+        }
+
+        return Array.from(byKey.values());
+    })();
+
+    const selectedProviderTypeValue = (() => {
+        if (isOdontologoTipo(formData.tipo)) {
+            return 'odontologo';
+        }
+
+        const normalizedArea = normalizeText(formData.area);
+        if (normalizedArea.includes('limpieza')) return 'limpieza';
+        if (normalizedArea.includes('laboratorio') || normalizedArea === 'lab') return 'laboratorio';
+        if (normalizedArea.includes('staff general')) return 'staff general';
+
+        const matched = providerTypeOptions.find((option) => normalizeText(option.value) === normalizedArea);
+        if (matched) return matched.value;
+
+        return 'staff general';
+    })();
+
+    function handleProviderTypeChange(nextTypeValue: string) {
+        const selected = providerTypeOptions.find((option) => option.value === nextTypeValue);
+        const selectedLabel = selected?.label || nextTypeValue;
+        const isOdontologoSelection = selected?.tipo === 'odontologo' || normalizeText(nextTypeValue) === 'odontologo';
+
+        setFormData((prev) => {
+            if (isOdontologoSelection) {
+                const preserveCurrentArea = prev.tipo === 'odontologo' && Boolean(prev.area);
+                return {
+                    ...prev,
+                    tipo: 'odontologo',
+                    area: preserveCurrentArea ? prev.area : 'Odontologia',
+                };
+            }
+
+            return {
+                ...prev,
+                tipo: 'prestador',
+                area: selectedLabel,
+            };
+        });
+    }
+
+    const odontologiaAreas = personalAreas.filter((a) =>
+        a.tipo_personal === 'odontologo'
+        || a.tipo_personal === 'profesional'
+        || a.tipo_personal === 'ambos'
     );
 
     // Calculate hours per person
@@ -489,23 +742,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             }`}
                     >
                         <Users className="w-4 h-4" />
-                        Staff General
+                        Equipo
                         <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full ml-2">
                             {prestadores.length}
-                        </span>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        onClick={() => setActiveTab('profesionales')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'profesionales'
-                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-b-2 border-emerald-500 rounded-b-none'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
-                            }`}
-                    >
-                        <Stethoscope className="w-4 h-4" />
-                        Prestaciones (Caja)
-                        <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full ml-2">
-                            {profesionales.length}
                         </span>
                     </Button>
                     <Button
@@ -538,25 +777,49 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 </div>
 
                 {/* Search and Actions */}
-                {(activeTab === 'equipo' || activeTab === 'profesionales') && (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700 flex-1 max-w-md">
+                {activeTab === 'equipo' && (
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                            {providerCategories.map((category) => {
+                                const isCategoryActive = activeProviderCategory === category.id;
+
+                                return (
+                                    <Button
+                                        key={category.id}
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => setActiveProviderCategory(category.id)}
+                                        className={`h-auto rounded-lg px-3 py-1.5 text-sm transition-colors ${isCategoryActive
+                                            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                                            }`}
+                                    >
+                                        {category.label}
+                                        <span className={`ml-2 rounded-full px-1.5 py-0.5 text-xs ${isCategoryActive
+                                            ? 'bg-white/20 text-white'
+                                            : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                            }`}>
+                                            {providerCounts[category.id]}
+                                        </span>
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl px-4 py-2 shadow-sm border border-slate-200 dark:border-slate-700 max-w-md">
                             <Search className="w-5 h-5 text-slate-400" />
                             <Input
                                 type="text"
-                                placeholder="Buscar personal..."
+                                placeholder={`Buscar en ${activeProviderLabel.toLowerCase()}...`}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="bg-transparent border-none outline-none text-sm flex-1 focus-visible:ring-0 shadow-none h-auto p-0"
                             />
                         </div>
-                        <Button
-                            onClick={() => openNewPersonalForm(activeTab === 'profesionales' ? 'profesional' : 'prestador')}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg hover:opacity-90 transition-opacity"
-                        >
-                            <UserPlus className="w-5 h-5" />
-                            {activeTab === 'profesionales' ? 'Nuevo Profesional' : 'Nuevo Prestador'}
-                        </Button>
+                        {hiddenUserPlaceholdersCount > 0 && (
+                            <p className="text-xs text-slate-500 px-1">
+                                Se ocultaron {hiddenUserPlaceholdersCount} usuario(s) de prueba/sin ficha de prestador.
+                            </p>
+                        )}
                     </div>
                 )}
 
@@ -602,17 +865,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             {/* Form Header */}
                             <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-xl ${formData.tipo === 'profesional'
+                                    <div className={`p-2 rounded-xl ${formData.tipo === 'odontologo'
                                         ? 'bg-emerald-100 dark:bg-emerald-900/50'
                                         : 'bg-indigo-100 dark:bg-indigo-900/50'
                                         }`}>
-                                        {formData.tipo === 'profesional'
+                                        {formData.tipo === 'odontologo'
                                             ? <Stethoscope className="w-5 h-5 text-emerald-600" />
                                             : <User className="w-5 h-5 text-indigo-600" />
                                         }
                                     </div>
                                     <h2 className="text-lg font-semibold">
-                                        {editingPersonal ? 'Editar' : 'Registrar'} {formData.tipo === 'profesional' ? 'Profesional' : 'Prestador'}
+                                        {editingPersonal ? 'Editar' : 'Registrar'} {formData.tipo === 'odontologo' ? 'Odontólogo' : 'Prestador'}
                                     </h2>
                                 </div>
                                 <Button
@@ -627,30 +890,26 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
                             {/* Form Body */}
                             <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)] space-y-6">
-                                {/* Type Toggle */}
-                                <div className="flex gap-2">
-                                    <Button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, tipo: 'prestador', area: '' })}
-                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all h-auto ${formData.tipo === 'prestador'
-                                            ? 'bg-indigo-600 text-white shadow-lg hover:bg-indigo-700'
-                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                                            }`}
-                                    >
-                                        <Users className="w-4 h-4 inline mr-2" />
-                                        Staff / Operativo
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, tipo: 'profesional', area: '' })}
-                                        className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all h-auto ${formData.tipo === 'profesional'
-                                            ? 'bg-emerald-600 text-white shadow-lg hover:bg-emerald-700'
-                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                                            }`}
-                                    >
-                                        <Stethoscope className="w-4 h-4 inline mr-2" />
-                                        Profesional
-                                    </Button>
+                                {/* Provider Type */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Tipo de prestador *
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedProviderTypeValue}
+                                            onChange={(e) => handleProviderTypeChange(e.target.value)}
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        >
+                                            {providerTypeOptions.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    </div>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Los tipos se gestionan desde Configuracion {'>'} Tipos de Prestadores.
+                                    </p>
                                 </div>
 
                                 {/* Basic Info */}
@@ -681,25 +940,30 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     </div>
                                 </div>
 
-                                {/* Area Selection */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Área / Especialidad *
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            value={formData.area}
-                                            onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        >
-                                            <option value="">Seleccionar área...</option>
-                                            {areasForType.map(area => (
-                                                <option key={area.id} value={area.nombre}>{area.nombre}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                {/* Odontologia Area Selection */}
+                                {formData.tipo === 'odontologo' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Area / especialidad odontologica *
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={formData.area}
+                                                onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value="">Seleccionar area...</option>
+                                                {odontologiaAreas.map((area) => (
+                                                    <option key={area.id} value={area.nombre}>{area.nombre}</option>
+                                                ))}
+                                                {formData.area && !odontologiaAreas.some((area) => area.nombre === formData.area) && (
+                                                    <option value={formData.area}>{formData.area}</option>
+                                                )}
+                                            </select>
+                                            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Contact Info */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -734,10 +998,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 {/* Document & Address */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            <FileText className="w-4 h-4 inline mr-1" />
-                                            DNI / Documento
-                                        </label>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                 <FileText className="w-4 h-4 inline mr-1" />
@@ -785,20 +1045,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
                                     {/* Payment Info */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                <DollarSign className="w-4 h-4 inline mr-1" />
-                                                Valor Hora (ARS)
-                                            </label>
-                                            <MoneyInput
-                                                value={formData.valor_hora_ars ?? 0}
-                                                onChange={(val) => setFormData({ ...formData, valor_hora_ars: val })}
-                                                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                                placeholder="0"
-                                                currency="ARS"
-                                            />
-                                        </div>
-                                        {formData.tipo === 'profesional' && (
+                                        {formData.tipo !== 'odontologo' && (
+                                            <div className="md:col-span-2 p-3 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400">
+                                                El valor hora se configura globalmente en Liquidaciones → Configuración de Valores.
+                                            </div>
+                                        )}
+                                        {formData.tipo === 'odontologo' && (
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                                     % Honorarios
@@ -816,8 +1068,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         )}
                                     </div>
 
-                                    {/* Professional specific fields */}
-                                    {formData.tipo === 'profesional' && (
+                                    {/* Odontólogo specific fields */}
+                                    {formData.tipo === 'odontologo' && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -1031,7 +1283,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         onChange={(e) => setPrestacionForm({ ...prestacionForm, recalcular_liquidacion: e.target.checked })}
                                         className="rounded border-slate-300 dark:border-slate-600"
                                     />
-                                    Recalcular liquidación del profesional automáticamente
+                                    Recalcular liquidación del odontólogo automáticamente
                                 </label>
                             </div>
 
@@ -1062,14 +1314,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     {filteredPrestadores.length === 0 ? (
                         <div className="col-span-full p-12 text-center text-slate-400">
                             <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                            <p>No hay miembros del staff registrados</p>
-                            <Button
-                                variant="link"
-                                onClick={() => openNewPersonalForm('prestador')}
-                                className="mt-4 text-indigo-600 hover:text-indigo-700 font-medium h-auto p-0"
-                            >
-                                + Agregar primer prestador
-                            </Button>
+                            <p>No hay prestadores en {activeProviderLabel}</p>
                         </div>
                     ) : (
                         filteredPrestadores.map((p) => (
@@ -1085,7 +1330,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             /* eslint-disable-next-line @next/next/no-img-element */
                                             <img src={p.foto_url} alt={p.nombre} className="w-12 h-12 rounded-full object-cover" />
                                         ) : (
-                                            <User className="w-6 h-6 text-indigo-600" />
+                                            isOdontologoTipo(p.tipo)
+                                                ? <Stethoscope className="w-6 h-6 text-emerald-600" />
+                                                : <User className="w-6 h-6 text-indigo-600" />
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -1094,14 +1341,28 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             {p.area || p.rol}
                                         </span>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => openEditForm(p)}
-                                        className="h-8 w-8 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
-                                    >
-                                        <Pencil className="w-4 h-4" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => openEditForm(p)}
+                                            className="h-8 w-8 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </Button>
+                                        {role === 'owner' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleDeletePersonal(p)}
+                                                disabled={deletingPersonalId === p.id}
+                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                                                title="Eliminar prestador"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2 text-sm">
@@ -1127,126 +1388,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     )}
                                 </div>
 
-                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                                    <span className="text-xs text-slate-400">Valor hora:</span>
-                                    <span className="font-bold text-green-600">
-                                        <SensitiveValue
-                                            value={p.valor_hora_ars}
-                                            format="currency-ars"
-                                            fieldId={`valor-hora-${p.id}`}
-                                        />
-                                    </span>
-                                </div>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )
-            }
-
-            {/* Profesionales Tab Content */}
-            {
-                activeTab === 'profesionales' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredProfesionales.length === 0 ? (
-                            <div className="col-span-full p-12 text-center text-slate-400">
-                                <Stethoscope className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                <p>No hay profesionales registrados</p>
-                                <Button
-                                    variant="link"
-                                    onClick={() => openNewPersonalForm('profesional')}
-                                    className="mt-4 text-emerald-600 hover:text-emerald-700 font-medium h-auto p-0"
-                                >
-                                    + Agregar primer profesional
-                                </Button>
-                            </div>
-                        ) : (
-                            filteredProfesionales.map((p) => (
-                                <motion.div
-                                    key={p.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md transition-shadow"
-                                >
-                                    <div className="flex items-start gap-3 mb-4">
-                                        <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center flex-shrink-0">
-                                            {p.foto_url ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img src={p.foto_url} alt={p.nombre} className="w-12 h-12 rounded-full object-cover" />
-                                            ) : (
-                                                <Stethoscope className="w-6 h-6 text-emerald-600" />
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-semibold truncate">
-                                                {p.nombre.startsWith('Dr') ? '' : 'Dr. '}
-                                                {p.nombre} {p.apellido}
-                                            </h4>
-                                            <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
-                                                {p.especialidad || p.area}
-                                            </span>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => openEditForm(p)}
-                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors"
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                                                title="Ver ficha completa"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2 text-sm">
-                                        {p.matricula_provincial && (
-                                            <div className="flex items-center gap-2 text-slate-500">
-                                                <BadgeCheck className="w-4 h-4 text-emerald-500" />
-                                                <span>Matrícula: {p.matricula_provincial}</span>
-                                            </div>
-                                        )}
-                                        {p.email && (
-                                            <div className="flex items-center gap-2 text-slate-500">
-                                                <Mail className="w-4 h-4" />
-                                                <span className="truncate">{p.email}</span>
-                                            </div>
-                                        )}
-                                        {p.condicion_afip && (
-                                            <div className="flex items-center gap-2">
-                                                <Building2 className="w-4 h-4 text-slate-400" />
-                                                <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 capitalize">
-                                                    {p.condicion_afip.replace('_', ' ')}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {p.poliza_vencimiento && (
-                                            <div className="flex items-center gap-2 text-slate-500">
-                                                <Shield className="w-4 h-4" />
-                                                <span>Póliza vence: {new Date(p.poliza_vencimiento).toLocaleDateString('es-AR')}</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {p.porcentaje_honorarios && p.porcentaje_honorarios > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                                            <span className="text-xs text-slate-400">Honorarios:</span>
-                                            <span className="font-bold text-emerald-600">{p.porcentaje_honorarios}%</span>
-                                        </div>
-                                    )}
-
-                                    {p.activo && !p.pagado_mes_actual && (
-                                        <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-center">
-                                            <span className="text-xs text-amber-600 font-medium">Pendiente de pago</span>
-                                        </div>
-                                    )}
+                                {isOdontologoTipo(p.tipo) && (
                                     <Button
                                         onClick={() => openPrestacionForm(p.id)}
                                         className="w-full mt-4 flex items-center justify-center gap-2 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors font-medium text-sm h-auto"
@@ -1254,11 +1396,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         <Plus className="w-4 h-4" />
                                         Registrar Prestación
                                     </Button>
-                                </motion.div>
-                            ))
-                        )}
-                    </div>
-                )
+                                )}
+
+                            </motion.div>
+                        ))
+                    )}
+                </div>
+            )
             }
 
             {/* Registros & Liquidaciones Tab Content */}
@@ -1362,7 +1506,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 const prestacionesProfe = prestacionesMes.filter(pr => pr.profesional_id === p.id);
                                 const totalPrestaciones = prestacionesProfe.reduce((acc, pr) => acc + pr.valor_cobrado, 0);
                                 const totalHonorarios = prestacionesProfe.reduce((acc, pr) => acc + (pr.monto_honorarios || 0), 0);
-                                const isProfesional = p.tipo === 'profesional';
+                                const isProfesional = isOdontologoTipo(p.tipo);
+                                const configuredHourValue = getConfiguredHourValue(p);
                                 const criticalObservadosCount = getCriticalObservadosCount(p.id);
                                 const hasCriticalObservados = criticalObservadosCount > 0;
 
@@ -1372,11 +1517,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5"
                                     >
                                         <div className="flex items-center gap-3 mb-4">
-                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${p.tipo === 'profesional'
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isOdontologoTipo(p.tipo)
                                                 ? 'bg-emerald-100 dark:bg-emerald-900/50'
                                                 : 'bg-purple-100 dark:bg-purple-900/50'
                                                 }`}>
-                                                {p.tipo === 'profesional'
+                                                {isOdontologoTipo(p.tipo)
                                                     ? <Stethoscope className="w-6 h-6 text-emerald-600" />
                                                     : <User className="w-6 h-6 text-purple-600" />
                                                 }
@@ -1395,15 +1540,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-sm text-slate-500">{isProfesional ? '% Honorarios' : 'Valor hora'}</p>
+                                                <p className="text-sm text-slate-500">{isProfesional ? '% Honorarios' : 'Esquema'}</p>
                                                 <p className="text-xl font-bold text-green-600">
-                                                    {isProfesional ? `${p.porcentaje_honorarios}%` : (
-                                                        <SensitiveValue
-                                                            value={p.valor_hora_ars}
-                                                            format="currency"
-                                                            fieldId={`valor-hora-${p.id}`}
-                                                        />
-                                                    )}
+                                                    {isProfesional ? `${p.porcentaje_honorarios}%` : 'Global'}
                                                 </p>
                                             </div>
                                         </div>
@@ -1413,7 +1552,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 <span className="text-sm text-slate-600">Total a Liquidar:</span>
                                                 <span className="font-bold">
                                                     <SensitiveValue
-                                                        value={isProfesional ? totalHonorarios : totalHoras * p.valor_hora_ars}
+                                                        value={isProfesional ? totalHonorarios : totalHoras * configuredHourValue}
                                                         format="currency-ars"
                                                         fieldId={`total-${p.id}`}
                                                     />
@@ -1436,7 +1575,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     <span className="text-xs text-slate-400">Equiv. USD:</span>
                                                     <span className="text-sm text-green-600">
                                                         <SensitiveValue
-                                                            value={(totalHoras * p.valor_hora_ars) / tcBna}
+                                                            value={(totalHoras * configuredHourValue) / tcBna}
                                                             format="currency"
                                                             fieldId={`total-usd-${p.id}`}
                                                         />

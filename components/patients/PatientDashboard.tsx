@@ -35,7 +35,7 @@ const PatientDriveTab = dynamic(() => import('@/components/patients/drive/Patien
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import PatientCommandCenter from './PatientCommandCenter';
@@ -106,8 +106,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const [activeTab, setActiveTab] = useState(
         hidePaymentTabs && PAYMENT_TABS.has(defaultTab) ? 'datos' : defaultTab
     );
-    const [isEditing, setIsEditing] = useState(false);
-
     // Portal magic link state
     const [sendingPortalLink, setSendingPortalLink] = useState(false);
     const [portalLinkSent, setPortalLinkSent] = useState(false);
@@ -153,7 +151,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     async function handleSaveFinancing() {
         setSavingFin(true);
         try {
-            const { error } = await supabase
+            const { error } = await createClient()
                 .from('pacientes')
                 .update({
                     financ_estado: finData.estado,
@@ -176,7 +174,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const age = calculateAge(patient.fecha_nacimiento);
     const whatsappNumber = patient.whatsapp_numero
         ? `${patient.whatsapp_pais_code || '+54'}${patient.whatsapp_numero.replace(/\D/g, '')}`
-        : patient.telefono;
+        : patient.whatsapp;
 
     // Calculate payment totals
     const totalPagadoUSD = payments
@@ -311,13 +309,13 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-lg font-semibold">Datos Personales</h2>
-                                    <button
-                                        onClick={() => setIsEditing(!isEditing)}
+                                    <Link
+                                        href={`/actualizar-datos?patientId=${patient.id_paciente}`}
                                         className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200"
                                     >
-                                        {isEditing ? <Save size={16} /> : <Edit2 size={16} />}
-                                        {isEditing ? 'Guardar' : 'Editar'}
-                                    </button>
+                                        <Edit2 size={16} />
+                                        Editar
+                                    </Link>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -396,10 +394,13 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
                                 <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                                     <h2 className="text-lg font-semibold">Historia Clínica</h2>
-                                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm">
+                                    <Link
+                                        href={`/worker-portal?patientId=${patient.id_paciente}`}
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                                    >
                                         <Plus size={16} />
                                         Nueva Entrada
-                                    </button>
+                                    </Link>
                                 </div>
 
                                 {historiaClinica.length === 0 ? (
@@ -555,10 +556,13 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
                                 <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                                     <h2 className="text-lg font-semibold">Planes de Tratamiento</h2>
-                                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm">
+                                    <Link
+                                        href={`/caja-recepcion?tab=contratos&patientId=${patient.id_paciente}`}
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                                    >
                                         <Plus size={16} />
                                         Nuevo Plan
-                                    </button>
+                                    </Link>
                                 </div>
 
                                 {planes.length === 0 ? (
@@ -569,9 +573,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 ) : (
                                     <div className="divide-y divide-gray-100 dark:divide-gray-800">
                                         {planes.map((plan) => {
-                                            const pagadoPlan = payments
-                                                .filter(p => p.estado !== 'Anulado')
-                                                .reduce((sum, p) => sum + (p.usd_equivalente || 0), 0);
+                                            const pagadoPlan = plan.total_usd - plan.saldo_usd;
                                             const progreso = plan.total_usd > 0 ? (pagadoPlan / plan.total_usd) * 100 : 0;
 
                                             return (
@@ -723,95 +725,93 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 />
                                             </div>
                                         </div>
+                                    ) : finData.estado === 'inactivo' ? (
+                                        <div className="p-6 text-center bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                                            <p className="text-gray-500 text-sm">No hay plan de financiación activo para este paciente.</p>
+                                            <button
+                                                onClick={() => setIsEditingFin(true)}
+                                                className="mt-2 text-blue-600 font-medium hover:underline text-sm"
+                                            >
+                                                Configurar Plan
+                                            </button>
+                                        </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                                                <p className="text-sm text-gray-500 mb-1">Total Financiado</p>
-                                                <p className="text-2xl font-bold text-gray-900 dark:text-white">${finData.monto.toLocaleString('es-AR')}</p>
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-sm text-gray-500 mb-1">Total Financiado</p>
+                                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">${finData.monto.toLocaleString('es-AR')}</p>
+                                                </div>
+                                                <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
+                                                    <p className="text-sm text-green-600 dark:text-green-400 mb-1">Pagado hasta hoy</p>
+                                                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                                                        ${totalPagadoFinanc.toLocaleString('es-AR')}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/30">
+                                                    <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Saldo Restante</p>
+                                                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                                                        ${saldoFinanc.toLocaleString('es-AR')}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
-                                                <p className="text-sm text-green-600 dark:text-green-400 mb-1">Pagado hasta hoy</p>
-                                                <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                                                    ${totalPagadoFinanc.toLocaleString('es-AR')}
-                                                </p>
+
+                                            {/* Quotas Visual Grid */}
+                                            <div className="mt-8">
+                                                <div className="flex justify-between items-end mb-4">
+                                                    <h3 className="font-medium text-gray-900 dark:text-white">Estado de Cuotas</h3>
+                                                    <span className="text-sm text-gray-500">
+                                                        {payments.filter(p => (p.cuota_nro || 0) > 0).length} pagadas de {finData.cuotas || 0}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                                                    {Array.from({ length: finData.cuotas }).map((_, i) => {
+                                                        const quotaNum = i + 1;
+                                                        const paidPayment = payments.find(p => p.cuota_nro === quotaNum && p.estado !== 'Anulado');
+                                                        const isPaid = !!paidPayment;
+                                                        const isNext = !isPaid && quotaNum === (payments.filter(p => (p.cuota_nro || 0) > 0).length + 1);
+
+                                                        return (
+                                                            <div
+                                                                key={quotaNum}
+                                                                className={clsx(
+                                                                    "relative p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all",
+                                                                    isPaid
+                                                                        ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+                                                                        : isNext
+                                                                            ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200 dark:bg-blue-900/20 dark:border-blue-400 dark:ring-blue-900"
+                                                                            : "bg-gray-50 border-gray-100 text-gray-400 dark:bg-gray-800 dark:border-gray-700"
+                                                                )}
+                                                            >
+                                                                <span className="text-xs font-semibold mb-1">Cuota {quotaNum}</span>
+                                                                {isPaid ? (
+                                                                    <Check size={20} className="mb-1" />
+                                                                ) : (
+                                                                    <span className="text-lg font-bold text-gray-300 dark:text-gray-600">
+                                                                        {i + 1}
+                                                                    </span>
+                                                                )}
+                                                                {isPaid && (
+                                                                    <span className="text-[10px] leading-tight opacity-75">
+                                                                        {new Date(paidPayment.fecha_hora).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                                                    </span>
+                                                                )}
+                                                                {isNext && (
+                                                                    <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm">
+                                                                        Próxima
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                            <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/30">
-                                                <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Saldo Restante</p>
-                                                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                                                    ${saldoFinanc.toLocaleString('es-AR')}
-                                                </p>
-                                            </div>
-                                        </div>
+                                        </>
                                     )}
-
-                                    {/* Quotas Visual Grid */}
-                                    <div className="mt-8">
-                                        <div className="flex justify-between items-end mb-4">
-                                            <h3 className="font-medium text-gray-900 dark:text-white">Estado de Cuotas</h3>
-                                            <span className="text-sm text-gray-500">
-                                                {((payments.filter(p => (p.cuota_nro || 0) > 0)).length)} pagadas de {finData.cuotas || 0}
-                                            </span>
-                                        </div>
-
-                                        {finData.cuotas > 0 ? (
-                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                                                {Array.from({ length: finData.cuotas }).map((_, i) => {
-                                                    const quotaNum = i + 1;
-                                                    const paidPayment = payments.find(p => p.cuota_nro === quotaNum && p.estado !== 'Anulado');
-                                                    const isPaid = !!paidPayment;
-                                                    const isNext = !isPaid && quotaNum === ((payments.filter(p => (p.cuota_nro || 0) > 0).length) + 1);
-
-                                                    return (
-                                                        <div
-                                                            key={quotaNum}
-                                                            className={clsx(
-                                                                "relative p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all",
-                                                                isPaid
-                                                                    ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
-                                                                    : isNext
-                                                                        ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200 dark:bg-blue-900/20 dark:border-blue-400 dark:ring-blue-900"
-                                                                        : "bg-gray-50 border-gray-100 text-gray-400 dark:bg-gray-800 dark:border-gray-700"
-                                                            )}
-                                                        >
-                                                            <span className="text-xs font-semibold mb-1">Cuota {quotaNum}</span>
-                                                            {isPaid ? (
-                                                                <Check size={20} className="mb-1" />
-                                                            ) : (
-                                                                <span className="text-lg font-bold text-gray-300 dark:text-gray-600">
-                                                                    {i + 1}
-                                                                </span>
-                                                            )}
-
-                                                            {isPaid && (
-                                                                <span className="text-[10px] leading-tight opacity-75">
-                                                                    {new Date(paidPayment.fecha_hora).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
-                                                                </span>
-                                                            )}
-                                                            {isNext && (
-                                                                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm">
-                                                                    Próxima
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <div className="p-6 text-center bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
-                                                <p className="text-gray-500">No hay cuotas configuradas.</p>
-                                                <button
-                                                    onClick={() => setIsEditingFin(true)}
-                                                    className="mt-2 text-blue-600 font-medium hover:underline text-sm"
-                                                >
-                                                    Configurar Plan
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
 
-                                {/* Listado de Pagos de Cuotas */}
-                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+                                {/* Listado de Pagos de Cuotas — solo si hay plan activo */}
+                                {finData.estado === 'activo' && <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
                                     <div className="p-5 border-b border-gray-100 dark:border-gray-800">
                                         <h3 className="font-semibold text-gray-900 dark:text-white">Pagos de Cuotas Registrados</h3>
                                         <p className="text-xs text-gray-500">Solo se muestran los pagos marcados explícitamente como cuota</p>
@@ -857,7 +857,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         </table>
                                     )}
 
-                                </div>
+                                </div>}
                             </div>
                         )}
 

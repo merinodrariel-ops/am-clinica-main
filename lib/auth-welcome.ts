@@ -41,8 +41,8 @@ function extractProvider(user: User) {
     return typeof providers[0] === 'string' ? providers[0] : 'email';
 }
 
-function normalizeRole(rawRole: unknown) {
-    const role = String(rawRole || '').toLowerCase();
+function normalizeCategoria(rawCategoria: unknown) {
+    const categoria = String(rawCategoria || '').toLowerCase();
     const allowed = new Set([
         'owner',
         'admin',
@@ -52,21 +52,20 @@ function normalizeRole(rawRole: unknown) {
         'partner_viewer',
         'laboratorio',
         'google_user',
+        'asistente',
+        'odontologo',
+        'recaptacion',
+        'contador',
+        'socio'
     ]);
-    return allowed.has(role) ? role : 'google_user';
+    return allowed.has(categoria) ? categoria : 'google_user';
 }
 
+import { generatePremiumWelcomeEmail } from '@/lib/email-templates';
+
 function buildWelcomeHtml(name: string) {
-    return `
-        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #0f172a;">
-            <h2 style="margin-bottom: 10px;">Bienvenido a Google Gravity</h2>
-            <p>Hola ${name}, tu acceso fue activado correctamente.</p>
-            <p>Ya podes ingresar y usar la plataforma de AM Clinica para gestionar pacientes, agenda, caja e inventario.</p>
-            <p style="margin-top: 18px; color: #475569; font-size: 13px;">
-                Si no reconoces este acceso, por favor responde este email o contacta al administrador.
-            </p>
-        </div>
-    `;
+    // Legacy function, now using template from email-templates.ts
+    return generatePremiumWelcomeEmail(name, `${process.env.NEXT_PUBLIC_APP_URL || ''}/portal`);
 }
 
 export async function syncUserProfileAndSendFirstWelcome(user: User): Promise<ProfileSyncResult> {
@@ -78,15 +77,15 @@ export async function syncUserProfileAndSendFirstWelcome(user: User): Promise<Pr
     const fullName = extractFullName(user);
     const avatarUrl = extractAvatar(user);
     const provider = extractProvider(user);
-    const desiredRole = normalizeRole(user.user_metadata?.role);
+    const desiredCategoria = normalizeCategoria(user.user_metadata?.categoria);
 
     const { data: profileBefore } = await admin
         .from('profiles')
-        .select('id, role, welcome_email_sent')
+        .select('id, categoria, welcome_email_sent')
         .eq('id', user.id)
         .maybeSingle();
 
-    const roleForInsert = normalizeRole(profileBefore?.role || desiredRole);
+    const categoriaForInsert = normalizeCategoria(profileBefore?.categoria || desiredCategoria);
 
     const { error: upsertError } = await admin
         .from('profiles')
@@ -95,7 +94,7 @@ export async function syncUserProfileAndSendFirstWelcome(user: User): Promise<Pr
                 id: user.id,
                 email: user.email,
                 full_name: fullName,
-                role: roleForInsert,
+                categoria: categoriaForInsert,
                 is_active: true,
                 estado: 'activo',
                 ultimo_login: new Date().toISOString(),
@@ -115,10 +114,12 @@ export async function syncUserProfileAndSendFirstWelcome(user: User): Promise<Pr
         return { success: true };
     }
 
+    const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/portal`;
+
     const send = await sendResendEmail({
         to: user.email!,
-        subject: 'Bienvenido a Google Gravity',
-        html: buildWelcomeHtml(fullName),
+        subject: 'Bienvenido a AM Clínica Dental',
+        html: generatePremiumWelcomeEmail(fullName, portalUrl),
     });
 
     if (!send.success) {

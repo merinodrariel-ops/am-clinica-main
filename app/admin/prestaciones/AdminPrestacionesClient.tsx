@@ -144,7 +144,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
 
     return (
         <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8 pb-32">
-            {/* Header section with Professional selection */}
+            {/* Header section with doctor selection */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-2">
                     <div className="flex items-center gap-3 mb-1">
@@ -152,7 +152,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
                             <Stethoscope size={22} />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black text-white tracking-tight">Prestaciones de Doctores</h1>
+                            <h1 className="text-2xl font-black text-white tracking-tight">Prestaciones de Odontologos</h1>
                             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Panel de Administración</p>
                         </div>
                     </div>
@@ -160,7 +160,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
 
                 <div className="w-full md:w-80">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                        Doctor Responsable
+                        Odontologo Responsable
                     </label>
                     <div className="relative">
                         <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -172,7 +172,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
                             }}
                             className="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-9 pr-4 py-3 text-slate-200 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 appearance-none cursor-pointer transition-all"
                         >
-                            <option value="">Seleccionar doctor...</option>
+                            <option value="">Seleccionar odontologo...</option>
                             {profesionales.map(p => (
                                 <option key={p.id} value={p.id}>
                                     {p.nombre} {p.apellido} {p.area ? `(${p.area})` : ''}
@@ -189,9 +189,9 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
                     <div className="p-4 bg-slate-950 rounded-full mb-4 text-slate-700">
                         <User size={48} strokeWidth={1} />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-300">No hay doctores disponibles</h3>
+                    <h3 className="text-xl font-bold text-slate-300">No hay odontologos disponibles</h3>
                     <p className="text-slate-500 text-sm max-w-sm mt-2">
-                        Esta pantalla solo carga prestaciones de profesionales activos. Revisa la configuración en Prestadores.
+                        Esta pantalla solo carga prestaciones de odontologos activos. Revisa la configuracion en Prestadores.
                     </p>
                 </div>
             ) : !selectedProfId ? (
@@ -199,9 +199,9 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
                     <div className="p-4 bg-slate-950 rounded-full mb-4 text-slate-700">
                         <User size={48} strokeWidth={1} />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-300">Selecciona un doctor</h3>
+                    <h3 className="text-xl font-bold text-slate-300">Selecciona un odontologo</h3>
                     <p className="text-slate-500 text-sm max-w-sm mt-2">
-                        Para comenzar a cargar prestaciones, primero selecciona el profesional odontólogo que realizó el trabajo.
+                        Para comenzar a cargar prestaciones, primero selecciona el odontologo que realizo el trabajo.
                     </p>
                 </div>
             ) : (
@@ -447,7 +447,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
                                         ) : (
                                             <>
                                                 <CheckCircle2 size={18} className="group-hover:scale-110 transition-transform" />
-                                                <span>GUARDAR EN FICHA PROFESIONAL</span>
+                                                <span>GUARDAR EN FICHA DEL ODONTOLOGO</span>
                                             </>
                                         )}
                                     </button>
@@ -466,7 +466,7 @@ export default function AdminPrestacionesClient({ profesionales, prestacionesCat
                 </div>
                 <div className="h-4 w-px bg-slate-800"></div>
                 <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                    <span>{profesionales.length} Prof.</span>
+                    <span>{profesionales.length} Odont.</span>
                     <span>{prestacionesCatalogo.length} Prest.</span>
                 </div>
             </div>

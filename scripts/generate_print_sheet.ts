@@ -17,98 +17,98 @@ import fs from 'fs';
 import path from 'path';
 
 function loadEnv(): Record<string, string> {
-    const envPath = path.resolve(process.cwd(), '.env.local');
-    const env: Record<string, string> = {};
-    if (!fs.existsSync(envPath)) return env;
-    fs.readFileSync(envPath, 'utf-8').split('\n').forEach(line => {
-        const match = line.match(/^([^#=][^=]*)=(.*)$/);
-        if (match) env[match[1].trim()] = match[2].trim().replace(/^['"]|['"]$/g, '');
-    });
-    return env;
+  const envPath = path.resolve(process.cwd(), '.env.local');
+  const env: Record<string, string> = {};
+  if (!fs.existsSync(envPath)) return env;
+  fs.readFileSync(envPath, 'utf-8').split('\n').forEach(line => {
+    const match = line.match(/^([^#=][^=]*)=(.*)$/);
+    if (match) env[match[1].trim()] = match[2].trim().replace(/^['"]|['"]$/g, '');
+  });
+  return env;
 }
 
 const env = loadEnv();
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
+  auth: { autoRefreshToken: false, persistSession: false },
 });
 
 const PROSPECT_WORKFLOW_ID = '11111111-0000-0000-0000-000000000001';
-const STAGE_CONVERTIDO     = '11111111-0001-0000-0000-000000000007';
-const STAGE_NO_INTERESADO  = '11111111-0001-0000-0000-000000000008';
+const STAGE_CONVERTIDO = '11111111-0001-0000-0000-000000000007';
+const STAGE_NO_INTERESADO = '11111111-0001-0000-0000-000000000008';
 
 const INTEREST_LABELS: Record<string, string> = {
-    ortodoncia:     'Ortodoncia',
-    carillas:       'Carillas',
-    implantes:      'Implantes',
-    blanqueamiento: 'Blanqueamiento',
-    botox:          'Botox',
+  ortodoncia: 'Ortodoncia',
+  carillas: 'Carillas',
+  implantes: 'Implantes',
+  blanqueamiento: 'Blanqueamiento',
+  botox: 'Botox',
 };
 
 function diasDesde(dateStr: string): number {
-    const today = new Date(); today.setHours(0,0,0,0);
-    return Math.floor((today.getTime() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000);
 }
 
 function formatDate(dateStr: string): string {
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 function formatPhone(p: any): string {
-    if (p?.whatsapp_numero) return `${p.whatsapp_pais_code || '+54'} ${p.whatsapp_numero}`.trim();
-    return p?.telefono || '';
+  if (p?.whatsapp_numero) return `${p.whatsapp_pais_code || '+54'} ${p.whatsapp_numero}`.trim();
+  return p?.whatsapp || '';
 }
 
 async function main() {
-    console.log('\n🖨️  Generando hoja de misión para ventas...\n');
+  console.log('\n🖨️  Generando hoja de misión para ventas...\n');
 
-    const { data: treatments } = await supabase
-        .from('patient_treatments')
-        .select(`
+  const { data: treatments } = await supabase
+    .from('patient_treatments')
+    .select(`
             prospect_consulta_date, prospect_main_interest, start_date,
-            pacientes ( nombre, apellido, email, telefono, whatsapp_pais_code, whatsapp_numero )
+            pacientes ( nombre, apellido, email, whatsapp, whatsapp_pais_code, whatsapp_numero )
         `)
-        .eq('workflow_id', PROSPECT_WORKFLOW_ID)
-        .eq('status', 'active')
-        .neq('current_stage_id', STAGE_CONVERTIDO)
-        .neq('current_stage_id', STAGE_NO_INTERESADO);
+    .eq('workflow_id', PROSPECT_WORKFLOW_ID)
+    .eq('status', 'active')
+    .neq('current_stage_id', STAGE_CONVERTIDO)
+    .neq('current_stage_id', STAGE_NO_INTERESADO);
 
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10);
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10);
 
-    const rows = (treatments || []).map(t => {
-        const p = t.pacientes as any;
-        const consultaDate = t.prospect_consulta_date || t.start_date?.slice(0, 10) || '';
-        const dias = consultaDate ? diasDesde(consultaDate) : 9999;
-        return {
-            nombre: p ? `${p.nombre} ${p.apellido}` : '—',
-            email: p?.email || '',
-            telefono: formatPhone(p),
-            interes: INTEREST_LABELS[t.prospect_main_interest || ''] || '',
-            consultaDate,
-            dias,
-        };
-    }).sort((a, b) => a.dias - b.dias);
+  const rows = (treatments || []).map(t => {
+    const p = t.pacientes as any;
+    const consultaDate = t.prospect_consulta_date || t.start_date?.slice(0, 10) || '';
+    const dias = consultaDate ? diasDesde(consultaDate) : 9999;
+    return {
+      nombre: p ? `${p.nombre} ${p.apellido}` : '—',
+      email: p?.email || '',
+      whatsapp: formatPhone(p),
+      interes: INTEREST_LABELS[t.prospect_main_interest || ''] || '',
+      consultaDate,
+      dias,
+    };
+  }).sort((a, b) => a.dias - b.dias);
 
-    const urgente = rows.filter(r => r.dias <= 30);
-    const alta    = rows.filter(r => r.dias > 30 && r.dias <= 90);
-    const media   = rows.filter(r => r.dias > 90 && r.dias <= 180);
+  const urgente = rows.filter(r => r.dias <= 30);
+  const alta = rows.filter(r => r.dias > 30 && r.dias <= 90);
+  const media = rows.filter(r => r.dias > 90 && r.dias <= 180);
 
-    function tableRows(list: typeof rows, showDias = true): string {
-        return list.map((r, i) => `
+  function tableRows(list: typeof rows, showDias = true): string {
+    return list.map((r, i) => `
             <tr class="${i % 2 === 0 ? 'even' : ''}">
                 <td class="num">${i + 1}</td>
                 <td class="name">${r.nombre}</td>
                 <td>${r.email ? `<span class="contact">${r.email}</span>` : '<span class="missing">sin email</span>'}</td>
-                <td>${r.telefono ? `<span class="contact">${r.telefono}</span>` : '<span class="missing">sin tel.</span>'}</td>
+                <td>${r.whatsapp ? `<span class="contact">${r.whatsapp}</span>` : '<span class="missing">sin WA</span>'}</td>
                 <td class="tag">${r.interes ? `<span class="badge">${r.interes}</span>` : ''}</td>
                 <td class="center">${r.consultaDate ? formatDate(r.consultaDate) : '—'}</td>
                 ${showDias ? `<td class="center dias">${r.dias === 9999 ? '—' : r.dias + 'd'}</td>` : ''}
                 <td class="check"><span class="checkbox"></span></td>
             </tr>`).join('');
-    }
+  }
 
-    const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -318,7 +318,7 @@ async function main() {
         <th>#</th>
         <th>Nombre</th>
         <th>Email</th>
-        <th>Teléfono</th>
+        <th>WhatsApp</th>
         <th>Interés</th>
         <th class="center">Consulta</th>
         <th class="center">Hace</th>
@@ -343,7 +343,7 @@ async function main() {
         <th>#</th>
         <th>Nombre</th>
         <th>Email</th>
-        <th>Teléfono</th>
+        <th>WhatsApp</th>
         <th>Interés</th>
         <th class="center">Consulta</th>
         <th class="center">Hace</th>
@@ -369,7 +369,7 @@ ${media.length > 0 ? `
         <th>#</th>
         <th>Nombre</th>
         <th>Email</th>
-        <th>Teléfono</th>
+        <th>WhatsApp</th>
         <th>Interés</th>
         <th class="center">Consulta</th>
         <th class="center">Hace</th>
@@ -392,7 +392,7 @@ ${media.length > 0 ? `
     <li><strong>Si no responden en 48hs:</strong> llamada telefónica + segundo mensaje.</li>
     <li><strong>Marcar el tilde (✓)</strong> cuando el paciente fue contactado y actualizar el estado en el sistema.</li>
     <li><strong>Si agenda turno:</strong> registrar en el sistema como "Agendado" y notificar al Dr. Merino.</li>
-    <li><strong>Sin email ni teléfono:</strong> consultar con recepción si tienen otro dato de contacto.</li>
+    <li><strong>Sin email ni WhatsApp:</strong> consultar con recepción si tienen otro dato de contacto.</li>
   </ol>
 </div>
 
@@ -405,19 +405,19 @@ ${media.length > 0 ? `
 </body>
 </html>`;
 
-    const outPath = path.resolve(process.cwd(), `scripts/output/mision_ventas_${dateStr}.html`);
-    fs.writeFileSync(outPath, html, 'utf-8');
+  const outPath = path.resolve(process.cwd(), `scripts/output/mision_ventas_${dateStr}.html`);
+  fs.writeFileSync(outPath, html, 'utf-8');
 
-    console.log(`✅ Hoja generada: scripts/output/mision_ventas_${dateStr}.html`);
-    console.log(`\n   Incluye:`);
-    console.log(`   🔴 ${urgente.length} urgentes`);
-    console.log(`   🟠 ${alta.length} alta prioridad`);
-    console.log(`   🟡 ${media.length} media prioridad`);
-    console.log(`\n💡 Para imprimir:`);
-    console.log(`   1. Abrí el archivo en Chrome`);
-    console.log(`   2. Ctrl+P (o Cmd+P en Mac)`);
-    console.log(`   3. Destino: "Guardar como PDF" o impresora directa`);
-    console.log(`   4. Orientación: Horizontal · Márgenes: Mínimos\n`);
+  console.log(`✅ Hoja generada: scripts/output/mision_ventas_${dateStr}.html`);
+  console.log(`\n   Incluye:`);
+  console.log(`   🔴 ${urgente.length} urgentes`);
+  console.log(`   🟠 ${alta.length} alta prioridad`);
+  console.log(`   🟡 ${media.length} media prioridad`);
+  console.log(`\n💡 Para imprimir:`);
+  console.log(`   1. Abrí el archivo en Chrome`);
+  console.log(`   2. Ctrl+P (o Cmd+P en Mac)`);
+  console.log(`   3. Destino: "Guardar como PDF" o impresora directa`);
+  console.log(`   4. Orientación: Horizontal · Márgenes: Mínimos\n`);
 }
 
 main().catch(err => { console.error('Error:', err); process.exit(1); });

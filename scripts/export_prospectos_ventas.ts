@@ -4,7 +4,7 @@
  * Exporta todos los prospectos activos del workflow "Prospectos - 1ra Consulta"
  * como CSV ordenado por urgencia, listo para el equipo de ventas.
  *
- * Columnas: Prioridad, Nombre, Email, Teléfono, Interés, Fecha Consulta,
+ * Columnas: Prioridad, Nombre, Email, WhatsApp, Interés, Fecha Consulta,
  *           Días desde consulta, Estado actual, Intentos de contacto
  *
  * Uso:
@@ -39,8 +39,8 @@ const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVIC
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const PROSPECT_WORKFLOW_ID = '11111111-0000-0000-0000-000000000001';
-const STAGE_CONVERTIDO     = '11111111-0001-0000-0000-000000000007';
-const STAGE_NO_INTERESADO  = '11111111-0001-0000-0000-000000000008';
+const STAGE_CONVERTIDO = '11111111-0001-0000-0000-000000000007';
+const STAGE_NO_INTERESADO = '11111111-0001-0000-0000-000000000008';
 
 const STAGE_NAMES: Record<string, string> = {
     '11111111-0001-0000-0000-000000000001': 'Consulta Realizada',
@@ -54,19 +54,19 @@ const STAGE_NAMES: Record<string, string> = {
 };
 
 const INTEREST_LABELS: Record<string, string> = {
-    ortodoncia:      'Ortodoncia',
-    carillas:        'Carillas / Diseño de Sonrisa',
-    implantes:       'Implantes',
-    blanqueamiento:  'Blanqueamiento',
-    botox:           'Botox / Estética Facial',
-    otro:            'Otro',
+    ortodoncia: 'Ortodoncia',
+    carillas: 'Carillas / Diseño de Sonrisa',
+    implantes: 'Implantes',
+    blanqueamiento: 'Blanqueamiento',
+    botox: 'Botox / Estética Facial',
+    otro: 'Otro',
 };
 
 // ── Priority tier based on days since consultation ────────────────────────────
 
 function getPrioridad(diasDesdeConsulta: number): string {
-    if (diasDesdeConsulta <= 30)  return '🔴 URGENTE (< 1 mes)';
-    if (diasDesdeConsulta <= 90)  return '🟠 ALTA (1-3 meses)';
+    if (diasDesdeConsulta <= 30) return '🔴 URGENTE (< 1 mes)';
+    if (diasDesdeConsulta <= 90) return '🟠 ALTA (1-3 meses)';
     if (diasDesdeConsulta <= 180) return '🟡 MEDIA (3-6 meses)';
     if (diasDesdeConsulta <= 365) return '🟢 BAJA (6-12 meses)';
     return '⚪ HISTÓRICO (> 1 año)';
@@ -108,7 +108,7 @@ async function main() {
                 nombre,
                 apellido,
                 email,
-                telefono,
+                whatsapp,
                 whatsapp_pais_code,
                 whatsapp_numero
             )
@@ -126,30 +126,30 @@ async function main() {
     // Build rows
     const rows = (treatments || []).map(t => {
         const p = (t.pacientes as any);
-        const nombre   = p ? `${p.nombre} ${p.apellido}` : 'Desconocido';
-        const email    = p?.email || '';
-        const telefono = p?.whatsapp_numero
+        const nombre = p ? `${p.nombre} ${p.apellido}` : 'Desconocido';
+        const email = p?.email || '';
+        const whatsapp = p?.whatsapp_numero
             ? `${p.whatsapp_pais_code || '+54'}${p.whatsapp_numero}`.replace(/\s/g, '')
-            : (p?.telefono || '');
+            : (p?.whatsapp || '');
 
         const consultaDate = t.prospect_consulta_date || t.start_date?.slice(0, 10) || '';
         const diasDesde = consultaDate
             ? Math.floor((today.getTime() - new Date(consultaDate + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
             : 9999;
 
-        const prioridad  = getPrioridad(diasDesde);
-        const interes    = INTEREST_LABELS[t.prospect_main_interest || ''] || 'Sin definir';
-        const etapa      = STAGE_NAMES[t.current_stage_id] || t.current_stage_id;
-        const contactos  = t.prospect_contact_count || 0;
+        const prioridad = getPrioridad(diasDesde);
+        const interes = INTEREST_LABELS[t.prospect_main_interest || ''] || 'Sin definir';
+        const etapa = STAGE_NAMES[t.current_stage_id] || t.current_stage_id;
+        const contactos = t.prospect_contact_count || 0;
         const tieneEmail = email ? '✓' : '✗';
-        const tieneTel   = telefono ? '✓' : '✗';
+        const tieneTel = whatsapp ? '✓' : '✗';
 
         return {
             diasDesde,
             prioridad,
             nombre,
             email,
-            telefono,
+            whatsapp,
             tieneEmail,
             tieneTel,
             interes,
@@ -164,13 +164,13 @@ async function main() {
     rows.sort((a, b) => a.diasDesde - b.diasDesde);
 
     // Stats
-    const urgente   = rows.filter(r => r.diasDesde <= 30).length;
-    const alta      = rows.filter(r => r.diasDesde > 30  && r.diasDesde <= 90).length;
-    const media     = rows.filter(r => r.diasDesde > 90  && r.diasDesde <= 180).length;
-    const baja      = rows.filter(r => r.diasDesde > 180 && r.diasDesde <= 365).length;
+    const urgente = rows.filter(r => r.diasDesde <= 30).length;
+    const alta = rows.filter(r => r.diasDesde > 30 && r.diasDesde <= 90).length;
+    const media = rows.filter(r => r.diasDesde > 90 && r.diasDesde <= 180).length;
+    const baja = rows.filter(r => r.diasDesde > 180 && r.diasDesde <= 365).length;
     const historico = rows.filter(r => r.diasDesde > 365).length;
-    const sinEmail  = rows.filter(r => !r.email).length;
-    const sinTel    = rows.filter(r => !r.telefono).length;
+    const sinEmail = rows.filter(r => !r.email).length;
+    const sinTel = rows.filter(r => !r.whatsapp).length;
 
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('           PROSPECTOS — RESUMEN PARA VENTAS');
@@ -183,7 +183,7 @@ async function main() {
     console.log(`⚪ Histórico (> 1 año):       ${historico}`);
     console.log(`───────────────────────────────────────────────────────────────`);
     console.log(`Sin email:                    ${sinEmail}`);
-    console.log(`Sin teléfono:                 ${sinTel}`);
+    console.log(`Sin WhatsApp:                 ${sinTel}`);
     console.log('═══════════════════════════════════════════════════════════════\n');
 
     // Interest breakdown
@@ -198,9 +198,9 @@ async function main() {
         'Prioridad',
         'Nombre',
         'Email',
-        'Teléfono',
+        'WhatsApp',
         'Tiene Email',
-        'Tiene Teléfono',
+        'Tiene WhatsApp',
         'Interés',
         'Fecha Consulta',
         'Días desde consulta',
@@ -214,7 +214,7 @@ async function main() {
             r.prioridad,
             r.nombre,
             r.email,
-            r.telefono,
+            r.whatsapp,
             r.tieneEmail,
             r.tieneTel,
             r.interes,
@@ -226,7 +226,7 @@ async function main() {
     ];
 
     const dateStr = today.toISOString().slice(0, 10);
-    const outDir  = path.resolve(process.cwd(), 'scripts/output');
+    const outDir = path.resolve(process.cwd(), 'scripts/output');
     fs.mkdirSync(outDir, { recursive: true });
     const outPath = path.join(outDir, `prospectos_ventas_${dateStr}.csv`);
     fs.writeFileSync(outPath, csvLines.join('\n'), 'utf-8');

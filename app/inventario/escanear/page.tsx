@@ -14,7 +14,7 @@ import {
     Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import type { ProductRecord } from '@/app/actions/inventory-products';
 import {
     lookupInventoryProductByCode,
@@ -58,9 +58,9 @@ const VISUAL_MATCH_BETA_ENABLED =
 
 export default function InventoryScannerPage() {
     return (
-        <RoleGuard allowedRoles={['owner', 'admin', 'reception', 'laboratorio', 'developer']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'laboratorio', 'developer']}>
             <ScannerScreen />
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }
 

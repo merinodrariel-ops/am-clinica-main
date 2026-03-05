@@ -24,7 +24,7 @@ interface Paciente {
     id_paciente: string;
     nombre: string;
     apellido: string;
-    telefono: string | null;
+    whatsapp: string | null;
     documento: string | null;
 }
 
@@ -205,7 +205,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
             const { data, error } = await supabase
                 .from('pacientes')
-                .select('id_paciente, nombre, apellido, telefono, documento')
+                .select('id_paciente, nombre, apellido, whatsapp, documento')
                 .eq('id_paciente', initialPatientId)
                 .single();
 
@@ -233,7 +233,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         try {
             const { data, error } = await supabase
                 .from('pacientes')
-                .select('id_paciente, nombre, apellido, telefono, documento')
+                .select('id_paciente, nombre, apellido, whatsapp, documento')
                 .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%,documento.ilike.%${query}%`)
                 .limit(10);
 

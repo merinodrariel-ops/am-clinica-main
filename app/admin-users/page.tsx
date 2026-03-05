@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { resendUserAccessEmail, inviteUser, setUserPassword, updateUser, deleteUserAccount } from '@/app/actions/user-management';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import {
     Mail,
     Plus,
@@ -23,28 +23,30 @@ interface Profile {
     id: string;
     email: string;
     full_name: string;
-    role: string;
-    telefono?: string;
+    categoria: string;
+    whatsapp?: string;
     estado?: string;
     is_active: boolean;
     created_at: string;
 }
 
-const APP_ROLE_OPTIONS = [
-    { value: 'partner_viewer', label: 'Solo Lectura' },
+const APP_CATEGORY_OPTIONS = [
+    { value: 'owner', label: 'Dueño' },
+    { value: 'admin', label: 'Administrador' },
+    { value: 'socio', label: 'Socio' },
+    { value: 'contador', label: 'Contador' },
+    { value: 'developer', label: 'Desarrollador' },
     { value: 'reception', label: 'Recepción' },
     { value: 'recaptacion', label: 'Recaptación' },
-    { value: 'laboratorio', label: 'Laboratorio' },
+    { value: 'dentist', label: 'Odontólogo' },
     { value: 'asistente', label: 'Asistente' },
-    { value: 'odontologo', label: 'Odontólogo' },
-    { value: 'admin', label: 'Administrador' },
+    { value: 'laboratorio', label: 'Laboratorio' },
     { value: 'pricing_manager', label: 'Gestor de Precios' },
-    { value: 'owner', label: 'Dueño' },
-    { value: 'developer', label: 'Desarrollador' },
+    { value: 'partner_viewer', label: 'Solo Lectura' },
 ];
 
-function roleLabel(role: string) {
-    return APP_ROLE_OPTIONS.find((option) => option.value === role)?.label || role.replace('_', ' ');
+function categoryLabel(cat: string) {
+    return APP_CATEGORY_OPTIONS.find((option) => option.value === cat)?.label || cat.replace('_', ' ');
 }
 
 export default function UserManagementPage() {
@@ -61,8 +63,8 @@ export default function UserManagementPage() {
     const [formData, setFormData] = useState({
         email: '',
         fullName: '',
-        role: 'partner_viewer',
-        telefono: ''
+        categoria: 'partner_viewer',
+        whatsapp: ''
     });
     const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
@@ -74,7 +76,7 @@ export default function UserManagementPage() {
     // Edit User State
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedUserForEdit, setSelectedUserForEdit] = useState<Profile | null>(null);
-    const [editData, setEditData] = useState({ fullName: '', role: '', telefono: '', email: '', estado: '', isActive: true });
+    const [editData, setEditData] = useState({ fullName: '', categoria: '', whatsapp: '', email: '', estado: '', isActive: true });
     const [editStatus, setEditStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'success_refresh'>('idle');
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -89,6 +91,7 @@ export default function UserManagementPage() {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
+                .neq('estado', 'eliminado')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -178,8 +181,8 @@ export default function UserManagementPage() {
         setSelectedUserForEdit(user);
         setEditData({
             fullName: user.full_name || '',
-            role: user.role || 'partner_viewer',
-            telefono: user.telefono || '',
+            categoria: user.categoria || 'partner_viewer',
+            whatsapp: user.whatsapp || '',
             email: user.email || '',
             estado: user.estado || (user.is_active ? 'activo' : 'inactivo'),
             isActive: user.is_active,
@@ -198,8 +201,8 @@ export default function UserManagementPage() {
         try {
             const result = await updateUser(selectedUserForEdit.id, {
                 full_name: editData.fullName,
-                role: editData.role,
-                telefono: editData.telefono,
+                categoria: editData.categoria,
+                whatsapp: editData.whatsapp,
                 email: editData.email,
                 estado: editData.estado,
                 is_active: editData.isActive,
@@ -234,13 +237,17 @@ export default function UserManagementPage() {
         try {
             const result = await deleteUserAccount(user.id, session.user.id);
             if (result.success) {
-                setActionMessage({ type: 'success', text: 'Usuario eliminado correctamente.' });
+                const successText = result.mode === 'soft'
+                    ? 'Usuario desactivado y ocultado correctamente (borrado lógico).'
+                    : 'Usuario eliminado correctamente.';
+                setActionMessage({ type: 'success', text: successText });
                 await loadUsers();
             } else {
                 setActionMessage({ type: 'error', text: result.error || 'No se pudo eliminar el usuario.' });
             }
-        } catch {
-            setActionMessage({ type: 'error', text: 'Error inesperado al eliminar usuario.' });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Error inesperado al eliminar usuario.';
+            setActionMessage({ type: 'error', text: message });
         } finally {
             setDeletingId(null);
             setTimeout(() => setActionMessage(null), 5000);
@@ -256,8 +263,8 @@ export default function UserManagementPage() {
             const formDataToSend = new FormData();
             formDataToSend.append('email', formData.email);
             formDataToSend.append('fullName', formData.fullName);
-            formDataToSend.append('role', formData.role);
-            formDataToSend.append('telefono', formData.telefono);
+            formDataToSend.append('categoria', formData.categoria);
+            formDataToSend.append('whatsapp', formData.whatsapp);
 
             const result = await inviteUser(formDataToSend);
 
@@ -269,7 +276,7 @@ export default function UserManagementPage() {
             setTimeout(() => {
                 setShowInviteModal(false);
                 setInviteStatus('idle');
-                setFormData({ email: '', fullName: '', role: 'partner_viewer', telefono: '' });
+                setFormData({ email: '', fullName: '', categoria: 'partner_viewer', whatsapp: '' });
                 loadUsers();
             }, 1000);
         } catch (error: unknown) {
@@ -279,7 +286,7 @@ export default function UserManagementPage() {
     }
 
     return (
-        <RoleGuard requireOwner>
+        <CategoriaGuard requireOwner>
             <div className="p-6 max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -288,7 +295,7 @@ export default function UserManagementPage() {
                             Gestión de Usuarios
                         </h1>
                         <p className="text-gray-500 mt-1">
-                            Administra el acceso y roles del personal de la clínica
+                            Administra el acceso y categorías del personal de la clínica
                         </p>
                     </div>
 
@@ -333,7 +340,7 @@ export default function UserManagementPage() {
                             <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
                                 <tr>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Usuario</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rol</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoría</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha Alta</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
@@ -350,7 +357,7 @@ export default function UserManagementPage() {
                                     .filter(user =>
                                         user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        user.role?.toLowerCase().includes(searchTerm.toLowerCase())
+                                        user.categoria?.toLowerCase().includes(searchTerm.toLowerCase())
                                     )
                                     .map((user) => (
                                         <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -372,10 +379,10 @@ export default function UserManagementPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                                                ${user.role === 'owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-                                                        user.role === 'admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                                ${user.categoria === 'owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                                        user.categoria === 'admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
                                                             'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}`}>
-                                                    {roleLabel(user.role)}
+                                                    {categoryLabel(user.categoria)}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
@@ -471,24 +478,27 @@ export default function UserManagementPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rol</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoría</label>
                                     <select
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800"
-                                        value={formData.role}
-                                        onChange={e => setFormData({ ...formData, role: e.target.value })}
+                                        value={formData.categoria}
+                                        onChange={e => setFormData({ ...formData, categoria: e.target.value })}
                                     >
-                                        {APP_ROLE_OPTIONS.map((roleOption) => (
-                                            <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                        {APP_CATEGORY_OPTIONS.map((catOption) => (
+                                            <option key={catOption.value} value={catOption.value}>{catOption.label}</option>
                                         ))}
                                     </select>
+                                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                        Categorías de prestadores (Odontólogos, Laboratorio, Staff) se gestionan en Prestadores / Personal.
+                                    </p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">WhatsApp</label>
                                     <input
                                         type="tel"
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800"
-                                        value={formData.telefono}
-                                        onChange={e => setFormData({ ...formData, telefono: e.target.value })}
+                                        value={formData.whatsapp}
+                                        onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
                                         placeholder="+54 9 ..."
                                     />
                                 </div>
@@ -637,14 +647,14 @@ export default function UserManagementPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rol</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoría</label>
                                     <select
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={editData.role}
-                                        onChange={e => setEditData({ ...editData, role: e.target.value })}
+                                        value={editData.categoria}
+                                        onChange={e => setEditData({ ...editData, categoria: e.target.value })}
                                     >
-                                        {APP_ROLE_OPTIONS.map((roleOption) => (
-                                            <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                                        {APP_CATEGORY_OPTIONS.map((catOption) => (
+                                            <option key={catOption.value} value={catOption.value}>{catOption.label}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -672,12 +682,12 @@ export default function UserManagementPage() {
                                     </button>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">WhatsApp</label>
                                     <input
                                         type="tel"
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={editData.telefono}
-                                        onChange={e => setEditData({ ...editData, telefono: e.target.value })}
+                                        value={editData.whatsapp}
+                                        onChange={e => setEditData({ ...editData, whatsapp: e.target.value })}
                                         placeholder="+54 9 ..."
                                     />
                                 </div>
@@ -717,6 +727,6 @@ export default function UserManagementPage() {
                     </div>
                 )}
             </div>
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }

@@ -144,7 +144,7 @@ export async function getRecallWorklist(filter: WorklistFilter = 'all', extraFil
         .select(`
       *,
       patient:patient_id (
-        id_paciente, nombre, apellido, telefono,
+        id_paciente, nombre, apellido, whatsapp,
         whatsapp_pais_code, whatsapp_numero, email
       )
     `)
@@ -198,7 +198,7 @@ export async function getRecallWorklist(filter: WorklistFilter = 'all', extraFil
             const pat = r.patient;
             if (!pat) return false;
             const fullName = `${pat.nombre} ${pat.apellido}`.toLowerCase();
-            return fullName.includes(s) || (pat.telefono || '').includes(s);
+            return fullName.includes(s) || (pat.whatsapp || '').includes(s);
         });
     }
 

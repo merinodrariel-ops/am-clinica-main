@@ -41,7 +41,7 @@ interface PatientInfo {
     nombre: string;
     apellido: string;
     email: string | null;
-    telefono: string | null;
+    whatsapp: string | null;
 }
 
 interface SearchResult {
@@ -206,7 +206,7 @@ export default function CsvImportWizard() {
                         if (!guess.endTime && (low.includes('end') || low.includes('fin'))) guess.endTime = f;
                         if (!guess.title && (low.includes('title') || low.includes('titulo') || low.includes('asunto'))) guess.title = f;
                         if (!guess.patientEmail && (low.includes('email') || low.includes('correo'))) guess.patientEmail = f;
-                        if (!guess.patientPhone && (low.includes('phone') || low.includes('telefono') || low.includes('celular'))) guess.patientPhone = f;
+                        if (!guess.patientPhone && (low.includes('phone') || low.includes('whatsapp') || low.includes('celular'))) guess.patientPhone = f;
                         if (!guess.patientName && (low.includes('name') || low.includes('nombre') || low.includes('paciente'))) guess.patientName = f;
                         if (!guess.notes && (low.includes('note') || low.includes('descripcion'))) guess.notes = f;
                     });
@@ -325,7 +325,7 @@ export default function CsvImportWizard() {
                 nombre: patient.full_name.split(' ')[0] || '',
                 apellido: patient.full_name.split(' ').slice(1).join(' ') || '',
                 email: null,
-                telefono: patient.phone || null,
+                whatsapp: patient.phone || null,
             }
         }));
         setSearchingRowId(null);
@@ -460,7 +460,7 @@ export default function CsvImportWizard() {
                             { key: 'title', label: 'Título / Asunto' },
                             { key: 'patientName', label: 'Nombre del Paciente' },
                             { key: 'patientEmail', label: 'Email del Paciente' },
-                            { key: 'patientPhone', label: 'Teléfono del Paciente' },
+                            { key: 'patientPhone', label: 'WhatsApp del Paciente' },
                             { key: 'notes', label: 'Notas / Detalles' }
                         ].map((f) => (
                             <div key={f.key}>
@@ -498,7 +498,7 @@ export default function CsvImportWizard() {
                         Analizando y Vinculando Identidades
                     </h3>
                     <p className="text-gray-500 mb-6">
-                        Buscando coincidencias con pacientes existentes por email, teléfono o nombre...
+                        Buscando coincidencias con pacientes existentes por email, WhatsApp o nombre...
                     </p>
                     <div className="max-w-md mx-auto h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${progress}%` }} />

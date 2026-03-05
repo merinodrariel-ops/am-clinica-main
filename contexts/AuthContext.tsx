@@ -6,13 +6,13 @@ import { createClient } from '@/utils/supabase/client';
 
 const supabase = createClient();
 
-type Role = 'owner' | 'admin' | 'pricing_manager' | 'reception' | 'partner_viewer' | 'developer' | 'laboratorio' | 'asistente' | 'odontologo' | 'recaptacion';
+import { WorkerCategory } from '@/types/worker-portal';
 
 interface Profile {
     id: string;
     email: string | null;
     full_name: string | null;
-    role: Role;
+    categoria: WorkerCategory;
     is_active: boolean;
 }
 
@@ -22,12 +22,12 @@ interface AuthContextType {
     profile: Profile | null;
     loading: boolean;
     signOut: () => Promise<void>;
-    role: Role | null;
+    categoria: WorkerCategory | null;
     isAdmin: boolean;
     isOwner: boolean;
     isRealOwner: boolean;
-    impersonatedRole: Role | null;
-    setImpersonatedRole: (role: Role | null) => void;
+    impersonatedCategoria: WorkerCategory | null;
+    setImpersonatedCategoria: (categoria: WorkerCategory | null) => void;
     canEdit: (module: string) => boolean;
 }
 
@@ -38,27 +38,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [impersonatedRole, setImpersonatedRole] = useState<Role | null>(null);
+    const [impersonatedCategoria, setImpersonatedCategoria] = useState<WorkerCategory | null>(null);
 
     const ownerEmail = (process.env.NEXT_PUBLIC_OWNER_EMAIL || 'dr.arielmerinopersonal@gmail.com').toLowerCase();
     const isHardcodedOwner = user?.email?.toLowerCase() === ownerEmail;
-    const isRealOwner = isHardcodedOwner || profile?.role === 'owner';
-    const metadataRole = user?.user_metadata?.role as Role | undefined;
+    const isRealOwner = isHardcodedOwner || profile?.categoria === 'owner';
+    const metadataCategoria = user?.user_metadata?.categoria as WorkerCategory | undefined;
 
-    // Calculate effective role:
+    // Calculate effective category:
     // 1. If impersonating, use that.
     // 2. If hardcoded owner, force 'owner' (unless impersonating).
-    // 3. Otherwise use profile role or metadata.
-    const effectiveRole = (isRealOwner && impersonatedRole)
-        ? impersonatedRole
-        : (isHardcodedOwner ? 'owner' : (profile?.role || metadataRole || null));
+    // 3. Otherwise use profile categoria or metadata.
+    const effectiveCategoria = (isRealOwner && impersonatedCategoria)
+        ? impersonatedCategoria
+        : (isHardcodedOwner ? 'owner' : (profile?.categoria || metadataCategoria || null));
 
     const signOut = async () => {
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
         setSession(null);
-        setImpersonatedRole(null);
+        setImpersonatedCategoria(null);
     };
 
     const fetchProfile = async (userId: string) => {
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         id: user.id,
                         email: user.email || null,
                         full_name: (user.user_metadata?.full_name as string) || null,
-                        role: (user.user_metadata?.role as Role) || 'partner_viewer',
+                        categoria: (user.user_metadata?.categoria as WorkerCategory) || 'partner_viewer',
                         is_active: true
                     });
                 }
@@ -99,9 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
-        // Load impersonated role from localStorage if exists
-        const savedRole = localStorage.getItem('impersonatedRole') as Role;
-        if (savedRole) setImpersonatedRole(savedRole);
+        // Load impersonated category from localStorage if exists
+        const savedCategoria = localStorage.getItem('impersonatedCategoria') as WorkerCategory;
+        if (savedCategoria) setImpersonatedCategoria(savedCategoria);
 
         // Check active session
         console.log('AuthContext: Checking session...');
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     id: currentUser.id,
                     email: currentUser.email || null,
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
-                    role: (currentUser.user_metadata?.role as Role) || 'partner_viewer',
+                    categoria: (currentUser.user_metadata?.categoria as WorkerCategory) || 'partner_viewer',
                     is_active: true
                 });
                 fetchProfile(currentUser.id);
@@ -143,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     id: currentUser.id,
                     email: currentUser.email || null,
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
-                    role: (currentUser.user_metadata?.role as Role) || 'partner_viewer',
+                    categoria: (currentUser.user_metadata?.categoria as WorkerCategory) || 'partner_viewer',
                     is_active: true
                 });
                 fetchProfile(currentUser.id);
@@ -158,55 +158,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
 
-    const handleSetImpersonatedRole = (role: Role | null) => {
-        setImpersonatedRole(role);
-        if (role) {
-            localStorage.setItem('impersonatedRole', role);
+    const handleSetImpersonatedCategoria = (categoria: WorkerCategory | null) => {
+        setImpersonatedCategoria(categoria);
+        if (categoria) {
+            localStorage.setItem('impersonatedCategoria', categoria);
         } else {
-            localStorage.removeItem('impersonatedRole');
+            localStorage.removeItem('impersonatedCategoria');
         }
     };
 
-    const isAdmin = effectiveRole === 'admin' || effectiveRole === 'owner';
-    const isOwner = effectiveRole === 'owner';
+    const isAdmin = effectiveCategoria === 'admin' || effectiveCategoria === 'owner';
+    const isOwner = effectiveCategoria === 'owner';
 
     // Permission Logic (Simplified Default Rule)
     const canEdit = (module: string): boolean => {
-        const role = effectiveRole;
-        if (!role) return false;
-        if (role === 'owner') return true;
-        if (role === 'partner_viewer') return false;
+        const categoria = effectiveCategoria;
+        if (!categoria) return false;
+        if (categoria === 'owner') return true;
+        if (categoria === 'partner_viewer') return false;
 
         // Admin edits everything operational
-        if (role === 'admin') return true;
+        if (categoria === 'admin') return true;
 
         // Reception
-        if (role === 'reception') {
+        if (categoria === 'reception') {
             return ['turnos', 'pacientes', 'caja_recepcion'].includes(module);
         }
 
         // Pricing Manager
-        if (role === 'pricing_manager') {
+        if (categoria === 'pricing_manager') {
             return ['tarifario', 'financiamiento'].includes(module);
         }
 
-        // Laboratorio
-        if (role === 'laboratorio') {
+        // Laboratorio / Technician
+        if (categoria === 'laboratorio' || categoria === 'lab' || categoria === 'technician') {
             return ['inventario', 'laboratorio', 'pacientes'].includes(module);
         }
 
-        // Asistente
-        if (role === 'asistente') {
+        // Asistente / Assistant
+        if (categoria === 'asistente' || categoria === 'assistant') {
             return ['inventario', 'pacientes', 'recalls', 'todos', 'turnos'].includes(module);
         }
 
         // Recaptacion
-        if (role === 'recaptacion') {
+        if (categoria === 'recaptacion') {
             return ['pacientes', 'recalls', 'todos', 'turnos'].includes(module);
         }
 
-        // Odontólogo
-        if (role === 'odontologo') {
+        // Odontólogo / Dentist
+        if (categoria === 'odontologo' || categoria === 'dentist') {
             return ['pacientes', 'turnos', 'recalls', 'todos'].includes(module);
         }
 
@@ -220,12 +220,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profile,
             loading,
             signOut,
-            role: effectiveRole || null,
+            categoria: effectiveCategoria || null,
             isAdmin,
             isOwner,
             isRealOwner,
-            impersonatedRole,
-            setImpersonatedRole: handleSetImpersonatedRole,
+            impersonatedCategoria,
+            setImpersonatedCategoria: handleSetImpersonatedCategoria,
             canEdit
         }}>
             {children}

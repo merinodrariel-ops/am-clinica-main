@@ -14,7 +14,7 @@ import {
     Search,
     Smartphone,
 } from 'lucide-react';
-import RoleGuard from '@/components/auth/RoleGuard';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import {
     listInventoryProducts,
     type ProductRecord,
@@ -36,9 +36,9 @@ function includesAny(text: string, needles: string[]) {
 
 export default function InventoryProductsPage() {
     return (
-        <RoleGuard allowedRoles={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
             <ProductsScreen />
-        </RoleGuard>
+        </CategoriaGuard>
     );
 }
 

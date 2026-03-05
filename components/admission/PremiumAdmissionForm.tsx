@@ -20,6 +20,7 @@ import {
     MessageCircle,
     CreditCard,
     MapPin,
+    Navigation,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAdmissionTriggers } from '@/hooks/useAdmissionTriggers';
@@ -34,6 +35,10 @@ type FormData = {
     lastName: string;
     dni: string;
     dob: string;
+
+    // Location
+    city: string;
+    neighborhood: string;
 
     // Contact
     countryCode: string;
@@ -123,9 +128,15 @@ const InputField = ({
     onBlur,
     error,
     touched,
+    submitAttempted,
     ...props
 }: any) => {
-    const showError = (touched || (value && value.length > 0)) && error;
+    // Only show errors when:
+    // 1. User clicked "Next" (submitAttempted) — shows all errors including 'required'
+    // 2. Field was blurred AND has content — shows format/length errors only
+    const isEmpty = !value || (typeof value === 'string' && !value.trim());
+    const isRequiredError = error && isEmpty;
+    const showError = submitAttempted ? !!error : (touched && !isEmpty && !!error && !isRequiredError);
     const [inputType, setInputType] = useState(type === 'date' ? 'text' : type);
 
     return (
@@ -144,7 +155,7 @@ const InputField = ({
                         if (type === 'date' && !e.target.value) setInputType('text');
                         if (onBlur) onBlur(e);
                     }}
-                    className={`w-full bg-transparent border-b-2 py-4 pl-10 text-lg font-light text-white placeholder:text-zinc-600 focus:outline-none transition-colors ${showError ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-white font-sans'} ${type === 'date' ? '[&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 invert' : ''}`}
+                    className={`w-full bg-transparent border-b-2 py-4 pl-10 text-lg font-light text-white placeholder:text-zinc-600 focus:outline-none transition-colors font-sans ${showError ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-white'} ${type === 'date' ? '[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100' : ''}`}
                     {...props}
                 />
             </div>
@@ -188,6 +199,8 @@ export default function PremiumAdmissionForm() {
         lastName: '',
         dni: '',
         dob: '',
+        city: '',
+        neighborhood: '',
         countryCode: '+54',
         phone: '',
         email: '',
@@ -198,6 +211,7 @@ export default function PremiumAdmissionForm() {
         discoverySource: '',
     });
     const [touched, setTouched] = useState<FormTouched>({});
+    const [submitAttempted, setSubmitAttempted] = useState(false);
     const [direction, setDirection] = useState(1);
 
     const {
@@ -227,7 +241,7 @@ export default function PremiumAdmissionForm() {
             apellido: formData.lastName,
             dni: formData.dni,
             email: formData.email,
-            telefono: `${formData.countryCode}${formData.phone.replace(/\D/g, '')}`,
+            whatsapp: `${formData.countryCode}${formData.phone.replace(/\D/g, '')}`,
             motivo_consulta: REASONS.find(r => r.id === formData.dentalReason)?.label || formData.dentalReason,
             referencia_origen: DISCOVERY_SOURCES.find(s => s.id === formData.discoverySource)?.label || formData.discoverySource,
         };
@@ -240,12 +254,14 @@ export default function PremiumAdmissionForm() {
 
     const nextStep = () => {
         setDirection(1);
+        setSubmitAttempted(false);
         setStep((s) => Math.min(s + 1, totalSteps - 1));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const prevStep = () => {
         setDirection(-1);
+        setSubmitAttempted(false);
         setStep((s) => Math.max(s - 1, 0));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -263,15 +279,16 @@ export default function PremiumAdmissionForm() {
             dni: formData.dni,
             cuit: undefined,
             email: formData.email,
-            telefono: `${formData.countryCode}${formData.phone.replace(/\D/g, '')}`,
+            whatsapp: `${formData.countryCode}${formData.phone.replace(/\D/g, '')}`,
             motivo_consulta: REASONS.find(r => r.id === formData.dentalReason)?.label || formData.dentalReason,
             referencia_origen: DISCOVERY_SOURCES.find(s => s.id === formData.discoverySource)?.label || formData.discoverySource,
             referencia_recomendado_por: undefined,
+            fecha_nacimiento: formData.dob || undefined,
             health_alerts: healthAlerts,
             health_notes: healthAlerts.join('\n'),
             mode: 'online' as const,
-            ciudad: 'CABA',
-            zona_barrio: 'No especificado',
+            ciudad: formData.city || 'No especificado',
+            zona_barrio: formData.neighborhood || 'No especificado',
             profesional: 'Consulta con Dr. Ariel Merino'
         };
 
@@ -296,22 +313,25 @@ export default function PremiumAdmissionForm() {
     const getErrors = (): FormErrors => {
         const errors: FormErrors = {};
 
-        if (!formData.firstName.trim()) errors.firstName = 'El nombre es obligatorio';
-        else if (formData.firstName.length < 2) errors.firstName = 'Mínimo 2 caracteres';
+        if (!formData.firstName.trim()) errors.firstName = 'Ingresa tu nombre';
+        else if (formData.firstName.length < 2) errors.firstName = 'Ingresa al menos 2 letras';
 
-        if (!formData.lastName.trim()) errors.lastName = 'El apellido es obligatorio';
-        else if (formData.lastName.length < 2) errors.lastName = 'Mínimo 2 caracteres';
+        if (!formData.lastName.trim()) errors.lastName = 'Ingresa tu apellido';
+        else if (formData.lastName.length < 2) errors.lastName = 'Ingresa al menos 2 letras';
 
-        if (!formData.dni.trim()) errors.dni = 'El DNI/Pasaporte es obligatorio';
-        else if (formData.dni.length < 5) errors.dni = 'DNI inválido';
+        if (!formData.dni.trim()) errors.dni = 'Ingresa tu DNI o Pasaporte';
+        else if (formData.dni.length < 5) errors.dni = 'Debe tener al menos 5 caracteres';
 
-        if (!formData.dob) errors.dob = 'La fecha de nacimiento es obligatoria';
+        if (!formData.dob) errors.dob = 'Selecciona tu fecha de nacimiento';
 
-        if (!formData.email.trim()) errors.email = 'El correo es obligatorio';
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Correo electrónico inválido';
+        if (!formData.city?.trim()) errors.city = 'Ingresa tu ciudad';
+        if (!formData.neighborhood?.trim()) errors.neighborhood = 'Ingresa tu barrio o zona';
 
-        if (!formData.phone.trim()) errors.phone = 'El WhatsApp es obligatorio';
-        else if (!/^[\d\s\-\(\)]{6,}$/.test(formData.phone)) errors.phone = 'Número inválido';
+        if (!formData.email.trim()) errors.email = 'Ingresa tu correo electrónico';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Ingresa un correo válido (ej: nombre@gmail.com)';
+
+        if (!formData.phone.trim()) errors.phone = 'Ingresa tu número de WhatsApp';
+        else if (!/^[\d\s\-\(\)]{6,}$/.test(formData.phone)) errors.phone = 'Ingresa un número válido (mínimo 6 dígitos)';
 
         if (formData.underMedicalTreatment === true && !formData.medications.trim()) {
             errors.medications = 'Por favor, especifica la medicación';
@@ -368,10 +388,11 @@ export default function PremiumAdmissionForm() {
     );
 
     const renderPersonal = () => {
-        const isStepValid = !errors.firstName && !errors.lastName && !errors.dni && !errors.dob && !errors.email && !errors.phone;
+        const isStepValid = !errors.firstName && !errors.lastName && !errors.dni && !errors.dob && !errors.city && !errors.neighborhood && !errors.email && !errors.phone;
 
         return (
             <motion.div
+                key="personal"
                 variants={slideInBlur}
                 custom={direction}
                 initial="initial"
@@ -381,7 +402,8 @@ export default function PremiumAdmissionForm() {
             >
                 <div className="mb-12">
                     <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-4 font-semibold font-sans">Paso 01</p>
-                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white italic">Información Personal</h2>
+                    <h2 className="font-serif text-4xl md:text-5xl font-light mb-4 text-white italic">Datos Personales</h2>
+                    <p className="text-zinc-400 font-light">Información básica para tu expediente clínico.</p>
                 </div>
 
                 <div className="space-y-8">
@@ -395,6 +417,7 @@ export default function PremiumAdmissionForm() {
                             onBlur={() => handleBlur('firstName')}
                             error={errors.firstName}
                             touched={touched.firstName}
+                            submitAttempted={submitAttempted}
                         />
                         <InputField
                             icon={User}
@@ -405,6 +428,7 @@ export default function PremiumAdmissionForm() {
                             onBlur={() => handleBlur('lastName')}
                             error={errors.lastName}
                             touched={touched.lastName}
+                            submitAttempted={submitAttempted}
                         />
                     </div>
 
@@ -418,6 +442,7 @@ export default function PremiumAdmissionForm() {
                             onBlur={() => handleBlur('dni')}
                             error={errors.dni}
                             touched={touched.dni}
+                            submitAttempted={submitAttempted}
                         />
                         <InputField
                             icon={Calendar}
@@ -428,6 +453,32 @@ export default function PremiumAdmissionForm() {
                             onBlur={() => handleBlur('dob')}
                             error={errors.dob}
                             touched={touched.dob}
+                            submitAttempted={submitAttempted}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <InputField
+                            icon={MapPin}
+                            type="text"
+                            placeholder="Ciudad"
+                            value={formData.city}
+                            onChange={(e: any) => updateData({ city: e.target.value })}
+                            onBlur={() => handleBlur('city')}
+                            error={errors.city}
+                            touched={touched.city}
+                            submitAttempted={submitAttempted}
+                        />
+                        <InputField
+                            icon={MapPin}
+                            type="text"
+                            placeholder="Barrio / Zona"
+                            value={formData.neighborhood}
+                            onChange={(e: any) => updateData({ neighborhood: e.target.value })}
+                            onBlur={() => handleBlur('neighborhood')}
+                            error={errors.neighborhood}
+                            touched={touched.neighborhood}
+                            submitAttempted={submitAttempted}
                         />
                     </div>
 
@@ -441,6 +492,7 @@ export default function PremiumAdmissionForm() {
                             onBlur={() => handleBlur('email')}
                             error={errors.email}
                             touched={touched.email}
+                            submitAttempted={submitAttempted}
                         />
                         <AnimatePresence>
                             {formData.email && !formData.email.includes('@') && (
@@ -469,7 +521,7 @@ export default function PremiumAdmissionForm() {
 
                     <div className="flex flex-col gap-1 w-full">
                         <div className="relative flex items-center group">
-                            <MessageCircle className={`absolute left-0 w-5 h-5 transition-colors ${(touched.phone || formData.phone) && errors.phone ? 'text-red-500' : 'text-zinc-600 group-focus-within:text-white'}`} />
+                            <MessageCircle className={`absolute left-0 w-5 h-5 transition-colors ${submitAttempted && errors.phone ? 'text-red-500' : 'text-zinc-600 group-focus-within:text-white'}`} />
                             <select
                                 value={formData.countryCode}
                                 onChange={(e) => updateData({ countryCode: e.target.value })}
@@ -484,11 +536,11 @@ export default function PremiumAdmissionForm() {
                                 value={formData.phone}
                                 onChange={(e) => updateData({ phone: e.target.value })}
                                 onBlur={() => handleBlur('phone')}
-                                className={`w-full bg-transparent border-b-2 py-4 pl-4 text-lg font-light text-white placeholder:text-zinc-600 focus:outline-none transition-colors ${(touched.phone || formData.phone) && errors.phone ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-white'}`}
+                                className={`w-full bg-transparent border-b-2 py-4 pl-4 text-lg font-light text-white placeholder:text-zinc-600 focus:outline-none transition-colors ${submitAttempted && errors.phone ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-white'}`}
                             />
                         </div>
                         <AnimatePresence>
-                            {(touched.phone || formData.phone) && errors.phone && (
+                            {submitAttempted && errors.phone && (
                                 <motion.div
                                     initial={{ opacity: 0, y: -5, height: 0 }}
                                     animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -508,7 +560,8 @@ export default function PremiumAdmissionForm() {
                     </button>
                     <button
                         onClick={() => {
-                            setTouched({ firstName: true, lastName: true, dni: true, dob: true, email: true, phone: true });
+                            setSubmitAttempted(true);
+                            setTouched({ firstName: true, lastName: true, dni: true, dob: true, city: true, neighborhood: true, email: true, phone: true });
                             if (isStepValid) nextStep();
                         }}
                         className={`px-8 py-3 rounded-full text-sm uppercase tracking-wider transition-all duration-500 flex items-center gap-2 ${isStepValid
@@ -590,6 +643,7 @@ export default function PremiumAdmissionForm() {
                                         onBlur={() => handleBlur('medications')}
                                         error={errors.medications}
                                         touched={touched.medications}
+                                        submitAttempted={submitAttempted}
                                     />
                                 </div>
                             </motion.div>
@@ -605,6 +659,7 @@ export default function PremiumAdmissionForm() {
                         onBlur={() => handleBlur('allergies')}
                         error={errors.allergies}
                         touched={touched.allergies}
+                        submitAttempted={submitAttempted}
                     />
                 </div>
 
@@ -614,6 +669,7 @@ export default function PremiumAdmissionForm() {
                     </button>
                     <button
                         onClick={() => {
+                            setSubmitAttempted(true);
                             if (formData.underMedicalTreatment === true) setTouched((prev) => ({ ...prev, medications: true }));
                             if (isStepValid) nextStep();
                         }}
@@ -823,6 +879,24 @@ export default function PremiumAdmissionForm() {
                             </div>
                         </div>
                     </a>
+                </div>
+
+                <div className="space-y-3 pt-4">
+                    <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider ml-1">3. Cómo llegar</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <a href="https://maps.app.goo.gl/MF3w2f2qPGMgUwKx5" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-red-500/50 hover:bg-red-500/10 transition-all group text-center">
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="w-10 h-10 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center shrink-0"><MapPin className="w-5 h-5" /></div>
+                                <h4 className="text-sm font-medium text-white group-hover:text-red-400 transition-colors">Google Maps</h4>
+                            </div>
+                        </a>
+                        <a href="https://waze.com/ul/hd1uy2s0h8" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group text-center">
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="w-10 h-10 bg-cyan-500/20 text-cyan-400 rounded-full flex items-center justify-center shrink-0"><Navigation className="w-5 h-5" /></div>
+                                <h4 className="text-sm font-medium text-white group-hover:text-cyan-400 transition-colors">Waze</h4>
+                            </div>
+                        </a>
+                    </div>
                 </div>
             </div>
         </motion.div>

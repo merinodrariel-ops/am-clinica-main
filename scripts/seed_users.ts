@@ -39,19 +39,19 @@ const USERS = [
         email: 'dr.arielmerinopersonal@gmail.com',
         password: '1234567890123',
         fullName: 'Dr. Ariel Merino (Owner)',
-        role: 'owner'
+        categoria: 'owner'
     },
     {
         email: 'amesteticadentaladm@gmail.com', // Corrected from 'amd' to 'adm'
         password: '1234567890123',
         fullName: 'Administración',
-        role: 'admin'
+        categoria: 'admin'
     },
     {
         email: 'drarielmerino@gmail.com',
         password: '1234567890123',
         fullName: 'Recepción',
-        role: 'reception'
+        categoria: 'reception'
     }
 ];
 
@@ -72,7 +72,7 @@ async function seedUsers() {
     }
 
     for (const user of USERS) {
-        console.log(`Processing: ${user.email} (${user.role})...`);
+        console.log(`Processing: ${user.email} (${user.categoria})...`);
 
         // Check if exists
         const { data: { users: existingUsers } } = await supabaseAdmin.auth.admin.listUsers();
@@ -88,18 +88,18 @@ async function seedUsers() {
             if (updateAuthError) console.error('Error updating password:', updateAuthError);
             else console.log('Password updated.');
 
-            // Update Role/Profile
+            // Update Categoria/Profile
             const { error: updateProfileError } = await supabaseAdmin
                 .from('profiles')
                 .update({
-                    role: user.role,
+                    categoria: user.categoria,
                     full_name: user.fullName,
                     is_active: true
                 })
                 .eq('id', existing.id);
 
             if (updateProfileError) console.error('Error updating profile:', updateProfileError);
-            else console.log('Profile role updated.');
+            else console.log('Profile categoria updated.');
 
         } else {
             // Create New
@@ -109,7 +109,7 @@ async function seedUsers() {
                 email_confirm: true,
                 user_metadata: {
                     full_name: user.fullName,
-                    role: user.role
+                    categoria: user.categoria
                 }
             });
 

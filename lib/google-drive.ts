@@ -729,16 +729,33 @@ export async function deleteFromDrive(fileId: string): Promise<{ success: boolea
     }
 }
 
-// Template IDs (These should ideally be in .env)
-const TEMPLATE_FICHA_ID = '1r-Sbwz9eXU3z0z2M3_7HIs-1AtL5U-z3L7Hj0s9z0A'; // Example ID
-const TEMPLATE_PRESUPUESTO_ID = '1LzL0z9eXU3z0z2M3_7HIs-1AtL5U-z3L7Hj0s9z0A'; // Example ID
+// Template IDs from environment (recommended) or fallback to name search
+const TEMPLATE_FICHA_ID = process.env.GOOGLE_SLIDES_TEMPLATE_FICHA || '';
+const TEMPLATE_PRESUPUESTO_ID = process.env.GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO || '';
 
 /**
  * Copies templates and replaces placeholders for a new patient
  */
 export async function createPatientDocuments(
     motherFolderId: string,
-    patientData: { nombre: string; apellido: string; dni: string; fecha: string }
+    patientData: {
+        nombre: string;
+        apellido: string;
+        dni: string;
+        fecha: string;
+        fechaNacimiento?: string;
+        edad?: string;
+        whatsapp?: string;
+        email?: string;
+        ciudad?: string;
+        barrio?: string;
+        motivoConsulta?: string;
+        comoNosConocio?: string;
+        alergias?: string;
+        medicacion?: string;
+        tratamientoActivo?: string;
+        observacionesGenerales?: string;
+    }
 ): Promise<{ fichaUrl?: string; presupuestoUrl?: string; error?: string }> {
     try {
         const drive = getDrive();
@@ -760,12 +777,13 @@ export async function createPatientDocuments(
         const results: { fichaUrl?: string; presupuestoUrl?: string } = {};
 
         // 2. Copy and populate "Ficha/Presentacion"
-        // Search for template by name if ID is not confirmed
-        const fichaTemplate = await findFileByName(drive, 'Plantilla Ficha/Presentacion');
-        if (fichaTemplate) {
+        const fichaTemplateId = TEMPLATE_FICHA_ID || (await findFileByName(drive, 'Plantilla Ficha/Presentacion'))?.id;
+        console.log('Ficha template lookup:', fichaTemplateId ? `Found ID: ${fichaTemplateId}` : 'NOT FOUND - create template and set GOOGLE_SLIDES_TEMPLATE_FICHA in .env.local');
+        if (fichaTemplateId) {
             const newFichaName = `Ficha - ${patientData.apellido}, ${patientData.nombre}`;
             const copyRes = await drive.files.copy({
-                fileId: fichaTemplate.id!,
+                fileId: fichaTemplateId,
+                supportsAllDrives: true,
                 requestBody: {
                     name: newFichaName,
                     parents: [presentacionFolder.id!],
@@ -779,11 +797,13 @@ export async function createPatientDocuments(
         }
 
         // 3. Copy and populate "Presupuesto"
-        const presupuestoTemplate = await findFileByName(drive, 'Plantilla Presupuesto');
-        if (presupuestoTemplate) {
+        const presupuestoTemplateId = TEMPLATE_PRESUPUESTO_ID || (await findFileByName(drive, 'Plantilla Presupuesto'))?.id;
+        console.log('Presupuesto template lookup:', presupuestoTemplateId ? `Found ID: ${presupuestoTemplateId}` : 'NOT FOUND - create template and set GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO in .env.local');
+        if (presupuestoTemplateId) {
             const newPresuName = `Presupuesto - ${patientData.apellido}, ${patientData.nombre}`;
             const copyRes = await drive.files.copy({
-                fileId: presupuestoTemplate.id!,
+                fileId: presupuestoTemplateId,
+                supportsAllDrives: true,
                 requestBody: {
                     name: newPresuName,
                     parents: [presupuestoFolder.id!],
@@ -809,14 +829,52 @@ export async function createPatientDocuments(
 async function replaceSlidesPlaceholders(
     slides: ReturnType<typeof google.slides>,
     presentationId: string,
-    data: { nombre: string; apellido: string; dni: string; fecha: string }
+    data: {
+        nombre: string;
+        apellido: string;
+        dni: string;
+        fecha: string;
+        fechaNacimiento?: string;
+        edad?: string;
+        whatsapp?: string;
+        email?: string;
+        ciudad?: string;
+        barrio?: string;
+        motivoConsulta?: string;
+        comoNosConocio?: string;
+        alergias?: string;
+        medicacion?: string;
+        tratamientoActivo?: string;
+        observacionesGenerales?: string;
+    }
 ) {
-    const requests = [
-        { replaceAllText: { replaceText: data.nombre, containsText: { text: '{{Nombre}}', matchCase: false } } },
-        { replaceAllText: { replaceText: data.apellido, containsText: { text: '{{Apellido}}', matchCase: false } } },
-        { replaceAllText: { replaceText: data.dni, containsText: { text: '{{DNI}}', matchCase: false } } },
-        { replaceAllText: { replaceText: data.fecha, containsText: { text: '{{Fecha}}', matchCase: false } } },
-    ];
+    const fullName = `${data.apellido}, ${data.nombre}`;
+    const replacements: Record<string, string> = {
+        '{{Nombre}}': data.nombre,
+        '{{Apellido}}': data.apellido,
+        '{{NombreApellido}}': fullName,
+        '{{DNI}}': data.dni || '-',
+        '{{Fecha}}': data.fecha,
+        '{{FechaNacimiento}}': data.fechaNacimiento || '-',
+        '{{Edad}}': data.edad || '-',
+        '{{Telefono}}': data.whatsapp || '-',
+        '{{Email}}': data.email || '-',
+        '{{Ciudad}}': data.ciudad || '-',
+        '{{Barrio}}': data.barrio || '-',
+        '{{MotivoConsulta}}': data.motivoConsulta || '-',
+        '{{ComoNosConocio}}': data.comoNosConocio || '-',
+        '{{Alergias}}': data.alergias || 'Sin alergias reportadas',
+        '{{Medicacion}}': data.medicacion || 'Sin medicación activa',
+        '{{TratamientoActivo}}': data.tratamientoActivo || 'Sin tratamiento activo',
+        '{{ObservacionesGenerales}}': data.observacionesGenerales || '-',
+    };
+
+    const requests = Object.entries(replacements).map(([placeholder, value]) => ({
+        replaceAllText: {
+            replaceText: value,
+            containsText: { text: placeholder, matchCase: false },
+        },
+    }));
 
     await slides.presentations.batchUpdate({
         presentationId,
