@@ -1971,6 +1971,41 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         if (idsUsd.has(id)) totalUsd += monto;
     });
 
+    // ── TRASPASOS: apply transfer impact from/to admin caja ──────────────────
+    // Regla de Oro: use monto + moneda directly — no currency conversion.
+    // TRASPASO and RETIRO_EFECTIVO are excluded from gastos (they're not losses).
+    {
+        let transQuery = getSupabase()
+            .from('transferencias_caja')
+            .select('monto, moneda, tipo_transferencia, caja_origen, caja_destino')
+            .or('caja_origen.eq.ADMIN,caja_destino.eq.ADMIN')
+            .eq('estado', 'confirmada');
+
+        // Only count transfers since last closure
+        if (ultimo?.hora_cierre) {
+            transQuery = transQuery.gt('fecha_hora', ultimo.hora_cierre);
+        } else if (ultimo) {
+            transQuery = transQuery.gt('fecha_hora', `${ultimo.fecha}T23:59:59`);
+        }
+
+        const { data: adminTrans } = await transQuery;
+        (adminTrans || []).forEach((t: {
+            monto: number;
+            moneda: string;
+            tipo_transferencia: string | null;
+            caja_origen: string | null;
+            caja_destino: string | null;
+        }) => {
+            const delta = Number(t.monto || 0);
+            const applyDelta = (sign: 1 | -1) => {
+                if (t.moneda === 'ARS') totalArs += sign * delta;
+                if (t.moneda === 'USD') totalUsd += sign * delta;
+            };
+            if (t.caja_origen === 'ADMIN') applyDelta(-1); // money leaves admin
+            if (t.caja_destino === 'ADMIN') applyDelta(1);  // money enters admin
+        });
+    }
+
     // ── GIRO ACTIVO: cumulative all-time balance (using usd_equivalente_total) ──
     // Everything normalized to USD to avoid currency mismatch between debt and payment.
     // Debt: GIRO_ACTIVO tipo movements (acumula deuda, no impacta efectivo)

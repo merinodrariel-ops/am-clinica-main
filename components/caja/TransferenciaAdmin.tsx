@@ -94,9 +94,9 @@ export default function TransferenciaAdmin({
 
         setSaving(true);
         try {
-            const usdEquivalente = moneda === 'USD'
-                ? monto
-                : (bnaRate > 0 ? Math.round((monto / bnaRate) * 100) / 100 : monto);
+            // Regla de Oro: un traspaso en ARS no se convierte a USD.
+            // usd_equivalente solo se calcula para movimientos en USD.
+            const usdEquivalente = moneda === 'USD' ? monto : null;
 
             const opsTag = `[OPS:${tipoTransferencia}|${cajaOrigen}|${tipoTransferencia === 'RETIRO_EFECTIVO' ? 'EXT' : cajaDestino}]`;
 

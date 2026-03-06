@@ -260,9 +260,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       const { data: transData } = await supabase
         .from("transferencias_caja")
         .select("*")
-        .or(`origen.eq.CAJA_ADMIN,destino.eq.CAJA_ADMIN`)
+        .or(`caja_origen.eq.ADMIN,caja_destino.eq.ADMIN`)
         .eq("sucursal_id", sucursal.id)
-        .eq("estado", "completado")
+        .eq("estado", "confirmada")
         .order("fecha_hora", { ascending: false });
 
       setTransfers(transData || []);
