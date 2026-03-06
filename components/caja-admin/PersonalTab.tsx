@@ -30,6 +30,7 @@ import {
     Eye,
     EyeOff,
     Settings,
+    Info,
 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -77,7 +78,7 @@ interface Props {
 }
 
 type MainTab = 'prestadores' | 'prestaciones' | 'horarios' | 'registros' | 'observados';
-type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza' | 'pago-hora' | 'pago-prestacion';
+type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza' | 'pago-hora' | 'pago-prestacion' | 'mensual';
 
 type ProviderTypeOption = {
     value: string;
@@ -150,8 +151,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         valor_hora_ars: 0,
         descripcion: '',
         poliza_url: '',
+        modelo_pago: 'horas',
+        monto_mensual: 0,
         moneda_mensual: 'ARS',
         activo: true,
+        porcentaje_honorarios: 0,
+        datos_bancarios: '',
     });
 
     // Hours form state
@@ -311,7 +316,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             especialidad: p.especialidad || '',
             poliza_url: p.poliza_url || '',
             porcentaje_honorarios: p.porcentaje_honorarios || 0,
-            modelo_pago: p.modelo_pago || 'prestaciones',
+            modelo_pago: getEffectiveModeloPago(p),
             monto_mensual: p.monto_mensual || 0,
             moneda_mensual: p.moneda_mensual || 'ARS',
             activo: p.activo !== false,
@@ -327,13 +332,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             || area.tipo_personal === 'ambos'
         )?.nombre || 'Odontologia';
 
-        const byCategory: Record<ProviderCategory, { tipo: CreatePersonalInput['tipo']; area: string }> = {
-            odontologos: { tipo: 'odontologo', area: odontologiaDefault },
-            lab: { tipo: 'prestador', area: 'Laboratorio' },
-            limpieza: { tipo: 'prestador', area: 'Limpieza' },
-            'staff-general': { tipo: 'prestador', area: 'Staff general' },
-            'pago-hora': { tipo: 'prestador', area: 'General' },
-            'pago-prestacion': { tipo: 'prestador', area: 'General' },
+        const byCategory: Record<ProviderCategory, { tipo: CreatePersonalInput['tipo']; area: string; modelo_pago: CreatePersonalInput['modelo_pago'] }> = {
+            odontologos: { tipo: 'odontologo', area: odontologiaDefault, modelo_pago: 'prestaciones' },
+            lab: { tipo: 'prestador', area: 'Laboratorio', modelo_pago: 'prestaciones' },
+            limpieza: { tipo: 'prestador', area: 'Limpieza', modelo_pago: 'horas' },
+            'staff-general': { tipo: 'prestador', area: 'Staff general', modelo_pago: 'horas' },
+            'pago-hora': { tipo: 'prestador', area: 'Staff general', modelo_pago: 'horas' },
+            'pago-prestacion': { tipo: 'odontologo', area: odontologiaDefault, modelo_pago: 'prestaciones' },
+            mensual: { tipo: 'prestador', area: 'Staff general', modelo_pago: 'mensual' },
         };
 
         const defaults = activeProviderCategory === 'todos' ? byCategory.odontologos : byCategory[activeProviderCategory];
@@ -356,7 +362,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             especialidad: '',
             poliza_url: '',
             porcentaje_honorarios: 0,
-            modelo_pago: defaults.tipo === 'odontologo' ? 'prestaciones' : 'horas',
+            modelo_pago: defaults.modelo_pago,
             monto_mensual: 0,
             moneda_mensual: 'ARS',
             activo: true,
@@ -723,6 +729,69 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             && !hasOperationalData;
     }
 
+    function getAreaConfiguredModelo(areaName?: string) {
+        const normalized = normalizeText(areaName);
+        if (!normalized) return null;
+
+        const matched = personalAreas.find((area) => normalizeText(area.nombre) === normalized);
+        return matched?.modelo_liquidacion || null;
+    }
+
+    function inferModeloFromContext(tipo?: string | null, areaName?: string | null, rolName?: string | null) {
+        const area = normalizeText(areaName);
+        const rol = normalizeText(rolName);
+
+        const isForcedHourly =
+            area.includes('limpieza')
+            || area.includes('staff')
+            || area.includes('admin')
+            || area.includes('administracion')
+            || area.includes('recepcion')
+            || area.includes('asistente')
+            || rol.includes('limpieza')
+            || rol.includes('staff')
+            || rol.includes('admin')
+            || rol.includes('recepcion')
+            || rol.includes('asistente');
+
+        if (isForcedHourly) return 'horas' as const;
+
+        const isProcedureBased =
+            isOdontologoTipo(tipo)
+            || area.includes('odont')
+            || area.includes('laboratorio')
+            || area === 'lab'
+            || rol.includes('odont')
+            || rol.includes('laboratorio')
+            || rol === 'lab';
+
+        if (isProcedureBased) return 'prestaciones' as const;
+
+        return null;
+    }
+
+    function getEffectiveModeloPago(p: Personal): 'horas' | 'prestaciones' | 'mensual' {
+        if (p.modelo_pago === 'mensual') return 'mensual';
+
+        const inferred = inferModeloFromContext(p.tipo, p.area, p.rol);
+        if (inferred) return inferred;
+
+        const configured = getAreaConfiguredModelo(p.area);
+        if (configured) return configured;
+
+        return p.modelo_pago || 'horas';
+    }
+
+    function getSuggestedModeloPagoForForm(tipo: CreatePersonalInput['tipo'], areaName: string) {
+        const inferred = inferModeloFromContext(tipo, areaName, '');
+        if (inferred) return inferred;
+
+        const configured = getAreaConfiguredModelo(areaName);
+        if (configured) return configured;
+
+        return isOdontologoTipo(tipo) ? 'prestaciones' : 'horas';
+    }
+
     function getPrestadorCategory(p: Personal): ProviderCategory {
         const area = normalizeText(p.area);
         const rol = normalizeText(p.rol);
@@ -755,6 +824,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         { id: 'todos', label: 'Todos' },
         { id: 'pago-hora', label: 'Por Hora' },
         { id: 'pago-prestacion', label: 'Por Prestación' },
+        { id: 'mensual', label: 'Mensual' },
         { id: 'odontologos', label: 'Odontólogos' },
         { id: 'lab', label: 'Lab' },
         { id: 'staff-general', label: 'Staff general' },
@@ -766,11 +836,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         acc[category] += 1;
         acc['todos'] += 1;
 
-        const mode = p.modelo_pago || 'prestaciones';
+        const mode = getEffectiveModeloPago(p);
         if (mode === 'horas') {
             acc['pago-hora'] += 1;
         } else if (mode === 'prestaciones') {
             acc['pago-prestacion'] += 1;
+        } else if (mode === 'mensual') {
+            acc['mensual'] += 1;
         }
 
         return acc;
@@ -782,17 +854,20 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         limpieza: 0,
         'pago-hora': 0,
         'pago-prestacion': 0,
+        mensual: 0,
     });
 
     const filteredPrestadores = prestadores.filter((p) => {
         const hasSearch = searchTerm.trim() !== '';
 
         if (!hasSearch && activeProviderCategory !== 'todos') {
-            const mode = p.modelo_pago || 'prestaciones';
+            const mode = getEffectiveModeloPago(p);
             if (activeProviderCategory === 'pago-hora') {
                 if (mode !== 'horas') return false;
             } else if (activeProviderCategory === 'pago-prestacion') {
                 if (mode !== 'prestaciones') return false;
+            } else if (activeProviderCategory === 'mensual') {
+                if (mode !== 'mensual') return false;
             } else if (getPrestadorCategory(p) !== activeProviderCategory) {
                 return false;
             }
@@ -881,17 +956,23 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setFormData((prev) => {
             if (isOdontologoSelection) {
                 const preserveCurrentArea = prev.tipo === 'odontologo' && Boolean(prev.area);
+                const nextArea = preserveCurrentArea ? prev.area : 'Odontologia';
                 return {
                     ...prev,
                     tipo: 'odontologo',
-                    area: preserveCurrentArea ? prev.area : 'Odontologia',
+                    area: nextArea,
+                    modelo_pago: getSuggestedModeloPagoForForm('odontologo', nextArea),
                 };
             }
 
+            const nextTipo: CreatePersonalInput['tipo'] = 'prestador';
+            const nextModelo = getSuggestedModeloPagoForForm(nextTipo, selectedLabel);
+
             return {
                 ...prev,
-                tipo: 'prestador',
+                tipo: nextTipo,
                 area: selectedLabel,
+                modelo_pago: nextModelo,
             };
         });
     }
@@ -1176,7 +1257,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         <div className="relative">
                                             <select
                                                 value={formData.area}
-                                                onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                                                onChange={(e) => {
+                                                    const nextArea = e.target.value;
+                                                    setFormData({
+                                                        ...formData,
+                                                        area: nextArea,
+                                                        modelo_pago: getSuggestedModeloPagoForForm(formData.tipo, nextArea),
+                                                    });
+                                                }}
                                                 className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             >
                                                 <option value="">Seleccionar area...</option>
@@ -1398,12 +1486,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     { id: 'horas', label: 'Por Hora' },
                                                     { id: 'prestaciones', label: 'Por Prestación' },
                                                     { id: 'mensual', label: 'Mensual' }
-                                                ].map((mode) => (
+                                                ].filter(mode => {
+                                                    if (isOdontologoTipo(formData.tipo)) {
+                                                        return mode.id === 'prestaciones';
+                                                    }
+                                                    return true;
+                                                }).map((mode) => (
                                                     <button
                                                         key={mode.id}
                                                         type="button"
                                                         onClick={() => setFormData({ ...formData, modelo_pago: mode.id as CreatePersonalInput['modelo_pago'] })}
-                                                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.modelo_pago === mode.id
+                                                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.modelo_pago === mode.id || (isOdontologoTipo(formData.tipo) && mode.id === 'prestaciones')
                                                             ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm border border-indigo-100/50"
                                                             : "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-700/40"
                                                             }`}
@@ -1413,7 +1506,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 ))}
                                             </div>
                                             <p className="text-[10px] text-slate-400 mt-2">
-                                                Determina si el prestador cobra mensualidad fija, por hora de trabajo o por procedimiento realizado.
+                                                {isOdontologoTipo(formData.tipo) ? "Los profesionales y odontólogos cobran exclusivamente por prestación." : "Determina si el prestador cobra mensualidad fija, por hora de trabajo o por procedimiento realizado."}
                                             </p>
                                         </div>
 
@@ -1474,12 +1567,41 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         <Clock className="w-4 h-4 inline mr-1 text-slate-400" />
                                                         Valor de Hora (Monto)
                                                     </label>
-                                                    <MoneyInput
-                                                        value={formData.valor_hora_ars || 0}
-                                                        onChange={(val) => setFormData({ ...formData, valor_hora_ars: val })}
-                                                        currency="ARS"
-                                                        className="w-full"
-                                                    />
+                                                    {(() => {
+                                                        const tipoLower = (formData.tipo || '').toLowerCase();
+                                                        const rolLower = (formData.rol || '').toLowerCase();
+                                                        const isOdontologoOwner = ['owner', 'odontologo', 'profesional'].includes(tipoLower) || rolLower.includes('owner');
+                                                        const isStaffOrLimpieza = !isOdontologoOwner;
+
+                                                        if (isStaffOrLimpieza) {
+                                                            return (
+                                                                <div>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            disabled
+                                                                            value={formData.valor_hora_ars?.toLocaleString('es-AR') || '0'}
+                                                                            className="pl-8 pr-4 py-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 cursor-not-allowed outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2 flex items-start gap-1">
+                                                                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                                                        El valor por hora para este rol se administra centralizadamente desde la pestaña de Configuración &gt; Valores Hora Staff.
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <MoneyInput
+                                                                value={formData.valor_hora_ars || 0}
+                                                                onChange={(val) => setFormData({ ...formData, valor_hora_ars: val })}
+                                                                currency="ARS"
+                                                                className="w-full"
+                                                            />
+                                                        );
+                                                    })()}
                                                 </div>
                                             )}
 
@@ -1810,7 +1932,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         )}
 
                                         {/* Monthly Amount Display with eye toggle */}
-                                        {(p.modelo_pago === 'mensual' || (!p.modelo_pago && !isOdontologoTipo(p.tipo))) && (
+                                        {p.modelo_pago === 'mensual' && (
                                             <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700/50">
                                                 <div className="flex items-center gap-2">
                                                     <DollarSign className="w-4 h-4 text-emerald-500" />
@@ -1865,7 +1987,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                                         {/* Action Buttons based on Payment Model */}
                                         {(() => {
-                                            const mode = p.modelo_pago || 'prestaciones';
+                                            const mode = getEffectiveModeloPago(p);
 
                                             if (mode === 'prestaciones') {
                                                 return (
@@ -2030,7 +2152,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 const prestacionesProfe = prestacionesMes.filter(pr => pr.profesional_id === p.id);
                                 const totalPrestaciones = prestacionesProfe.reduce((acc, pr) => acc + pr.valor_cobrado, 0);
                                 const totalHonorarios = prestacionesProfe.reduce((acc, pr) => acc + (pr.monto_honorarios || 0), 0);
-                                const isProfesional = isOdontologoTipo(p.tipo);
+                                const mode = getEffectiveModeloPago(p);
+                                const isProfesional = mode === 'prestaciones';
                                 const configuredHourValue = getConfiguredHourValue(p);
                                 const criticalObservadosCount = getCriticalObservadosCount(p.id);
                                 const hasCriticalObservados = criticalObservadosCount > 0;
@@ -2058,15 +2181,24 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
                                         <div className="grid grid-cols-2 gap-4 mb-4">
                                             <div>
-                                                <p className="text-sm text-slate-500">{isProfesional ? 'Prestaciones' : 'Horas mes'}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {mode === 'prestaciones' ? 'Prestaciones cargadas' : mode === 'mensual' ? 'Mensualidad' : 'Horas mes'}
+                                                </p>
                                                 <p className="text-xl font-bold">
-                                                    {isProfesional ? prestacionesProfe.length : `${totalHoras}h`}
+                                                    {mode === 'prestaciones'
+                                                        ? prestacionesProfe.length
+                                                        : mode === 'mensual'
+                                                            ? new Intl.NumberFormat('es-AR', {
+                                                                style: 'currency',
+                                                                currency: p.moneda_mensual === 'USD' ? 'USD' : 'ARS'
+                                                            }).format(p.monto_mensual || 0)
+                                                            : `${totalHoras}h`}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-sm text-slate-500">{isProfesional ? 'Modelo' : 'Esquema'}</p>
-                                                <p className="text-xl font-bold text-green-600">
-                                                    {isProfesional ? 'Por prestacion' : 'Global'}
+                                                <p className="text-xs text-slate-500">Esquema</p>
+                                                <p className="text-sm font-bold text-green-600 mt-1 uppercase tracking-wider text-[11px]">
+                                                    {mode === 'prestaciones' ? 'Por prestación' : mode === 'mensual' ? 'Mensualidad fija' : 'Pago por hora'}
                                                 </p>
                                             </div>
                                         </div>
@@ -2076,7 +2208,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 <span className="text-sm text-slate-600">Total a Liquidar:</span>
                                                 <span className="font-bold">
                                                     <SensitiveValue
-                                                        value={isProfesional ? totalHonorarios : totalHoras * configuredHourValue}
+                                                        value={mode === 'prestaciones' ? totalHonorarios : mode === 'mensual' ? (p.monto_mensual || 0) : totalHoras * configuredHourValue}
                                                         format="currency-ars"
                                                         fieldId={`total-${p.id}`}
                                                     />
@@ -2094,7 +2226,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     </span>
                                                 </div>
                                             )}
-                                            {tcBna && !isProfesional && (
+                                            {tcBna && mode === 'horas' && (
                                                 <div className="flex items-center justify-between mt-1">
                                                     <span className="text-xs text-slate-400">Equiv. USD:</span>
                                                     <span className="text-sm text-green-600">
@@ -2121,7 +2253,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             <div className="space-y-2">
                                                 <Button
                                                     onClick={() => handleGenerarLiquidacion(p.id)}
-                                                    disabled={submitting || hasCriticalObservados || (isProfesional ? totalHonorarios === 0 : totalHoras === 0)}
+                                                    disabled={submitting || hasCriticalObservados || (mode === 'prestaciones' ? totalHonorarios === 0 : mode === 'mensual' ? (p.monto_mensual || 0) === 0 : totalHoras === 0)}
                                                     className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-200 h-auto"
                                                 >
                                                     <DollarSign className="w-4 h-4" />
