@@ -324,9 +324,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     function openCreateForm() {
         const odontologiaDefault = personalAreas.find((area) =>
-            area.tipo_personal === 'odontologo'
-            || area.tipo_personal === 'profesional'
-            || area.tipo_personal === 'ambos'
+            area.nombre.toLowerCase().includes('odontolog')
         )?.nombre || 'Odontologia';
 
         const byCategory: Record<ProviderCategory, { tipo: CreatePersonalInput['tipo']; area: string; modelo_pago: CreatePersonalInput['modelo_pago'] }> = {
@@ -900,6 +898,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const providerTypeOptions: ProviderTypeOption[] = (() => {
         const byKey = new Map<string, ProviderTypeOption>();
 
+        const isOdontologiaArea = (areaName: string) => {
+            const normalized = normalizeText(areaName);
+            return normalized.includes('odont');
+        };
+
         for (const option of DEFAULT_PROVIDER_TYPE_OPTIONS) {
             byKey.set(normalizeText(option.value), option);
         }
@@ -908,9 +911,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             const value = (area.nombre || '').trim();
             if (!value) continue;
 
-            const tipo = area.tipo_personal === 'odontologo' || area.tipo_personal === 'profesional'
-                ? 'odontologo'
-                : 'prestador';
+            const tipo = isOdontologiaArea(value) ? 'odontologo' : 'prestador';
 
             const key = normalizeText(value);
             if (!byKey.has(key)) {
@@ -974,11 +975,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         });
     }
 
-    const odontologiaAreas = personalAreas.filter((a) =>
-        a.tipo_personal === 'odontologo'
-        || a.tipo_personal === 'profesional'
-        || a.tipo_personal === 'ambos'
-    );
+    const odontologiaAreas = personalAreas.filter((a) => normalizeText(a.nombre).includes('odont'));
 
     // Calculate hours per person
     const horasPorPersona = personal.map(p => {
