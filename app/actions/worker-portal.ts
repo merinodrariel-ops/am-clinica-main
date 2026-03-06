@@ -205,18 +205,28 @@ export async function uploadWorkerDocument(workerId: string, file: File, type: s
 }
 
 export async function uploadWorkerPhoto(workerId: string, file: File) {
+    const adminClient = getAdminClient();
     const supabase = await createClient();
 
-    const fileExt = file.name.split('.').pop();
+    // Derive extension from MIME type (file.name may still say .jpg even after WebP conversion)
+    const mimeToExt: Record<string, string> = {
+        'image/webp': 'webp',
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+    };
+    const fileExt = mimeToExt[file.type] ?? file.name.split('.').pop() ?? 'jpg';
     const fileName = `${workerId}/profile_${Date.now()}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
+    // Use admin client for storage upload to bypass RLS
+    // (admin uploads on behalf of any worker, not just themselves)
+    const { error: uploadError } = await adminClient.storage
         .from('personal-documents')
-        .upload(fileName, file);
+        .upload(fileName, file, { upsert: false });
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = adminClient.storage
         .from('personal-documents')
         .getPublicUrl(fileName);
 

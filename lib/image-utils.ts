@@ -1,5 +1,6 @@
 /**
  * Compresses an image file by resizing it and reducing quality.
+ * Defaults to WebP format for smaller file sizes (saves ~30% vs JPEG).
  * Returns a new File object.
  */
 export async function compressImage(
@@ -14,8 +15,8 @@ export async function compressImage(
     const {
         maxWidth = 800,
         maxHeight = 800,
-        quality = 0.7,
-        type = 'image/jpeg'
+        quality = 0.82,
+        type = 'image/webp'
     } = options;
 
     return new Promise((resolve, reject) => {

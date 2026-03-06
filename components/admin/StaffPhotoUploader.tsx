@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Camera } from 'lucide-react';
 import { uploadWorkerPhoto } from '@/app/actions/worker-portal';
+import { compressImage } from '@/lib/image-utils';
 import { toast } from 'sonner';
 
 interface StaffPhotoUploaderProps {
@@ -22,7 +23,14 @@ export default function StaffPhotoUploader({ workerId, initialPhotoUrl, workerNa
 
         setUploading(true);
         try {
-            const result = await uploadWorkerPhoto(workerId, file);
+            // Compress + convert to WebP before upload (saves storage on free tier)
+            const compressed = await compressImage(file, {
+                maxWidth: 600,
+                maxHeight: 600,
+                quality: 0.82,
+                type: 'image/webp',
+            });
+            const result = await uploadWorkerPhoto(workerId, compressed);
             if (result.success) {
                 setPhotoUrl(result.url);
                 toast.success('Foto de perfil actualizada correctamente');
