@@ -133,7 +133,6 @@ export interface Personal {
     descripcion?: string;
     valor_hora_ars: number;
     modelo_pago: 'horas' | 'prestaciones' | 'mensual';
-    moneda_mensual?: 'ARS' | 'USD';
     activo: boolean;
     pagado_mes_actual?: boolean;
     ultimo_pago_fecha?: string;
