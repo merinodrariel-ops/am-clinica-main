@@ -26,7 +26,7 @@ import CategoriaGuard from "@/components/auth/CategoriaGuard";
 const TABS = [
     { id: 'movimientos', label: 'Movimientos', icon: Receipt },
     { id: 'arqueo', label: 'Inicio / Cierre', icon: Archive },
-    { id: 'personal', label: 'Prestadores', icon: Users },
+    { id: 'personal', label: 'Liquidaciones', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
 ] as const;
@@ -271,17 +271,7 @@ function CajaAdminContent() {
                         </div>
                     </div>
 
-                    <div className="mb-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
-                        <p className="text-xs uppercase tracking-widest text-indigo-300 mb-3">Caja Administración Unificada</p>
-                        <div className="grid grid-cols-1 gap-3">
-                            <Link
-                                href="/caja-admin/liquidaciones"
-                                className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 hover:border-indigo-400 hover:text-white transition-colors"
-                            >
-                                Liquidaciones
-                            </Link>
-                        </div>
-                    </div>
+
 
                     {observadosSummary.critical > 0 && (
                         <div className="mb-6 rounded-2xl glass-card bg-red-500/10 border border-red-500/20 p-4">

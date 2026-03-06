@@ -58,6 +58,8 @@ import {
     generarLiquidacionProfesional
 } from '@/lib/caja-admin-prestaciones';
 import ObservadosTab from './ObservadosTab';
+import PrestacionesTab from './PrestacionesTab';
+import HorariosTab from './HorariosTab';
 import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
 import { useAuth } from '@/contexts/AuthContext';
@@ -65,11 +67,11 @@ import { useAuth } from '@/contexts/AuthContext';
 interface Props {
     sucursal: Sucursal;
     tcBna: number | null;
-    initialTab?: MainTab;
+    initialTab?: MainTab | 'equipo';
     initialObservedPersonalId?: string;
 }
 
-type MainTab = 'equipo' | 'registros' | 'observados';
+type MainTab = 'prestadores' | 'prestaciones' | 'horarios' | 'registros' | 'observados';
 type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza';
 
 type ProviderTypeOption = {
@@ -94,8 +96,8 @@ const DEFAULT_PROVIDER_TYPE_OPTIONS: ProviderTypeOption[] = [
 
 export default function PersonalTab({ tcBna, initialTab, initialObservedPersonalId }: Props) {
     const { categoria: role } = useAuth();
-    const [activeTab, setActiveTab] = useState<MainTab>(initialTab || 'equipo');
-    const [activeProviderCategory, setActiveProviderCategory] = useState<ProviderCategory>('odontologos');
+    const [activeTab, setActiveTab] = useState<MainTab>((initialTab === 'equipo' ? 'prestadores' : initialTab) || 'prestadores');
+    const [activeProviderCategory, setActiveProviderCategory] = useState<ProviderCategory | 'todos'>('todos');
     const [observadosCount, setObservadosCount] = useState(0);
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [personalAreas, setPersonalAreas] = useState<PersonalArea[]>([]);
@@ -278,7 +280,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     useEffect(() => {
         if (!initialTab) return;
-        setActiveTab(initialTab);
+        setActiveTab(initialTab === 'equipo' ? 'prestadores' : initialTab);
     }, [initialTab]);
 
     function openEditForm(p: Personal) {
@@ -318,7 +320,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             'staff-general': { tipo: 'prestador', area: 'Staff general' },
         };
 
-        const defaults = byCategory[activeProviderCategory];
+        const defaults = activeProviderCategory === 'todos' ? byCategory.odontologos : byCategory[activeProviderCategory];
 
         setEditingPersonal(null);
         setFormData({
@@ -413,16 +415,22 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         try {
             if (editingPersonal) {
                 // Cast to Partial<Personal> for update compatibility
-                await updatePersonal(editingPersonal.id, payload as unknown as Parameters<typeof updatePersonal>[1]);
+                const result = await updatePersonal(editingPersonal.id, payload as unknown as Parameters<typeof updatePersonal>[1]);
+                if (!result.success) {
+                    throw new Error(result.error || 'No se pudo actualizar el prestador');
+                }
             } else {
-                await createPersonal(payload);
+                const result = await createPersonal(payload);
+                if (result.error) {
+                    throw result.error;
+                }
             }
             setShowForm(false);
             setEditingPersonal(null);
             loadData();
         } catch (error) {
             console.error('Error saving personal:', error);
-            alert('Error al guardar');
+            alert(error instanceof Error ? error.message : 'Error al guardar');
         }
         setSubmitting(false);
     }
@@ -707,18 +715,21 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     // Filter personal by type and search
     const prestadores = personal.filter((p) => !shouldHideFromPrestadores(p));
 
-    const providerCategories: Array<{ id: ProviderCategory; label: string }> = [
+    const providerCategories: Array<{ id: ProviderCategory | 'todos'; label: string }> = [
+        { id: 'todos', label: 'Todos' },
         { id: 'odontologos', label: 'Odontólogos' },
         { id: 'lab', label: 'Lab' },
         { id: 'staff-general', label: 'Staff general' },
         { id: 'limpieza', label: 'Limpieza' },
     ];
 
-    const providerCounts = prestadores.reduce<Record<ProviderCategory, number>>((acc, p) => {
+    const providerCounts = prestadores.reduce<Record<ProviderCategory | 'todos', number>>((acc, p) => {
         const category = getPrestadorCategory(p);
         acc[category] += 1;
+        acc['todos'] += 1;
         return acc;
     }, {
+        todos: 0,
         odontologos: 0,
         lab: 0,
         'staff-general': 0,
@@ -728,7 +739,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const filteredPrestadores = prestadores.filter((p) => {
         const hasSearch = searchTerm.trim() !== '';
 
-        if (!hasSearch && getPrestadorCategory(p) !== activeProviderCategory) {
+        if (!hasSearch && activeProviderCategory !== 'todos' && getPrestadorCategory(p) !== activeProviderCategory) {
             return false;
         }
 
@@ -866,17 +877,36 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
                     <Button
                         variant="ghost"
-                        onClick={() => setActiveTab('equipo')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'equipo'
+                        onClick={() => setActiveTab('prestadores')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'prestadores'
                             ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-b-2 border-indigo-500 rounded-b-none'
                             : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
                             }`}
                     >
                         <Users className="w-4 h-4" />
-                        Equipo
-                        <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full ml-2">
-                            {prestadores.length}
-                        </span>
+                        Prestadores
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        onClick={() => setActiveTab('prestaciones')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'prestaciones'
+                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-b-2 border-emerald-500 rounded-b-none'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
+                            }`}
+                    >
+                        <Stethoscope className="w-4 h-4" />
+                        Lista de Prestaciones
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        onClick={() => setActiveTab('horarios')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'horarios'
+                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-b-2 border-blue-500 rounded-b-none'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
+                            }`}
+                    >
+                        <Calendar className="w-4 h-4" />
+                        Horarios
                     </Button>
                     <Button
                         variant="ghost"
@@ -908,7 +938,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 </div>
 
                 {/* Search and Actions */}
-                {activeTab === 'equipo' && (
+                {activeTab === 'prestadores' && (
                     <div className="space-y-3">
                         <div className="flex flex-wrap gap-2">
                             {providerCategories.map((category) => {
@@ -1363,67 +1393,67 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     />
                                 </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">Prestación</label>
-                                        <select
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
-                                            value={prestacionForm.prestacion_id}
-                                            onChange={e => {
-                                                const p = prestacionesLista.find(pl => pl.id === e.target.value);
-                                                if (p) {
-                                                    setPrestacionForm({
-                                                        ...prestacionForm,
-                                                        prestacion_id: p.id,
-                                                        prestacion_nombre_manual: p.nombre,
-                                                        valor_cobrado: p.precio_base,
-                                                        moneda: p.moneda
-                                                    });
-                                                } else {
-                                                    setPrestacionForm({
-                                                        ...prestacionForm,
-                                                        prestacion_id: '',
-                                                    });
-                                                }
-                                            }}
-                                        >
-                                            <option value="">Seleccionar prestación...</option>
-                                            {prestacionesLista.map(p => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.area_nombre} - {p.nombre} ({p.moneda} {p.precio_base})
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {prestacionesLista.length === 0 && (
-                                            <p className="text-xs text-amber-500 mt-1">
-                                                No hay tarifario cargado. Podés registrar prestación manual abajo.
-                                            </p>
-                                        )}
-                                    </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Prestación</label>
+                                    <select
+                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                        value={prestacionForm.prestacion_id}
+                                        onChange={e => {
+                                            const p = prestacionesLista.find(pl => pl.id === e.target.value);
+                                            if (p) {
+                                                setPrestacionForm({
+                                                    ...prestacionForm,
+                                                    prestacion_id: p.id,
+                                                    prestacion_nombre_manual: p.nombre,
+                                                    valor_cobrado: p.precio_base,
+                                                    moneda: p.moneda
+                                                });
+                                            } else {
+                                                setPrestacionForm({
+                                                    ...prestacionForm,
+                                                    prestacion_id: '',
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        <option value="">Seleccionar prestación...</option>
+                                        {prestacionesLista.map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.area_nombre} - {p.nombre} ({p.moneda} {p.precio_base})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {prestacionesLista.length === 0 && (
+                                        <p className="text-xs text-amber-500 mt-1">
+                                            No hay tarifario cargado. Podés registrar prestación manual abajo.
+                                        </p>
+                                    )}
+                                </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">Nombre de prestación (manual)</label>
-                                        <Input
-                                            type="text"
-                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
-                                            value={prestacionForm.prestacion_nombre_manual}
-                                            onChange={e => setPrestacionForm({ ...prestacionForm, prestacion_nombre_manual: e.target.value })}
-                                            placeholder="Ej: Consulta control, Limpieza, etc."
-                                        />
-                                        {recentPrestaciones.length > 0 && (
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                {recentPrestaciones.map((name) => (
-                                                    <button
-                                                        type="button"
-                                                        key={name}
-                                                        onClick={() => setPrestacionForm({ ...prestacionForm, prestacion_nombre_manual: name, prestacion_id: '' })}
-                                                        className="px-2 py-1 text-[11px] rounded-md border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-                                                    >
-                                                        {name}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Nombre de prestación (manual)</label>
+                                    <Input
+                                        type="text"
+                                        className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                        value={prestacionForm.prestacion_nombre_manual}
+                                        onChange={e => setPrestacionForm({ ...prestacionForm, prestacion_nombre_manual: e.target.value })}
+                                        placeholder="Ej: Consulta control, Limpieza, etc."
+                                    />
+                                    {recentPrestaciones.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {recentPrestaciones.map((name) => (
+                                                <button
+                                                    type="button"
+                                                    key={name}
+                                                    onClick={() => setPrestacionForm({ ...prestacionForm, prestacion_nombre_manual: name, prestacion_id: '' })}
+                                                    className="px-2 py-1 text-[11px] rounded-md border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                                >
+                                                    {name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <MoneyInput
@@ -1499,8 +1529,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 )}
             </AnimatePresence>
 
-            {/* Equipo (Prestadores de Servicio) Tab Content */}
-            {activeTab === 'equipo' && (
+            {/* Prestadores Tab Content */}
+            {activeTab === 'prestadores' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredPrestadores.length === 0 ? (
                         <div className="col-span-full p-12 text-center text-slate-400">
@@ -1865,6 +1895,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     </>
                 )
             }
+
+            {/* Prestaciones Tab Content */}
+            {activeTab === 'prestaciones' && (
+                <PrestacionesTab />
+            )}
+
+            {/* Horarios Tab Content */}
+            {activeTab === 'horarios' && (
+                <HorariosTab />
+            )}
 
             {/* Observados Tab */}
             {

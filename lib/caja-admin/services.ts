@@ -106,6 +106,19 @@ function normalizeWhatsAppE164(value?: string | null): string | null {
     return `+${digits}`;
 }
 
+function mapPersonalCategoria(input: CreatePersonalInput, normalizedTipo: 'prestador' | 'odontologo'): string {
+    if (normalizedTipo === 'odontologo') return 'odontologo';
+
+    const area = (input.area || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+    if (area.includes('laboratorio') || area === 'lab') return 'laboratorio';
+    if (area.includes('asistente')) return 'asistente';
+    if (area.includes('recepcion')) return 'reception';
+
+    // Default for staff/cleaning/others
+    return 'admin';
+}
+
 
 // =============================================
 // Sucursales
@@ -736,24 +749,39 @@ export async function updatePersonalArea(id: string, updates: Partial<PersonalAr
 export async function createPersonal(input: CreatePersonalInput): Promise<{ data: Personal | null; error: Error | null }> {
     const normalizedTipo = input.tipo === 'profesional' ? 'odontologo' : input.tipo;
     const normalizedWhatsapp = normalizeWhatsAppE164(input.whatsapp || null);
+    const categoria = mapPersonalCategoria(input, normalizedTipo);
 
     if (input.whatsapp && !normalizedWhatsapp) {
         return { data: null, error: new Error('WhatsApp inválido. Debe incluir código país (ej: +549...) y sin 0/15.') };
     }
 
-    const { data, error } = await getSupabase()
+    const basePayload = {
+        ...input,
+        tipo: normalizedTipo,
+        categoria,
+        whatsapp: normalizedWhatsapp,
+        valor_hora_ars: input.valor_hora_ars || 0,
+        activo: true,
+        fecha_ingreso: input.fecha_ingreso || new Date().toISOString().split('T')[0],
+    };
+
+    let { data, error } = await getSupabase()
         .from('personal')
-        .insert({
-            ...input,
-            tipo: normalizedTipo,
-            whatsapp: normalizedWhatsapp,
-            rol: input.rol || (normalizedTipo === 'odontologo' ? 'Odontólogo' : 'Prestador'),
-            valor_hora_ars: input.valor_hora_ars || 0,
-            activo: true,
-            fecha_ingreso: input.fecha_ingreso || new Date().toISOString().split('T')[0],
-        })
+        .insert(basePayload)
         .select()
         .single();
+
+    // Backward compatibility for environments where personal.rol still exists as NOT NULL.
+    if (error && /null value in column "rol"|column "rol"/i.test(error.message || '')) {
+        ({ data, error } = await getSupabase()
+            .from('personal')
+            .insert({
+                ...basePayload,
+                rol: input.rol || (normalizedTipo === 'odontologo' ? 'Odontólogo' : 'Prestador'),
+            })
+            .select()
+            .single());
+    }
 
     if (error) {
         return { data: null, error: new Error(error.message) };

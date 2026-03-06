@@ -143,3 +143,536 @@
  POST /caja-admin?tab=personal 200 in 485ms (compile: 11ms, proxy.ts: 169ms, render: 306ms)
  POST /caja-admin?tab=personal 200 in 672ms (compile: 181ms, proxy.ts: 189ms, render: 302ms)
  POST /caja-admin?tab=personal 200 in 783ms (compile: 48ms, proxy.ts: 413ms, render: 321ms)
+✓ Compiled in 8.8s
+ GET /caja-admin?tab=personal 200 in 3.8s (compile: 1204ms, proxy.ts: 1254ms, render: 1351ms)
+ GET /api/bna-cotizacion 200 in 2.6s (compile: 19ms, proxy.ts: 2.4s, render: 131ms)
+ GET /api/bna-cotizacion 200 in 158ms (compile: 7ms, proxy.ts: 145ms, render: 6ms)
+ GET /api/bna-cotizacion 200 in 308ms (compile: 18ms, proxy.ts: 270ms, render: 19ms)
+ GET /caja-admin?tab=personal 200 in 510ms (compile: 109ms, proxy.ts: 310ms, render: 91ms)
+ GET /api/bna-cotizacion 200 in 200ms (compile: 18ms, proxy.ts: 165ms, render: 16ms)
+ GET /api/bna-cotizacion 200 in 158ms (compile: 8ms, proxy.ts: 145ms, render: 5ms)
+ GET /api/bna-cotizacion 200 in 232ms (compile: 43ms, proxy.ts: 182ms, render: 7ms)
+ POST /caja-admin?tab=personal 200 in 591ms (compile: 8ms, proxy.ts: 183ms, render: 401ms)
+ POST /caja-admin?tab=personal 200 in 554ms (compile: 33ms, proxy.ts: 183ms, render: 338ms)
+ POST /caja-admin?tab=personal 200 in 519ms (compile: 31ms, proxy.ts: 167ms, render: 320ms)
+ POST /caja-admin?tab=personal 200 in 519ms (compile: 4ms, proxy.ts: 210ms, render: 305ms)
+✓ Finished filesystem cache database compaction in 34.4s
+✓ Finished writing to filesystem cache in 36.8s
+ GET /caja-admin?tab=personal 200 in 1249ms (compile: 162ms, proxy.ts: 848ms, render: 239ms)
+ GET /api/bna-cotizacion 200 in 3.4s (compile: 102ms, proxy.ts: 2.6s, render: 706ms)
+ POST /caja-admin?tab=personal 200 in 3.3s (compile: 858ms, proxy.ts: 2.0s, render: 442ms)
+ POST /caja-admin?tab=personal 200 in 1049ms (compile: 352ms, proxy.ts: 240ms, render: 456ms)
+ GET /patients 200 in 16.0s (compile: 15.1s, proxy.ts: 583ms, render: 330ms)
+ POST /patients 200 in 2.7s (compile: 143ms, proxy.ts: 478ms, render: 2.0s)
+ POST /patients 200 in 2.1s (compile: 124ms, proxy.ts: 723ms, render: 1294ms)
+ POST /patients 200 in 6.0s (compile: 486ms, proxy.ts: 1660ms, render: 3.9s)
+ POST /patients 200 in 1021ms (compile: 123ms, proxy.ts: 408ms, render: 491ms)
+✓ Finished filesystem cache database compaction in 55s
+✓ Finished writing to filesystem cache in 44s
+ GET /caja-admin 200 in 956ms (compile: 173ms, proxy.ts: 291ms, render: 493ms)
+○ Compiling /caja-recepcion ...
+ GET /api/bna-cotizacion 200 in 330ms (compile: 8ms, proxy.ts: 202ms, render: 121ms)
+ GET /api/bna-cotizacion 200 in 196ms (compile: 5ms, proxy.ts: 187ms, render: 4ms)
+ GET /caja-recepcion 200 in 4.7s (compile: 3.5s, proxy.ts: 1131ms, render: 48ms)
+ GET /caja-recepcion 200 in 286ms (compile: 3ms, proxy.ts: 270ms, render: 14ms)
+ GET /caja-recepcion 200 in 241ms (compile: 7ms, proxy.ts: 215ms, render: 19ms)
+ GET /api/bna-cotizacion 200 in 205ms (compile: 3ms, proxy.ts: 196ms, render: 6ms)
+ GET /api/bna-cotizacion 200 in 175ms (compile: 2ms, proxy.ts: 171ms, render: 3ms)
+✓ Compiled in 1353ms
+ POST /caja-admin?tab=personal 200 in 1830ms (compile: 382ms, proxy.ts: 766ms, render: 682ms)
+ GET /admision 200 in 7.0s (compile: 6.1s, proxy.ts: 648ms, render: 313ms)
+✓ Finished filesystem cache database compaction in 23.3s
+✓ Finished writing to filesystem cache in 22.5s
+Persisting failed: Unable to write SST file 00004458.sst
+
+Caused by:
+    No such file or directory (os error 2)
+
+thread '<unnamed>' (1402674) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Meta for get_source_map_rope_operation (TaskId 958634))
+
+Caused by:
+    0: Looking up data for TaskId 958634 from database failed
+    1: Unable to open static sorted file referenced from 00004456.meta
+    2: Unable to open static sorted file 00004452.sst
+    3: No such file or directory (os error 2)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+⨯ Error: ENOENT: no such file or directory, open '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
+    at ignore-listed frames {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
+}
+
+thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /var/folders/3t/0382vlg545910rm3mgtp2wg40000gn/T/next-panic-85e229f831010b9726e9d16869d3972.log.
+
+To help make Turbopack better, report this error by ]8;;https://github.com/vercel/next.js/discussions/new?category=turbopack-error-report&title=Turbopack%20Error%3A%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29&body=Turbopack%20version%3A%20%60v16.1.0-canary.19-84-g3aa53984e%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0AFailed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%0ADebug%20info%3A%0A-%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%20%20%0A%20%20Caused%20by%3A%0A%20%20%20%20%20%200%3A%20Looking%20up%20data%20for%20TaskId%20920747%20from%20database%20failed%0A%20%20%20%20%20%201%3A%20Unable%20to%20open%20static%20sorted%20file%20referenced%20from%2000004408.meta%0A%20%20%20%20%20%202%3A%20Unable%20to%20open%20static%20sorted%20file%2000004401.sst%0A%20%20%20%20%20%203%3A%20No%20such%20file%20or%20directory%20%28os%20error%202%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace\clicking here.]8;;\
+-----
+
+⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Debug info:
+- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+  
+  Caused by:
+      0: Looking up data for TaskId 920747 from database failed
+      1: Unable to open static sorted file referenced from 00004408.meta
+      2: Unable to open static sorted file 00004401.sst
+      3: No such file or directory (os error 2)
+    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
+  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
+}
+
+thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+thread '<unnamed>' (1402674) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Meta for get_source_map_rope_operation (TaskId 958634))
+
+Caused by:
+    0: Looking up data for TaskId 958634 from database failed
+    1: Unable to open static sorted file referenced from 00004456.meta
+    2: Unable to open static sorted file 00004452.sst
+    3: No such file or directory (os error 2)
+Error: ENOENT: no such file or directory, open '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
+    at ignore-listed frames {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
+}
+
+thread 'tokio-runtime-worker' (1640828) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /var/folders/3t/0382vlg545910rm3mgtp2wg40000gn/T/next-panic-85e229f831010b9726e9d16869d3972.log.
+
+To help make Turbopack better, report this error by ]8;;https://github.com/vercel/next.js/discussions/new?category=turbopack-error-report&title=Turbopack%20Error%3A%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29&body=Turbopack%20version%3A%20%60v16.1.0-canary.19-84-g3aa53984e%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0AFailed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%0ADebug%20info%3A%0A-%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%20%20%0A%20%20Caused%20by%3A%0A%20%20%20%20%20%200%3A%20Looking%20up%20data%20for%20TaskId%20920747%20from%20database%20failed%0A%20%20%20%20%20%201%3A%20Unable%20to%20open%20static%20sorted%20file%20referenced%20from%2000004408.meta%0A%20%20%20%20%20%202%3A%20Unable%20to%20open%20static%20sorted%20file%2000004401.sst%0A%20%20%20%20%20%203%3A%20No%20such%20file%20or%20directory%20%28os%20error%202%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace\clicking here.]8;;\
+-----
+
+⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Debug info:
+- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+  
+  Caused by:
+      0: Looking up data for TaskId 920747 from database failed
+      1: Unable to open static sorted file referenced from 00004408.meta
+      2: Unable to open static sorted file 00004401.sst
+      3: No such file or directory (os error 2)
+    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
+  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
+}
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Debug info:
+- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+  
+  Caused by:
+      0: Looking up data for TaskId 920747 from database failed
+      1: Unable to open static sorted file referenced from 00004408.meta
+      2: Unable to open static sorted file 00004401.sst
+      3: No such file or directory (os error 2)
+    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
+  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
+}
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for PlainSource::from_source (TaskId 918501))
+
+Caused by:
+    0: Looking up data for TaskId 918501 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004400.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <FileSource as Asset>::content (TaskId 162588))
+
+Caused by:
+    0: Looking up data for TaskId 162588 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004404.sst
+    3: No such file or directory (os error 2)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+
+thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Meta for endpoint_write_to_disk_operation (TaskId 737185))
+
+Caused by:
+    0: Looking up data for TaskId 737185 from database failed
+    1: Unable to open static sorted file referenced from 00004456.meta
+    2: Unable to open static sorted file 00004452.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741015))
+
+Caused by:
+    0: Looking up data for TaskId 741015 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004403.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741001))
+
+Caused by:
+    0: Looking up data for TaskId 741001 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004399.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for endpoint_write_to_disk_operation (TaskId 737185))
+
+Caused by:
+    0: Looking up data for TaskId 737185 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004403.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741050))
+
+Caused by:
+    0: Looking up data for TaskId 741050 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004400.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for PlainIssue::from_issue (TaskId 741107))
+
+Caused by:
+    0: Looking up data for TaskId 741107 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004400.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))
+
+Caused by:
+    0: Looking up data for TaskId 738130 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004407.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740964))
+
+Caused by:
+    0: Looking up data for TaskId 740964 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741072))
+
+Caused by:
+    0: Looking up data for TaskId 741072 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004404.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740989))
+
+Caused by:
+    0: Looking up data for TaskId 740989 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004400.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740867))
+
+Caused by:
+    0: Looking up data for TaskId 740867 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004402.sst
+    3: No such file or directory (os error 2)
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /var/folders/3t/0382vlg545910rm3mgtp2wg40000gn/T/next-panic-85e229f831010b9726e9d16869d3972.log.
+
+To help make Turbopack better, report this error by ]8;;https://github.com/vercel/next.js/discussions/new?category=turbopack-error-report&title=Turbopack%20Error%3A%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Araw_read_dir%20%28TaskId%20738130%29%29&body=Turbopack%20version%3A%20%60v16.1.0-canary.19-84-g3aa53984e%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0AFailed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Araw_read_dir%20%28TaskId%20738130%29%29%0A%0ADebug%20info%3A%0A-%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Araw_read_dir%20%28TaskId%20738130%29%29%0A%20%20%0A%20%20Caused%20by%3A%0A%20%20%20%20%20%200%3A%20Looking%20up%20data%20for%20TaskId%20738130%20from%20database%20failed%0A%20%20%20%20%20%201%3A%20Unable%20to%20open%20static%20sorted%20file%20referenced%20from%2000004408.meta%0A%20%20%20%20%20%202%3A%20Unable%20to%20open%20static%20sorted%20file%2000004407.sst%0A%20%20%20%20%20%203%3A%20No%20such%20file%20or%20directory%20%28os%20error%202%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace\clicking here.]8;;\
+-----
+
+
+thread 'tokio-runtime-worker' (1642824) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741099))
+
+Caused by:
+    0: Looking up data for TaskId 741099 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004399.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740995))
+
+Caused by:
+    0: Looking up data for TaskId 740995 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740942))
+
+Caused by:
+    0: Looking up data for TaskId 740942 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004402.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/mod.rs:963:22:
+Failed to lookup task type: Looking up task type for TaskId 741000 from database failed
+
+Caused by:
+    0: Unable to open static sorted file referenced from 00004389.meta
+    1: Unable to open static sorted file 00004387.sst
+    2: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for PlainIssue::from_issue (TaskId 741106))
+
+Caused by:
+    0: Looking up data for TaskId 741106 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004399.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for VersionedContentMap::insert_output_assets (TaskId 740826))
+
+Caused by:
+    0: Looking up data for TaskId 740826 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004404.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741051))
+
+Caused by:
+    0: Looking up data for TaskId 741051 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740961))
+
+Caused by:
+    0: Looking up data for TaskId 740961 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004400.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740902))
+
+Caused by:
+    0: Looking up data for TaskId 740902 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004402.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1642824) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740889))
+
+Caused by:
+    0: Looking up data for TaskId 740889 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004407.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741048))
+
+Caused by:
+    0: Looking up data for TaskId 741048 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004404.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741093))
+
+Caused by:
+    0: Looking up data for TaskId 741093 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741055))
+
+Caused by:
+    0: Looking up data for TaskId 741055 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004404.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740838))
+
+Caused by:
+    0: Looking up data for TaskId 740838 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for <AppEndpoint as Endpoint>::output (TaskId 737188))
+
+Caused by:
+    0: Looking up data for TaskId 737188 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for endpoint_write_to_disk (TaskId 737186))
+
+Caused by:
+    0: Looking up data for TaskId 737186 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004407.sst
+    3: No such file or directory (os error 2)
+
+thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Debug info:
+- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+  
+  Caused by:
+      0: Looking up data for TaskId 920747 from database failed
+      1: Unable to open static sorted file referenced from 00004408.meta
+      2: Unable to open static sorted file 00004401.sst
+      3: No such file or directory (os error 2)
+    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
+  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
+}
+
+thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))
+
+Debug info:
+- Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))
+  
+  Caused by:
+      0: Looking up data for TaskId 738130 from database failed
+      1: Unable to open static sorted file referenced from 00004408.meta
+      2: Unable to open static sorted file 00004407.sst
+      3: No such file or directory (os error 2)
+    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))) {
+  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
+}
+
+thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Debug info:
+- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+  
+  Caused by:
+      0: Looking up data for TaskId 920747 from database failed
+      1: Unable to open static sorted file referenced from 00004408.meta
+      2: Unable to open static sorted file 00004401.sst
+      3: No such file or directory (os error 2)
+    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
+  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
+}
+
+thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Caused by:
+    0: Looking up data for TaskId 920747 from database failed
+    1: Unable to open static sorted file referenced from 00004408.meta
+    2: Unable to open static sorted file 00004401.sst
+    3: No such file or directory (os error 2)
+Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+
+Debug info:
+- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
+  
+  Caused by:
+      0: Looking up data for TaskId 920747 from database failed
+      1: Unable to open static sorted file referenced from 00004408.meta
+      2: Unable to open static sorted file 00004401.sst
+      3: No such file or directory (os error 2)
+    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
+  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
+}
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+[?25h
