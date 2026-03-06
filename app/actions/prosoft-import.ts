@@ -880,11 +880,11 @@ export async function previewProsoftFileSafe(
     try {
         const file = formData.get('file') as File;
         if (!file) throw new Error('No se envió ningún archivo');
-        
+
         const buffer = Buffer.from(await file.arrayBuffer());
         const isCsv = file.name.endsWith('.csv');
         let csvText = '';
-        
+
         if (isCsv) {
             csvText = buffer.toString('utf8');
         } else {
@@ -892,7 +892,7 @@ export async function previewProsoftFileSafe(
             const firstSheetName = workbook.SheetNames[0];
             csvText = xlsx.utils.sheet_to_csv(workbook.Sheets[firstSheetName]);
         }
-        
+
         const csvRows = parseCsvText(csvText);
         const preview = await processProsoftRows(csvRows, mesOverride);
         return { success: true, data: preview };

@@ -156,7 +156,7 @@ const STAFF_GROUP_KEY = 'am.staff.group-mode';
 const STAFF_DENSE_KEY = 'am.staff.dense-mode';
 
 type GroupMode = 'role' | 'company' | 'access' | 'compliance' | 'liquidacion';
-type LiquidacionFilter = null | 'horas' | 'prestaciones';
+type LiquidacionFilter = null | 'horas' | 'prestaciones' | 'mensual';
 
 type InlineDraft = {
     email: string;
@@ -324,8 +324,10 @@ export default function StaffListPage() {
         const q = searchTerm.trim().toLowerCase();
         return workers.filter((worker) => {
             if (onlyActive && worker.activo === false) return false;
-            if (liquidacionFilter === 'horas' && !worker.cobra_por_horas) return false;
-            if (liquidacionFilter === 'prestaciones' && worker.cobra_por_horas) return false;
+            const mode = worker.modelo_pago || 'prestaciones';
+            if (liquidacionFilter === 'horas' && mode !== 'horas') return false;
+            if (liquidacionFilter === 'prestaciones' && mode !== 'prestaciones') return false;
+            if (liquidacionFilter === 'mensual' && mode !== 'mensual') return false;
             if (!q) return true;
 
             const fullName = `${worker.nombre || ''} ${worker.apellido || ''}`.toLowerCase();
@@ -511,14 +513,24 @@ export default function StaffListPage() {
                     key: 'horas',
                     label: 'Por horas',
                     icon: <Clock size={16} className="text-violet-400" />,
-                    workers: filteredWorkers.filter((w) => w.cobra_por_horas === true),
+                    workers: filteredWorkers.filter((w) => (w.modelo_pago || 'prestaciones') === 'horas'),
                     isCategoryColumn: false,
                 },
                 {
                     key: 'prestaciones',
                     label: 'Por prestaciones',
                     icon: <ListChecks size={16} className="text-emerald-400" />,
-                    workers: filteredWorkers.filter((w) => !w.cobra_por_horas),
+                    workers: filteredWorkers.filter((w) => (w.modelo_pago || 'prestaciones') === 'prestaciones'),
+                    isCategoryColumn: false,
+                },
+                {
+                    key: 'mensual',
+                    label: 'Mensual / Otros',
+                    icon: <DollarSign size={16} className="text-amber-400" />,
+                    workers: filteredWorkers.filter((w) => {
+                        const mode = w.modelo_pago || 'prestaciones';
+                        return mode === 'mensual';
+                    }),
                     isCategoryColumn: false,
                 },
             ];
@@ -696,21 +708,24 @@ export default function StaffListPage() {
                     </button>
                     <button
                         onClick={() => setLiquidacionFilter((v) =>
-                            v === null ? 'horas' : v === 'horas' ? 'prestaciones' : null
+                            v === null ? 'horas' : v === 'horas' ? 'prestaciones' : v === 'prestaciones' ? 'mensual' : null
                         )}
-                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-                            liquidacionFilter === 'horas'
-                                ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
-                                : liquidacionFilter === 'prestaciones'
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${liquidacionFilter === 'horas'
+                            ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                            : liquidacionFilter === 'prestaciones'
                                 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                                : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
-                        }`}
+                                : liquidacionFilter === 'mensual'
+                                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                                    : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
+                            }`}
                     >
                         {liquidacionFilter === 'horas'
                             ? <><Clock size={13} /> Por horas</>
                             : liquidacionFilter === 'prestaciones'
-                            ? <><ListChecks size={13} /> Por prestaciones</>
-                            : 'Liquidación: todas'
+                                ? <><ListChecks size={13} /> Por prestaciones</>
+                                : liquidacionFilter === 'mensual'
+                                    ? <><DollarSign size={13} /> Mensual</>
+                                    : 'Liquidación: todas'
                         }
                     </button>
                     <div className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">

@@ -1324,7 +1324,7 @@ export async function resolverRegistro(
     const { error: updateError } = await getSupabase()
         .from('registro_horas')
         .update({
-            estado: 'Resuelto',
+            estado: 'approved',
             hora_ingreso: data.hora_ingreso || current.hora_ingreso,
             hora_egreso: data.hora_egreso || current.hora_egreso,
             horas: newHoras,
@@ -1375,7 +1375,7 @@ export async function resolverRegistro(
         usuario: data.resuelto_por,
         campo_modificado: 'estado',
         valor_anterior: current.estado,
-        valor_nuevo: 'Resuelto',
+        valor_nuevo: 'approved',
         motivo: data.nota_resolucion,
         metodo_verificacion: data.metodo_verificacion,
         evidencia_url: data.evidencia_url,
@@ -1406,7 +1406,7 @@ export async function anularRegistro(
     const { error: updateError } = await getSupabase()
         .from('registro_horas')
         .update({
-            estado: 'Anulado',
+            estado: 'rejected',
             nota_resolucion: motivo,
             resuelto_por: usuario,
             resuelto_fecha_hora: new Date().toISOString(),
@@ -1423,7 +1423,7 @@ export async function anularRegistro(
         usuario: usuario,
         campo_modificado: 'estado',
         valor_anterior: current.estado,
-        valor_nuevo: 'Anulado',
+        valor_nuevo: 'rejected',
         motivo: motivo,
     });
 

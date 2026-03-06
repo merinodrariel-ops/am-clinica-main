@@ -39,6 +39,8 @@ export interface WorkerProfile {
     pagado_mes_actual?: boolean;
     ultimo_pago_fecha?: string;
     ultimo_pago_monto?: number;
+    monto_mensual?: number;
+    datos_bancarios?: string;
 
     // UI/UX compatibility fields (mapping from personal table)
     full_name?: string; // Virtual field for UI
@@ -52,6 +54,7 @@ export interface WorkerProfile {
 
     // Billing mode: true = hourly rate, false = per-prestacion list
     cobra_por_horas?: boolean;
+    modelo_pago?: 'horas' | 'prestaciones' | 'mensual' | null;
 
     status?: 'active' | 'inactive' | 'on_leave';
     activo?: boolean;

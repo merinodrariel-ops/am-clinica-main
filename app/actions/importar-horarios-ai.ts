@@ -87,7 +87,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
                 hora_ingreso: r.hora_ingreso,
                 hora_egreso: r.hora_egreso,
                 horas: r.horas || 0,
-                estado: r.estado === 'observado' ? 'observado' : 'pending'
+                estado: r.estado === 'observado' || r.estado === 'Observado' ? 'observado' : 'pending'
             }));
 
         let insertedCount = 0;

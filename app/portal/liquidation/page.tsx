@@ -78,7 +78,7 @@ export default async function LiquidationPage() {
                                             <div>
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-white font-bold">{format(new Date(log.fecha), 'MMMM yyyy', { locale: es })}</span>
-                                                    {log.estado === 'Registrado' && (
+                                                    {log.estado === 'pending' && (
                                                         <span className="px-1.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[9px] font-bold uppercase">Validado</span>
                                                     )}
                                                 </div>

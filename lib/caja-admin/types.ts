@@ -130,6 +130,7 @@ export interface Personal {
     fecha_ingreso?: string;
     descripcion?: string;
     valor_hora_ars: number;
+    modelo_pago: 'horas' | 'prestaciones' | 'mensual';
     activo: boolean;
     pagado_mes_actual?: boolean;
     ultimo_pago_fecha?: string;
@@ -142,6 +143,8 @@ export interface Personal {
     consentimientos_urls?: string[];
     sanciones_notas?: string;
     porcentaje_honorarios?: number;
+    monto_mensual?: number;
+    datos_bancarios?: string;
     created_at?: string;
     updated_at?: string;
 }
@@ -259,6 +262,7 @@ export interface CreatePersonalInput {
     barrio_localidad?: string;
     condicion_afip?: 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro';
     valor_hora_ars?: number;
+    modelo_pago?: 'horas' | 'prestaciones' | 'mensual';
     empresa_prestadora_id?: string;
     descripcion?: string;
     fecha_ingreso?: string;
@@ -267,6 +271,8 @@ export interface CreatePersonalInput {
     especialidad?: string;
     poliza_url?: string;
     porcentaje_honorarios?: number;
+    monto_mensual?: number;
+    datos_bancarios?: string;
 }
 
 // Subtipos de movimientos

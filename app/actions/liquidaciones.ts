@@ -182,7 +182,7 @@ export async function generateLiquidacion(
             .eq('personal_id', personalId)
             .gte('fecha', startDate)
             .lte('fecha', endDate)
-            .in('estado', ['Registrado', 'Observado', 'Resuelto']); // Updated states
+            .in('estado', ['pending', 'observado', 'approved']); // English states for constraint compliance
 
         totalHoras = (logs || []).reduce((s, l) => s + Number(l.horas || 0), 0);
         const valorHora = Number(worker.valor_hora_ars || 0);

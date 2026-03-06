@@ -25,6 +25,10 @@ import {
     ChevronDown,
     Trash2,
     MessageCircle,
+    Copy,
+    ExternalLink,
+    Eye,
+    EyeOff,
 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -72,7 +76,7 @@ interface Props {
 }
 
 type MainTab = 'prestadores' | 'prestaciones' | 'horarios' | 'registros' | 'observados';
-type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza';
+type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza' | 'pago-hora' | 'pago-prestacion';
 
 type ProviderTypeOption = {
     value: string;
@@ -161,6 +165,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         cleaningHourValue: 0,
         staffGeneralHourValue: 0,
     });
+    const [visibleMontoIds, setVisibleMontoIds] = useState<Set<string>>(new Set());
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     function normalizeText(value?: string | null) {
         return (value || '')
@@ -302,6 +308,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             especialidad: p.especialidad || '',
             poliza_url: p.poliza_url || '',
             porcentaje_honorarios: p.porcentaje_honorarios || 0,
+            modelo_pago: p.modelo_pago || 'prestaciones',
+            monto_mensual: p.monto_mensual || 0,
+            datos_bancarios: p.datos_bancarios || '',
         });
         setShowForm(true);
     }
@@ -318,6 +327,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             lab: { tipo: 'prestador', area: 'Laboratorio' },
             limpieza: { tipo: 'prestador', area: 'Limpieza' },
             'staff-general': { tipo: 'prestador', area: 'Staff general' },
+            'pago-hora': { tipo: 'prestador', area: 'General' },
+            'pago-prestacion': { tipo: 'prestador', area: 'General' },
         };
 
         const defaults = activeProviderCategory === 'todos' ? byCategory.odontologos : byCategory[activeProviderCategory];
@@ -340,6 +351,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             especialidad: '',
             poliza_url: '',
             porcentaje_honorarios: 0,
+            modelo_pago: defaults.tipo === 'odontologo' ? 'prestaciones' : 'horas',
+            monto_mensual: 0,
+            datos_bancarios: '',
         });
         setShowForm(true);
     }
@@ -582,6 +596,21 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         }
     }
 
+    async function handleUpdateModeloPago(pId: string, modelo: 'horas' | 'prestaciones' | 'mensual') {
+        try {
+            const result = await updatePersonal(pId, { modelo_pago: modelo } as Partial<Personal>);
+            if (!result.success) {
+                alert(result.error || 'No se pudo actualizar el modelo de pago.');
+                return;
+            }
+            // Update local state without full reload for better UX
+            setPersonal(prev => prev.map(p => p.id === pId ? { ...p, modelo_pago: modelo } : p));
+        } catch (error) {
+            console.error('Error updating payment model:', error);
+            alert('Error al actualizar el modelo de pago');
+        }
+    }
+
     function getCriticalObservadosCount(personalId: string): number {
         const criticalThreshold = Date.now() - 48 * 60 * 60 * 1000;
 
@@ -717,6 +746,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     const providerCategories: Array<{ id: ProviderCategory | 'todos'; label: string }> = [
         { id: 'todos', label: 'Todos' },
+        { id: 'pago-hora', label: 'Por Hora' },
+        { id: 'pago-prestacion', label: 'Por Prestación' },
         { id: 'odontologos', label: 'Odontólogos' },
         { id: 'lab', label: 'Lab' },
         { id: 'staff-general', label: 'Staff general' },
@@ -727,6 +758,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const category = getPrestadorCategory(p);
         acc[category] += 1;
         acc['todos'] += 1;
+
+        const mode = p.modelo_pago || 'prestaciones';
+        if (mode === 'horas') {
+            acc['pago-hora'] += 1;
+        } else if (mode === 'prestaciones') {
+            acc['pago-prestacion'] += 1;
+        }
+
         return acc;
     }, {
         todos: 0,
@@ -734,13 +773,22 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         lab: 0,
         'staff-general': 0,
         limpieza: 0,
+        'pago-hora': 0,
+        'pago-prestacion': 0,
     });
 
     const filteredPrestadores = prestadores.filter((p) => {
         const hasSearch = searchTerm.trim() !== '';
 
-        if (!hasSearch && activeProviderCategory !== 'todos' && getPrestadorCategory(p) !== activeProviderCategory) {
-            return false;
+        if (!hasSearch && activeProviderCategory !== 'todos') {
+            const mode = p.modelo_pago || 'prestaciones';
+            if (activeProviderCategory === 'pago-hora') {
+                if (mode !== 'horas') return false;
+            } else if (activeProviderCategory === 'pago-prestacion') {
+                if (mode !== 'prestaciones') return false;
+            } else if (getPrestadorCategory(p) !== activeProviderCategory) {
+                return false;
+            }
         }
 
         return (
@@ -1063,27 +1111,53 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
                             {/* Form Body */}
                             <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)] space-y-6">
-                                {/* Provider Type */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Tipo de prestador *
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedProviderTypeValue}
-                                            onChange={(e) => handleProviderTypeChange(e.target.value)}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        >
-                                            {providerTypeOptions.map((option) => (
-                                                <option key={option.value} value={option.value}>{option.label}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                {/* Provider Type & Payment Model */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Tipo de prestador *
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={selectedProviderTypeValue}
+                                                onChange={(e) => handleProviderTypeChange(e.target.value)}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {providerTypeOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                        </div>
                                     </div>
-                                    <p className="mt-1 text-xs text-slate-500">
-                                        Los tipos se gestionan desde Configuracion {'>'} Tipos de Prestadores.
-                                    </p>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Modelo de Pago *
+                                        </label>
+                                        <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl gap-1 border border-slate-200 dark:border-slate-800">
+                                            {[
+                                                { id: 'horas', label: 'Hora' },
+                                                { id: 'prestaciones', label: 'Prestación' },
+                                                { id: 'mensual', label: 'Mensual' }
+                                            ].map((mode) => (
+                                                <button
+                                                    key={mode.id}
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, modelo_pago: mode.id as any })}
+                                                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.modelo_pago === mode.id
+                                                        ? "bg-white dark:bg-slate-800 text-indigo-600 shadow-sm border border-slate-200 dark:border-slate-700"
+                                                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                                                        }`}
+                                                >
+                                                    {mode.id === 'prestaciones' ? 'Prestación' : mode.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
+                                <p className="text-[10px] text-slate-400 -mt-2">
+                                    Define qué botón de carga rápida aparecerá en la ficha del prestador.
+                                </p>
 
                                 {/* Basic Info */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1241,98 +1315,120 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             placeholder="Ej: Palermo, CABA"
                                         />
                                     </div>
+                                </div>
 
-                                    {/* Payment Info */}
-                                    {formData.tipo !== 'odontologo' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="md:col-span-2 p-3 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400">
-                                                El valor hora se configura globalmente en Liquidaciones → Configuración de Valores.
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Odontólogo specific fields */}
-                                    {formData.tipo === 'odontologo' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                    <BadgeCheck className="w-4 h-4 inline mr-1" />
-                                                    Matricula nacional
-                                                </label>
-                                                <Input
-                                                    type="text"
-                                                    value={formData.matricula_provincial}
-                                                    onChange={(e) => setFormData({ ...formData, matricula_provincial: e.target.value })}
-                                                    className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                                                    placeholder="MN-12345"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                    <Shield className="w-4 h-4 inline mr-1" />
-                                                    Especialidad
-                                                </label>
-                                                <Input
-                                                    type="text"
-                                                    value={formData.especialidad}
-                                                    onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })}
-                                                    className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                                                    placeholder="Ej: Ortodoncia"
-                                                />
-                                            </div>
-                                            <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                    <FileText className="w-4 h-4 inline mr-1" />
-                                                    Seguro de mala praxis (PDF)
-                                                </label>
-                                                <div className="flex flex-wrap items-center gap-3">
-                                                    <input
-                                                        type="file"
-                                                        accept="application/pdf"
-                                                        disabled={uploadingPoliza || !editingPersonal}
-                                                        onChange={async (e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (!file) return;
-                                                            await handleUploadPoliza(file);
-                                                            e.currentTarget.value = '';
-                                                        }}
-                                                        className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-white hover:file:bg-indigo-700 disabled:opacity-60"
-                                                    />
-                                                    {uploadingPoliza && (
-                                                        <span className="text-xs text-slate-500">Subiendo PDF...</span>
-                                                    )}
-                                                </div>
-                                                {!editingPersonal && (
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                        Guarda primero el prestador para habilitar el adjunto.
-                                                    </p>
-                                                )}
-                                                {formData.poliza_url && (
-                                                    <a
-                                                        href={formData.poliza_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="mt-2 inline-flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-700"
-                                                    >
-                                                        Ver PDF adjunto
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Description */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Notas / Descripción
+                                            <DollarSign className="w-4 h-4 inline mr-1" />
+                                            Monto Mensual Estipulado
+                                        </label>
+                                        <MoneyInput
+                                            value={formData.monto_mensual || 0}
+                                            onChange={(val) => setFormData({ ...formData, monto_mensual: val })}
+                                            currency="ARS"
+                                            className="w-full"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-1">
+                                            Sueldo fijo mensual acordado (solo se usa si el modelo es Mensual).
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            <Building2 className="w-4 h-4 inline mr-1" />
+                                            Datos Bancarios
                                         </label>
                                         <Textarea
-                                            value={formData.descripcion}
-                                            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[80px]"
-                                            placeholder="Información adicional..."
+                                            value={formData.datos_bancarios || ''}
+                                            onChange={(e) => setFormData({ ...formData, datos_bancarios: e.target.value })}
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            placeholder="CBU, Alias, Banco..."
+                                            rows={2}
                                         />
                                     </div>
+                                </div>
+
+                                {/* Odontólogo specific fields */}
+                                {formData.tipo === 'odontologo' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <BadgeCheck className="w-4 h-4 inline mr-1" />
+                                                Matricula nacional
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                value={formData.matricula_provincial}
+                                                onChange={(e) => setFormData({ ...formData, matricula_provincial: e.target.value })}
+                                                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                                placeholder="MN-12345"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <Shield className="w-4 h-4 inline mr-1" />
+                                                Especialidad
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                value={formData.especialidad}
+                                                onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })}
+                                                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                                placeholder="Ej: Ortodoncia"
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                <FileText className="w-4 h-4 inline mr-1" />
+                                                Seguro de mala praxis (PDF)
+                                            </label>
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <input
+                                                    type="file"
+                                                    accept="application/pdf"
+                                                    disabled={uploadingPoliza || !editingPersonal}
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        await handleUploadPoliza(file);
+                                                        e.currentTarget.value = '';
+                                                    }}
+                                                    className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-white hover:file:bg-indigo-700 disabled:opacity-60"
+                                                />
+                                                {uploadingPoliza && (
+                                                    <span className="text-xs text-slate-500">Subiendo PDF...</span>
+                                                )}
+                                            </div>
+                                            {!editingPersonal && (
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    Guarda primero el prestador para habilitar el adjunto.
+                                                </p>
+                                            )}
+                                            {formData.poliza_url && (
+                                                <a
+                                                    href={formData.poliza_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="mt-2 inline-flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-700"
+                                                >
+                                                    Ver PDF adjunto
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Description */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Notas / Descripción
+                                    </label>
+                                    <Textarea
+                                        value={formData.descripcion}
+                                        onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[80px]"
+                                        placeholder="Información adicional..."
+                                    />
                                 </div>
                             </div>
 
@@ -1530,115 +1626,241 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             </AnimatePresence>
 
             {/* Prestadores Tab Content */}
-            {activeTab === 'prestadores' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredPrestadores.length === 0 ? (
-                        <div className="col-span-full p-12 text-center text-slate-400">
-                            <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                            <p>No hay prestadores en {activeProviderLabel}</p>
-                        </div>
-                    ) : (
-                        filteredPrestadores.map((p) => (
-                            <motion.div
-                                key={p.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md transition-shadow"
-                            >
-                                <div className="flex items-start gap-3 mb-4">
-                                    <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center flex-shrink-0">
-                                        {p.foto_url ? (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={p.foto_url} alt={p.nombre} className="w-12 h-12 rounded-full object-cover" />
-                                        ) : (
-                                            isOdontologoTipo(p.tipo)
-                                                ? <Stethoscope className="w-6 h-6 text-emerald-600" />
-                                                : <User className="w-6 h-6 text-indigo-600" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-semibold truncate">{p.nombre} {p.apellido}</h4>
-                                        <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                            {p.area || p.rol}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => openEditForm(p)}
-                                            className="h-8 w-8 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
-                                        >
-                                            <Pencil className="w-4 h-4" />
-                                        </Button>
-                                        {role === 'owner' && (
+            {
+                activeTab === 'prestadores' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredPrestadores.length === 0 ? (
+                            <div className="col-span-full p-12 text-center text-slate-400">
+                                <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                <p>No hay prestadores en {activeProviderLabel}</p>
+                            </div>
+                        ) : (
+                            filteredPrestadores.map((p) => (
+                                <motion.div
+                                    key={p.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md transition-shadow"
+                                >
+                                    <div className="flex items-start gap-3 mb-4">
+                                        <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center flex-shrink-0">
+                                            {p.foto_url ? (
+                                                /* eslint-disable-next-line @next/next/no-img-element */
+                                                <img src={p.foto_url} alt={p.nombre} className="w-12 h-12 rounded-full object-cover" />
+                                            ) : (
+                                                isOdontologoTipo(p.tipo)
+                                                    ? <Stethoscope className="w-6 h-6 text-emerald-600" />
+                                                    : <User className="w-6 h-6 text-indigo-600" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-semibold truncate">{p.nombre} {p.apellido}</h4>
+                                            <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                                {p.area || p.rol}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => handleDeletePersonal(p)}
-                                                disabled={deletingPersonalId === p.id}
-                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
-                                                title="Eliminar prestador"
+                                                onClick={() => openEditForm(p)}
+                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Pencil className="w-4 h-4" />
                                             </Button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 text-sm">
-                                    {p.email && (
-                                        <div className="flex items-center gap-2 text-slate-500">
-                                            <Mail className="w-4 h-4" />
-                                            <span className="truncate">{p.email}</span>
-                                        </div>
-                                    )}
-                                    {p.whatsapp && (
-                                        <div className="flex items-center justify-between gap-2 text-slate-500">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <Phone className="w-4 h-4" />
-                                                <span className="truncate">{p.whatsapp}</span>
-                                            </div>
-                                            {getWhatsAppLink(p.whatsapp) && (
-                                                <a
-                                                    href={getWhatsAppLink(p.whatsapp)!}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    title="Contactar por WhatsApp"
-                                                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors text-xs font-medium"
+                                            {role === 'owner' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleDeletePersonal(p)}
+                                                    disabled={deletingPersonalId === p.id}
+                                                    className="h-8 w-8 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                                                    title="Eliminar prestador"
                                                 >
-                                                    <MessageCircle className="w-4 h-4" />
-                                                    <span>Contactar</span>
-                                                </a>
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
                                             )}
                                         </div>
-                                    )}
-                                    {p.condicion_afip && (
-                                        <div className="flex items-center gap-2">
-                                            <Building2 className="w-4 h-4 text-slate-400" />
-                                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 capitalize">
-                                                {p.condicion_afip.replace('_', ' ')}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
+                                    </div>
 
-                                {isOdontologoTipo(p.tipo) && (
-                                    <Button
-                                        onClick={() => openPrestacionForm(p.id)}
-                                        className="w-full mt-4 flex items-center justify-center gap-2 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors font-medium text-sm h-auto"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        Registrar Prestación
-                                    </Button>
-                                )}
+                                    <div className="space-y-2 text-sm">
+                                        {p.email && (
+                                            <div className="flex items-center gap-2 text-slate-500">
+                                                <Mail className="w-4 h-4" />
+                                                <span className="truncate">{p.email}</span>
+                                            </div>
+                                        )}
+                                        {p.whatsapp && (
+                                            <div className="flex items-center justify-between gap-2 text-slate-500">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <Phone className="w-4 h-4" />
+                                                    <span className="truncate">{p.whatsapp}</span>
+                                                </div>
+                                                {getWhatsAppLink(p.whatsapp) && (
+                                                    <a
+                                                        href={getWhatsAppLink(p.whatsapp)!}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="Contactar por WhatsApp"
+                                                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors text-xs font-medium"
+                                                    >
+                                                        <MessageCircle className="w-4 h-4" />
+                                                        <span>Contactar</span>
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+                                        {p.condicion_afip && (
+                                            <div className="flex items-center gap-2">
+                                                <Building2 className="w-4 h-4 text-slate-400" />
+                                                <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 capitalize">
+                                                    {p.condicion_afip.replace('_', ' ')}
+                                                </span>
+                                            </div>
+                                        )}
 
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )
-            }
+                                        {/* Monthly Amount Display with eye toggle */}
+                                        {(p.modelo_pago === 'mensual' || (!p.modelo_pago && !isOdontologoTipo(p.tipo))) && (
+                                            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700/50">
+                                                <div className="flex items-center gap-2">
+                                                    <DollarSign className="w-4 h-4 text-emerald-500" />
+                                                    <span className="text-[11px] font-medium text-slate-500">Monto Mensual:</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">
+                                                        {visibleMontoIds.has(p.id)
+                                                            ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(p.monto_mensual || 0)
+                                                            : '********'}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => {
+                                                            const next = new Set(visibleMontoIds);
+                                                            if (next.has(p.id)) next.delete(p.id);
+                                                            else next.add(p.id);
+                                                            setVisibleMontoIds(next);
+                                                        }}
+                                                        className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
+                                                    >
+                                                        {visibleMontoIds.has(p.id) ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Bank Details with Copy Button */}
+                                        {p.datos_bancarios && (
+                                            <div className="mt-2 group/bank relative">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Datos Bancarios</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(p.datos_bancarios || '');
+                                                            setCopiedId(p.id);
+                                                            setTimeout(() => setCopiedId(null), 2000);
+                                                        }}
+                                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                                    >
+                                                        {copiedId === p.id ? <Check size={10} /> : <Copy size={10} />}
+                                                        <span className="text-[9px] font-bold uppercase">{copiedId === p.id ? 'Copiado' : 'Copiar'}</span>
+                                                    </button>
+                                                </div>
+                                                <div className="text-[11px] text-slate-600 dark:text-slate-400 p-2 rounded-lg bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100/30 dark:border-indigo-800/20 whitespace-pre-wrap line-clamp-2 hover:line-clamp-none transition-all">
+                                                    {p.datos_bancarios}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Billing Mode Toggles */}
+                                    <div className="flex bg-slate-100 dark:bg-slate-700/50 p-1 rounded-lg gap-1 border border-slate-200 dark:border-slate-600 mt-2">
+                                        {[
+                                            { id: 'horas', label: 'Hora' },
+                                            { id: 'prestaciones', label: 'Prestación' },
+                                            { id: 'mensual', label: 'Mensual' }
+                                        ].map((mode) => {
+                                            const currentMode = p.modelo_pago || 'prestaciones';
+                                            const isActive = currentMode === mode.id;
+                                            return (
+                                                <button
+                                                    key={mode.id}
+                                                    onClick={() => handleUpdateModeloPago(p.id, mode.id as any)}
+                                                    className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${isActive
+                                                        ? "bg-white dark:bg-slate-600 text-indigo-600 shadow-sm"
+                                                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-600/40"
+                                                        }`}
+                                                >
+                                                    {mode.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                                        {/* Action Buttons based on Payment Model */}
+                                        {(() => {
+                                            const mode = p.modelo_pago || 'prestaciones';
+
+                                            if (mode === 'prestaciones') {
+                                                return (
+                                                    <Button
+                                                        onClick={() => openPrestacionForm(p.id)}
+                                                        className="w-full h-auto py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl shadow-lg shadow-emerald-100 dark:shadow-none hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center gap-1 group border-0"
+                                                    >
+                                                        <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
+                                                            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                                                            Cargar Prestaciones
+                                                        </div>
+                                                        <span className="text-[10px] opacity-70 font-medium">Pago por procedimiento</span>
+                                                    </Button>
+                                                );
+                                            }
+
+                                            if (mode === 'horas') {
+                                                return (
+                                                    <Button
+                                                        onClick={() => {
+                                                            setHorasForm({
+                                                                personal_id: p.id,
+                                                                fecha: new Date().toISOString().split('T')[0],
+                                                                horas: 0,
+                                                                observaciones: '',
+                                                            });
+                                                            setShowHorasForm(true);
+                                                        }}
+                                                        className="w-full h-auto py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-100 dark:shadow-none hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center gap-1 group border-0"
+                                                    >
+                                                        <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
+                                                            <Clock className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                            Cargar Horas
+                                                        </div>
+                                                        <span className="text-[10px] opacity-70 font-medium">Ingreso de tiempo</span>
+                                                    </Button>
+                                                );
+                                            }
+
+                                            if (mode === 'mensual') {
+                                                return (
+                                                    <Button
+                                                        onClick={() => alert('Próximamente: Carga de Mensualidad')}
+                                                        className="w-full h-auto py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-100 dark:shadow-none hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center gap-1 group border-0"
+                                                    >
+                                                        <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
+                                                            <DollarSign className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                            Cargar Mensualidad
+                                                        </div>
+                                                        <span className="text-[10px] opacity-70 font-medium">Pago fijo mensual</span>
+                                                    </Button>
+                                                );
+                                            }
+
+                                            return null;
+                                        })()}
+                                    </div>
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
+                )}
 
             {/* Registros & Liquidaciones Tab Content */}
             {
@@ -1897,14 +2119,18 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             }
 
             {/* Prestaciones Tab Content */}
-            {activeTab === 'prestaciones' && (
-                <PrestacionesTab />
-            )}
+            {
+                activeTab === 'prestaciones' && (
+                    <PrestacionesTab />
+                )
+            }
 
             {/* Horarios Tab Content */}
-            {activeTab === 'horarios' && (
-                <HorariosTab />
-            )}
+            {
+                activeTab === 'horarios' && (
+                    <HorariosTab />
+                )
+            }
 
             {/* Observados Tab */}
             {

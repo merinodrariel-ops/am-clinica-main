@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
-import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Star, Sparkles } from 'lucide-react';
+import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Star, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-    previewProsoftImportSafe, importProsoftDataSafe,
+    previewProsoftFileSafe, importProsoftPreviewSafe,
     getAllPersonalBasic, saveProsoftMapping,
     getProsoftMappings, deleteProsoftMapping,
     ProsoftPreview,
@@ -33,7 +33,8 @@ type ProsoftFila = ProsoftPreview['filas'][number];
 type ProsoftRegistro = ProsoftFila['registros'][number];
 
 export default function ProsoftImporter() {
-    const [url, setUrl] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     const [preview, setPreview] = useState<ProsoftPreview | null>(null);
     const [loading, setLoading] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -67,14 +68,15 @@ export default function ProsoftImporter() {
         getProsoftMappings().then(setSavedMappings).catch(() => { });
     }, []);
 
-    async function handlePreview() {
-        if (!url.trim()) { toast.error('Ingresá el link de la planilla Prosoft'); return; }
+    async function handlePreview(selectedFile: File) {
         setLoading(true);
         setPreview(null);
         setResult(null);
         setPendingMaps({});
         try {
-            const previewResult = await previewProsoftImportSafe(url.trim());
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            const previewResult = await previewProsoftFileSafe(formData);
             if (!previewResult.success) {
                 toast.error(previewResult.error);
                 return;
@@ -94,7 +96,7 @@ export default function ProsoftImporter() {
         if (!preview) return;
         setImporting(true);
         try {
-            const importResult = await importProsoftDataSafe(url.trim(), undefined, true);
+            const importResult = await importProsoftPreviewSafe(preview, true);
             if (!importResult.success) {
                 toast.error(importResult.error);
                 return;
@@ -376,26 +378,50 @@ export default function ProsoftImporter() {
                 </div>
             )}
 
-            {/* Inputs */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-                <input
-                    type="url"
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="https://docs.google.com/spreadsheets/d/..."
-                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
-                />
-                <button
-                    onClick={handlePreview}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-60 text-white text-sm font-medium rounded-xl transition-colors"
-                >
-                    {loading
-                        ? <RefreshCw size={14} className="animate-spin" />
-                        : <Search size={14} />
+            {/* Inputs Dropzone */}
+            <div
+                className={`relative flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl transition-colors ${
+                    isDragging
+                        ? 'border-teal-500 bg-teal-500/10'
+                        : 'border-slate-700 bg-slate-800/50 hover:bg-slate-800'
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const droppedFile = e.dataTransfer.files?.[0];
+                    if (droppedFile) {
+                        setFile(droppedFile);
+                        handlePreview(droppedFile);
                     }
-                    Vista previa
-                </button>
+                }}
+            >
+                <input
+                    type="file"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".csv, .xls, .xlsx"
+                    onChange={(e) => {
+                        const selectedFile = e.target.files?.[0];
+                        if (selectedFile) {
+                            setFile(selectedFile);
+                            handlePreview(selectedFile);
+                        }
+                    }}
+                />
+                <div className="text-center pointer-events-none">
+                    {loading ? (
+                        <Loader2 className="w-10 h-10 animate-spin text-teal-500 mx-auto mb-4" />
+                    ) : (
+                        <Upload className="w-10 h-10 text-slate-400 mx-auto mb-4" />
+                    )}
+                    <p className="text-sm font-medium text-white">
+                        {loading ? 'Procesando archivo...' : 'Haz clic para subir o arrastra tu archivo aquí'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-2">
+                        Acepta archivos .xls, .xlsx, .csv generados por Prosoft
+                    </p>
+                </div>
             </div>
 
             {preview && (
@@ -809,7 +835,7 @@ export default function ProsoftImporter() {
                         )}
 
                         <button
-                            onClick={() => { setResult(null); setPreview(null); setUrl(''); }}
+                            onClick={() => { setResult(null); setPreview(null); setFile(null); }}
                             className="text-xs text-slate-400 hover:text-white transition-colors"
                         >
                             ← Nueva importación
