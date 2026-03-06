@@ -1169,65 +1169,51 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                             )}
 
                             {/* Sharing actions */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <Button
-                                    onClick={() => {
-                                        if (!generatedReceiptUrl || !receiptCanvasRef.current) return;
-                                        if (navigator.share) {
-                                            receiptCanvasRef.current.toBlob(async (blob) => {
-                                                if (!blob) return;
-                                                const file = new File([blob], 'comprobante.jpg', { type: 'image/jpeg' });
-                                                try {
-                                                    await navigator.share({
-                                                        files: [file],
-                                                        title: 'Comprobante de Pago AM Clínica',
-                                                        text: `Comprobante ${formData.paciente_nombre} — AM Clínica`,
-                                                    });
-                                                } catch { /* cancelled */ }
-                                            }, 'image/jpeg', 0.9);
+                            {/* PRIMARY: Send as image via WhatsApp app (Windows/mobile) */}
+                            <Button
+                                onClick={() => {
+                                    if (!generatedReceiptUrl || !receiptCanvasRef.current) return;
+                                    receiptCanvasRef.current.toBlob(async (blob) => {
+                                        if (!blob) return;
+                                        const file = new File([blob], 'comprobante-AM-Clinica.jpg', { type: 'image/jpeg' });
+                                        if (navigator.canShare?.({ files: [file] })) {
+                                            try {
+                                                await navigator.share({
+                                                    files: [file],
+                                                    title: 'Comprobante AM Clínica',
+                                                });
+                                            } catch { /* cancelled */ }
                                         } else {
-                                            // Fallback: download
+                                            // Fallback: download so user can attach manually
                                             const link = document.createElement('a');
                                             link.href = generatedReceiptUrl;
-                                            link.download = 'comprobante.jpg';
+                                            link.download = 'comprobante-AM-Clinica.jpg';
                                             link.click();
                                         }
-                                    }}
-                                    disabled={!generatedReceiptUrl}
-                                    className="py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
-                                >
-                                    📱 Compartir
-                                </Button>
+                                    }, 'image/jpeg', 0.95);
+                                }}
+                                disabled={!generatedReceiptUrl}
+                                className="w-full py-4 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2 text-base"
+                            >
+                                📲 Enviar como imagen por WhatsApp
+                            </Button>
+                            <p className="text-xs text-center text-gray-400 -mt-2">
+                                Abre WhatsApp (app de Windows o móvil) y adjunta la imagen automáticamente
+                            </p>
 
-                                <Button
-                                    onClick={() => {
-                                        if (!generatedReceiptUrl) return;
-                                        const digits = patientWhatsapp.replace(/\D/g, '');
-                                        const text = `Hola! Te compartimos tu comprobante de pago de AM Clínica.\nConcepto: ${formData.concepto_nombre}\nMonto: ${formatCurrency(formData.monto, formData.moneda)}`;
-                                        const encoded = encodeURIComponent(text);
-                                        const url = digits
-                                            ? `https://web.whatsapp.com/send?phone=${digits}&text=${encoded}`
-                                            : `https://web.whatsapp.com/send?text=${encoded}`;
-                                        window.open(url, '_blank', 'noopener,noreferrer');
-                                    }}
-                                    disabled={!generatedReceiptUrl}
-                                    className="py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
-                                >
-                                    💬 WhatsApp Web
-                                </Button>
-
+                            <div className="grid grid-cols-2 gap-3">
                                 <Button
                                     onClick={() => {
                                         if (!generatedReceiptUrl) return;
                                         const link = document.createElement('a');
                                         link.href = generatedReceiptUrl;
-                                        link.download = 'comprobante.jpg';
+                                        link.download = 'comprobante-AM-Clinica.jpg';
                                         link.click();
                                     }}
                                     disabled={!generatedReceiptUrl}
-                                    className="py-3 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
+                                    className="py-3 bg-gray-700 hover:bg-gray-800 text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
                                 >
-                                    💾 Descargar
+                                    💾 Descargar JPG
                                 </Button>
 
                                 <Button
