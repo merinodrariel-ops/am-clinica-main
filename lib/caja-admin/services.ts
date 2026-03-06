@@ -172,6 +172,52 @@ export async function updateSucursalValoresHora(sucursalId: string, valores: { s
 }
 
 // =============================================
+// Histórico de Valores Hora
+// =============================================
+
+export async function getValoresHoraHistoria(sucursalId: string): Promise<import('./types').ValoresHoraHistoria[]> {
+    const { data, error } = await getSupabase()
+        .from('sucursal_valores_hora_historia')
+        .select('*')
+        .eq('sucursal_id', sucursalId)
+        .order('fecha_desde', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching valores hora historia:', error);
+        return [];
+    }
+    return data || [];
+}
+
+export async function createValoresHoraHistoriaEntry(
+    sucursalId: string,
+    entrada: { fecha_desde: string; valor_hora_staff_ars: number; valor_hora_limpieza_ars: number; notas?: string }
+): Promise<{ success: boolean; error?: string }> {
+    const { error } = await getSupabase()
+        .from('sucursal_valores_hora_historia')
+        .upsert({
+            sucursal_id: sucursalId,
+            fecha_desde: entrada.fecha_desde,
+            valor_hora_staff_ars: entrada.valor_hora_staff_ars,
+            valor_hora_limpieza_ars: entrada.valor_hora_limpieza_ars,
+            notas: entrada.notas || null,
+        }, { onConflict: 'sucursal_id,fecha_desde' });
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+export async function deleteValoresHoraHistoriaEntry(id: string): Promise<{ success: boolean; error?: string }> {
+    const { error } = await getSupabase()
+        .from('sucursal_valores_hora_historia')
+        .delete()
+        .eq('id', id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+// =============================================
 // Cuentas Financieras
 // =============================================
 
@@ -737,6 +783,7 @@ export async function createPersonalArea(input: Partial<PersonalArea>): Promise<
     const payload = {
         nombre: (input.nombre || '').trim(),
         descripcion: input.descripcion || null,
+        tipo_personal: 'prestador', // legacy DB constraint, not shown in UI
         modelo_liquidacion: input.modelo_liquidacion || 'prestaciones',
         color: input.color || '#6366f1',
         icono: input.icono || 'User',

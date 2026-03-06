@@ -27,8 +27,6 @@ import {
     MessageCircle,
     Copy,
     ExternalLink,
-    Eye,
-    EyeOff,
     Settings,
     Info,
 } from 'lucide-react';
@@ -173,7 +171,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         cleaningHourValue: 0,
         staffGeneralHourValue: 0,
     });
-    const [visibleMontoIds, setVisibleMontoIds] = useState<Set<string>>(new Set());
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
     function normalizeText(value?: string | null) {
@@ -1928,34 +1925,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 capitalize">
                                                     {p.condicion_afip.replace('_', ' ')}
                                                 </span>
-                                            </div>
-                                        )}
-
-                                        {/* Monthly Amount Display with eye toggle */}
-                                        {p.modelo_pago === 'mensual' && (
-                                            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700/50">
-                                                <div className="flex items-center gap-2">
-                                                    <DollarSign className="w-4 h-4 text-emerald-500" />
-                                                    <span className="text-[11px] font-medium text-slate-500">Mensualidad (Monto):</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">
-                                                        {visibleMontoIds.has(p.id)
-                                                            ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: p.moneda_mensual === 'USD' ? 'USD' : 'ARS' }).format(p.monto_mensual || 0)
-                                                            : '********'}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => {
-                                                            const next = new Set(visibleMontoIds);
-                                                            if (next.has(p.id)) next.delete(p.id);
-                                                            else next.add(p.id);
-                                                            setVisibleMontoIds(next);
-                                                        }}
-                                                        className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
-                                                    >
-                                                        {visibleMontoIds.has(p.id) ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                    </button>
-                                                </div>
                                             </div>
                                         )}
 

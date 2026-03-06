@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Building2,
     Receipt,
     Archive,
     Users,
@@ -219,25 +218,6 @@ function CajaAdminContent() {
                         </div>
 
                         <div className="flex items-center gap-4">
-                            {/* Sucursal Selector */}
-                            <div className="flex items-center gap-2 glass-card rounded-xl px-4 py-2 border border-white/10 bg-navy-900/50">
-                                <Building2 className="w-5 h-5 text-indigo-400" />
-                                <select
-                                    value={selectedSucursal?.id || ''}
-                                    onChange={(e) => {
-                                        const s = sucursales.find(s => s.id === e.target.value);
-                                        setSelectedSucursal(s || null);
-                                    }}
-                                    className="bg-transparent border-none outline-none text-sm font-medium text-slate-200 cursor-pointer [&>option]:bg-navy-900"
-                                >
-                                    {sucursales.map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.nombre} ({s.modo_caja})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
                             {/* TC BNA (only for ARS) */}
                             {selectedSucursal?.moneda_local === 'ARS' && (
                                 <div className="flex items-center gap-2 glass-card bg-emerald-500/10 rounded-xl px-4 py-2 border border-emerald-500/20">

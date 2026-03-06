@@ -63,7 +63,7 @@ export async function getAssignableTodoMembersAction(): Promise<{ success: boole
             return { success: false, data: [], error: profilesError.message };
         }
 
-        const data = (profilesData || []).map((row) => ({
+        const data = (profilesData || []).map((row: any) => ({
             id: `profile:${row.id}`,
             full_name: row.full_name,
             categoria: row.categoria || 'prestador',

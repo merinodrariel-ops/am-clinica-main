@@ -326,7 +326,7 @@ export default function TodosPage() {
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'todos', filter: `assigned_to_id=eq.${user.id}` },
-                (payload) => {
+                (payload: any) => {
                     const t = payload.new as Todo;
                     const by = t.created_by_name ? ` — de ${t.created_by_name}` : '';
                     toast(`📌 Nueva tarea asignada a vos${by}`, {

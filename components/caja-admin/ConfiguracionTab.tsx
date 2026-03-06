@@ -24,8 +24,8 @@ import {
     deleteCategoria
 } from "@/lib/caja-admin/services";
 import { getPersonal, getPersonalAreas, createPersonalArea, togglePersonalActivo, updatePersonalArea } from "@/lib/caja-admin";
-import { updateSucursalValoresHora } from "@/lib/caja-admin/services";
-import { CajaAdminCategoria, Sucursal, Personal } from "@/lib/caja-admin/types";
+import { updateSucursalValoresHora, getValoresHoraHistoria, createValoresHoraHistoriaEntry, deleteValoresHoraHistoriaEntry } from "@/lib/caja-admin/services";
+import { CajaAdminCategoria, Sucursal, Personal, ValoresHoraHistoria } from "@/lib/caja-admin/types";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
@@ -130,11 +130,12 @@ export default function ConfiguracionTab({ sucursal }: Props) {
     const [personalLoading, setPersonalLoading] = useState(true);
     const [personalError, setPersonalError] = useState<string | null>(null);
     const [updatingPersonalId, setUpdatingPersonalId] = useState<string | null>(null);
-    const [areas, setAreas] = useState<Array<{ id: string; nombre: string; modelo_liquidacion: string; activo: boolean; orden: number }>>([]);
+    const [areas, setAreas] = useState<Array<{ id: string; nombre: string; modelo_liquidacion: string; moneda_liquidacion: string; activo: boolean; orden: number }>>([]);
     const [areasLoading, setAreasLoading] = useState(true);
     const [newAreaName, setNewAreaName] = useState('');
     const [newAreaModelo, setNewAreaModelo] = useState<'horas' | 'mensual' | 'prestaciones'>('prestaciones');
     const [updatingAreaId, setUpdatingAreaId] = useState<string | null>(null);
+    const [updatingAreaModelo, setUpdatingAreaModelo] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [editingItem, setEditingItem] = useState<Partial<CajaAdminCategoria>>({});
@@ -145,6 +146,16 @@ export default function ConfiguracionTab({ sucursal }: Props) {
     const [valorHoraLimpieza, setValorHoraLimpieza] = useState<number>(sucursal.valor_hora_limpieza_ars || 0);
     const [isSavingValoresHora, setIsSavingValoresHora] = useState(false);
 
+    // Historical rates
+    const [valoresHoraHistoria, setValoresHoraHistoria] = useState<ValoresHoraHistoria[]>([]);
+    const [isLoadingHistoria, setIsLoadingHistoria] = useState(false);
+    const [showAddPeriodo, setShowAddPeriodo] = useState(false);
+    const [newPeriodoFecha, setNewPeriodoFecha] = useState('');
+    const [newPeriodoStaff, setNewPeriodoStaff] = useState<number>(sucursal.valor_hora_staff_ars || 0);
+    const [newPeriodoLimpieza, setNewPeriodoLimpieza] = useState<number>(sucursal.valor_hora_limpieza_ars || 0);
+    const [newPeriodoNotas, setNewPeriodoNotas] = useState('');
+    const [isSavingPeriodo, setIsSavingPeriodo] = useState(false);
+
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
     );
@@ -153,8 +164,16 @@ export default function ConfiguracionTab({ sucursal }: Props) {
         loadData();
         loadPersonal();
         loadAreas();
+        loadValoresHoraHistoria();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sucursal.id]);
+
+    async function loadValoresHoraHistoria() {
+        setIsLoadingHistoria(true);
+        const data = await getValoresHoraHistoria(sucursal.id);
+        setValoresHoraHistoria(data);
+        setIsLoadingHistoria(false);
+    }
 
     async function loadData() {
         setIsLoading(true);
@@ -227,6 +246,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                 id: item.id,
                 nombre: item.nombre,
                 modelo_liquidacion: item.modelo_liquidacion || 'prestaciones',
+                moneda_liquidacion: item.moneda_liquidacion || 'ARS',
                 activo: item.activo,
                 orden: item.orden,
             })));
@@ -293,6 +313,34 @@ export default function ConfiguracionTab({ sucursal }: Props) {
         }
     }
 
+    async function handleUpdateAreaModelo(areaId: string, modelo: 'horas' | 'mensual' | 'prestaciones') {
+        setUpdatingAreaModelo(areaId);
+        try {
+            const result = await updatePersonalArea(areaId, { modelo_liquidacion: modelo });
+            if (!result.success) {
+                alert(result.error || 'No se pudo actualizar el modelo de liquidación');
+                return;
+            }
+            setAreas((prev) => prev.map((item) => item.id === areaId ? { ...item, modelo_liquidacion: modelo } : item));
+        } finally {
+            setUpdatingAreaModelo(null);
+        }
+    }
+
+    async function handleUpdateAreaMoneda(areaId: string, moneda: 'ARS' | 'USD') {
+        setUpdatingAreaModelo(areaId); // reuse same loading state
+        try {
+            const result = await updatePersonalArea(areaId, { moneda_liquidacion: moneda });
+            if (!result.success) {
+                alert(result.error || 'No se pudo actualizar la moneda');
+                return;
+            }
+            setAreas((prev) => prev.map((item) => item.id === areaId ? { ...item, moneda_liquidacion: moneda } : item));
+        } finally {
+            setUpdatingAreaModelo(null);
+        }
+    }
+
     async function handleSaveValoresHora() {
         if (!canManageProviderStatus) return;
         setIsSavingValoresHora(true);
@@ -311,6 +359,50 @@ export default function ConfiguracionTab({ sucursal }: Props) {
         } finally {
             setIsSavingValoresHora(false);
         }
+    }
+
+    async function handleSavePeriodo() {
+        if (!canManageProviderStatus || !newPeriodoFecha) return;
+        setIsSavingPeriodo(true);
+        try {
+            const res = await createValoresHoraHistoriaEntry(sucursal.id, {
+                fecha_desde: newPeriodoFecha,
+                valor_hora_staff_ars: newPeriodoStaff,
+                valor_hora_limpieza_ars: newPeriodoLimpieza,
+                notas: newPeriodoNotas || undefined,
+            });
+            if (!res.success) {
+                alert(res.error || 'No se pudo guardar el período');
+                return;
+            }
+            // If this is the most recent entry, also sync sucursal + personal
+            const reloaded = await getValoresHoraHistoria(sucursal.id);
+            setValoresHoraHistoria(reloaded);
+            const vigente = reloaded[0]; // sorted DESC by fecha_desde
+            if (vigente && vigente.fecha_desde === newPeriodoFecha) {
+                await updateSucursalValoresHora(sucursal.id, {
+                    staff: vigente.valor_hora_staff_ars,
+                    limpieza: vigente.valor_hora_limpieza_ars,
+                });
+                setValorHoraStaff(vigente.valor_hora_staff_ars);
+                setValorHoraLimpieza(vigente.valor_hora_limpieza_ars);
+            }
+            setShowAddPeriodo(false);
+            setNewPeriodoFecha('');
+            setNewPeriodoNotas('');
+        } finally {
+            setIsSavingPeriodo(false);
+        }
+    }
+
+    async function handleDeletePeriodo(id: string) {
+        if (!confirm('¿Eliminar este período histórico?')) return;
+        const res = await deleteValoresHoraHistoriaEntry(id);
+        if (!res.success) {
+            alert(res.error || 'No se pudo eliminar');
+            return;
+        }
+        setValoresHoraHistoria(prev => prev.filter(v => v.id !== id));
     }
 
     function handleAdd() {
@@ -426,72 +518,182 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                         : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
                         }`}
                 >
-                    Valores Hora Staff
+                    Valores Hora
                 </button>
             </div>
 
             {providerConfigTab === "valores-hora" && (
                 <div className="space-y-4">
-                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4">
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Valores por Hora Generales (ARS)</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            Configurá acá los valores estándar por hora. Si guardás, todos los prestadores activos del tipo "Staff General", "Administración", "Recepción" o "Limpieza" que estén en modalidad por horas se actualizarán automáticamente.
-                        </p>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4 flex-1">
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Histórico de Valores Hora (ARS)</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                Cada período define los valores que se usarán al liquidar horas de ese mes. Siempre se aplica el valor vigente más reciente anterior o igual a la fecha de la liquidación.
+                            </p>
+                        </div>
+                        {canManageProviderStatus && (
+                            <button
+                                onClick={() => {
+                                    setShowAddPeriodo(true);
+                                    setNewPeriodoStaff(sucursal.valor_hora_staff_ars || 0);
+                                    setNewPeriodoLimpieza(sucursal.valor_hora_limpieza_ars || 0);
+                                    setNewPeriodoNotas('');
+                                    setNewPeriodoFecha('');
+                                }}
+                                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm whitespace-nowrap mt-1"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Nuevo período
+                            </button>
+                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Valor Hora - Staff General, Administración, Recepción (ARS)
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                    {/* Add period form */}
+                    {showAddPeriodo && (
+                        <div className="rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Agregar nuevo período</h3>
+                                <button onClick={() => setShowAddPeriodo(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Vigente desde</label>
                                     <input
-                                        type="number"
-                                        min="0"
-                                        value={valorHoraStaff}
-                                        onChange={(e) => setValorHoraStaff(Number(e.target.value))}
-                                        className="pl-8 pr-4 py-2 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="Ej: 3500"
+                                        type="date"
+                                        value={newPeriodoFecha}
+                                        onChange={(e) => setNewPeriodoFecha(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                     />
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    Valor Hora - Limpieza (ARS)
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={valorHoraLimpieza}
-                                        onChange={(e) => setValorHoraLimpieza(Number(e.target.value))}
-                                        className="pl-8 pr-4 py-2 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="Ej: 3000"
-                                    />
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Valor hora — Staff / Admin / Recepción</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={newPeriodoStaff}
+                                            onChange={(e) => setNewPeriodoStaff(Number(e.target.value))}
+                                            className="pl-7 pr-3 py-2 w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            placeholder="3500"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Valor hora — Limpieza</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={newPeriodoLimpieza}
+                                            onChange={(e) => setNewPeriodoLimpieza(Number(e.target.value))}
+                                            className="pl-7 pr-3 py-2 w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            placeholder="3000"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-
-                            <div className="pt-2">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Notas (opcional)</label>
+                                <input
+                                    type="text"
+                                    value={newPeriodoNotas}
+                                    onChange={(e) => setNewPeriodoNotas(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="Ej: Actualización marzo 2026"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
                                 <button
-                                    onClick={handleSaveValoresHora}
-                                    disabled={!canManageProviderStatus || isSavingValoresHora}
-                                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => setShowAddPeriodo(false)}
+                                    className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSavePeriodo}
+                                    disabled={!newPeriodoFecha || isSavingPeriodo}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
                                 >
                                     <Save className="w-4 h-4" />
-                                    {isSavingValoresHora ? 'Guardando y Sicronizando...' : 'Guardar y Aplicar a Todos'}
+                                    {isSavingPeriodo ? 'Guardando...' : 'Guardar período'}
                                 </button>
-                                {!canManageProviderStatus && (
-                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
-                                        Solo un Owner puede cambiar e impactar estos valores.
-                                    </p>
-                                )}
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* History list */}
+                    {isLoadingHistoria ? (
+                        <div className="text-center py-8 text-slate-400 text-sm">Cargando historial...</div>
+                    ) : valoresHoraHistoria.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 text-sm">
+                            No hay períodos registrados. Agregá el primero con el botón de arriba.
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+                                        <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Vigente desde</th>
+                                        <th className="text-right px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Staff / Admin / Recepción</th>
+                                        <th className="text-right px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Limpieza</th>
+                                        <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Notas</th>
+                                        {canManageProviderStatus && <th className="w-10"></th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {valoresHoraHistoria.map((v, idx) => {
+                                        const [y, m, d] = v.fecha_desde.split('-').map(Number);
+                                        const fecha = new Date(y, m - 1, d);
+                                        const label = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+                                        const isVigente = idx === 0;
+                                        return (
+                                            <tr key={v.id} className="border-b last:border-0 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-4 py-3 text-slate-800 dark:text-slate-200 font-medium">
+                                                    {label}
+                                                    {isVigente && (
+                                                        <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold">
+                                                            Vigente
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300 font-mono">
+                                                    ${v.valor_hora_staff_ars.toLocaleString('es-AR')}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300 font-mono">
+                                                    ${v.valor_hora_limpieza_ars.toLocaleString('es-AR')}
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                                                    {v.notas || '—'}
+                                                </td>
+                                                {canManageProviderStatus && (
+                                                    <td className="px-2 py-3">
+                                                        <button
+                                                            onClick={() => handleDeletePeriodo(v.id)}
+                                                            className="text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors"
+                                                            title="Eliminar período"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {!canManageProviderStatus && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                            Solo un Owner puede agregar o eliminar períodos.
+                        </p>
+                    )}
                 </div>
             )}
 
@@ -699,17 +901,44 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                             <tr key={item.id} className="border-t border-slate-200 dark:border-slate-800">
                                                 <td className="px-4 py-2 text-slate-900 dark:text-slate-100">{item.nombre}</td>
                                                 <td className="px-4 py-2">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-                                                        item.modelo_liquidacion === 'horas'
-                                                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                                                            : item.modelo_liquidacion === 'mensual'
-                                                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                                                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                                                    }`}>
-                                                        {item.modelo_liquidacion === 'horas' ? '⏱ Por hora'
-                                                            : item.modelo_liquidacion === 'mensual' ? '📅 Mensual'
-                                                                : '📋 Por prestación'}
-                                                    </span>
+                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                        {([
+                                                            { value: 'prestaciones', label: '📋 Prestación', activeClass: 'bg-emerald-100 text-emerald-700 border-emerald-400 dark:bg-emerald-900/40 dark:text-emerald-300' },
+                                                            { value: 'horas', label: '⏱ Por hora', activeClass: 'bg-blue-100 text-blue-700 border-blue-400 dark:bg-blue-900/40 dark:text-blue-300' },
+                                                            { value: 'mensual', label: '📅 Mensual', activeClass: 'bg-purple-100 text-purple-700 border-purple-400 dark:bg-purple-900/40 dark:text-purple-300' },
+                                                        ] as const).map((opt) => (
+                                                            <button
+                                                                key={opt.value}
+                                                                onClick={() => item.modelo_liquidacion !== opt.value && handleUpdateAreaModelo(item.id, opt.value)}
+                                                                disabled={updatingAreaModelo === item.id}
+                                                                className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-all disabled:opacity-50 ${
+                                                                    item.modelo_liquidacion === opt.value
+                                                                        ? opt.activeClass
+                                                                        : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                                                                }`}
+                                                            >
+                                                                {opt.label}
+                                                            </button>
+                                                        ))}
+                                                        <span className="text-slate-300 dark:text-slate-600 mx-1 select-none">·</span>
+                                                        {([
+                                                            { value: 'ARS', label: '$ ARS', activeClass: 'bg-sky-100 text-sky-700 border-sky-400 dark:bg-sky-900/40 dark:text-sky-300' },
+                                                            { value: 'USD', label: '💵 USD', activeClass: 'bg-amber-100 text-amber-700 border-amber-400 dark:bg-amber-900/40 dark:text-amber-300' },
+                                                        ] as const).map((opt) => (
+                                                            <button
+                                                                key={opt.value}
+                                                                onClick={() => item.moneda_liquidacion !== opt.value && handleUpdateAreaMoneda(item.id, opt.value)}
+                                                                disabled={updatingAreaModelo === item.id}
+                                                                className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-all disabled:opacity-50 ${
+                                                                    item.moneda_liquidacion === opt.value
+                                                                        ? opt.activeClass
+                                                                        : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                                                                }`}
+                                                            >
+                                                                {opt.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right">
                                                     <button

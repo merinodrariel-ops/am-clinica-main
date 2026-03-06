@@ -163,11 +163,22 @@ export interface EmpresaPrestadora {
     updated_at?: string;
 }
 
+export interface ValoresHoraHistoria {
+    id: string;
+    sucursal_id: string;
+    fecha_desde: string; // 'YYYY-MM-DD'
+    valor_hora_staff_ars: number;
+    valor_hora_limpieza_ars: number;
+    notas?: string;
+    created_at?: string;
+}
+
 export interface PersonalArea {
     id: string;
     nombre: string;
     descripcion?: string;
     modelo_liquidacion: 'horas' | 'mensual' | 'prestaciones';
+    moneda_liquidacion: 'ARS' | 'USD';
     color: string;
     icono: string;
     activo: boolean;
