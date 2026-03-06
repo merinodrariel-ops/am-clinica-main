@@ -410,7 +410,18 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     const pendingText = syncResult.pendingSaved
                         ? ' Se guardo automaticamente en Pagos Pendientes de Asignar.'
                         : '';
-                    alert((syncResult.error || 'Pago registrado en caja, pero no se pudo acreditar la cuota.') + pendingText);
+
+                    if (syncResult.failureCode === 'plan_not_found') {
+                        const wantsCreate = window.confirm(
+                            `Paciente no encontrado en el plan de cuotas. ¿Desea crear una financiación nueva?${pendingText}`
+                        );
+
+                        if (wantsCreate) {
+                            window.location.assign('/caja-recepcion?tab=contratos');
+                        }
+                    } else {
+                        alert((syncResult.error || 'Pago registrado en caja, pero no se pudo acreditar la cuota.') + pendingText);
+                    }
                 }
             }
 

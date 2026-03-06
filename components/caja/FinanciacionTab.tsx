@@ -25,6 +25,7 @@ import {
     type PlanFinanciacion,
 } from '@/lib/financiacion';
 import { createClient } from '@/utils/supabase/client';
+import { syncFinanciacionIdentidadesAction } from '@/app/actions/financiacion-cuotas';
 
 const supabase = createClient();
 
@@ -342,6 +343,7 @@ export default function FinanciacionTab() {
     const [stats, setStats] = useState<FinanciacionStats | null>(null);
     const [pendingPagos, setPendingPagos] = useState<PendingPago[]>([]);
     const [loading, setLoading] = useState(true);
+    const [syncingIdentidades, setSyncingIdentidades] = useState(false);
 
     const nextMonth = getNextMonthName();
 
@@ -394,6 +396,36 @@ export default function FinanciacionTab() {
         }
     };
 
+    const handleSyncIdentidades = async () => {
+        setSyncingIdentidades(true);
+        try {
+            const result = await syncFinanciacionIdentidadesAction();
+
+            if (!result.success) {
+                alert(result.error || 'No se pudo sincronizar identidades.');
+                return;
+            }
+
+            await load();
+
+            const unresolvedPreview = (result.unresolvedExamples || []).slice(0, 4);
+            const unresolvedText = unresolvedPreview.length > 0
+                ? `\nNo vinculados (ejemplos): ${unresolvedPreview.join(', ')}`
+                : '';
+
+            alert(
+                `Sincronización completada.\n` +
+                `Planes revisados: ${result.scanned}\n` +
+                `Vinculados ahora: ${result.linked}\n` +
+                `Ya vinculados: ${result.alreadyLinked}\n` +
+                `Sin resolver: ${result.unresolved}` +
+                unresolvedText
+            );
+        } finally {
+            setSyncingIdentidades(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
@@ -409,6 +441,22 @@ export default function FinanciacionTab() {
 
     return (
         <div className="space-y-6">
+            <div className="flex items-center justify-end">
+                <button
+                    type="button"
+                    onClick={handleSyncIdentidades}
+                    disabled={syncingIdentidades}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-60"
+                    style={{
+                        background: 'hsla(217, 91%, 60%, 0.18)',
+                        color: 'hsl(217 91% 72%)',
+                        border: '1px solid hsla(217, 91%, 60%, 0.3)',
+                    }}
+                >
+                    {syncingIdentidades ? 'Sincronizando identidades...' : 'Sincronizar identidades'}
+                </button>
+            </div>
+
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <KpiMini
