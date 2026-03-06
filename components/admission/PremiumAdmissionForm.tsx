@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useSearchParams } from 'next/navigation';
 import {
     ArrowRight,
     ArrowLeft,
@@ -192,6 +193,7 @@ const ProgressBar = ({ currentStep, totalSteps }: { currentStep: number; totalSt
 };
 
 export default function PremiumAdmissionForm() {
+    const searchParams = useSearchParams();
     const [step, setStep] = useState(0);
     const [formData, setFormData] = useState<FormData>({
         id_paciente: '',
@@ -214,6 +216,17 @@ export default function PremiumAdmissionForm() {
     const [submitAttempted, setSubmitAttempted] = useState(false);
     const [direction, setDirection] = useState(1);
     const [isValidating, setIsValidating] = useState(false);
+    const [identityState, setIdentityState] = useState<{
+        status: 'idle' | 'checking' | 'ok' | 'exists' | 'error';
+        message?: string;
+        patientName?: string;
+    }>({ status: 'idle' });
+    const lastIdentitySignatureRef = useRef('');
+    const lastIdentityExistsRef = useRef(false);
+
+    const allowDuplicateForTesting =
+        process.env.NODE_ENV !== 'production'
+        && (searchParams.get('allowDuplicates') === '1' || process.env.NEXT_PUBLIC_ADMISSION_ALLOW_DUPLICATES === 'true');
 
     const {
         isOnline,
@@ -228,12 +241,90 @@ export default function PremiumAdmissionForm() {
     const totalSteps = 6;
 
     const updateData = (fields: Partial<FormData>) => {
+        if (Object.prototype.hasOwnProperty.call(fields, 'dni') || Object.prototype.hasOwnProperty.call(fields, 'email')) {
+            setIdentityState((prev) => (prev.status === 'idle' ? prev : { status: 'idle' }));
+        }
         setFormData((prev) => ({ ...prev, ...fields }));
     };
 
     const handleBlur = (field: keyof FormData) => {
         setTouched((prev) => ({ ...prev, [field]: true }));
     };
+
+    const identitySignature = useMemo(() => {
+        const dni = formData.dni.replace(/\D/g, '');
+        const email = formData.email.trim().toLowerCase();
+        return `${dni}|${email}`;
+    }, [formData.dni, formData.email]);
+
+    const canCheckIdentity = useMemo(() => {
+        const dni = formData.dni.replace(/\D/g, '');
+        const email = formData.email.trim();
+        const hasValidDni = dni.length >= 7 && dni.length <= 14;
+        const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        return hasValidDni || hasValidEmail;
+    }, [formData.dni, formData.email]);
+
+    const runIdentityCheck = useCallback(async (force = false) => {
+        if (!canCheckIdentity) {
+            setIdentityState((prev) => (prev.status === 'idle' ? prev : { status: 'idle' }));
+            return true;
+        }
+
+        if (!force && identitySignature === lastIdentitySignatureRef.current) {
+            return !lastIdentityExistsRef.current;
+        }
+
+        lastIdentitySignatureRef.current = identitySignature;
+        setIdentityState({ status: 'checking' });
+
+        try {
+            const res = await checkAdmissionIdentityAction({ dni: formData.dni, email: formData.email });
+
+            if (!res.success) {
+                lastIdentityExistsRef.current = false;
+                setIdentityState({
+                    status: 'error',
+                    message: res.error || 'No se pudo validar identidad en este momento.',
+                });
+                return false;
+            }
+
+            if (res.exists) {
+                lastIdentityExistsRef.current = true;
+                const patientName = [res.patient?.nombre, res.patient?.apellido].filter(Boolean).join(' ').trim();
+                setIdentityState({
+                    status: 'exists',
+                    patientName,
+                    message: patientName
+                        ? `Ya existe un paciente registrado: ${patientName}.`
+                        : 'Este DNI o correo ya se encuentra registrado.',
+                });
+                return allowDuplicateForTesting;
+            }
+
+            lastIdentityExistsRef.current = false;
+            setIdentityState({ status: 'ok', message: 'DNI y correo disponibles.' });
+            return true;
+        } catch (error) {
+            lastIdentityExistsRef.current = false;
+            setIdentityState({
+                status: 'error',
+                message: error instanceof Error ? error.message : 'Error inesperado de validación',
+            });
+            return false;
+        }
+    }, [allowDuplicateForTesting, canCheckIdentity, formData.dni, formData.email, identitySignature]);
+
+    useEffect(() => {
+        if (step !== 1 || !canCheckIdentity) return;
+
+        const timeout = window.setTimeout(() => {
+            void runIdentityCheck(false);
+        }, 450);
+
+        return () => window.clearTimeout(timeout);
+    }, [step, canCheckIdentity, identitySignature, runIdentityCheck]);
 
     const persistLead = async () => {
         const payload = {
@@ -320,8 +411,10 @@ export default function PremiumAdmissionForm() {
         if (!formData.lastName.trim()) errors.lastName = 'Ingresa tu apellido';
         else if (formData.lastName.length < 2) errors.lastName = 'Ingresa al menos 2 letras';
 
-        if (!formData.dni.trim()) errors.dni = 'Ingresa tu DNI o Pasaporte';
-        else if (formData.dni.length < 5) errors.dni = 'Debe tener al menos 5 caracteres';
+        const dniTrimmed = formData.dni.trim();
+        const dniDigits = formData.dni.replace(/\D/g, '');
+        if (!dniTrimmed) errors.dni = 'Ingresa tu DNI o Pasaporte';
+        else if (dniDigits.length < 7 || dniDigits.length > 14) errors.dni = 'DNI inválido (7 a 14 dígitos)';
 
         if (!formData.dob) errors.dob = 'Selecciona tu fecha de nacimiento';
 
@@ -440,7 +533,10 @@ export default function PremiumAdmissionForm() {
                             placeholder="DNI / Pasaporte"
                             value={formData.dni}
                             onChange={(e: any) => updateData({ dni: e.target.value })}
-                            onBlur={() => handleBlur('dni')}
+                            onBlur={async () => {
+                                handleBlur('dni');
+                                await runIdentityCheck(true);
+                            }}
                             error={errors.dni}
                             touched={touched.dni}
                             submitAttempted={submitAttempted}
@@ -490,7 +586,10 @@ export default function PremiumAdmissionForm() {
                             placeholder="Correo Electrónico"
                             value={formData.email}
                             onChange={(e: any) => updateData({ email: e.target.value })}
-                            onBlur={() => handleBlur('email')}
+                            onBlur={async () => {
+                                handleBlur('email');
+                                await runIdentityCheck(true);
+                            }}
                             error={errors.email}
                             touched={touched.email}
                             submitAttempted={submitAttempted}
@@ -553,6 +652,32 @@ export default function PremiumAdmissionForm() {
                             )}
                         </AnimatePresence>
                     </div>
+
+                    <AnimatePresence>
+                        {identityState.status !== 'idle' && identityState.status !== 'ok' && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 6 }}
+                                className={`rounded-xl border px-4 py-3 text-sm ${identityState.status === 'exists'
+                                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-200'
+                                    : identityState.status === 'checking'
+                                        ? 'border-white/20 bg-white/5 text-zinc-300'
+                                        : 'border-red-500/40 bg-red-500/10 text-red-200'
+                                    }`}
+                            >
+                                {identityState.status === 'checking'
+                                    ? 'Validando si ya existe un paciente con ese DNI/email...'
+                                    : identityState.message}
+                                {identityState.status === 'exists' && (
+                                    <div className="mt-2 text-xs text-amber-100/80">
+                                        Si ya sos paciente, usá el formulario de actualización de datos.
+                                        {allowDuplicateForTesting && ' (Modo prueba activo: podés continuar igualmente).'}
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 <div className="mt-16 flex items-center justify-between">
@@ -567,14 +692,19 @@ export default function PremiumAdmissionForm() {
                             if (isStepValid) {
                                 setIsValidating(true);
                                 try {
-                                    const res = await checkAdmissionIdentityAction({ dni: formData.dni, email: formData.email });
-                                    if (res.exists) {
+                                    const canContinue = await runIdentityCheck(true);
+                                    if (!canContinue) {
                                         toast.error('Este DNI o correo ya se encuentra registrado.', {
                                             description: 'Si ya sos paciente, por favor contactanos por WhatsApp para agendar tu cita.'
                                         });
                                         setIsValidating(false);
                                         return;
                                     }
+
+                                    if (identityState.status === 'exists' && allowDuplicateForTesting) {
+                                        toast.warning('Modo prueba activo: continuando con identidad duplicada.');
+                                    }
+
                                     nextStep();
                                 } catch (error) {
                                     toast.error('Error al validar los datos. Por favor intentá nuevamente.');
