@@ -22,7 +22,8 @@ import type { Todo, TodoPriority, TodoStatus } from '@/lib/supabase';
 export interface ProfileOption {
     id: string;
     full_name: string | null;
-    role: string;
+    categoria: string;
+    user_id?: string | null;
 }
 
 interface NewTodoModalProps {
@@ -78,6 +79,21 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData, pro
         setErrors({});
     }, [initialData, isOpen]);
 
+    useEffect(() => {
+        if (!isOpen || !initialData?.assigned_to_id) return;
+
+        const directOption = profiles.find((p) => p.id === initialData.assigned_to_id);
+        if (directOption) {
+            setAssignedToId(directOption.id);
+            return;
+        }
+
+        const byUserId = profiles.find((p) => p.user_id === initialData.assigned_to_id);
+        if (byUserId) {
+            setAssignedToId(byUserId.id);
+        }
+    }, [initialData, isOpen, profiles]);
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         const newErrors: { title?: string } = {};
@@ -85,6 +101,7 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData, pro
         if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
         const selectedProfile = profiles.find(p => p.id === assignedToId);
+        const assignedToUserId = selectedProfile?.user_id || null;
 
         setSaving(true);
         try {
@@ -93,7 +110,7 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData, pro
                 description: description.trim() || null,
                 priority,
                 status,
-                assigned_to_id: assignedToId || null,
+                assigned_to_id: assignedToUserId,
                 assigned_to_name: selectedProfile?.full_name || null,
                 created_by_name: null,
                 due_date: dueDate || null,
@@ -268,7 +285,7 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData, pro
                                                 <option value="">Sin asignar</option>
                                                 {profiles.map(p => (
                                                     <option key={p.id} value={p.id}>
-                                                        {p.full_name || p.role}
+                                                        {p.full_name || p.categoria}{p.user_id ? '' : ' (sin usuario)'}
                                                     </option>
                                                 ))}
                                             </select>

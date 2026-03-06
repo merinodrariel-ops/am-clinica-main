@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CheckSquare,
@@ -32,13 +31,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Todo, TodoPriority, TodoStatus } from '@/lib/supabase';
 import NewTodoModal, { type ProfileOption } from '@/components/todos/NewTodoModal';
 import TodoKanban from '@/components/todos/TodoKanban';
+import { createClient } from '@/utils/supabase/client';
+import { getAssignableTodoMembersAction } from '@/app/actions/todos';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient();
 
 const PRIORITY_CONFIG: Record<TodoPriority, {
     label: string;
@@ -298,12 +296,26 @@ export default function TodosPage() {
 
     // ── Load team profiles ──
     useEffect(() => {
-        supabase
-            .from('profiles')
-            .select('id, full_name, role')
-            .eq('is_active', true)
-            .order('full_name')
-            .then(({ data }) => { if (data) setProfiles(data as ProfileOption[]); });
+        let cancelled = false;
+
+        async function loadAssignableProfiles() {
+            const result = await getAssignableTodoMembersAction();
+
+            if (!cancelled) {
+                if (result.success) {
+                    setProfiles(result.data as ProfileOption[]);
+                } else {
+                    console.error('[Todos] Error loading assignable profiles:', result.error);
+                    setProfiles([]);
+                }
+            }
+        }
+
+        loadAssignableProfiles();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     // ── Realtime: notify me when a task is assigned to me ──
@@ -327,6 +339,7 @@ export default function TodosPage() {
             )
             .subscribe();
         return () => { supabase.removeChannel(channel); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id]);
 
     // ── CRUD ──
