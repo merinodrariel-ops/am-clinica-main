@@ -645,25 +645,21 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
         if (isProviderLikeArea) return false;
 
-        const isSystemOrBackofficeRole =
+        const isOwnerOrDirectionRole =
             rol.includes('owner')
-            || rol.includes('admin')
             || rol.includes('direccion')
             || area.includes('direccion')
-            || area.includes('owner')
-            || area.includes('admin');
+            || area.includes('owner');
 
-        if (isSystemOrBackofficeRole) return true;
+        if (isOwnerOrDirectionRole) return true;
 
         const isGenericUserRole =
             area.includes('recepcion')
-            || area.includes('administracion')
             || area.includes('tecnologia')
             || area === 'general'
             || area.includes('marketing')
             || area.includes('asistente dental')
             || rol.includes('recepcion')
-            || rol.includes('administr')
             || rol.includes('asistente');
 
         const hasOperationalData = Boolean(
@@ -730,7 +726,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     });
 
     const filteredPrestadores = prestadores.filter((p) => {
-        if (getPrestadorCategory(p) !== activeProviderCategory) {
+        const hasSearch = searchTerm.trim() !== '';
+
+        if (!hasSearch && getPrestadorCategory(p) !== activeProviderCategory) {
             return false;
         }
 
