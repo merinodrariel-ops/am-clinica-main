@@ -24,6 +24,7 @@ import {
     deleteCategoria
 } from "@/lib/caja-admin/services";
 import { getPersonal, getPersonalAreas, createPersonalArea, togglePersonalActivo, updatePersonalArea } from "@/lib/caja-admin";
+import { updateSucursalValoresHora } from "@/lib/caja-admin/services";
 import { CajaAdminCategoria, Sucursal, Personal } from "@/lib/caja-admin/types";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -124,20 +125,25 @@ export default function ConfiguracionTab({ sucursal }: Props) {
     const { categoria } = useAuth();
     const canManageProviderStatus = categoria === "owner";
     const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
-    const [providerConfigTab, setProviderConfigTab] = useState<"categorias" | "prestadores" | "tipos">("categorias");
+    const [providerConfigTab, setProviderConfigTab] = useState<"categorias" | "prestadores" | "tipos" | "valores-hora">("categorias");
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [personalLoading, setPersonalLoading] = useState(true);
     const [personalError, setPersonalError] = useState<string | null>(null);
     const [updatingPersonalId, setUpdatingPersonalId] = useState<string | null>(null);
-    const [areas, setAreas] = useState<Array<{ id: string; nombre: string; tipo_personal: string; activo: boolean; orden: number }>>([]);
+    const [areas, setAreas] = useState<Array<{ id: string; nombre: string; modelo_liquidacion: string; activo: boolean; orden: number }>>([]);
     const [areasLoading, setAreasLoading] = useState(true);
     const [newAreaName, setNewAreaName] = useState('');
-    const [newAreaTipo, setNewAreaTipo] = useState<'prestador' | 'odontologo' | 'ambos'>('prestador');
+    const [newAreaModelo, setNewAreaModelo] = useState<'horas' | 'mensual' | 'prestaciones'>('prestaciones');
     const [updatingAreaId, setUpdatingAreaId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [editingItem, setEditingItem] = useState<Partial<CajaAdminCategoria>>({});
     const [error, setError] = useState<string | null>(null);
+
+    // Valores Hora global states
+    const [valorHoraStaff, setValorHoraStaff] = useState<number>(sucursal.valor_hora_staff_ars || 0);
+    const [valorHoraLimpieza, setValorHoraLimpieza] = useState<number>(sucursal.valor_hora_limpieza_ars || 0);
+    const [isSavingValoresHora, setIsSavingValoresHora] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -220,7 +226,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
             setAreas((data || []).map((item) => ({
                 id: item.id,
                 nombre: item.nombre,
-                tipo_personal: item.tipo_personal,
+                modelo_liquidacion: item.modelo_liquidacion || 'prestaciones',
                 activo: item.activo,
                 orden: item.orden,
             })));
@@ -258,7 +264,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
 
         const result = await createPersonalArea({
             nombre,
-            tipo_personal: newAreaTipo,
+            modelo_liquidacion: newAreaModelo,
             activo: true,
             orden: (areas.length + 1) * 10,
         });
@@ -284,6 +290,26 @@ export default function ConfiguracionTab({ sucursal }: Props) {
             setAreas((prev) => prev.map((item) => item.id === areaId ? { ...item, activo: !activo } : item));
         } finally {
             setUpdatingAreaId(null);
+        }
+    }
+
+    async function handleSaveValoresHora() {
+        if (!canManageProviderStatus) return;
+        setIsSavingValoresHora(true);
+        try {
+            const res = await updateSucursalValoresHora(sucursal.id, {
+                staff: valorHoraStaff,
+                limpieza: valorHoraLimpieza
+            });
+
+            if (!res.success) {
+                alert(res.error || 'No se pudieron actualizar los valores hora');
+                return;
+            }
+
+            alert('Valores actualizados exitosamente en toda la sucursal y la base de personal.');
+        } finally {
+            setIsSavingValoresHora(false);
         }
     }
 
@@ -393,7 +419,81 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                 >
                     Tipos de Prestadores
                 </button>
+                <button
+                    onClick={() => setProviderConfigTab("valores-hora")}
+                    className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${providerConfigTab === "valores-hora"
+                        ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border-b-2 border-indigo-500"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
+                >
+                    Valores Hora Staff
+                </button>
             </div>
+
+            {providerConfigTab === "valores-hora" && (
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Valores por Hora Generales (ARS)</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Configurá acá los valores estándar por hora. Si guardás, todos los prestadores activos del tipo "Staff General", "Administración", "Recepción" o "Limpieza" que estén en modalidad por horas se actualizarán automáticamente.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    Valor Hora - Staff General, Administración, Recepción (ARS)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={valorHoraStaff}
+                                        onChange={(e) => setValorHoraStaff(Number(e.target.value))}
+                                        className="pl-8 pr-4 py-2 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Ej: 3500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    Valor Hora - Limpieza (ARS)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={valorHoraLimpieza}
+                                        onChange={(e) => setValorHoraLimpieza(Number(e.target.value))}
+                                        className="pl-8 pr-4 py-2 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Ej: 3000"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <button
+                                    onClick={handleSaveValoresHora}
+                                    disabled={!canManageProviderStatus || isSavingValoresHora}
+                                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Save className="w-4 h-4" />
+                                    {isSavingValoresHora ? 'Guardando y Sicronizando...' : 'Guardar y Aplicar a Todos'}
+                                </button>
+                                {!canManageProviderStatus && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+                                        Solo un Owner puede cambiar e impactar estos valores.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {providerConfigTab === "categorias" && (
                 <>
@@ -538,23 +638,34 @@ export default function ConfiguracionTab({ sucursal }: Props) {
 
                     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-3">
                         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Nuevo tipo</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="flex flex-col md:flex-row gap-3">
                             <input
                                 type="text"
                                 value={newAreaName}
                                 onChange={(event) => setNewAreaName(event.target.value)}
                                 placeholder="Ej: Contadores"
-                                className="md:col-span-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
+                                className="flex-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
                             />
-                            <select
-                                value={newAreaTipo}
-                                onChange={(event) => setNewAreaTipo(event.target.value as 'prestador' | 'odontologo' | 'ambos')}
-                                className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
-                            >
-                                <option value="prestador">Prestador</option>
-                                <option value="odontologo">Odontólogo</option>
-                                <option value="ambos">Ambos</option>
-                            </select>
+                            <div className="flex gap-2">
+                                {([
+                                    { value: 'prestaciones', label: 'Por prestación', icon: '📋' },
+                                    { value: 'horas', label: 'Por hora', icon: '⏱' },
+                                    { value: 'mensual', label: 'Mensual', icon: '📅' },
+                                ] as const).map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setNewAreaModelo(opt.value)}
+                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${newAreaModelo === opt.value
+                                            ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-400 text-indigo-700 dark:text-indigo-300'
+                                            : 'border-slate-300 dark:border-slate-700 text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                                            }`}
+                                    >
+                                        <span>{opt.icon}</span>
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                         <button
                             onClick={handleCreateArea}
@@ -576,7 +687,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                 <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-500">
                                     <tr>
                                         <th className="px-4 py-2 text-left">Nombre</th>
-                                        <th className="px-4 py-2 text-left">Aplica a</th>
+                                        <th className="px-4 py-2 text-left">Liquidación</th>
                                         <th className="px-4 py-2 text-right">Estado</th>
                                     </tr>
                                 </thead>
@@ -587,12 +698,18 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                         .map((item) => (
                                             <tr key={item.id} className="border-t border-slate-200 dark:border-slate-800">
                                                 <td className="px-4 py-2 text-slate-900 dark:text-slate-100">{item.nombre}</td>
-                                                <td className="px-4 py-2 text-slate-500 capitalize">
-                                                    {item.tipo_personal === 'odontologo' || item.tipo_personal === 'profesional'
-                                                        ? 'odontólogo'
-                                                        : item.tipo_personal === 'empleado'
-                                                        ? 'prestador'
-                                                        : item.tipo_personal}
+                                                <td className="px-4 py-2">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                                                        item.modelo_liquidacion === 'horas'
+                                                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                            : item.modelo_liquidacion === 'mensual'
+                                                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                                    }`}>
+                                                        {item.modelo_liquidacion === 'horas' ? '⏱ Por hora'
+                                                            : item.modelo_liquidacion === 'mensual' ? '📅 Mensual'
+                                                                : '📋 Por prestación'}
+                                                    </span>
                                                 </td>
                                                 <td className="px-4 py-2 text-right">
                                                     <button

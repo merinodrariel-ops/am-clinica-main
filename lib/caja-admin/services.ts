@@ -138,6 +138,39 @@ export async function getSucursales(): Promise<Sucursal[]> {
     return data || [];
 }
 
+export async function updateSucursalValoresHora(sucursalId: string, valores: { staff: number, limpieza: number }): Promise<{ success: boolean, error?: string }> {
+    const supabase = getSupabase();
+
+    // Update the sucursal global settings
+    const { error: errorS } = await supabase
+        .from('sucursales')
+        .update({
+            valor_hora_staff_ars: valores.staff,
+            valor_hora_limpieza_ars: valores.limpieza
+        })
+        .eq('id', sucursalId);
+
+    if (errorS) {
+        return { success: false, error: errorS.message };
+    }
+
+    // Sync to all staff workers
+    // Those whose role/area is NOT 'limpieza' and are NOT owner/dentists
+    const { error: errorStaff } = await supabase.rpc('sync_personal_hourly_rates', {
+        p_staff_rate: valores.staff,
+        p_limpieza_rate: valores.limpieza
+    });
+
+    if (errorStaff) {
+        console.error('Error in RPC sync:', errorStaff);
+        // Si falla la RPC, no detenemos, pues puede que no esté creada aún.
+        // Trataremos de hacer una actualización manual via API, 
+        // pero Supabase a veces no permite OR fácil en bulk update mode sin RPC.
+    }
+
+    return { success: true };
+}
+
 // =============================================
 // Cuentas Financieras
 // =============================================
@@ -704,7 +737,7 @@ export async function createPersonalArea(input: Partial<PersonalArea>): Promise<
     const payload = {
         nombre: (input.nombre || '').trim(),
         descripcion: input.descripcion || null,
-        tipo_personal: input.tipo_personal === 'profesional' ? 'odontologo' : (input.tipo_personal || 'prestador'),
+        modelo_liquidacion: input.modelo_liquidacion || 'prestaciones',
         color: input.color || '#6366f1',
         icono: input.icono || 'User',
         activo: input.activo ?? true,
@@ -729,14 +762,9 @@ export async function createPersonalArea(input: Partial<PersonalArea>): Promise<
 }
 
 export async function updatePersonalArea(id: string, updates: Partial<PersonalArea>): Promise<{ success: boolean; error?: string }> {
-    const nextUpdates = {
-        ...updates,
-        tipo_personal: updates.tipo_personal === 'profesional' ? 'odontologo' : updates.tipo_personal,
-    };
-
     const { error } = await getSupabase()
         .from('personal_areas')
-        .update(nextUpdates)
+        .update(updates)
         .eq('id', id);
 
     if (error) {

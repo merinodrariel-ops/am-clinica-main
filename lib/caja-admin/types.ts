@@ -5,6 +5,8 @@ export interface Sucursal {
     modo_caja: 'SEPARADA' | 'UNIFICADA';
     moneda_local: string;
     activa: boolean;
+    valor_hora_staff_ars?: number;
+    valor_hora_limpieza_ars?: number;
 }
 
 export interface CuentaFinanciera {
@@ -165,7 +167,7 @@ export interface PersonalArea {
     id: string;
     nombre: string;
     descripcion?: string;
-    tipo_personal: 'prestador' | 'odontologo' | 'profesional' | 'ambos';
+    modelo_liquidacion: 'horas' | 'mensual' | 'prestaciones';
     color: string;
     icono: string;
     activo: boolean;
