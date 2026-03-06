@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 
 export type StaffViewMode = 'board' | 'table';
-export type StaffGroupMode = 'role' | 'company' | 'access' | 'compliance';
+export type StaffGroupMode = 'role' | 'company' | 'access' | 'compliance' | 'liquidacion';
 
 export interface StaffUiPreferencesInput {
     viewMode: StaffViewMode;
@@ -14,14 +14,14 @@ export interface StaffUiPreferencesInput {
     roleOrder: string[];
 }
 
-export interface StaffUiPreferences extends StaffUiPreferencesInput { }
+export type StaffUiPreferences = StaffUiPreferencesInput;
 
 function isValidViewMode(value: string): value is StaffViewMode {
     return value === 'board' || value === 'table';
 }
 
 function isValidGroupMode(value: string): value is StaffGroupMode {
-    return value === 'role' || value === 'company' || value === 'access' || value === 'compliance';
+    return value === 'role' || value === 'company' || value === 'access' || value === 'compliance' || value === 'liquidacion';
 }
 
 function sanitizeRoleOrder(roleOrder: string[]): string[] {
