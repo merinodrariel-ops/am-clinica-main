@@ -19,6 +19,7 @@ import { getLocalISODate } from '@/lib/local-date';
 import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
+import { syncPagoCuotaAction } from '@/app/actions/financiacion-cuotas';
 
 interface Paciente {
     id_paciente: string;
@@ -92,6 +93,7 @@ interface FormData {
     es_cuota: boolean;
     cuota_nro: number;
     cuotas_total: number;
+    presupuesto_ref: string;
     comprobante_url?: string;
 }
 
@@ -149,6 +151,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         es_cuota: false,
         cuota_nro: 1,
         cuotas_total: 1,
+        presupuesto_ref: '',
         comprobante_url: '',
     });
 
@@ -389,28 +392,25 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             if (error) throw error;
 
             // Sync planes_financiacion when a cuota payment is registered
-            if (formData.es_cuota && formData.paciente_id) {
-                const { data: plan } = await supabase
-                    .from('planes_financiacion')
-                    .select('id, cuotas_pagadas, cuotas_total, monto_cuota_usd, saldo_restante_usd')
-                    .eq('paciente_id', formData.paciente_id)
-                    .eq('estado', 'En curso')
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
+            if (formData.es_cuota && formData.paciente_id && insertedMovement?.id) {
+                const syncResult = await syncPagoCuotaAction({
+                    movementId: insertedMovement.id,
+                    pacienteId: formData.paciente_id,
+                    pacienteNombre: formData.paciente_nombre,
+                    montoUsd: usdEquivalente,
+                    montoOriginal: formData.monto,
+                    moneda: formData.moneda,
+                    cuotaNro: formData.cuota_nro,
+                    cuotasTotal: formData.cuotas_total,
+                    presupuestoRef: formData.presupuesto_ref?.trim() || null,
+                    observaciones: formData.observaciones?.trim() || null,
+                });
 
-                if (plan) {
-                    const nuevasCuotasPagadas = (plan.cuotas_pagadas || 0) + 1;
-                    const nuevoSaldo = Math.max(0, (plan.saldo_restante_usd || 0) - (plan.monto_cuota_usd || usdEquivalente));
-                    const nuevoEstado = nuevasCuotasPagadas >= plan.cuotas_total ? 'Finalizado' : 'En curso';
-                    await supabase
-                        .from('planes_financiacion')
-                        .update({
-                            cuotas_pagadas: nuevasCuotasPagadas,
-                            saldo_restante_usd: nuevoSaldo,
-                            estado: nuevoEstado,
-                        })
-                        .eq('id', plan.id);
+                if (!syncResult.success) {
+                    const pendingText = syncResult.pendingSaved
+                        ? ' Se guardo automaticamente en Pagos Pendientes de Asignar.'
+                        : '';
+                    alert((syncResult.error || 'Pago registrado en caja, pero no se pudo acreditar la cuota.') + pendingText);
                 }
             }
 
@@ -504,6 +504,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             es_cuota: false,
             cuota_nro: 1,
             cuotas_total: 1,
+            presupuesto_ref: '',
         });
         setConceptoSearch('');
         onClose();
@@ -880,24 +881,36 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 </label>
 
                                 {formData.es_cuota && (
-                                    <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">Cuota Nro.</label>
-                                            <Input
-                                                type="number"
-                                                min="1"
-                                                value={formData.cuota_nro}
-                                                onChange={(e) => setFormData({ ...formData, cuota_nro: Math.max(1, parseInt(e.target.value) || 0) })}
-                                                className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
-                                            />
+                                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Cuota Nro.</label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={formData.cuota_nro}
+                                                    onChange={(e) => setFormData({ ...formData, cuota_nro: Math.max(1, parseInt(e.target.value) || 0) })}
+                                                    className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">De un total de</label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={formData.cuotas_total}
+                                                    onChange={(e) => setFormData({ ...formData, cuotas_total: Math.max(1, parseInt(e.target.value) || 0) })}
+                                                    className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
+                                                />
+                                            </div>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">De un total de</label>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Referencia presupuesto (opcional)</label>
                                             <Input
-                                                type="number"
-                                                min="1"
-                                                value={formData.cuotas_total}
-                                                onChange={(e) => setFormData({ ...formData, cuotas_total: Math.max(1, parseInt(e.target.value) || 0) })}
+                                                type="text"
+                                                value={formData.presupuesto_ref}
+                                                onChange={(e) => setFormData({ ...formData, presupuesto_ref: e.target.value })}
+                                                placeholder="Ej: PRES-2026-031"
                                                 className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
                                             />
                                         </div>

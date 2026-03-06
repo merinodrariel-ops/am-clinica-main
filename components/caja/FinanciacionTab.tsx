@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
     CreditCard,
     Landmark,
@@ -14,6 +14,7 @@ import {
     ChevronDown,
     ChevronUp,
     CheckCircle,
+    AlertTriangle,
 } from 'lucide-react';
 import {
     getFinanciacionData,
@@ -23,6 +24,23 @@ import {
     type FinanciacionStats,
     type PlanFinanciacion,
 } from '@/lib/financiacion';
+import { createClient } from '@/utils/supabase/client';
+
+const supabase = createClient();
+
+interface PendingPago {
+    id: string;
+    paciente_nombre: string;
+    presupuesto_ref: string | null;
+    cuota_nro: number | null;
+    cuotas_total: number | null;
+    monto_usd: number;
+    monto_original: number;
+    moneda: 'USD' | 'ARS' | 'USDT';
+    motivo: string;
+    error_message: string | null;
+    created_at: string;
+}
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
@@ -322,20 +340,39 @@ function PlanRow({
 
 export default function FinanciacionTab() {
     const [stats, setStats] = useState<FinanciacionStats | null>(null);
+    const [pendingPagos, setPendingPagos] = useState<PendingPago[]>([]);
     const [loading, setLoading] = useState(true);
 
     const nextMonth = getNextMonthName();
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
-        const data = await getFinanciacionData();
-        setStats(data);
+        const [statsData, pendingResult] = await Promise.all([
+            getFinanciacionData(),
+            supabase
+                .from('financiacion_pagos_pendientes')
+                .select('id, paciente_nombre, presupuesto_ref, cuota_nro, cuotas_total, monto_usd, monto_original, moneda, motivo, error_message, created_at')
+                .eq('estado', 'pendiente')
+                .order('created_at', { ascending: false })
+                .limit(50),
+        ]);
+
+        setStats(statsData);
+        if (!pendingResult.error) {
+            setPendingPagos((pendingResult.data || []) as PendingPago[]);
+        } else {
+            setPendingPagos([]);
+        }
         setLoading(false);
-    };
+    }, []);
 
     useEffect(() => {
-        load();
-    }, []);
+        const timer = window.setTimeout(() => {
+            void load();
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [load]);
 
     const handleUpload = async (planId: string, file: File) => {
         await uploadContrato(planId, file);
@@ -434,6 +471,63 @@ export default function FinanciacionTab() {
                     {activos.length === 0 && (
                         <p className="text-center py-8 text-sm" style={{ color: 'hsl(230 10% 40%)' }}>
                             No hay financiaciones activas
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {/* Pending payment assignment */}
+            <div>
+                <h3
+                    className="text-sm font-bold mb-3 flex items-center gap-2"
+                    style={{ color: 'hsl(210 20% 85%)' }}
+                >
+                    <AlertTriangle size={16} style={{ color: 'hsl(25 95% 60%)' }} />
+                    Pagos Pendientes de Asignar ({pendingPagos.length})
+                </h3>
+                <div className="space-y-3">
+                    {pendingPagos.map((pago) => (
+                        <div
+                            key={pago.id}
+                            className="glass-card rounded-xl p-4"
+                            style={{ background: 'hsla(25, 80%, 10%, 0.25)', border: '1px solid hsla(25, 95%, 60%, 0.2)' }}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'hsl(35 95% 75%)' }}>
+                                        {pago.paciente_nombre}
+                                    </p>
+                                    <p className="text-xs" style={{ color: 'hsl(30 80% 70%)' }}>
+                                        {new Date(pago.created_at).toLocaleString('es-AR')}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-bold" style={{ color: 'hsl(35 95% 75%)' }}>
+                                        {pago.moneda} {Number(pago.monto_original).toLocaleString()}
+                                    </p>
+                                    <p className="text-xs" style={{ color: 'hsl(230 10% 60%)' }}>
+                                        ≈ USD {Number(pago.monto_usd).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-2 text-xs space-y-1" style={{ color: 'hsl(30 70% 75%)' }}>
+                                <p>Motivo: <span className="font-medium">{pago.motivo}</span></p>
+                                {(pago.cuota_nro && pago.cuotas_total) && (
+                                    <p>Cuota informada: <span className="font-medium">{pago.cuota_nro}/{pago.cuotas_total}</span></p>
+                                )}
+                                {pago.presupuesto_ref && (
+                                    <p>Referencia presupuesto: <span className="font-medium">{pago.presupuesto_ref}</span></p>
+                                )}
+                                {pago.error_message && (
+                                    <p className="break-words">Error: <span className="font-medium">{pago.error_message}</span></p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {pendingPagos.length === 0 && (
+                        <p className="text-center py-6 text-sm" style={{ color: 'hsl(230 10% 40%)' }}>
+                            Sin pagos pendientes de asignacion
                         </p>
                     )}
                 </div>

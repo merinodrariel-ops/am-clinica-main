@@ -1,0 +1,279 @@
+'use server';
+
+import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
+
+type MatchMethod = 'paciente_id' | 'presupuesto_id' | 'dni' | 'nombre_fuzzy';
+
+interface SyncCuotaParams {
+    movementId: string;
+    pacienteId: string;
+    pacienteNombre: string;
+    montoUsd: number;
+    montoOriginal: number;
+    moneda: 'USD' | 'ARS' | 'USDT';
+    cuotaNro?: number | null;
+    cuotasTotal?: number | null;
+    presupuestoRef?: string | null;
+    observaciones?: string | null;
+}
+
+interface SyncCuotaResult {
+    success: boolean;
+    error?: string;
+    matchMethod?: MatchMethod;
+    planId?: string;
+    cuotasPagadas?: number;
+    saldoRestanteUsd?: number;
+    pendingSaved?: boolean;
+}
+
+const PRESUPUESTO_KEYS = ['presupuesto_id', 'id_presupuesto', 'presupuesto_ref', 'id_presupuesto_externo', 'presupuesto'];
+const DNI_KEYS = ['dni', 'documento', 'paciente_documento', 'dni_paciente', 'cuit'];
+
+function normalizeText(value?: string | null) {
+    return (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\\/]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+function normalizeDigits(value?: string | null) {
+    return (value || '').replace(/\D/g, '');
+}
+
+function buildNameVariants(raw?: string | null): string[] {
+    const source = raw || '';
+    const variants = new Set<string>();
+    const normalized = normalizeText(source);
+    if (normalized) variants.add(normalized);
+
+    for (const part of source.split('/')) {
+        const value = normalizeText(part);
+        if (value) variants.add(value);
+    }
+
+    return Array.from(variants);
+}
+
+function getPlanText(plan: Record<string, unknown>, key: string) {
+    const value = plan[key];
+    return typeof value === 'string' ? value : null;
+}
+
+function getPlanNumber(plan: Record<string, unknown>, key: string) {
+    const value = Number(plan[key]);
+    return Number.isFinite(value) ? value : 0;
+}
+
+function findByPresupuestoRef(plans: Array<Record<string, unknown>>, presupuestoRef: string) {
+    const normalizedRef = normalizeText(presupuestoRef);
+    if (!normalizedRef) return null;
+
+    return plans.find((plan) => PRESUPUESTO_KEYS.some((key) => {
+        const value = getPlanText(plan, key);
+        return normalizeText(value) === normalizedRef;
+    })) || null;
+}
+
+function findByDni(plans: Array<Record<string, unknown>>, pacienteDni: string) {
+    const normalizedDni = normalizeDigits(pacienteDni);
+    if (!normalizedDni) return null;
+
+    return plans.find((plan) => DNI_KEYS.some((key) => {
+        const value = getPlanText(plan, key);
+        return normalizeDigits(value) === normalizedDni;
+    })) || null;
+}
+
+function findByNameFuzzy(plans: Array<Record<string, unknown>>, patientName: string) {
+    const inputVariants = buildNameVariants(patientName);
+    if (inputVariants.length === 0) return null;
+
+    return plans.find((plan) => {
+        const planName = getPlanText(plan, 'paciente_nombre') || [getPlanText(plan, 'apellido'), getPlanText(plan, 'nombre')].filter(Boolean).join(' ');
+        const normalizedPlan = normalizeText(planName);
+        if (!normalizedPlan) return false;
+
+        return inputVariants.some((variant) => {
+            if (variant === normalizedPlan) return true;
+            if (variant.length >= 6 && normalizedPlan.includes(variant)) return true;
+            if (normalizedPlan.length >= 6 && variant.includes(normalizedPlan)) return true;
+
+            const variantTokens = variant.split(' ').filter(Boolean);
+            const planTokens = normalizedPlan.split(' ').filter(Boolean);
+            const tokenMatches = variantTokens.filter((token) => planTokens.includes(token)).length;
+            return tokenMatches >= 2;
+        });
+    }) || null;
+}
+
+async function savePendingPayment(admin: ReturnType<typeof createAdminClient>, params: SyncCuotaParams, reason: string, matchSnapshot?: Record<string, unknown>, errorMessage?: string) {
+    const payload = {
+        movement_id: params.movementId,
+        paciente_id: params.pacienteId,
+        paciente_nombre: params.pacienteNombre,
+        presupuesto_ref: params.presupuestoRef || null,
+        cuota_nro: params.cuotaNro || null,
+        cuotas_total: params.cuotasTotal || null,
+        monto_usd: params.montoUsd,
+        monto_original: params.montoOriginal,
+        moneda: params.moneda,
+        motivo: reason,
+        estado: 'pendiente',
+        match_snapshot: matchSnapshot || null,
+        error_message: errorMessage || null,
+    };
+
+    const { error } = await admin
+        .from('financiacion_pagos_pendientes')
+        .upsert(payload, { onConflict: 'movement_id' });
+
+    return !error;
+}
+
+export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<SyncCuotaResult> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: 'No autenticado' };
+        }
+
+        const admin = createAdminClient();
+
+        const { data: patientRow } = await admin
+            .from('pacientes')
+            .select('id_paciente, documento, nombre, apellido')
+            .eq('id_paciente', params.pacienteId)
+            .maybeSingle();
+
+        const patientDni = normalizeDigits((patientRow as Record<string, unknown> | null)?.documento as string | undefined);
+        const patientName = params.pacienteNombre || `${(patientRow as Record<string, unknown> | null)?.apellido || ''} ${(patientRow as Record<string, unknown> | null)?.nombre || ''}`.trim();
+
+        const { data: plansRaw, error: plansError } = await admin
+            .from('planes_financiacion')
+            .select('*')
+            .eq('estado', 'En curso')
+            .order('created_at', { ascending: false })
+            .limit(300);
+
+        if (plansError) {
+            const pendingSaved = await savePendingPayment(admin, params, 'error_consulta_planes', undefined, plansError.message);
+            return { success: false, error: `Pago registrado en caja, pero falló la consulta de financiación: ${plansError.message}`, pendingSaved };
+        }
+
+        const plans = (plansRaw || []) as Array<Record<string, unknown>>;
+
+        let matched: Record<string, unknown> | null = null;
+        let matchMethod: MatchMethod | undefined;
+
+        matched = plans.find((plan) => String(plan.paciente_id || '') === params.pacienteId) || null;
+        if (matched) matchMethod = 'paciente_id';
+
+        if (!matched && params.presupuestoRef) {
+            matched = findByPresupuestoRef(plans, params.presupuestoRef);
+            if (matched) matchMethod = 'presupuesto_id';
+        }
+
+        if (!matched && patientDni) {
+            matched = findByDni(plans, patientDni);
+            if (matched) matchMethod = 'dni';
+        }
+
+        if (!matched) {
+            matched = findByNameFuzzy(plans, patientName);
+            if (matched) matchMethod = 'nombre_fuzzy';
+        }
+
+        if (!matched) {
+            const pendingSaved = await savePendingPayment(admin, params, 'plan_no_encontrado', {
+                patient_name: patientName,
+                patient_dni: patientDni,
+                presupuesto_ref: params.presupuestoRef || null,
+                candidates: plans.slice(0, 15).map((plan) => ({
+                    id: plan.id,
+                    paciente_nombre: plan.paciente_nombre,
+                    paciente_id: plan.paciente_id,
+                    cuit: plan.cuit,
+                })),
+            });
+
+            return {
+                success: false,
+                error: 'Pago registrado en caja, pero no se encontró un plan de financiación para acreditar la cuota.',
+                pendingSaved,
+            };
+        }
+
+        const planId = String(matched.id || '');
+        if (!planId) {
+            const pendingSaved = await savePendingPayment(admin, params, 'plan_sin_id', { matched });
+            return { success: false, error: 'Pago registrado en caja, pero el plan encontrado no tiene ID válido.', pendingSaved };
+        }
+
+        const prevPaid = getPlanNumber(matched, 'cuotas_pagadas');
+        const totalCuotas = getPlanNumber(matched, 'cuotas_total');
+        const cuotaValue = getPlanNumber(matched, 'monto_cuota_usd') || params.montoUsd;
+        const currentSaldo = getPlanNumber(matched, 'saldo_restante_usd');
+
+        const nextPaid = totalCuotas > 0 ? Math.min(totalCuotas, prevPaid + 1) : prevPaid + 1;
+        const nextSaldo = Math.max(0, currentSaldo - cuotaValue);
+        const nextEstado = totalCuotas > 0 && nextPaid >= totalCuotas ? 'Finalizado' : 'En curso';
+
+        const { error: updateError } = await admin
+            .from('planes_financiacion')
+            .update({
+                cuotas_pagadas: nextPaid,
+                saldo_restante_usd: nextSaldo,
+                estado: nextEstado,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', planId);
+
+        if (updateError) {
+            const pendingSaved = await savePendingPayment(admin, params, 'error_actualizacion_plan', { matched, matchMethod }, updateError.message);
+            return { success: false, error: `Pago registrado en caja, pero no se pudo actualizar el plan: ${updateError.message}`, pendingSaved };
+        }
+
+        // Immediate confirmation read (equivalent to forcing visible consistency)
+        const { data: verifyRow, error: verifyError } = await admin
+            .from('planes_financiacion')
+            .select('id, cuotas_pagadas, saldo_restante_usd')
+            .eq('id', planId)
+            .single();
+
+        if (verifyError || !verifyRow || Number(verifyRow.cuotas_pagadas || 0) !== nextPaid) {
+            const pendingSaved = await savePendingPayment(admin, params, 'confirmacion_escritura_fallida', {
+                expected: { cuotas_pagadas: nextPaid, saldo_restante_usd: nextSaldo },
+                got: verifyRow || null,
+                matchMethod,
+            }, verifyError?.message);
+
+            return {
+                success: false,
+                error: 'Pago registrado en caja, pero no se confirmó la acreditación de cuota en financiación.',
+                pendingSaved,
+                matchMethod,
+                planId,
+            };
+        }
+
+        return {
+            success: true,
+            matchMethod,
+            planId,
+            cuotasPagadas: Number(verifyRow.cuotas_pagadas || 0),
+            saldoRestanteUsd: Number(verifyRow.saldo_restante_usd || 0),
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Error inesperado al acreditar cuota',
+        };
+    }
+}
