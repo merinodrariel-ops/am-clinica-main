@@ -108,6 +108,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     const [step, setStep] = useState(1);
     const [saving, setSaving] = useState(false);
     const receiptCanvasRef = useRef<HTMLCanvasElement>(null);
+    const [generatedReceiptUrl, setGeneratedReceiptUrl] = useState<string | null>(null);
+    const [patientWhatsapp, setPatientWhatsapp] = useState<string>('');
 
     // Patient search
     const [searchQuery, setSearchQuery] = useState('');
@@ -216,6 +218,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 paciente_id: data.id_paciente,
                 paciente_nombre: `${data.apellido}, ${data.nombre}`,
             }));
+            setPatientWhatsapp(data.whatsapp || '');
             setSearchQuery('');
             setPatients([]);
             setStep(prev => (prev < 2 ? 2 : prev));
@@ -253,6 +256,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             paciente_id: patient.id_paciente,
             paciente_nombre: `${patient.apellido}, ${patient.nombre}`,
         }));
+        setPatientWhatsapp(patient.whatsapp || '');
         setSearchQuery('');
         setPatients([]);
         setStep(2); // Move to next step immediately
@@ -410,7 +414,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 }
             }
 
-            // Auto-generate receipt in background (never blocks payment flow)
+            // Generate receipt and show to user before closing
             if (insertedMovement?.id) {
                 try {
                     const canvas = receiptCanvasRef.current;
@@ -430,13 +434,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                             atendidoPor: 'AM Clínica',
                             cuotaInfo,
                         });
+                        setGeneratedReceiptUrl(imageDataUrl);
                         const base64Data = imageDataUrl.split(',')[1];
-                        // Fire and forget — don't await
                         saveReceiptAndLinkToMovement(
                             insertedMovement.id,
                             receiptNumber,
                             base64Data
-                        ).catch(err => console.error('Auto-receipt generation failed:', err));
+                        ).catch(err => console.error('Auto-receipt save failed:', err));
                     }
                 } catch (receiptError) {
                     console.error('Auto-receipt generation failed:', receiptError);
@@ -464,7 +468,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             }
 
             onSuccess();
-            handleClose();
+            setStep(5);
         } catch (error) {
             console.error('Error saving movement:', error);
             alert('Error al guardar el ingreso');
@@ -475,6 +479,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
     function handleClose() {
         setStep(1);
+        setGeneratedReceiptUrl(null);
+        setPatientWhatsapp('');
         setSearchQuery('');
         setPatients([]);
         setCargaHistorica(false);
@@ -1119,6 +1125,105 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                             >
                                 ← Volver
                             </Button>
+                        </div>
+                    )}
+
+                    {step === 5 && (
+                        <div className="space-y-5">
+                            {/* Success header */}
+                            <div className="flex flex-col items-center gap-2 pt-2 pb-1">
+                                <div className="h-14 w-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                    <Check size={28} className="text-green-600 dark:text-green-400" />
+                                </div>
+                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">¡Ingreso registrado!</h3>
+                                <p className="text-sm text-gray-500 text-center">Tu comprobante está listo para compartir</p>
+                            </div>
+
+                            {/* Receipt preview */}
+                            {generatedReceiptUrl ? (
+                                <div className="rounded-2xl overflow-hidden shadow-2xl border border-gray-100 dark:border-gray-700">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={generatedReceiptUrl}
+                                        alt="Comprobante de pago"
+                                        className="w-full object-contain"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="h-32 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                    <Loader2 size={24} className="animate-spin text-gray-400" />
+                                </div>
+                            )}
+
+                            {/* Sharing actions */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <Button
+                                    onClick={() => {
+                                        if (!generatedReceiptUrl || !receiptCanvasRef.current) return;
+                                        if (navigator.share) {
+                                            receiptCanvasRef.current.toBlob(async (blob) => {
+                                                if (!blob) return;
+                                                const file = new File([blob], 'comprobante.jpg', { type: 'image/jpeg' });
+                                                try {
+                                                    await navigator.share({
+                                                        files: [file],
+                                                        title: 'Comprobante de Pago AM Clínica',
+                                                        text: `Comprobante ${formData.paciente_nombre} — AM Clínica`,
+                                                    });
+                                                } catch { /* cancelled */ }
+                                            }, 'image/jpeg', 0.9);
+                                        } else {
+                                            // Fallback: download
+                                            const link = document.createElement('a');
+                                            link.href = generatedReceiptUrl;
+                                            link.download = 'comprobante.jpg';
+                                            link.click();
+                                        }
+                                    }}
+                                    disabled={!generatedReceiptUrl}
+                                    className="py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
+                                >
+                                    📱 Compartir
+                                </Button>
+
+                                <Button
+                                    onClick={() => {
+                                        if (!generatedReceiptUrl) return;
+                                        const digits = patientWhatsapp.replace(/\D/g, '');
+                                        const text = `Hola! Te compartimos tu comprobante de pago de AM Clínica.\nConcepto: ${formData.concepto_nombre}\nMonto: ${formatCurrency(formData.monto, formData.moneda)}`;
+                                        const encoded = encodeURIComponent(text);
+                                        const url = digits
+                                            ? `https://web.whatsapp.com/send?phone=${digits}&text=${encoded}`
+                                            : `https://web.whatsapp.com/send?text=${encoded}`;
+                                        window.open(url, '_blank', 'noopener,noreferrer');
+                                    }}
+                                    disabled={!generatedReceiptUrl}
+                                    className="py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
+                                >
+                                    💬 WhatsApp Web
+                                </Button>
+
+                                <Button
+                                    onClick={() => {
+                                        if (!generatedReceiptUrl) return;
+                                        const link = document.createElement('a');
+                                        link.href = generatedReceiptUrl;
+                                        link.download = 'comprobante.jpg';
+                                        link.click();
+                                    }}
+                                    disabled={!generatedReceiptUrl}
+                                    className="py-3 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
+                                >
+                                    💾 Descargar
+                                </Button>
+
+                                <Button
+                                    onClick={handleClose}
+                                    className="py-3 bg-transparent border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold rounded-xl h-auto flex items-center justify-center gap-2"
+                                >
+                                    ✕ Cerrar
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>
