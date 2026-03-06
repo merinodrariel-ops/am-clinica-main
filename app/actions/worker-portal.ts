@@ -730,7 +730,14 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
         .eq('id', user.id)
         .single();
 
-    if (!profile || !['admin', 'owner'].includes(profile.categoria || '')) {
+    // Normalize Spanish aliases (administradora/administrador → admin) same as get_my_role() in DB
+    const rawCategoria = (profile?.categoria || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normalizedCategoria = ['administradora', 'administrador', 'administracion', 'admin'].includes(rawCategoria)
+        ? 'admin'
+        : rawCategoria;
+
+    if (!profile || !['admin', 'owner'].includes(normalizedCategoria)) {
         throw new Error('Acceso denegado: Se requieren permisos de administrador o dueño');
     }
 
