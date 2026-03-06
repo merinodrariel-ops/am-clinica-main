@@ -1,7 +1,17 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+
+// Service-role client bypasses RLS for agenda mutations.
+// Auth is still verified via SSR client before calling these.
+function getAdminClient() {
+    return createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+}
 
 type AppointmentUpdatePayload = Partial<{
     id: string;
@@ -93,7 +103,10 @@ export async function createAppointment(formData: FormData) {
 }
 
 export async function updateAppointment(id: string, updates: AppointmentUpdatePayload) {
+    // Verify auth via SSR client, then use admin client to bypass RLS
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
 
     // Sanitize input to avoid updating protected fields
     const safeUpdates = { ...updates };
@@ -101,7 +114,7 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     delete safeUpdates.created_at;
     delete safeUpdates.created_by;
 
-    const { error } = await supabase
+    const { error } = await getAdminClient()
         .from('agenda_appointments')
         .update({
             ...safeUpdates,
@@ -119,9 +132,12 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
 }
 
 export async function deleteAppointment(id: string) {
+    // Verify auth via SSR client, then use admin client to bypass RLS
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
 
-    const { error } = await supabase
+    const { error } = await getAdminClient()
         .from('agenda_appointments')
         .delete()
         .eq('id', id);
@@ -270,8 +286,11 @@ export async function reassignDoctorBulk(
     newDoctorId: string
 ) {
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado', updatedCount: 0 };
 
-    let query = supabase
+    const admin = getAdminClient();
+    let query = admin
         .from('agenda_appointments')
         .update({ doctor_id: newDoctorId, updated_at: new Date().toISOString() })
         .eq('title', filters.title)
