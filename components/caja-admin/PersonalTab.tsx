@@ -29,6 +29,7 @@ import {
     ExternalLink,
     Eye,
     EyeOff,
+    Settings,
 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -149,6 +150,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         valor_hora_ars: 0,
         descripcion: '',
         poliza_url: '',
+        moneda_mensual: 'ARS',
+        activo: true,
     });
 
     // Hours form state
@@ -310,6 +313,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             porcentaje_honorarios: p.porcentaje_honorarios || 0,
             modelo_pago: p.modelo_pago || 'prestaciones',
             monto_mensual: p.monto_mensual || 0,
+            moneda_mensual: p.moneda_mensual || 'ARS',
+            activo: p.activo !== false,
             datos_bancarios: p.datos_bancarios || '',
         });
         setShowForm(true);
@@ -353,6 +358,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             porcentaje_honorarios: 0,
             modelo_pago: defaults.tipo === 'odontologo' ? 'prestaciones' : 'horas',
             monto_mensual: 0,
+            moneda_mensual: 'ARS',
+            activo: true,
             datos_bancarios: '',
         });
         setShowForm(true);
@@ -1130,34 +1137,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Modelo de Pago *
-                                        </label>
-                                        <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl gap-1 border border-slate-200 dark:border-slate-800">
-                                            {[
-                                                { id: 'horas', label: 'Hora' },
-                                                { id: 'prestaciones', label: 'Prestación' },
-                                                { id: 'mensual', label: 'Mensual' }
-                                            ].map((mode) => (
-                                                <button
-                                                    key={mode.id}
-                                                    type="button"
-                                                    onClick={() => setFormData({ ...formData, modelo_pago: mode.id as any })}
-                                                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.modelo_pago === mode.id
-                                                        ? "bg-white dark:bg-slate-800 text-indigo-600 shadow-sm border border-slate-200 dark:border-slate-700"
-                                                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
-                                                        }`}
-                                                >
-                                                    {mode.id === 'prestaciones' ? 'Prestación' : mode.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
                                 </div>
-                                <p className="text-[10px] text-slate-400 -mt-2">
-                                    Define qué botón de carga rápida aparecerá en la ficha del prestador.
-                                </p>
 
                                 {/* Basic Info */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1317,36 +1297,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            <DollarSign className="w-4 h-4 inline mr-1" />
-                                            Monto Mensual Estipulado
-                                        </label>
-                                        <MoneyInput
-                                            value={formData.monto_mensual || 0}
-                                            onChange={(val) => setFormData({ ...formData, monto_mensual: val })}
-                                            currency="ARS"
-                                            className="w-full"
-                                        />
-                                        <p className="text-[10px] text-slate-400 mt-1">
-                                            Sueldo fijo mensual acordado (solo se usa si el modelo es Mensual).
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            <Building2 className="w-4 h-4 inline mr-1" />
-                                            Datos Bancarios
-                                        </label>
-                                        <Textarea
-                                            value={formData.datos_bancarios || ''}
-                                            onChange={(e) => setFormData({ ...formData, datos_bancarios: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
-                                            placeholder="CBU, Alias, Banco..."
-                                            rows={2}
-                                        />
-                                    </div>
-                                </div>
 
                                 {/* Odontólogo specific fields */}
                                 {formData.tipo === 'odontologo' && (
@@ -1429,6 +1379,146 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[80px]"
                                         placeholder="Información adicional..."
                                     />
+                                </div>
+
+                                {/* Configuration / Payment Info Grouped at the End */}
+                                <div className="mt-4 pt-6 border-t border-slate-200 dark:border-slate-700">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <Settings className="w-3.5 h-3.5" />
+                                        Configuración de Liquidación
+                                    </h4>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                Modelo de Liquidación
+                                            </label>
+                                            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 border border-slate-200 dark:border-slate-700 max-w-sm">
+                                                {[
+                                                    { id: 'horas', label: 'Por Hora' },
+                                                    { id: 'prestaciones', label: 'Por Prestación' },
+                                                    { id: 'mensual', label: 'Mensual' }
+                                                ].map((mode) => (
+                                                    <button
+                                                        key={mode.id}
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, modelo_pago: mode.id as CreatePersonalInput['modelo_pago'] })}
+                                                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.modelo_pago === mode.id
+                                                            ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm border border-indigo-100/50"
+                                                            : "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-700/40"
+                                                            }`}
+                                                    >
+                                                        {mode.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-2">
+                                                Determina si el prestador cobra mensualidad fija, por hora de trabajo o por procedimiento realizado.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 bg-slate-50 dark:bg-slate-900">
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado del prestador</p>
+                                                <p className="text-[10px] text-slate-500">Define si aparece activo o inactivo en el sistema</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, activo: !(formData.activo ?? true) })}
+                                                className={`relative h-7 w-14 rounded-full transition-colors ${(formData.activo ?? true) ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                                aria-label="Cambiar estado activo"
+                                            >
+                                                <span
+                                                    className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white transition-transform ${(formData.activo ?? true) ? 'translate-x-7' : 'translate-x-0'}`}
+                                                />
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {formData.modelo_pago === 'mensual' && (
+                                                <>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                            <DollarSign className="w-4 h-4 inline mr-1 text-slate-400" />
+                                                            Mensualidad (Monto)
+                                                        </label>
+                                                        <MoneyInput
+                                                            value={formData.monto_mensual || 0}
+                                                            onChange={(val) => setFormData({ ...formData, monto_mensual: val })}
+                                                            currency={formData.moneda_mensual || 'ARS'}
+                                                            className="w-full"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                            Moneda mensualidad
+                                                        </label>
+                                                        <div className="relative">
+                                                            <select
+                                                                value={formData.moneda_mensual || 'ARS'}
+                                                                onChange={(e) => setFormData({ ...formData, moneda_mensual: e.target.value as 'ARS' | 'USD' })}
+                                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                            >
+                                                                <option value="ARS">Pesos (ARS)</option>
+                                                                <option value="USD">USD</option>
+                                                            </select>
+                                                            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {formData.modelo_pago === 'horas' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        <Clock className="w-4 h-4 inline mr-1 text-slate-400" />
+                                                        Valor de Hora (Monto)
+                                                    </label>
+                                                    <MoneyInput
+                                                        value={formData.valor_hora_ars || 0}
+                                                        onChange={(val) => setFormData({ ...formData, valor_hora_ars: val })}
+                                                        currency="ARS"
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {formData.modelo_pago === 'prestaciones' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        <FileText className="w-4 h-4 inline mr-1 text-slate-400" />
+                                                        Porcentaje Honorarios (%)
+                                                    </label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={formData.porcentaje_honorarios || 0}
+                                                            onChange={(e) => setFormData({ ...formData, porcentaje_honorarios: Number(e.target.value) })}
+                                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 pr-10"
+                                                            placeholder="Ej: 40"
+                                                        />
+                                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">%</span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <Building2 className="w-4 h-4 inline mr-1 text-slate-400" />
+                                                    Datos Bancarios
+                                                </label>
+                                                <Textarea
+                                                    value={formData.datos_bancarios || ''}
+                                                    onChange={(e) => setFormData({ ...formData, datos_bancarios: e.target.value })}
+                                                    className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                                    placeholder="CBU, Alias, Banco..."
+                                                    rows={2}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1724,12 +1814,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700/50">
                                                 <div className="flex items-center gap-2">
                                                     <DollarSign className="w-4 h-4 text-emerald-500" />
-                                                    <span className="text-[11px] font-medium text-slate-500">Monto Mensual:</span>
+                                                    <span className="text-[11px] font-medium text-slate-500">Mensualidad (Monto):</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">
                                                         {visibleMontoIds.has(p.id)
-                                                            ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(p.monto_mensual || 0)
+                                                            ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: p.moneda_mensual === 'USD' ? 'USD' : 'ARS' }).format(p.monto_mensual || 0)
                                                             : '********'}
                                                     </span>
                                                     <button
@@ -1771,29 +1861,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         )}
                                     </div>
 
-                                    {/* Billing Mode Toggles */}
-                                    <div className="flex bg-slate-100 dark:bg-slate-700/50 p-1 rounded-lg gap-1 border border-slate-200 dark:border-slate-600 mt-2">
-                                        {[
-                                            { id: 'horas', label: 'Hora' },
-                                            { id: 'prestaciones', label: 'Prestación' },
-                                            { id: 'mensual', label: 'Mensual' }
-                                        ].map((mode) => {
-                                            const currentMode = p.modelo_pago || 'prestaciones';
-                                            const isActive = currentMode === mode.id;
-                                            return (
-                                                <button
-                                                    key={mode.id}
-                                                    onClick={() => handleUpdateModeloPago(p.id, mode.id as any)}
-                                                    className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${isActive
-                                                        ? "bg-white dark:bg-slate-600 text-indigo-600 shadow-sm"
-                                                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-600/40"
-                                                        }`}
-                                                >
-                                                    {mode.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
 
                                     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                                         {/* Action Buttons based on Payment Model */}
@@ -1848,7 +1915,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                             <DollarSign className="w-5 h-5 group-hover:scale-110 transition-transform" />
                                                             Cargar Mensualidad
                                                         </div>
-                                                        <span className="text-[10px] opacity-70 font-medium">Pago fijo mensual</span>
+                                                        <span className="text-[10px] opacity-70 font-medium">Mensualidad fija</span>
                                                     </Button>
                                                 );
                                             }

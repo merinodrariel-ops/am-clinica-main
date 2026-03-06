@@ -761,7 +761,8 @@ export async function createPersonal(input: CreatePersonalInput): Promise<{ data
         categoria,
         whatsapp: normalizedWhatsapp,
         valor_hora_ars: input.valor_hora_ars || 0,
-        activo: true,
+        moneda_mensual: input.moneda_mensual || 'ARS',
+        activo: input.activo ?? true,
         fecha_ingreso: input.fecha_ingreso || new Date().toISOString().split('T')[0],
     };
 
@@ -779,6 +780,17 @@ export async function createPersonal(input: CreatePersonalInput): Promise<{ data
                 ...basePayload,
                 rol: input.rol || (normalizedTipo === 'odontologo' ? 'Odontólogo' : 'Prestador'),
             })
+            .select()
+            .single());
+    }
+
+    // Backward compatibility for environments where moneda_mensual column does not exist yet.
+    if (error && /column "moneda_mensual"/i.test(error.message || '')) {
+        const { moneda_mensual: _ignored, ...payloadWithoutMoneda } = basePayload as Record<string, unknown>;
+
+        ({ data, error } = await getSupabase()
+            .from('personal')
+            .insert(payloadWithoutMoneda)
             .select()
             .single());
     }
@@ -817,10 +829,18 @@ export async function updatePersonal(
         ...(normalizedWhatsapp !== undefined ? { whatsapp: normalizedWhatsapp } : {}),
     };
 
-    const { error } = await getSupabase()
+    let { error } = await getSupabase()
         .from('personal')
         .update(nextUpdates)
         .eq('id', id);
+
+    if (error && /column "moneda_mensual"/i.test(error.message || '') && Object.prototype.hasOwnProperty.call(nextUpdates, 'moneda_mensual')) {
+        const { moneda_mensual: _ignored, ...fallbackUpdates } = nextUpdates as Record<string, unknown>;
+        ({ error } = await getSupabase()
+            .from('personal')
+            .update(fallbackUpdates)
+            .eq('id', id));
+    }
 
     if (error) {
         return { success: false, error: error.message };

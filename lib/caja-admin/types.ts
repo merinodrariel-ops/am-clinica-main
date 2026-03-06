@@ -131,6 +131,7 @@ export interface Personal {
     descripcion?: string;
     valor_hora_ars: number;
     modelo_pago: 'horas' | 'prestaciones' | 'mensual';
+    moneda_mensual?: 'ARS' | 'USD';
     activo: boolean;
     pagado_mes_actual?: boolean;
     ultimo_pago_fecha?: string;
@@ -144,6 +145,7 @@ export interface Personal {
     sanciones_notas?: string;
     porcentaje_honorarios?: number;
     monto_mensual?: number;
+    moneda_mensual?: 'ARS' | 'USD';
     datos_bancarios?: string;
     created_at?: string;
     updated_at?: string;
@@ -272,6 +274,8 @@ export interface CreatePersonalInput {
     poliza_url?: string;
     porcentaje_honorarios?: number;
     monto_mensual?: number;
+    moneda_mensual?: 'ARS' | 'USD';
+    activo?: boolean;
     datos_bancarios?: string;
 }
 
