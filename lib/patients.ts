@@ -42,6 +42,7 @@ export interface Paciente {
     consentimiento_comunicacion?: boolean;
     is_deleted?: boolean;
     welcome_email_sent?: boolean; // tracks if welcome email was sent
+    como_nos_conocio?: string | null;
 }
 
 export interface HistoriaClinica {

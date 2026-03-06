@@ -1,14 +1,23 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
+
+function getAdminClient() {
+    return createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+}
 
 // Fields we consider "updatable" — the ones old patients may be missing
 const UPDATABLE_FIELDS = [
+    'documento',
     'fecha_nacimiento',
-    'ciudad',
-    'zona_barrio',
     'email',
     'whatsapp',
+    'como_nos_conocio',
 ] as const;
 
 type UpdatableField = typeof UPDATABLE_FIELDS[number];
@@ -21,46 +30,32 @@ export type PatientLookupResult = {
     missingFields?: UpdatableField[];
     existingData?: Partial<Record<UpdatableField, string | null>>;
     error?: string;
-    // For disambiguation when multiple matches
     multipleMatches?: Array<{ id_paciente: string; nombre: string; apellido: string; hint: string }>;
 };
 
 export type SearchMethod = 'dni' | 'whatsapp' | 'email' | 'auto';
 
 // ─── Phone normalizer ──────────────────────────────────────────────
-// Extracts the last 8 core digits from any Argentine phone format.
-// +54 9 11 5632-5000 → 56325000
-// 011 15 5632-5000   → 56325000
-// 1156325000         → 56325000
-// 15-5632-5000       → 56325000
 function extractCoreDigits(phone: string): string {
     const digits = phone.replace(/\D/g, '');
-    // Argentine mobile: last 8 digits are always the subscriber number
-    // (area code is 2-4 digits, subscriber is always 8)
-    if (digits.length >= 8) {
-        return digits.slice(-8);
-    }
+    if (digits.length >= 8) return digits.slice(-8);
     return digits;
 }
 
-// Detect what the user typed
 function detectSearchType(input: string): SearchMethod {
     const trimmed = input.trim();
     if (trimmed.includes('@')) return 'email';
-    // If it starts with + or has mostly digits with formats like spaces/dashes
     const digitsOnly = trimmed.replace(/\D/g, '');
     if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
-        // Could be phone or DNI — if longer than 10 or starts with country code, it's phone
-        if (trimmed.startsWith('+') || digitsOnly.length > 10 || trimmed.startsWith('15')) {
-            return 'whatsapp';
-        }
-        // 7-8 digits is most likely DNI, 10+ is phone
+        if (trimmed.startsWith('+') || digitsOnly.length > 10 || trimmed.startsWith('15')) return 'whatsapp';
         if (digitsOnly.length <= 8) return 'dni';
         return 'whatsapp';
     }
     if (digitsOnly.length >= 7 && digitsOnly.length <= 10) return 'dni';
-    return 'dni'; // fallback
+    return 'dni';
 }
+
+const SELECT_FIELDS = 'id_paciente, nombre, apellido, documento, fecha_nacimiento, email, whatsapp, como_nos_conocio';
 
 // ─── Unified smart lookup ──────────────────────────────────────────
 export async function lookupPatient(
@@ -74,50 +69,41 @@ export async function lookupPatient(
     }
 
     const resolvedMethod = method === 'auto' ? detectSearchType(trimmed) : method;
-
-    const selectFields = 'id_paciente, nombre, apellido, fecha_nacimiento, ciudad, zona_barrio, email, whatsapp, documento';
-
     let results: Array<Record<string, unknown>> = [];
 
     if (resolvedMethod === 'email') {
         const { data } = await supabase
             .from('pacientes')
-            .select(selectFields)
+            .select(SELECT_FIELDS)
             .eq('is_deleted', false)
             .ilike('email', trimmed)
             .limit(5);
         results = data || [];
     } else if (resolvedMethod === 'whatsapp') {
-        // Extract core 8 digits and search with LIKE
         const core = extractCoreDigits(trimmed);
-        if (core.length < 6) {
-            return { found: false, error: 'Ingresá al menos 6 dígitos de tu WhatsApp' };
-        }
+        if (core.length < 6) return { found: false, error: 'Ingresá al menos 6 dígitos de tu WhatsApp' };
         const { data } = await supabase
             .from('pacientes')
-            .select(selectFields)
+            .select(SELECT_FIELDS)
             .eq('is_deleted', false)
             .like('whatsapp', `%${core}%`)
             .limit(5);
         results = data || [];
-
-        // If no results with core digits, try raw search
         if (results.length === 0) {
             const digitsOnly = trimmed.replace(/\D/g, '');
             const { data: fallbackData } = await supabase
                 .from('pacientes')
-                .select(selectFields)
+                .select(SELECT_FIELDS)
                 .eq('is_deleted', false)
                 .like('whatsapp', `%${digitsOnly}%`)
                 .limit(5);
             results = fallbackData || [];
         }
     } else {
-        // DNI search — try normalized and raw
         const normalized = trimmed.replace(/[.\s-]/g, '');
         const { data } = await supabase
             .from('pacientes')
-            .select(selectFields)
+            .select(SELECT_FIELDS)
             .eq('is_deleted', false)
             .or(`documento.eq.${normalized},documento.eq.${trimmed}`)
             .limit(5);
@@ -132,11 +118,10 @@ export async function lookupPatient(
         };
         return {
             found: false,
-            error: `${tipMap[resolvedMethod] || 'No encontramos resultados.'} Probá con otro dato o completá el formulario de admisión.`,
+            error: `${tipMap[resolvedMethod] || 'No encontramos resultados.'} Probá con otro dato.`,
         };
     }
 
-    // Multiple matches → disambiguation
     if (results.length > 1) {
         return {
             found: false,
@@ -149,12 +134,9 @@ export async function lookupPatient(
         };
     }
 
-    // Single match → return with missing fields
-    const patient = results[0];
-    return buildPatientResult(patient);
+    return buildPatientResult(results[0]);
 }
 
-// Build a hint to help disambiguate (show partial info)
 function buildHint(patient: Record<string, unknown>, method: SearchMethod): string {
     if (method === 'whatsapp' && patient.documento) {
         const doc = String(patient.documento);
@@ -194,50 +176,97 @@ function buildPatientResult(patient: Record<string, unknown>): PatientLookupResu
     };
 }
 
-// Direct lookup by id (for disambiguation selection)
 export async function lookupPatientById(id: string): Promise<PatientLookupResult> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('pacientes')
-        .select('id_paciente, nombre, apellido, fecha_nacimiento, ciudad, zona_barrio, email, whatsapp')
+        .select(SELECT_FIELDS)
         .eq('id_paciente', id)
         .eq('is_deleted', false)
         .single();
 
-    if (error || !data) {
-        return { found: false, error: 'Paciente no encontrado' };
-    }
-
+    if (error || !data) return { found: false, error: 'Paciente no encontrado' };
     return buildPatientResult(data as Record<string, unknown>);
 }
 
-// Keep legacy function for backwards compatibility
 export async function lookupPatientByDni(dni: string): Promise<PatientLookupResult> {
     return lookupPatient(dni, 'dni');
 }
 
+// ─── Token-based personalized lookup ──────────────────────────────
+// Uses admin client because patient_portal_tokens has RLS = no public access.
+export async function lookupPatientByToken(token: string): Promise<PatientLookupResult> {
+    if (!token || token.length < 10) return { found: false, error: 'Token inválido' };
+
+    const admin = getAdminClient();
+    const { data: tokenRow, error: tokenError } = await admin
+        .from('patient_portal_tokens')
+        .select('patient_id, expires_at, used')
+        .eq('token', token)
+        .single();
+
+    if (tokenError || !tokenRow) return { found: false, error: 'Link inválido o expirado' };
+    if (tokenRow.used) return { found: false, error: 'Este link ya fue utilizado' };
+    if (new Date(tokenRow.expires_at) < new Date()) {
+        return { found: false, error: 'Este link expiró. Pedí uno nuevo en recepción.' };
+    }
+
+    const { data: patient, error: patientError } = await admin
+        .from('pacientes')
+        .select(SELECT_FIELDS)
+        .eq('id_paciente', tokenRow.patient_id)
+        .eq('is_deleted', false)
+        .single();
+
+    if (patientError || !patient) return { found: false, error: 'Paciente no encontrado' };
+    return buildPatientResult(patient as Record<string, unknown>);
+}
+
+// ─── Generate personalized update link ────────────────────────────
+// Called by staff from the patient list. Returns a 7-day URL.
+export async function generatePatientUpdateToken(
+    patientId: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const admin = getAdminClient();
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    const { error } = await admin
+        .from('patient_portal_tokens')
+        .upsert(
+            { patient_id: patientId, token, expires_at: expiresAt.toISOString(), used: false },
+            { onConflict: 'patient_id' }
+        );
+
+    if (error) return { success: false, error: error.message };
+
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+    const url = `${baseUrl}/actualizar-datos?t=${token}`;
+    return { success: true, url };
+}
+
+// ─── Update patient data ───────────────────────────────────────────
+// Uses admin client so it works from both staff and the public token form.
 export async function updatePatientData(
     id_paciente: string,
     updates: Partial<Record<UpdatableField, string>>
 ): Promise<{ success: boolean; error?: string }> {
-    const supabase = await createClient();
-    if (!id_paciente) {
-        return { success: false, error: 'ID de paciente no proporcionado' };
-    }
+    if (!id_paciente) return { success: false, error: 'ID de paciente no proporcionado' };
 
-    // Clean up empty values
     const cleanUpdates: Record<string, string> = {};
     for (const [key, value] of Object.entries(updates)) {
-        if (value && value.trim()) {
-            cleanUpdates[key] = value.trim();
-        }
+        if (value && value.trim()) cleanUpdates[key] = value.trim();
     }
 
     if (Object.keys(cleanUpdates).length === 0) {
         return { success: false, error: 'No hay datos para actualizar' };
     }
 
-    const { error } = await supabase
+    const { error } = await getAdminClient()
         .from('pacientes')
         .update(cleanUpdates)
         .eq('id_paciente', id_paciente);

@@ -14,10 +14,21 @@ import {
     Trash2,
     AlertTriangle,
     Loader2,
-    Presentation
+    Presentation,
+    Send,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Paciente, formatWhatsAppLink, formatMailtoLink, softDeletePaciente } from '@/lib/patients';
+import { generatePatientUpdateToken } from '@/app/actions/patient-update';
+
+const ENRICHMENT_FIELDS: (keyof Paciente)[] = ['documento', 'fecha_nacimiento', 'email', 'whatsapp', 'como_nos_conocio'];
+
+function getMissingCount(patient: Paciente): number {
+    return ENRICHMENT_FIELDS.filter(f => {
+        const v = patient[f];
+        return v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+    }).length;
+}
 
 interface PatientListProps {
     patients: Paciente[];
@@ -98,6 +109,28 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [patientToDelete, setPatientToDelete] = useState<Paciente | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [sendingEnrichId, setSendingEnrichId] = useState<string | null>(null);
+
+    async function handleSendEnrichmentLink(patient: Paciente) {
+        setSendingEnrichId(patient.id_paciente);
+        try {
+            const result = await generatePatientUpdateToken(patient.id_paciente);
+            if (!result.success || !result.url) {
+                alert('Error al generar el link: ' + (result.error || 'desconocido'));
+                return;
+            }
+            const phone = (patient.whatsapp || '').replace(/\D/g, '');
+            const msg = encodeURIComponent(
+                `Hola ${patient.nombre}! Te enviamos este link personalizado para completar tus datos en AM Estética Dental 😊\n\n${result.url}\n\n¡Muchas gracias!`
+            );
+            const waUrl = phone
+                ? `https://wa.me/${phone}?text=${msg}`
+                : `https://wa.me/?text=${msg}`;
+            window.open(waUrl, '_blank', 'noopener,noreferrer');
+        } finally {
+            setSendingEnrichId(null);
+        }
+    }
 
     async function handleConfirmDelete() {
         if (!patientToDelete) return;
@@ -190,6 +223,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                         {currentPatients.map((patient, index) => {
                             const whatsapp = getWhatsAppNumber(patient);
                             const email = patient.email;
+                            const missingCount = getMissingCount(patient);
 
                             return (
                                 <motion.tr
@@ -208,9 +242,19 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                 <User size={20} />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-white group-hover:text-teal-400 transition-colors drop-shadow-sm">
-                                                    {patient.apellido}, {patient.nombre}
-                                                </p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-medium text-white group-hover:text-teal-400 transition-colors drop-shadow-sm">
+                                                        {patient.apellido}, {patient.nombre}
+                                                    </p>
+                                                    {missingCount > 0 && (
+                                                        <span
+                                                            className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                                            title={`${missingCount} dato${missingCount > 1 ? 's' : ''} faltante${missingCount > 1 ? 's' : ''}`}
+                                                        >
+                                                            {missingCount}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {patient.documento && (
                                                     <p className="text-xs text-slate-500">
                                                         DNI: {patient.documento}
@@ -307,6 +351,20 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-2">
+                                            {missingCount > 0 && (
+                                                <button
+                                                    onClick={() => handleSendEnrichmentLink(patient)}
+                                                    disabled={sendingEnrichId === patient.id_paciente}
+                                                    className="p-2 text-amber-500/70 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg inline-flex transition-colors disabled:opacity-50"
+                                                    title="Enviar link de actualización de datos por WhatsApp"
+                                                >
+                                                    {sendingEnrichId === patient.id_paciente ? (
+                                                        <Loader2 size={18} className="animate-spin" />
+                                                    ) : (
+                                                        <Send size={18} />
+                                                    )}
+                                                </button>
+                                            )}
                                             <Link
                                                 href={`/patients/${patient.id_paciente}`}
                                                 className="p-2 text-slate-500 hover:text-teal-400 hover:bg-teal-500/10 rounded-lg inline-flex transition-colors"

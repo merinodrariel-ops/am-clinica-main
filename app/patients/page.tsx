@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Plus,
     Search,
     RefreshCw,
     Loader2,
     Copy,
-    Check
+    Check,
+    ChevronDown,
+    ClipboardList,
+    UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import PatientList from '@/components/patients/PatientList';
@@ -23,18 +26,27 @@ export default function PatientsPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
-    const [copied, setCopied] = useState(false);
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const handleCopyAdmissionLink = async () => {
-        try {
-            // Point to the internal admission route
-            const admissionUrl = `${window.location.origin}/admision`;
-            await navigator.clipboard.writeText(admissionUrl);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (err) {
-            console.error('Failed to copy admission link:', err);
+    // Close dropdown on outside click
+    useEffect(() => {
+        function handleOutside(e: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setDropdownOpen(false);
+            }
         }
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, []);
+
+    const handleCopyLink = async (key: 'admision' | 'datos') => {
+        const path = key === 'admision' ? '/admision' : '/actualizar-datos';
+        await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+        setCopiedKey(key);
+        setDropdownOpen(false);
+        setTimeout(() => setCopiedKey(null), 2000);
     };
 
     const loadPatients = useCallback(async () => {
@@ -94,17 +106,47 @@ export default function PatientsPage() {
                     {/* Registration Buttons - Protected */}
                     {canEdit('pacientes') && (
                         <div className="flex items-center gap-3">
-                            <button
-                                onClick={handleCopyAdmissionLink}
-                                className={`flex items-center gap-2 px-4 py-2.5 border transition-all rounded-lg font-medium ${copied
-                                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
-                                    : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
-                                    }`}
-                                title="Copiar link del formulario de admisión para pacientes"
-                            >
-                                {copied ? <Check size={18} /> : <Copy size={18} />}
-                                {copied ? '¡Copiado!' : 'Copiar Formulario'}
-                            </button>
+                            {/* Copy dropdown */}
+                            <div className="relative" ref={dropdownRef}>
+                                <button
+                                    onClick={() => setDropdownOpen(v => !v)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 border transition-all rounded-lg font-medium ${copiedKey
+                                        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
+                                        : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
+                                        }`}
+                                >
+                                    {copiedKey ? <Check size={18} /> : <Copy size={18} />}
+                                    {copiedKey ? '¡Copiado!' : 'Copiar Link'}
+                                    {!copiedKey && <ChevronDown size={14} className={`transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />}
+                                </button>
+
+                                {dropdownOpen && (
+                                    <div className="absolute right-0 mt-2 w-56 rounded-xl border border-white/10 bg-slate-900/95 backdrop-blur-sm shadow-xl z-30 overflow-hidden">
+                                        <button
+                                            onClick={() => handleCopyLink('admision')}
+                                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-left"
+                                        >
+                                            <ClipboardList size={16} className="text-emerald-400 flex-shrink-0" />
+                                            <div>
+                                                <p className="font-medium">Formulario de admisión</p>
+                                                <p className="text-xs text-slate-500">Para nuevos pacientes</p>
+                                            </div>
+                                        </button>
+                                        <div className="h-px bg-white/5" />
+                                        <button
+                                            onClick={() => handleCopyLink('datos')}
+                                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-left"
+                                        >
+                                            <UserCheck size={16} className="text-amber-400 flex-shrink-0" />
+                                            <div>
+                                                <p className="font-medium">Actualización de datos</p>
+                                                <p className="text-xs text-slate-500">Para pacientes existentes</p>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             <Link
                                 href="/admision"
                                 target="_blank"

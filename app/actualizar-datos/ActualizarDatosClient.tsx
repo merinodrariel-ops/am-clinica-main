@@ -8,8 +8,6 @@ import {
     Check,
     Shield,
     Calendar,
-    MapPin,
-    Home,
     Mail,
     Phone,
     ArrowRight,
@@ -17,10 +15,13 @@ import {
     ChevronLeft,
     Fingerprint,
     User,
+    Hash,
+    Loader2,
 } from 'lucide-react';
 import {
     lookupPatient,
     lookupPatientById,
+    lookupPatientByToken,
     updatePatientData,
     type PatientLookupResult,
     type SearchMethod,
@@ -55,45 +56,55 @@ const SEARCH_TABS: Array<{ method: SearchMethod; label: string; icon: React.Reac
 ];
 
 // ─── Field config ────────────────────────────────────────────────
-const FIELD_CONFIG: Record<string, { label: string; placeholder: string; icon: React.ReactNode; type: string }> = {
+const FIELD_CONFIG: Record<string, { label: string; placeholder: string; icon: React.ReactNode; type: string; inputMode?: 'text' | 'numeric' | 'email' | 'tel' }> = {
+    documento: {
+        label: 'DNI / Documento',
+        placeholder: 'Ej: 32456789',
+        icon: <Hash size={18} />,
+        type: 'text',
+        inputMode: 'numeric',
+    },
     fecha_nacimiento: {
         label: 'Fecha de nacimiento',
         placeholder: '',
         icon: <Calendar size={18} />,
         type: 'date',
     },
-    ciudad: {
-        label: 'Ciudad',
-        placeholder: 'Ej: Buenos Aires',
-        icon: <MapPin size={18} />,
-        type: 'text',
-    },
-    zona_barrio: {
-        label: 'Barrio / Zona',
-        placeholder: 'Ej: Palermo, Recoleta...',
-        icon: <Home size={18} />,
-        type: 'text',
-    },
     email: {
         label: 'Email',
         placeholder: 'tu@email.com',
         icon: <Mail size={18} />,
         type: 'email',
+        inputMode: 'email',
     },
     whatsapp: {
         label: 'WhatsApp',
         placeholder: '+54 11 1234-5678',
         icon: <Phone size={18} />,
         type: 'tel',
+        inputMode: 'tel',
     },
 };
+
+// ─── Referral source chips ────────────────────────────────────────
+const ORIGEN_OPTIONS = [
+    { value: 'redes_sociales', label: 'Redes sociales', emoji: '📱' },
+    { value: 'google', label: 'Google', emoji: '🔍' },
+    { value: 'anuncios', label: 'Publicidad', emoji: '📢' },
+    { value: 'recomendacion', label: 'Me recomendaron', emoji: '🤝' },
+    { value: 'ya_era_paciente', label: 'Ya era paciente', emoji: '⭐' },
+    { value: 'otro', label: 'Otro', emoji: '💬' },
+];
 
 // ─── Component ────────────────────────────────────────────────────
 export default function ActualizarDatosClient() {
     const searchParams = useSearchParams();
+    const tokenParam = searchParams.get('t');
     const dniParam = searchParams.get('d');
 
-    const [step, setStep] = useState<'search' | 'disambiguate' | 'form' | 'success'>('search');
+    const [step, setStep] = useState<'loading' | 'search' | 'disambiguate' | 'form' | 'success'>(
+        tokenParam ? 'loading' : 'search'
+    );
     const [searchMethod, setSearchMethod] = useState<SearchMethod>('whatsapp');
     const [searchValue, setSearchValue] = useState(dniParam || '');
     const [searching, setSearching] = useState(false);
@@ -111,6 +122,25 @@ export default function ActualizarDatosClient() {
             setSearchMethod('dni');
         }
     }, [dniParam]);
+
+    // Token-based auto-lookup
+    useEffect(() => {
+        if (!tokenParam) return;
+        setStep('loading');
+        lookupPatientByToken(tokenParam).then((result) => {
+            if (result.found) {
+                setPatient(result);
+                if (result.missingFields && result.missingFields.length > 0) {
+                    setStep('form');
+                } else {
+                    setStep('success');
+                }
+            } else {
+                setError(result.error || 'Link inválido o expirado');
+                setStep('search');
+            }
+        });
+    }, [tokenParam]);
 
     const handleSearch = useCallback(async (value: string, method: SearchMethod) => {
         const trimmed = value.trim();
@@ -211,6 +241,23 @@ export default function ActualizarDatosClient() {
                 </motion.div>
 
                 <AnimatePresence mode="wait">
+
+                    {/* ─── LOADING (token resolution) ─────────────── */}
+                    {step === 'loading' && (
+                        <motion.div
+                            key="loading"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex flex-col items-center justify-center gap-6 py-16"
+                        >
+                            <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center">
+                                <Loader2 className="text-[#D4AF37] animate-spin" size={28} />
+                            </div>
+                            <p className="text-zinc-500 text-sm tracking-wide">Cargando tu perfil…</p>
+                        </motion.div>
+                    )}
+
                     {/* ─── STEP 1: SMART SEARCH ────────────────────── */}
                     {step === 'search' && (
                         <motion.div
@@ -383,13 +430,15 @@ export default function ActualizarDatosClient() {
                             transition={{ duration: 0.4 }}
                             className="space-y-6"
                         >
-                            {/* Back button */}
-                            <button
-                                onClick={resetSearch}
-                                className="text-zinc-600 hover:text-zinc-400 transition-colors flex items-center gap-1 text-xs uppercase tracking-wider"
-                            >
-                                <ChevronLeft size={14} /> Volver
-                            </button>
+                            {/* Back button — only shown when not token-based */}
+                            {!tokenParam && (
+                                <button
+                                    onClick={resetSearch}
+                                    className="text-zinc-600 hover:text-zinc-400 transition-colors flex items-center gap-1 text-xs uppercase tracking-wider"
+                                >
+                                    <ChevronLeft size={14} /> Volver
+                                </button>
+                            )}
 
                             {/* Greeting */}
                             <div className="text-center">
@@ -429,6 +478,46 @@ export default function ActualizarDatosClient() {
                                     </div>
 
                                     {patient.missingFields.map((field, i) => {
+                                        // como_nos_conocio renders as chip selector
+                                        if (field === 'como_nos_conocio') {
+                                            return (
+                                                <motion.div
+                                                    key={field}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: i * 0.1 }}
+                                                    className="space-y-3"
+                                                >
+                                                    <label className="text-zinc-400 text-xs flex items-center gap-2">
+                                                        <span className="text-[#D4AF37]/60">
+                                                            <Sparkles size={18} />
+                                                        </span>
+                                                        ¿Cómo nos conociste?
+                                                    </label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {ORIGEN_OPTIONS.map((opt) => {
+                                                            const selected = formValues[field] === opt.value;
+                                                            return (
+                                                                <button
+                                                                    key={opt.value}
+                                                                    type="button"
+                                                                    onClick={() => updateField(field, opt.value)}
+                                                                    className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border text-left text-sm transition-all ${selected
+                                                                        ? 'bg-[#D4AF37]/15 border-[#D4AF37]/50 text-[#D4AF37]'
+                                                                        : 'bg-[#111] border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300'
+                                                                        }`}
+                                                                >
+                                                                    <span className="text-base leading-none">{opt.emoji}</span>
+                                                                    <span className="leading-tight text-xs">{opt.label}</span>
+                                                                    {selected && <Check size={12} className="ml-auto flex-shrink-0" />}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        }
+
                                         const config = FIELD_CONFIG[field];
                                         if (!config) return null;
                                         return (
@@ -445,6 +534,7 @@ export default function ActualizarDatosClient() {
                                                 </label>
                                                 <input
                                                     type={config.type}
+                                                    inputMode={config.inputMode}
                                                     value={formValues[field] || ''}
                                                     onChange={(e) => updateField(field, e.target.value)}
                                                     placeholder={config.placeholder}
