@@ -50,6 +50,9 @@ export interface WorkerProfile {
     poliza_vencimiento?: string;
     documents?: Record<string, { url: string; uploaded_at: string; status: string }>; // JSONB
 
+    // Billing mode: true = hourly rate, false = per-prestacion list
+    cobra_por_horas?: boolean;
+
     status?: 'active' | 'inactive' | 'on_leave';
     activo?: boolean;
     fecha_ingreso?: string;

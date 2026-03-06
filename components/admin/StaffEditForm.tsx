@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { WorkerProfile, WorkerCategory } from '@/types/worker-portal';
 import { updateWorkerProfileAdmin, getAppUsers, getProviderCompanies, createProviderCompany } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
-import { Save, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2 } from 'lucide-react';
+import { Save, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2, Clock, ListChecks } from 'lucide-react';
 
 interface StaffEditFormProps {
     worker: WorkerProfile;
@@ -20,6 +20,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     const [companies, setCompanies] = useState<Array<{ id: string; nombre: string }>>([]);
     const [newCompanyName, setNewCompanyName] = useState('');
     const [creatingCompany, setCreatingCompany] = useState(false);
+    const [cobraPorHoras, setCobraPorHoras] = useState(worker.cobra_por_horas ?? false);
 
     const APP_ROLE_LABELS: Record<string, string> = {
         partner_viewer: 'Solo lectura',
@@ -66,6 +67,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             matricula_provincial: fd.get('matricula_provincial') as string,
             user_id: linkedUserId || undefined,
             empresa_prestadora_id: providerCompanyId || undefined,
+            cobra_por_horas: cobraPorHoras,
         };
 
         try {
@@ -248,6 +250,47 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                     <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
                         <DollarSign size={14} /> Configuración Financiera
                     </h3>
+
+                    {/* Billing mode toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setCobraPorHoras(prev => !prev)}
+                        className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 text-left ${
+                            cobraPorHoras
+                                ? 'bg-violet-500/10 border-violet-500/30'
+                                : 'bg-emerald-500/10 border-emerald-500/30'
+                        }`}
+                    >
+                        {/* Pill / track */}
+                        <div className={`relative w-14 h-7 rounded-full flex-shrink-0 transition-colors duration-300 ${
+                            cobraPorHoras ? 'bg-violet-600' : 'bg-emerald-600'
+                        }`}>
+                            <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition-transform duration-300 ${
+                                cobraPorHoras ? 'translate-x-7' : 'translate-x-0'
+                            }`} />
+                        </div>
+
+                        {/* Labels */}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                                {cobraPorHoras
+                                    ? <Clock size={15} className="text-violet-400 flex-shrink-0" />
+                                    : <ListChecks size={15} className="text-emerald-400 flex-shrink-0" />
+                                }
+                                <p className={`text-sm font-bold transition-colors duration-200 ${
+                                    cobraPorHoras ? 'text-violet-300' : 'text-emerald-300'
+                                }`}>
+                                    {cobraPorHoras ? 'Cobra por horas' : 'Cobra por prestaciones'}
+                                </p>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                {cobraPorHoras
+                                    ? 'Entra en la lógica de Horarios · Se usa el valor hora ARS'
+                                    : 'Entra en la lógica de Lista de Prestaciones · Se usa el % de honorarios'
+                                }
+                            </p>
+                        </div>
+                    </button>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
