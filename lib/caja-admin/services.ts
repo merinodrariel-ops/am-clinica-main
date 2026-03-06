@@ -73,13 +73,11 @@ function normalizeWhatsAppE164(value?: string | null): string | null {
     const raw = value.trim();
     if (!raw) return null;
 
+    // Enforce explicit country code from inputs (e.g. +549...)
+    if (!raw.startsWith('+')) return null;
+
     let digits = raw.replace(/\D/g, '');
     if (!digits) return null;
-
-    if (!raw.startsWith('+')) {
-        // Default local numbers to Argentina country code.
-        digits = `54${digits}`;
-    }
 
     if (digits.startsWith('54')) {
         let rest = digits.slice(2).replace(/^0+/, '');
@@ -740,7 +738,7 @@ export async function createPersonal(input: CreatePersonalInput): Promise<{ data
     const normalizedWhatsapp = normalizeWhatsAppE164(input.whatsapp || null);
 
     if (input.whatsapp && !normalizedWhatsapp) {
-        return { data: null, error: new Error('WhatsApp inválido. Usá código país (ej: +549...) y sin 0/15.') };
+        return { data: null, error: new Error('WhatsApp inválido. Debe incluir código país (ej: +549...) y sin 0/15.') };
     }
 
     const { data, error } = await getSupabase()
@@ -777,7 +775,7 @@ export async function updatePersonal(
             } else {
                 normalizedWhatsapp = normalizeWhatsAppE164(trimmed);
                 if (!normalizedWhatsapp) {
-                    return { success: false, error: 'WhatsApp inválido. Usá código país (ej: +549...) y sin 0/15.' };
+                    return { success: false, error: 'WhatsApp inválido. Debe incluir código país (ej: +549...) y sin 0/15.' };
                 }
             }
         } else if (updates.whatsapp === null) {

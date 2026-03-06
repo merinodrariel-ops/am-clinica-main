@@ -45,6 +45,7 @@ import {
     countObservadosPendientes,
     createPersonal,
     updatePersonal,
+    uploadPersonalDocument,
     type CreatePersonalInput
 } from '@/lib/caja-admin';
 import {
@@ -141,6 +142,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         condicion_afip: undefined,
         valor_hora_ars: 0,
         descripcion: '',
+        poliza_url: '',
     });
 
     // Hours form state
@@ -151,7 +153,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         observaciones: '',
     });
     const [submitting, setSubmitting] = useState(false);
-    const [normalizingWhatsapps, setNormalizingWhatsapps] = useState(false);
+    const [uploadingPoliza, setUploadingPoliza] = useState(false);
+    const [whatsappError, setWhatsappError] = useState('');
     const [hourConfig, setHourConfig] = useState({
         cleaningHourValue: 0,
         staffGeneralHourValue: 0,
@@ -184,12 +187,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const raw = value.trim();
         if (!raw) return null;
 
+        // Force explicit country code from the form (e.g. +549...)
+        if (!raw.startsWith('+')) return null;
+
         let digits = raw.replace(/\D/g, '');
         if (!digits) return null;
-
-        if (!raw.startsWith('+')) {
-            digits = `54${digits}`;
-        }
 
         if (digits.startsWith('54')) {
             let rest = digits.slice(2).replace(/^0+/, '');
@@ -221,44 +223,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const normalized = normalizeWhatsAppE164(phone);
         if (!normalized) return null;
         return `https://wa.me/${normalized.replace(/\D/g, '')}`;
-    }
-
-    async function handleNormalizeExistingWhatsapps() {
-        if (normalizingWhatsapps) return;
-
-        const candidates = personal
-            .filter((p) => Boolean(p.whatsapp))
-            .map((p) => ({
-                id: p.id,
-                current: p.whatsapp || '',
-                normalized: normalizeWhatsAppE164(p.whatsapp),
-            }))
-            .filter((item) => item.normalized && item.current !== item.normalized) as Array<{ id: string; current: string; normalized: string }>;
-
-        if (candidates.length === 0) {
-            alert('No hay numeros para corregir.');
-            return;
-        }
-
-        setNormalizingWhatsapps(true);
-        try {
-            let updated = 0;
-
-            for (const item of candidates) {
-                const result = await updatePersonal(item.id, { whatsapp: item.normalized });
-                if (result.success) {
-                    updated += 1;
-                }
-            }
-
-            if (updated > 0) {
-                await loadData();
-            }
-
-            alert(`WhatsApp corregidos: ${updated} de ${candidates.length}.`);
-        } finally {
-            setNormalizingWhatsapps(false);
-        }
     }
 
     async function loadData() {
@@ -334,9 +298,81 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             descripcion: p.descripcion || '',
             matricula_provincial: p.matricula_provincial || '',
             especialidad: p.especialidad || '',
+            poliza_url: p.poliza_url || '',
             porcentaje_honorarios: p.porcentaje_honorarios || 0,
         });
         setShowForm(true);
+    }
+
+    function openCreateForm() {
+        const odontologiaDefault = personalAreas.find((area) =>
+            area.tipo_personal === 'odontologo'
+            || area.tipo_personal === 'profesional'
+            || area.tipo_personal === 'ambos'
+        )?.nombre || 'Odontologia';
+
+        const byCategory: Record<ProviderCategory, { tipo: CreatePersonalInput['tipo']; area: string }> = {
+            odontologos: { tipo: 'odontologo', area: odontologiaDefault },
+            lab: { tipo: 'prestador', area: 'Laboratorio' },
+            limpieza: { tipo: 'prestador', area: 'Limpieza' },
+            'staff-general': { tipo: 'prestador', area: 'Staff general' },
+        };
+
+        const defaults = byCategory[activeProviderCategory];
+
+        setEditingPersonal(null);
+        setFormData({
+            nombre: '',
+            apellido: '',
+            tipo: defaults.tipo,
+            area: defaults.area,
+            email: '',
+            whatsapp: '',
+            documento: '',
+            direccion: '',
+            barrio_localidad: '',
+            condicion_afip: undefined,
+            valor_hora_ars: 0,
+            descripcion: '',
+            matricula_provincial: '',
+            especialidad: '',
+            poliza_url: '',
+            porcentaje_honorarios: 0,
+        });
+        setShowForm(true);
+    }
+
+    async function handleUploadPoliza(file: File) {
+        if (!editingPersonal) {
+            alert('Primero guarda el prestador para poder adjuntar el PDF.');
+            return;
+        }
+
+        if (file.type !== 'application/pdf') {
+            alert('Solo se permite adjuntar PDF para el seguro de mala praxis.');
+            return;
+        }
+
+        setUploadingPoliza(true);
+        try {
+            const { url, error } = await uploadPersonalDocument(editingPersonal.id, file, 'poliza');
+            if (error || !url) {
+                throw error || new Error('No se pudo subir el archivo');
+            }
+
+            const result = await updatePersonal(editingPersonal.id, { poliza_url: url });
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo guardar el link del PDF');
+            }
+
+            setFormData((prev) => ({ ...prev, poliza_url: url }));
+            setEditingPersonal((prev) => (prev ? { ...prev, poliza_url: url } : prev));
+        } catch (error) {
+            console.error('Error uploading policy PDF:', error);
+            alert('No se pudo adjuntar el seguro de mala praxis.');
+        } finally {
+            setUploadingPoliza(false);
+        }
     }
 
     function openPrestacionForm(profesionalId: string) {
@@ -362,9 +398,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
         const normalizedWhatsapp = normalizeWhatsAppE164(formData.whatsapp || '');
         if (formData.whatsapp && !normalizedWhatsapp) {
-            alert('WhatsApp inválido. Usá formato internacional con código de país (ej: +549...) y sin 0/15.');
+            setWhatsappError('WhatsApp invalido. Debe incluir codigo de pais (ej: +549...) y no usar 0/15.');
             return;
         }
+
+        setWhatsappError('');
 
         const payload = {
             ...formData,
@@ -911,6 +949,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     className="bg-transparent border-none outline-none text-sm flex-1 focus-visible:ring-0 shadow-none h-auto p-0"
                                 />
                             </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    onClick={openCreateForm}
+                                    className="h-auto px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:opacity-90"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Agregar prestador
+                                </Button>
+                            </div>
                         </div>
                         {hiddenUserPlaceholdersCount > 0 && (
                             <p className="text-xs text-slate-500 px-1">
@@ -1085,19 +1133,36 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         <Input
                                             type="tel"
                                             value={formData.whatsapp}
-                                            onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                                            onChange={(e) => {
+                                                setFormData({ ...formData, whatsapp: e.target.value });
+                                                if (whatsappError) setWhatsappError('');
+                                            }}
                                             onBlur={() => {
+                                                if (!formData.whatsapp) {
+                                                    setWhatsappError('');
+                                                    return;
+                                                }
+
                                                 const normalized = normalizeWhatsAppE164(formData.whatsapp || '');
                                                 if (normalized) {
                                                     setFormData((prev) => ({ ...prev, whatsapp: normalized }));
+                                                    setWhatsappError('');
+                                                } else {
+                                                    setWhatsappError('WhatsApp invalido. Debe incluir codigo de pais (ej: +549...) y no usar 0/15.');
                                                 }
                                             }}
                                             className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                             placeholder="+5491123456789"
                                         />
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Formato internacional. Inclui codigo de pais y no uses 0 ni 15.
-                                        </p>
+                                        {whatsappError ? (
+                                            <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">
+                                                {whatsappError}
+                                            </p>
+                                        ) : (
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Formato internacional. Inclui codigo de pais y no uses 0 ni 15.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1186,6 +1251,44 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                                                     placeholder="Ej: Ortodoncia"
                                                 />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    <FileText className="w-4 h-4 inline mr-1" />
+                                                    Seguro de mala praxis (PDF)
+                                                </label>
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <input
+                                                        type="file"
+                                                        accept="application/pdf"
+                                                        disabled={uploadingPoliza || !editingPersonal}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            await handleUploadPoliza(file);
+                                                            e.currentTarget.value = '';
+                                                        }}
+                                                        className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-white hover:file:bg-indigo-700 disabled:opacity-60"
+                                                    />
+                                                    {uploadingPoliza && (
+                                                        <span className="text-xs text-slate-500">Subiendo PDF...</span>
+                                                    )}
+                                                </div>
+                                                {!editingPersonal && (
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                        Guarda primero el prestador para habilitar el adjunto.
+                                                    </p>
+                                                )}
+                                                {formData.poliza_url && (
+                                                    <a
+                                                        href={formData.poliza_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="mt-2 inline-flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-700"
+                                                    >
+                                                        Ver PDF adjunto
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
                                     )}

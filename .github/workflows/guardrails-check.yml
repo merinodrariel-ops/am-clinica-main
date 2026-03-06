@@ -1,0 +1,87 @@
+name: Guardrails Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guardrails scan on changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_REF="origin/${{ github.base_ref }}"
+          git fetch origin "${{ github.base_ref }}" --depth=1
+
+          CHANGED_FILES=$(git diff --name-only "${BASE_REF}"...HEAD)
+
+          if [ -z "${CHANGED_FILES}" ]; then
+            echo "No changed files detected."
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "${CHANGED_FILES}"
+
+          FAIL=0
+
+          # 1) Block profiles.role usage in code/sql (excluding markdown and memory docs)
+          for f in ${CHANGED_FILES}; do
+            [ -f "${f}" ] || continue
+            case "${f}" in
+              *.md|docs/*|memory/*) continue ;;
+            esac
+
+            if grep -nE "profiles\.role|\brole\s+FROM\s+public\.profiles\b|\bSELECT\s+role\s+INTO\b" "${f}" >/dev/null; then
+              echo "[ERROR] Forbidden role reference in ${f}. Use profiles.categoria or get_my_role()."
+              grep -nE "profiles\.role|\brole\s+FROM\s+public\.profiles\b|\bSELECT\s+role\s+INTO\b" "${f}" || true
+              FAIL=1
+            fi
+          done
+
+          # 2) Block '@/lib/supabase' imports inside client components
+          for f in ${CHANGED_FILES}; do
+            [ -f "${f}" ] || continue
+            case "${f}" in
+              *.ts|*.tsx|*.js|*.jsx) ;;
+              *) continue ;;
+            esac
+
+            if grep -nE "^['\"]use client['\"];" "${f}" >/dev/null; then
+              if grep -nE "from ['\"]@/lib/supabase['\"]|from ['\"]/lib/supabase['\"]" "${f}" >/dev/null; then
+                echo "[ERROR] Client component imports '@/lib/supabase' in ${f}. Use @/utils/supabase/client instead."
+                grep -nE "from ['\"]@/lib/supabase['\"]|from ['\"]/lib/supabase['\"]" "${f}" || true
+                FAIL=1
+              fi
+            fi
+          done
+
+          # 3) Flag UTC date-only constructor bug pattern
+          for f in ${CHANGED_FILES}; do
+            [ -f "${f}" ] || continue
+            case "${f}" in
+              *.ts|*.tsx|*.js|*.jsx) ;;
+              *) continue ;;
+            esac
+
+            if grep -nE "new Date\(\s*['\"][0-9]{4}-[0-9]{2}-[0-9]{2}['\"]\s*\)" "${f}" >/dev/null; then
+              echo "[ERROR] Date-only UTC constructor found in ${f}. Parse YYYY-MM-DD as local date parts."
+              grep -nE "new Date\(\s*['\"][0-9]{4}-[0-9]{2}-[0-9]{2}['\"]\s*\)" "${f}" || true
+              FAIL=1
+            fi
+          done
+
+          if [ "${FAIL}" -ne 0 ]; then
+            echo "Guardrails check failed."
+            exit 1
+          fi
+
+          echo "Guardrails check passed."

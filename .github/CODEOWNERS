@@ -1,0 +1,13 @@
+# Default owner for all changes
+* merinodrariel@gmail.com
+
+# Critical paths
+supabase/migrations/* merinodrariel@gmail.com
+utils/supabase/* merinodrariel@gmail.com
+contexts/AuthContext.tsx merinodrariel@gmail.com
+app/actions/* merinodrariel@gmail.com
+
+# Process and agent governance
+docs/AGENT_* merinodrariel@gmail.com
+docs/TASK_CONTRACT.md merinodrariel@gmail.com
+.github/workflows/* merinodrariel@gmail.com

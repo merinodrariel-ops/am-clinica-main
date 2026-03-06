@@ -265,6 +265,7 @@ export interface CreatePersonalInput {
     // Professional fields
     matricula_provincial?: string;
     especialidad?: string;
+    poliza_url?: string;
     porcentaje_honorarios?: number;
 }
 

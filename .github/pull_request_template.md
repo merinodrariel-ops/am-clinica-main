@@ -3,6 +3,11 @@
 - What changed?
 - Why this change?
 
+## Routing & Contract
+
+- [ ] I selected the right task route from `docs/AGENT_ROUTING.md`
+- [ ] I used `docs/TASK_CONTRACT.md` for scope/DoD/validation before implementation
+
 ## Guardrails Check (Required)
 
 - [ ] I read `docs/AGENT_GUARDRAILS.md`
