@@ -26,6 +26,8 @@ import {
     DollarSign,
     PhoneCall,
     Briefcase,
+    Clock,
+    ListChecks,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
@@ -153,7 +155,8 @@ const STAFF_CATEGORY_ORDER_KEY = 'am.staff.category-order';
 const STAFF_GROUP_KEY = 'am.staff.group-mode';
 const STAFF_DENSE_KEY = 'am.staff.dense-mode';
 
-type GroupMode = 'role' | 'company' | 'access' | 'compliance';
+type GroupMode = 'role' | 'company' | 'access' | 'compliance' | 'liquidacion';
+type LiquidacionFilter = null | 'horas' | 'prestaciones';
 
 type InlineDraft = {
     email: string;
@@ -173,6 +176,7 @@ export default function StaffListPage() {
     const [dragOverCategoryColumn, setDragOverCategoryColumn] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [onlyActive, setOnlyActive] = useState(false);
+    const [liquidacionFilter, setLiquidacionFilter] = useState<LiquidacionFilter>(null);
     const [viewMode, setViewMode] = useState<'board' | 'table'>('board');
     const [categoryOrderPreference, setCategoryOrderPreference] = useState<string[]>([]);
     const [groupMode, setGroupMode] = useState<GroupMode>('role');
@@ -320,6 +324,8 @@ export default function StaffListPage() {
         const q = searchTerm.trim().toLowerCase();
         return workers.filter((worker) => {
             if (onlyActive && worker.activo === false) return false;
+            if (liquidacionFilter === 'horas' && !worker.cobra_por_horas) return false;
+            if (liquidacionFilter === 'prestaciones' && worker.cobra_por_horas) return false;
             if (!q) return true;
 
             const fullName = `${worker.nombre || ''} ${worker.apellido || ''}`.toLowerCase();
@@ -334,7 +340,7 @@ export default function StaffListPage() {
                 area.includes(q)
             );
         });
-    }, [onlyActive, searchTerm, workers]);
+    }, [onlyActive, liquidacionFilter, searchTerm, workers]);
 
     const activeCount = workers.filter((w) => w.activo !== false).length;
     const withAccess = workers.filter((w) => w.user_id).length;
@@ -497,6 +503,25 @@ export default function StaffListPage() {
                 workers: groupedByCategory.grouped[cat] || [],
                 isCategoryColumn: true,
             }));
+        }
+
+        if (groupMode === 'liquidacion') {
+            return [
+                {
+                    key: 'horas',
+                    label: 'Por horas',
+                    icon: <Clock size={16} className="text-violet-400" />,
+                    workers: filteredWorkers.filter((w) => w.cobra_por_horas === true),
+                    isCategoryColumn: false,
+                },
+                {
+                    key: 'prestaciones',
+                    label: 'Por prestaciones',
+                    icon: <ListChecks size={16} className="text-emerald-400" />,
+                    workers: filteredWorkers.filter((w) => !w.cobra_por_horas),
+                    isCategoryColumn: false,
+                },
+            ];
         }
 
         if (groupMode === 'company') {
@@ -669,6 +694,25 @@ export default function StaffListPage() {
                     >
                         {onlyActive ? 'Mostrando solo activos' : 'Mostrar solo activos'}
                     </button>
+                    <button
+                        onClick={() => setLiquidacionFilter((v) =>
+                            v === null ? 'horas' : v === 'horas' ? 'prestaciones' : null
+                        )}
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                            liquidacionFilter === 'horas'
+                                ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                                : liquidacionFilter === 'prestaciones'
+                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                                : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white'
+                        }`}
+                    >
+                        {liquidacionFilter === 'horas'
+                            ? <><Clock size={13} /> Por horas</>
+                            : liquidacionFilter === 'prestaciones'
+                            ? <><ListChecks size={13} /> Por prestaciones</>
+                            : 'Liquidación: todas'
+                        }
+                    </button>
                     <div className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-950 p-1">
                         <button
                             onClick={() => setViewMode('board')}
@@ -691,6 +735,7 @@ export default function StaffListPage() {
                         {([
                             ['role', 'Por categoría'],
                             ['company', 'Por empresa'],
+                            ['liquidacion', 'Por liquidación'],
                             ['access', 'Por acceso'],
                             ['compliance', 'Por docs'],
                         ] as const).map(([value, label]) => (
