@@ -153,7 +153,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                         <label className="text-xs font-bold text-slate-500 uppercase ml-1">DNI / Documento</label>
                         <div className="relative">
                             <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                            <input name="documento" defaultValue={worker.documento} required className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl pl-11 pr-4 py-2.5 text-white outline-none transition-all" />
+                            <input name="documento" defaultValue={worker.documento} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl pl-11 pr-4 py-2.5 text-white outline-none transition-all" />
                         </div>
                     </div>
 
