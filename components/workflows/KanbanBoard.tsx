@@ -14,17 +14,55 @@ import {
     DragOverEvent,
     DragEndEvent,
 } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import {
+    SortableContext,
+    horizontalListSortingStrategy,
+    useSortable,
+    arrayMove,
+    sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { KanbanColumn } from './KanbanColumn';
 import { TreatmentCard } from './TreatmentCard';
-import { moveTreatmentStage, getPatientTimeline } from '@/app/actions/clinical-workflows';
+import { moveTreatmentStage, getPatientTimeline, updateWorkflowStagesOrder } from '@/app/actions/clinical-workflows';
 import { Toaster as SharedToaster } from 'sonner';
 import { toast } from 'sonner';
 import { TreatmentDetailsModal } from './TreatmentDetailsModal';
 import { PatientTimelineModal } from './PatientTimelineModal';
 import { Search, X, AlertTriangle, Clock } from 'lucide-react';
 import clsx from 'clsx';
-import type { ClinicalWorkflow, PatientTreatment, PatientSummary, PatientTimelineData } from './types';
+import { useAuth } from '@/contexts/AuthContext';
+import type { ClinicalWorkflow, PatientTreatment, PatientSummary, PatientTimelineData, WorkflowStage } from './types';
+
+// Prefix used to differentiate column drag IDs from card drag IDs
+const COL_PREFIX = 'col-';
+
+interface SortableColumnProps {
+    stage: WorkflowStage;
+    isDraggingAnyColumn: boolean;
+    children: (dragHandleProps: React.HTMLAttributes<HTMLButtonElement>) => React.ReactNode;
+}
+
+function SortableColumn({ stage, isDraggingAnyColumn, children }: SortableColumnProps) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id: `${COL_PREFIX}${stage.id}`,
+    });
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        zIndex: isDragging ? 10 : undefined,
+    };
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={clsx('snap-center shrink-0 h-full', isDraggingAnyColumn && !isDragging && 'cursor-grabbing')}
+        >
+            {children({ ...attributes, ...listeners } as React.HTMLAttributes<HTMLButtonElement>)}
+        </div>
+    );
+}
 
 interface KanbanBoardProps {
     workflow: ClinicalWorkflow;
@@ -53,9 +91,16 @@ function getAlertStatus(treatment: PatientTreatment, timeLimitDays?: number | nu
 }
 
 export function KanbanBoard({ workflow, initialTreatments }: KanbanBoardProps) {
+    const { categoria } = useAuth();
+    const canReorderColumns = categoria === 'owner' || categoria === 'admin';
+
     const [treatments, setTreatments] = useState(initialTreatments);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [dragOriginStageId, setDragOriginStageId] = useState<string | null>(null);
+    const [isDraggingColumn, setIsDraggingColumn] = useState(false);
+    const [localStages, setLocalStages] = useState(
+        () => [...workflow.stages].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+    );
     const [selectedTreatment, setSelectedTreatment] = useState<PatientTreatment | null>(null);
     const [timelinePatient, setTimelinePatient] = useState<PatientSummary | null>(null);
     const [timelineData, setTimelineData] = useState<PatientTimelineData | null>(null);
@@ -87,11 +132,12 @@ export function KanbanBoard({ workflow, initialTreatments }: KanbanBoardProps) {
         setTreatments(initialTreatments);
     }, [initialTreatments]);
 
-    // Sorted stages for next-stage computation
-    const sortedStages = useMemo(
-        () => [...workflow.stages].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
-        [workflow.stages]
-    );
+    // Keep localStages in sync when workflow prop changes (tab switch)
+    React.useEffect(() => {
+        setLocalStages([...workflow.stages].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)));
+    }, [workflow.stages]);
+
+    const sortedStages = localStages;
     const lastStageId = sortedStages[sortedStages.length - 1]?.id;
 
     const handleMoveToNextStage = useCallback(async (treatment: PatientTreatment, currentStageId: string) => {
@@ -164,6 +210,10 @@ export function KanbanBoard({ workflow, initialTreatments }: KanbanBoardProps) {
 
     const handleDragStart = (event: DragStartEvent) => {
         const draggedId = event.active.id as string;
+        if (draggedId.startsWith(COL_PREFIX)) {
+            setIsDraggingColumn(true);
+            return;
+        }
         const draggedTreatment = treatments.find(t => t.id === draggedId);
         setActiveId(draggedId);
         setDragOriginStageId(draggedTreatment?.current_stage_id || null);
@@ -172,13 +222,15 @@ export function KanbanBoard({ workflow, initialTreatments }: KanbanBoardProps) {
     const handleDragOver = (event: DragOverEvent) => {
         const { active, over } = event;
         if (!over) return;
+        // Skip card logic when dragging a column
+        if ((active.id as string).startsWith(COL_PREFIX)) return;
 
         const activeId = active.id;
-        const overId = over.id;
+        const overId = over.id as string;
         const activeTreatment = treatments.find(t => t.id === activeId);
         if (!activeTreatment) return;
 
-        const overColumnId = workflow.stages.find(s => s.id === overId)?.id;
+        const overColumnId = localStages.find(s => s.id === overId)?.id;
         if (overColumnId && activeTreatment.current_stage_id !== overColumnId) {
             setTreatments(prev => prev.map(t =>
                 t.id === activeId ? { ...t, current_stage_id: overColumnId } : t
@@ -188,8 +240,28 @@ export function KanbanBoard({ workflow, initialTreatments }: KanbanBoardProps) {
 
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
-        setActiveId(null);
         const draggedId = active.id as string;
+
+        // ── Column reorder ──
+        if (draggedId.startsWith(COL_PREFIX)) {
+            setIsDraggingColumn(false);
+            if (!over) return;
+            const activeStageId = draggedId.slice(COL_PREFIX.length);
+            const overStageId = (over.id as string).slice(COL_PREFIX.length);
+            const oldIdx = localStages.findIndex(s => s.id === activeStageId);
+            const newIdx = localStages.findIndex(s => s.id === overStageId);
+            if (oldIdx < 0 || newIdx < 0 || oldIdx === newIdx) return;
+            const reordered = arrayMove(localStages, oldIdx, newIdx);
+            setLocalStages(reordered);
+            updateWorkflowStagesOrder(
+                workflow.id,
+                reordered.map((s, i) => ({ id: s.id, order_index: i + 1 }))
+            ).catch(() => toast.error('No se pudo guardar el orden'));
+            return;
+        }
+
+        // ── Card move ──
+        setActiveId(null);
 
         if (!over) {
             if (dragOriginStageId) {
@@ -211,7 +283,7 @@ export function KanbanBoard({ workflow, initialTreatments }: KanbanBoardProps) {
 
         let targetStageId = activeTreatment.current_stage_id;
 
-        if (workflow.stages.some(s => s.id === overContainerId)) {
+        if (localStages.some(s => s.id === overContainerId)) {
             targetStageId = overContainerId;
         } else {
             const overTreatment = treatments.find(t => t.id === overContainerId);
@@ -347,22 +419,45 @@ export function KanbanBoard({ workflow, initialTreatments }: KanbanBoardProps) {
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
-                <div className="flex flex-1 overflow-x-auto pb-4 gap-4 px-2 snap-x snap-mandatory min-h-0">
-                    {workflow.stages.map(stage => (
-                        <div key={stage.id} className="snap-center shrink-0 h-full">
-                            <KanbanColumn
-                                stage={stage}
-                                treatments={getTreatmentsByStage(stage.id)}
-                                stagePosition={Math.max((stage.order_index || 1), 1)}
-                                totalStages={workflow.stages.length}
-                                onTreatmentClick={setSelectedTreatment}
-                                onPatientClick={handlePatientClick}
-                                onMoveToNext={(treatment) => handleMoveToNextStage(treatment, stage.id)}
-                                isLastStage={stage.id === lastStageId}
-                            />
-                        </div>
-                    ))}
-                </div>
+                <SortableContext
+                    items={localStages.map(s => `${COL_PREFIX}${s.id}`)}
+                    strategy={horizontalListSortingStrategy}
+                >
+                    <div className="flex flex-1 overflow-x-auto pb-4 gap-4 px-2 snap-x snap-mandatory min-h-0">
+                        {localStages.map((stage, idx) => (
+                            canReorderColumns ? (
+                                <SortableColumn key={stage.id} stage={stage} isDraggingAnyColumn={isDraggingColumn}>
+                                    {(dragHandleProps) => (
+                                        <KanbanColumn
+                                            stage={stage}
+                                            treatments={getTreatmentsByStage(stage.id)}
+                                            stagePosition={idx + 1}
+                                            totalStages={localStages.length}
+                                            onTreatmentClick={setSelectedTreatment}
+                                            onPatientClick={handlePatientClick}
+                                            onMoveToNext={(treatment) => handleMoveToNextStage(treatment, stage.id)}
+                                            isLastStage={stage.id === lastStageId}
+                                            dragHandleProps={dragHandleProps}
+                                        />
+                                    )}
+                                </SortableColumn>
+                            ) : (
+                                <div key={stage.id} className="snap-center shrink-0 h-full">
+                                    <KanbanColumn
+                                        stage={stage}
+                                        treatments={getTreatmentsByStage(stage.id)}
+                                        stagePosition={idx + 1}
+                                        totalStages={localStages.length}
+                                        onTreatmentClick={setSelectedTreatment}
+                                        onPatientClick={handlePatientClick}
+                                        onMoveToNext={(treatment) => handleMoveToNextStage(treatment, stage.id)}
+                                        isLastStage={stage.id === lastStageId}
+                                    />
+                                </div>
+                            )
+                        ))}
+                    </div>
+                </SortableContext>
 
                 <SharedToaster />
 

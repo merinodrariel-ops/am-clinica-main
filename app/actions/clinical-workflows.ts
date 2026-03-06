@@ -1971,3 +1971,20 @@ export async function updateWorkflowName(id: string, name: string) {
     if (error) throw new Error('No se pudo renombrar el workflow');
     revalidatePath('/workflows');
 }
+
+export async function updateWorkflowStagesOrder(
+    workflowId: string,
+    stages: { id: string; order_index: number }[]
+) {
+    const supabase = await createClient();
+    await Promise.all(
+        stages.map(({ id, order_index }) =>
+            supabase
+                .from('clinical_workflow_stages')
+                .update({ order_index })
+                .eq('id', id)
+                .eq('workflow_id', workflowId)
+        )
+    );
+    revalidatePath('/workflows');
+}

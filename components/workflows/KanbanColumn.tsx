@@ -3,7 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { TreatmentCard } from './TreatmentCard';
 import clsx from 'clsx';
-import { Bell, Timer, AlertTriangle } from 'lucide-react';
+import { Bell, Timer, AlertTriangle, GripVertical } from 'lucide-react';
 import type { PatientTreatment, PatientSummary, WorkflowStage } from './types';
 
 interface KanbanColumnProps {
@@ -15,9 +15,10 @@ interface KanbanColumnProps {
     onPatientClick: (patient: PatientSummary) => void;
     onMoveToNext: (treatment: PatientTreatment) => void;
     isLastStage: boolean;
+    dragHandleProps?: React.HTMLAttributes<HTMLButtonElement> & { ref?: React.Ref<HTMLButtonElement> };
 }
 
-export function KanbanColumn({ stage, treatments, stagePosition, totalStages, onTreatmentClick, onPatientClick, onMoveToNext, isLastStage }: KanbanColumnProps) {
+export function KanbanColumn({ stage, treatments, stagePosition, totalStages, onTreatmentClick, onPatientClick, onMoveToNext, isLastStage, dragHandleProps }: KanbanColumnProps) {
     const { setNodeRef } = useDroppable({
         id: stage.id,
     });
@@ -71,6 +72,15 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
                 "p-3 rounded-t-xl border-b-2 font-semibold flex justify-between items-center gap-2",
                 getStageColor(stage.color)
             )}>
+                {dragHandleProps && (
+                    <button
+                        {...dragHandleProps}
+                        className="p-0.5 rounded cursor-grab active:cursor-grabbing text-current opacity-40 hover:opacity-80 transition-opacity touch-none shrink-0"
+                        tabIndex={-1}
+                    >
+                        <GripVertical size={14} />
+                    </button>
+                )}
                 <span className="truncate">{stageLabel}</span>
                 <div className="flex items-center gap-1 flex-shrink-0">
                     {/* Urgency badges */}
