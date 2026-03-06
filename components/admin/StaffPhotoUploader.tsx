@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Camera } from 'lucide-react';
 import { uploadWorkerPhoto } from '@/app/actions/worker-portal';
 import { compressImage } from '@/lib/image-utils';
@@ -16,6 +16,7 @@ interface StaffPhotoUploaderProps {
 export default function StaffPhotoUploader({ workerId, initialPhotoUrl, workerName, initials }: StaffPhotoUploaderProps) {
     const [uploading, setUploading] = useState(false);
     const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -23,7 +24,6 @@ export default function StaffPhotoUploader({ workerId, initialPhotoUrl, workerNa
 
         setUploading(true);
         try {
-            // Compress + convert to WebP before upload (saves storage on free tier)
             const compressed = await compressImage(file, {
                 maxWidth: 600,
                 maxHeight: 600,
@@ -40,6 +40,7 @@ export default function StaffPhotoUploader({ workerId, initialPhotoUrl, workerNa
             toast.error('Error al subir la foto');
         } finally {
             setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -58,16 +59,26 @@ export default function StaffPhotoUploader({ workerId, initialPhotoUrl, workerNa
                     </div>
                 )}
             </div>
-            <label className="absolute -bottom-1 -right-1 p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all shadow-lg border-2 border-slate-950 cursor-pointer">
+
+            {/* Hidden file input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                onChange={handleUpload}
+                disabled={uploading}
+            />
+
+            {/* Button triggers the input via ref — works on all browsers including iOS Safari */}
+            <button
+                type="button"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all shadow-lg border-2 border-slate-950 cursor-pointer disabled:opacity-50"
+            >
                 <Camera size={14} />
-                <input
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleUpload}
-                    disabled={uploading}
-                />
-            </label>
+            </button>
         </div>
     );
 }

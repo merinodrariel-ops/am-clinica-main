@@ -230,7 +230,9 @@ export async function uploadWorkerPhoto(workerId: string, file: File) {
         .from('personal-documents')
         .getPublicUrl(fileName);
 
-    const { error: updateError } = await supabase
+    // Use admin client for DB update too — SSR client blocked by RLS when
+    // admin uploads for a worker that isn't their own auth user
+    const { error: updateError } = await adminClient
         .from(TableNames.Profiles)
         .update({ foto_url: publicUrl })
         .eq('id', workerId);
@@ -768,7 +770,10 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
 
     if (currentWorkerError) throw new Error(currentWorkerError.message);
 
-    const { error } = await supabase
+    // Use admin client — SSR client can be blocked by RLS even for admin
+    // users (e.g. if get_my_role() returns unexpected value in a given session)
+    const adminForUpdate = getAdminClient();
+    const { error } = await adminForUpdate
         .from('personal')
         .update(cleanData)
         .eq('id', workerId);
