@@ -3,6 +3,7 @@ import { KanbanBoard } from '@/components/workflows/KanbanBoard';
 import { NewTreatmentModal } from '@/components/workflows/NewTreatmentModal';
 import { WorkflowSettingsModal } from '@/components/workflows/WorkflowSettingsModal';
 import { WorkflowNotificationsModal } from '@/components/workflows/WorkflowNotificationsModal';
+import WorkflowSidebar from '@/components/workflows/WorkflowSidebar';
 import LaboratorioPanel from '@/components/laboratorio/LaboratorioPanel';
 import type { ClinicalWorkflow, PatientTreatment } from '@/components/workflows/types';
 import Link from 'next/link';
@@ -97,43 +98,11 @@ export default async function WorkflowsPage({ searchParams }: { searchParams: Pr
                 {activeSection === 'kanban' ? (
                     <>
                         <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto">
-                            <div className="p-4">
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-2">Tratamientos</h3>
-                                <nav className="space-y-1">
-                                    {treatmentWorkflows.map((wf: ClinicalWorkflow) => (
-                                        <Link
-                                            key={wf.id}
-                                            href={`/workflows?section=kanban&tab=${wf.id}`}
-                                            className={`
-                                                flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                                                ${activeWorkflowId === wf.id
-                                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                                                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/50'}
-                                            `}
-                                        >
-                                            {getWorkflowDisplayName(wf.name)}
-                                        </Link>
-                                    ))}
-                                </nav>
-
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-3 px-2">Recurrentes</h3>
-                                <nav className="space-y-1">
-                                    {recurrentWorkflows.map((wf: ClinicalWorkflow) => (
-                                        <Link
-                                            key={wf.id}
-                                            href={`/workflows?section=kanban&tab=${wf.id}`}
-                                            className={`
-                                                flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                                                ${activeWorkflowId === wf.id
-                                                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400'
-                                                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/50'}
-                                            `}
-                                        >
-                                            {getWorkflowDisplayName(wf.name)}
-                                        </Link>
-                                    ))}
-                                </nav>
-                            </div>
+                            <WorkflowSidebar
+                                treatmentWorkflows={treatmentWorkflows}
+                                recurrentWorkflows={recurrentWorkflows}
+                                activeWorkflowId={activeWorkflowId}
+                            />
                         </div>
 
                         <div className="flex-1 bg-gray-100/50 dark:bg-gray-900/50 relative overflow-hidden flex flex-col">

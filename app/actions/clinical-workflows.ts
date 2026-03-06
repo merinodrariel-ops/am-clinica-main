@@ -205,7 +205,7 @@ export async function getClinicalWorkflows(): Promise<ClinicalWorkflow[]> {
             stages:clinical_workflow_stages(*)
         `)
         .eq('active', true)
-        .order('created_at', { ascending: true });
+        .order('display_order', { ascending: true, nullsFirst: false });
 
     if (error) {
         console.error('Error fetching workflows:', error);
@@ -1945,4 +1945,29 @@ export async function getPatientTimeline(
     }));
 
     return { patient, treatments };
+}
+
+// ── Workflow-level mutations (name, display_order) ──────────────────────────
+
+export async function updateWorkflowOrder(items: { id: string; display_order: number }[]) {
+    const supabase = await createClient();
+    await Promise.all(
+        items.map(({ id, display_order }) =>
+            supabase
+                .from('clinical_workflows')
+                .update({ display_order })
+                .eq('id', id)
+        )
+    );
+    revalidatePath('/workflows');
+}
+
+export async function updateWorkflowName(id: string, name: string) {
+    const supabase = await createClient();
+    const { error } = await supabase
+        .from('clinical_workflows')
+        .update({ name: name.trim() })
+        .eq('id', id);
+    if (error) throw new Error('No se pudo renombrar el workflow');
+    revalidatePath('/workflows');
 }

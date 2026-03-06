@@ -32,6 +32,7 @@ export interface ClinicalWorkflow {
     name: string;
     type: WorkflowType;
     frequency_months?: number | null;
+    display_order?: number | null;
     stages: WorkflowStage[];
 }
 
