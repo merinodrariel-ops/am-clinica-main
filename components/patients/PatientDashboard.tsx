@@ -697,7 +697,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                                 Plan de Financiación
                                                 {sheetFinance && (
-                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">Google Sheets</span>
+                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">En curso</span>
                                                 )}
                                                 {finData.estado === 'activo' && (
                                                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">Activo</span>
@@ -712,7 +712,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             <p className="text-gray-500 text-sm mt-1">Gestión de cuotas y saldos</p>
                                             {sheetFinance && (
                                                 <p className="text-xs text-emerald-600 mt-1">
-                                                    Datos sincronizados por {sheetFinance.matchedBy === 'dni' ? 'DNI' : 'nombre'} · {new Date(sheetFinance.fetchedAt).toLocaleString('es-AR')}
+                                                    Actualizado · {new Date(sheetFinance.fetchedAt).toLocaleString('es-AR')}
                                                 </p>
                                             )}
                                             {sheetFinanceError && (
@@ -733,7 +733,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 transition-colors"
                                             >
                                                 {sheetFinanceLoading ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
-                                                {sheetFinanceLoading ? 'Actualizando...' : 'Releer Sheet'}
+                                                {sheetFinanceLoading ? 'Actualizando...' : 'Actualizar'}
                                             </button>
 
                                             <button
