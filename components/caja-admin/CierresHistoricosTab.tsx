@@ -165,7 +165,7 @@ export default function CierresHistoricosTab({ sucursal }: Props) {
                                             <div key={cuenta.id} className="bg-white/5 border border-white/5 rounded-xl p-3">
                                                 <div className="text-xs font-medium text-slate-500 mb-2 truncate" title={cuenta.nombre_cuenta}>
                                                     {cuenta.nombre_cuenta}
-                                                </span>
+                                                </div>
                                                 <div className="flex justify-between items-end">
                                                     <div>
                                                         <div className="text-[10px] text-slate-500 leading-none mb-1">Cierre</div>
