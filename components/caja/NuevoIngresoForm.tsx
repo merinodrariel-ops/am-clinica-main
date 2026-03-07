@@ -38,6 +38,10 @@ interface NuevoIngresoFormProps {
 }
 
 type SenaTipo = '' | 'diseno_sonrisa' | 'ortodoncia_invisible' | 'cirugia_implantes';
+type MonedaIngreso = 'USD' | 'ARS' | 'USDT';
+type MetodoPagoIngreso = 'Efectivo' | 'Transferencia' | 'MercadoPago' | 'Cripto';
+type CanalDestinoIngreso = 'Empresa' | 'Personal' | 'MP' | 'USDT';
+type TipoComprobanteIngreso = 'Factura A' | 'Tipo C' | 'Sin factura' | 'Otro';
 
 const SENA_OPCIONES: Array<{ value: SenaTipo; label: string; workflow: string }> = [
     { value: 'diseno_sonrisa', label: 'Diseno de Sonrisa', workflow: 'Diseno de Sonrisa' },
@@ -74,6 +78,13 @@ function getSenaWorkflowLabel(tipo: SenaTipo) {
     return SENA_OPCIONES.find(option => option.value === tipo)?.workflow || '';
 }
 
+function makeUuid() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 interface FormData {
     paciente_id: string;
     paciente_nombre: string;
@@ -82,10 +93,10 @@ interface FormData {
     categoria: string;
     precio_lista_usd: number;
     monto: number;
-    moneda: 'USD' | 'ARS' | 'USDT';
-    metodo_pago: 'Efectivo' | 'Transferencia' | 'MercadoPago' | 'Cripto';
-    canal_destino: 'Empresa' | 'Personal' | 'MP' | 'USDT';
-    tipo_comprobante: 'Factura A' | 'Tipo C' | 'Sin factura' | 'Otro';
+    moneda: MonedaIngreso;
+    metodo_pago: MetodoPagoIngreso;
+    canal_destino: CanalDestinoIngreso;
+    tipo_comprobante: TipoComprobanteIngreso;
     estado: 'pagado' | 'pendiente';
     observaciones: string;
     es_sena: boolean;
@@ -95,6 +106,14 @@ interface FormData {
     cuotas_total: number;
     presupuesto_ref: string;
     comprobante_url?: string;
+}
+
+interface PaymentSplit {
+    id: string;
+    monto: number;
+    moneda: MonedaIngreso;
+    metodo_pago: MetodoPagoIngreso;
+    canal_destino: CanalDestinoIngreso;
 }
 
 const METODOS_PAGO = [
@@ -154,6 +173,49 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         presupuesto_ref: '',
         comprobante_url: '',
     });
+    const [useMultiplePayments, setUseMultiplePayments] = useState(false);
+    const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>([
+        {
+            id: makeUuid(),
+            monto: 0,
+            moneda: 'USD',
+            metodo_pago: 'Efectivo',
+            canal_destino: 'Empresa',
+        },
+    ]);
+
+    const createSplitFromCurrentForm = (): PaymentSplit => ({
+        id: makeUuid(),
+        monto: formData.monto || 0,
+        moneda: formData.moneda,
+        metodo_pago: formData.metodo_pago,
+        canal_destino: formData.canal_destino,
+    });
+
+    function setSplitValue(index: number, updates: Partial<PaymentSplit>) {
+        setPaymentSplits((prev) => {
+            const next = [...prev];
+            next[index] = { ...next[index], ...updates };
+            return next;
+        });
+    }
+
+    function addPaymentSplit() {
+        setPaymentSplits((prev) => ([
+            ...prev,
+            {
+                id: makeUuid(),
+                monto: 0,
+                moneda: formData.moneda,
+                metodo_pago: formData.metodo_pago,
+                canal_destino: formData.canal_destino,
+            },
+        ]));
+    }
+
+    function removePaymentSplit(index: number) {
+        setPaymentSplits((prev) => prev.filter((_, idx) => idx !== index));
+    }
 
     // Load tarifario on mount
     useEffect(() => {
@@ -328,14 +390,22 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
 
 
-    function calculateUsdEquivalent(): number {
-        if (formData.moneda === 'USD' || formData.moneda === 'USDT') {
-            return formData.monto;
+    function calculateUsdEquivalentForAmount(monto: number, moneda: MonedaIngreso): number {
+        if (moneda === 'USD' || moneda === 'USDT') {
+            return monto;
         }
-        if (formData.moneda === 'ARS' && bnaRate > 0) {
-            return Math.round((formData.monto / bnaRate) * 100) / 100;
+        if (moneda === 'ARS' && bnaRate > 0) {
+            return Math.round((monto / bnaRate) * 100) / 100;
         }
         return 0;
+    }
+
+    function calculateUsdEquivalent(): number {
+        return calculateUsdEquivalentForAmount(formData.monto, formData.moneda);
+    }
+
+    function getMixedUsdTotal(splits: PaymentSplit[]) {
+        return splits.reduce((acc, split) => acc + calculateUsdEquivalentForAmount(split.monto, split.moneda), 0);
     }
 
     async function handleSubmit() {
@@ -358,46 +428,99 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 : formData.concepto_nombre;
             const categoriaFinal = formData.es_sena ? 'Senas' : formData.categoria;
 
-            const { data: insertedMovement, error } = await supabase
-                .from('caja_recepcion_movimientos')
-                .insert({
-                    paciente_id: formData.paciente_id,
-                    concepto_id: formData.concepto_id || null,
-                    concepto_nombre: conceptoFinal,
-                    categoria: categoriaFinal,
-                    precio_lista_usd: formData.precio_lista_usd,
+            const referenceUsd = usdEquivalente;
+            const validPaymentSplits = useMultiplePayments
+                ? paymentSplits.filter((split) => split.monto > 0)
+                : [];
+
+            if (useMultiplePayments && validPaymentSplits.length === 0) {
+                alert('Debes cargar al menos una forma de pago con monto mayor a 0.');
+                return;
+            }
+
+            if (useMultiplePayments) {
+                const mixedUsdTotal = getMixedUsdTotal(validPaymentSplits);
+                const difference = Math.abs(mixedUsdTotal - referenceUsd);
+                if (difference > 1) {
+                    alert(`El total de formas de pago no coincide con el monto cargado. Diferencia aproximada: USD ${difference.toFixed(2)}`);
+                    return;
+                }
+            }
+
+            const movementGroupTag = useMultiplePayments && validPaymentSplits.length > 1
+                ? `PAGO_MIXTO:${makeUuid()}`
+                : null;
+            const cleanedObservation = (formData.observaciones || '').trim();
+
+            const paymentsToInsert = useMultiplePayments
+                ? validPaymentSplits.map((split, index) => ({
+                    monto: split.monto,
+                    moneda: split.moneda,
+                    metodo_pago: split.metodo_pago,
+                    canal_destino: split.canal_destino,
+                    usd_equivalente: calculateUsdEquivalentForAmount(split.monto, split.moneda),
+                    cuota_nro: formData.es_cuota && index === 0 ? formData.cuota_nro : null,
+                    cuotas_total: formData.es_cuota && index === 0 ? formData.cuotas_total : null,
+                    observaciones: [
+                        movementGroupTag ? `[${movementGroupTag}]` : '',
+                        useMultiplePayments && validPaymentSplits.length > 1 ? `Linea ${index + 1}/${validPaymentSplits.length}` : '',
+                        cleanedObservation,
+                    ].filter(Boolean).join(' · '),
+                }))
+                : [{
                     monto: formData.monto,
                     moneda: formData.moneda,
                     metodo_pago: formData.metodo_pago,
                     canal_destino: formData.canal_destino,
-                    tipo_comprobante: formData.tipo_comprobante,
-                    estado: formData.estado,
-                    observaciones: formData.observaciones,
-                    tc_bna_venta: formData.moneda === 'ARS' ? bnaRate : null,
-                    tc_fuente: formData.moneda === 'ARS' ? 'BNA_AUTO' : 'N/A',
-                    tc_fecha_hora: formData.moneda === 'ARS' ? new Date().toISOString() : null,
-                    usd_equivalente: usdEquivalente,
-                    usuario: 'Recepción',
-                    created_by: user?.id || null,
-                    // Dual date fields
-                    fecha_movimiento: cargaHistorica ? fechaMovimiento : getLocalISODate(),
-                    origen: cargaHistorica ? 'carga_historica' : 'manual',
+                    usd_equivalente: referenceUsd,
                     cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
                     cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
-                    comprobante_url: formData.comprobante_url || null,
-                })
-                .select('id')
-                .single();
+                    observaciones: cleanedObservation,
+                }];
+
+            const payload = paymentsToInsert.map((payment) => ({
+                paciente_id: formData.paciente_id,
+                concepto_id: formData.concepto_id || null,
+                concepto_nombre: conceptoFinal,
+                categoria: categoriaFinal,
+                precio_lista_usd: formData.precio_lista_usd,
+                monto: payment.monto,
+                moneda: payment.moneda,
+                metodo_pago: payment.metodo_pago,
+                canal_destino: payment.canal_destino,
+                tipo_comprobante: formData.tipo_comprobante,
+                estado: formData.estado,
+                observaciones: payment.observaciones,
+                tc_bna_venta: payment.moneda === 'ARS' ? bnaRate : null,
+                tc_fuente: payment.moneda === 'ARS' ? 'BNA_AUTO' : 'N/A',
+                tc_fecha_hora: payment.moneda === 'ARS' ? new Date().toISOString() : null,
+                usd_equivalente: payment.usd_equivalente,
+                usuario: 'Recepción',
+                created_by: user?.id || null,
+                fecha_movimiento: cargaHistorica ? fechaMovimiento : getLocalISODate(),
+                origen: cargaHistorica ? 'carga_historica' : 'manual',
+                cuota_nro: payment.cuota_nro,
+                cuotas_total: payment.cuotas_total,
+                comprobante_url: formData.comprobante_url || null,
+            }));
+
+            const { data: insertedMovements, error } = await supabase
+                .from('caja_recepcion_movimientos')
+                .insert(payload)
+                .select('id, monto, moneda, usd_equivalente, metodo_pago');
 
             if (error) throw error;
 
+            const primaryMovement = insertedMovements?.[0];
+            const totalUsdFromSplits = paymentsToInsert.reduce((acc, payment) => acc + (payment.usd_equivalente || 0), 0);
+
             // Sync planes_financiacion when a cuota payment is registered
-            if (formData.es_cuota && formData.paciente_id && insertedMovement?.id) {
+            if (formData.es_cuota && formData.paciente_id && primaryMovement?.id) {
                 const syncResult = await syncPagoCuotaAction({
-                    movementId: insertedMovement.id,
+                    movementId: primaryMovement.id,
                     pacienteId: formData.paciente_id,
                     pacienteNombre: formData.paciente_nombre,
-                    montoUsd: usdEquivalente,
+                    montoUsd: Math.round(totalUsdFromSplits * 100) / 100,
                     montoOriginal: formData.monto,
                     moneda: formData.moneda,
                     cuotaNro: formData.cuota_nro,
@@ -426,7 +549,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             }
 
             // Generate receipt and show to user before closing
-            if (insertedMovement?.id) {
+            if (primaryMovement?.id) {
                 try {
                     const canvas = receiptCanvasRef.current;
                     if (canvas) {
@@ -434,21 +557,26 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                         const cuotaInfo = formData.es_cuota
                             ? `${formData.cuota_nro}/${formData.cuotas_total}`
                             : undefined;
+                        const receiptMonto = useMultiplePayments ? Math.round(totalUsdFromSplits * 100) / 100 : formData.monto;
+                        const receiptMoneda: MonedaIngreso = useMultiplePayments ? 'USD' : formData.moneda;
+                        const receiptMetodo = useMultiplePayments
+                            ? `Mixto (${paymentsToInsert.length} pagos)`
+                            : formData.metodo_pago;
                         const imageDataUrl = drawReceiptOnCanvas(canvas, {
                             numero: receiptNumber,
                             fecha: new Date(),
                             paciente: formData.paciente_nombre,
                             concepto: conceptoFinal,
-                            monto: formData.monto,
-                            moneda: formData.moneda,
-                            metodoPago: formData.metodo_pago,
+                            monto: receiptMonto,
+                            moneda: receiptMoneda,
+                            metodoPago: receiptMetodo,
                             atendidoPor: 'AM Clínica',
                             cuotaInfo,
                         });
                         setGeneratedReceiptUrl(imageDataUrl);
                         const base64Data = imageDataUrl.split(',')[1];
                         saveReceiptAndLinkToMovement(
-                            insertedMovement.id,
+                            primaryMovement.id,
                             receiptNumber,
                             base64Data
                         ).catch(err => console.error('Auto-receipt save failed:', err));
@@ -463,7 +591,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     const workflowResult = await triggerWorkflowFromSenaPayment({
                         patientId: formData.paciente_id,
                         senaTipo: formData.sena_tipo,
-                        movementId: insertedMovement?.id || null,
+                        movementId: primaryMovement?.id || null,
                         conceptoNombre: conceptoFinal,
                         monto: formData.monto,
                         moneda: formData.moneda,
@@ -491,6 +619,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     function handleClose() {
         setStep(1);
         setGeneratedReceiptUrl(null);
+        setUseMultiplePayments(false);
+        setPaymentSplits([
+            {
+                id: makeUuid(),
+                monto: 0,
+                moneda: 'USD',
+                metodo_pago: 'Efectivo',
+                canal_destino: 'Empresa',
+            },
+        ]);
         setPatientWhatsapp('');
         setSearchQuery('');
         setPatients([]);
@@ -842,7 +980,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         <FileText size={18} className="text-blue-600 dark:text-blue-400" />
                                     </div>
                                     <div>
-                                        <p className="font-bold text-gray-900 dark:text-white">{formatCurrency(formData.monto, formData.moneda)}</p>
+                                        <p className="font-bold text-gray-900 dark:text-white">
+                                            {useMultiplePayments
+                                                ? formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')
+                                                : formatCurrency(formData.monto, formData.moneda)}
+                                        </p>
                                         <p className="text-xs text-gray-500">{formData.concepto_nombre}</p>
                                     </div>
                                 </div>
@@ -854,27 +996,160 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
                             {/* Payment Method */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Método de Pago
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {METODOS_PAGO.map((metodo) => (
-                                        <Button
-                                            key={metodo.value}
-                                            onClick={() => setFormData({ ...formData, metodo_pago: metodo.value as FormData['metodo_pago'] })}
-                                            className={clsx(
-                                                "p-3 border rounded-xl text-left transition-colors h-auto justify-start",
-                                                formData.metodo_pago === metodo.value
-                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100"
-                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 bg-transparent"
-                                            )}
-                                        >
-                                            <span className="mr-2">{metodo.icon}</span>
-                                            {metodo.label}
-                                        </Button>
-                                    ))}
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Método de Pago
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={useMultiplePayments}
+                                            onChange={(e) => {
+                                                const next = e.target.checked;
+                                                setUseMultiplePayments(next);
+                                                if (next) {
+                                                    setPaymentSplits((prev) => {
+                                                        if (prev.length > 0 && prev.some((split) => split.monto > 0)) return prev;
+                                                        return [createSplitFromCurrentForm()];
+                                                    });
+                                                } else {
+                                                    const first = paymentSplits[0];
+                                                    if (first) {
+                                                        setFormData((prev) => ({
+                                                            ...prev,
+                                                            metodo_pago: first.metodo_pago,
+                                                            moneda: first.moneda,
+                                                            monto: first.monto > 0 ? first.monto : prev.monto,
+                                                            canal_destino: first.canal_destino,
+                                                        }));
+                                                    }
+                                                }
+                                            }}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        Pago mixto (varios medios)
+                                    </label>
                                 </div>
+
+                                {!useMultiplePayments && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {METODOS_PAGO.map((metodo) => (
+                                            <Button
+                                                key={metodo.value}
+                                                onClick={() => setFormData({ ...formData, metodo_pago: metodo.value as FormData['metodo_pago'] })}
+                                                className={clsx(
+                                                    "p-3 border rounded-xl text-left transition-colors h-auto justify-start",
+                                                    formData.metodo_pago === metodo.value
+                                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100"
+                                                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 bg-transparent"
+                                                )}
+                                            >
+                                                <span className="mr-2">{metodo.icon}</span>
+                                                {metodo.label}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {useMultiplePayments && (
+                                    <div className="space-y-3">
+                                        {paymentSplits.map((split, idx) => {
+                                            const splitUsd = calculateUsdEquivalentForAmount(split.monto, split.moneda);
+                                            return (
+                                                <div key={split.id} className="p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900/40 space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-xs font-semibold text-gray-500 uppercase">Pago {idx + 1}</p>
+                                                        {paymentSplits.length > 1 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                onClick={() => removePaymentSplit(idx)}
+                                                                className="text-xs text-red-500 hover:text-red-600 h-auto p-0"
+                                                            >
+                                                                Quitar
+                                                            </Button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <select
+                                                            value={split.metodo_pago}
+                                                            onChange={(e) => setSplitValue(idx, { metodo_pago: e.target.value as MetodoPagoIngreso })}
+                                                            className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                                                        >
+                                                            {METODOS_PAGO.map((metodo) => (
+                                                                <option key={metodo.value} value={metodo.value}>{metodo.label}</option>
+                                                            ))}
+                                                        </select>
+
+                                                        <select
+                                                            value={split.canal_destino}
+                                                            onChange={(e) => setSplitValue(idx, { canal_destino: e.target.value as CanalDestinoIngreso })}
+                                                            className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                                                        >
+                                                            <option value="Empresa">Empresa</option>
+                                                            <option value="Personal">Personal</option>
+                                                            <option value="MP">MP</option>
+                                                            <option value="USDT">USDT</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                                                        <MoneyInput
+                                                            value={split.monto || 0}
+                                                            onChange={(val) => setSplitValue(idx, { monto: val })}
+                                                            className="w-full h-auto"
+                                                            placeholder="0"
+                                                        />
+                                                        <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                                                            {(['ARS', 'USD', 'USDT'] as MonedaIngreso[]).map((currency) => (
+                                                                <Button
+                                                                    key={currency}
+                                                                    type="button"
+                                                                    onClick={() => setSplitValue(idx, { moneda: currency })}
+                                                                    className={clsx(
+                                                                        'px-2 py-1 text-xs font-bold rounded-none h-auto',
+                                                                        split.moneda === currency
+                                                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                            : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                                    )}
+                                                                >
+                                                                    {currency}
+                                                                </Button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <p className="text-xs text-gray-500">≈ {formatCurrency(splitUsd, 'USD')}</p>
+                                                </div>
+                                            );
+                                        })}
+
+                                        <div className="flex items-center justify-between gap-3">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={addPaymentSplit}
+                                                className="text-xs h-auto py-2"
+                                            >
+                                                + Agregar forma de pago
+                                            </Button>
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-gray-500 uppercase">Total en formas de pago</p>
+                                                <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                                                    {formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
+
+                            {useMultiplePayments && (
+                                <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-900/10 p-3 text-xs text-blue-700 dark:text-blue-300">
+                                    Carga todas las formas de pago y el sistema registra el ingreso en un solo paso sin duplicar la cuota.
+                                </div>
+                            )}
 
                             {/* Financiación / Cuotas */}
                             <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 space-y-3">
@@ -930,12 +1205,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                             </div>
 
                             {/* Ticket Upload for non-cash payments */}
-                            {formData.metodo_pago !== 'Efectivo' && (
+                            {((!useMultiplePayments && formData.metodo_pago !== 'Efectivo') ||
+                                (useMultiplePayments && paymentSplits.some((split) => split.metodo_pago !== 'Efectivo'))) && (
                                 <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-xl bg-blue-50/30 dark:bg-blue-900/10">
                                     <div className="flex items-center gap-2 mb-3">
                                         <FileText size={16} className="text-blue-600" />
                                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Comprobante de operación
+                                            {useMultiplePayments ? 'Comprobante del pago mixto' : 'Comprobante de operación'}
                                         </label>
                                     </div>
 
@@ -1072,7 +1348,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Monto:</span>
                                     <span className="font-bold text-lg">
-                                        {formatCurrency(formData.monto, formData.moneda)}
+                                        {useMultiplePayments
+                                            ? formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')
+                                            : formatCurrency(formData.monto, formData.moneda)}
                                     </span>
                                 </div>
                                 {formData.es_cuota && (
@@ -1091,8 +1369,19 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 )}
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Método:</span>
-                                    <span>{formData.metodo_pago}</span>
+                                    <span>{useMultiplePayments ? `Mixto (${paymentSplits.filter((split) => split.monto > 0).length} pagos)` : formData.metodo_pago}</span>
                                 </div>
+
+                                {useMultiplePayments && (
+                                    <div className="space-y-1 pt-1">
+                                        {paymentSplits.filter((split) => split.monto > 0).map((split, idx) => (
+                                            <div key={split.id} className="flex justify-between text-xs text-gray-500">
+                                                <span>Pago {idx + 1}: {split.metodo_pago}</span>
+                                                <span>{formatCurrency(split.monto, split.moneda)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
 
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Estado:</span>
