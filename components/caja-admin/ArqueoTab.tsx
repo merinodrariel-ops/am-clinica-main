@@ -31,6 +31,7 @@ interface Props {
 }
 
 export default function ArqueoTab({ sucursal, tcBna }: Props) {
+    const { user, profile, categoria: role } = useAuth();
     const [cierreHoy, setCierreHoy] = useState<CajaAdminArqueo | null>(null);
     const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
     const [ultimoCierre, setUltimoCierre] = useState<CajaAdminArqueo | null>(null);
@@ -41,6 +42,8 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
     const [submitting, setSubmitting] = useState(false);
     const [opening, setOpening] = useState(false);
     const [showAbrirModal, setShowAbrirModal] = useState(false);
+    const [yesterdayStr, setYesterdayStr] = useState('');
+    const [inheritedMetrics, setInheritedMetrics] = useState<any>(null);
     const [showCerrarModal, setShowCerrarModal] = useState(false);
     const [saldosIniciales, setSaldosIniciales] = useState<Record<string, number>>({});
     const [expectedBalances, setExpectedBalances] = useState<Record<string, number>>({});
@@ -55,13 +58,21 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
         setLoading(true);
         try {
             const today = getLocalISODate();
-            const [cuentasData, cierreData, aperturaData, balanceActual] = await Promise.all([
+            // yesterday at 23:59:59
+            const yesterdayDate = new Date();
+            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            const yesterdayStrVal = yesterdayDate.toISOString().split('T')[0];
+            setYesterdayStr(yesterdayStrVal);
+
+            const [cuentasData, cierreData, aperturaData, balanceActual, balanceYesterday] = await Promise.all([
                 getCuentas(sucursal.id),
                 getUltimoCierreAdmin(sucursal.id),
                 getAperturaAdminDelDia(sucursal.id, today),
                 getCurrentBalanceAdmin(sucursal.id),
+                getCurrentBalanceAdmin(sucursal.id, yesterdayStrVal),
             ]);
             setCuentas(cuentasData);
+            setInheritedMetrics(balanceYesterday.metrics);
 
             // Priority: If there is an open session, it's "Open".
             // Even if there's a closure for today, a new session might have been started.
@@ -88,12 +99,15 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
 
             setExpectedBalances(balanceActual.saldosPorCuenta);
 
-            // Initialize saldos inputs with expected values
+            // Initialize saldos inputs with YESTERDAY'S FINAL balance (Arrastre)
+            // if box is already open, we might want to show expected current, 
+            // but for APERTURA we strictly use yesterday's final as per user request.
             const formInit: Record<string, number> = {};
             cuentasData.forEach(c => {
                 if (c.tipo_cuenta === 'EFECTIVO') {
-                    // Pre-fill with expected balance to help the user
-                    formInit[c.id] = balanceActual.saldosPorCuenta[c.id] || 0;
+                    // Start from yesterday's theoretical end if no open session exists
+                    const baseBalance = hasActiveApertura ? balanceActual.saldosPorCuenta[c.id] : (balanceYesterday.saldosPorCuenta[c.id] || 0);
+                    formInit[c.id] = baseBalance || 0;
                 }
             });
             setSaldos(formInit);
@@ -109,11 +123,19 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
         setOpening(true);
         try {
             const today = getLocalISODate();
+            const yesterdayDate = new Date();
+            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+            // Re-fetch yesterday balance to ensure no cache issues just before opening
+            const balanceYesterday = await getCurrentBalanceAdmin(sucursal.id, yesterdayStr);
+
             await abrirCajaAdminDelDia({
                 sucursalId: sucursal.id,
                 fecha: today,
                 usuario: profile?.full_name || user?.email || 'Admin',
                 tcBna: tcBna || null,
+                saldosIniciales: balanceYesterday.saldosPorCuenta,
             });
             setShowAbrirModal(false);
             await loadData();
@@ -173,8 +195,6 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
             setSubmitting(false);
         }
     }
-
-    const { categoria: role, profile, user } = useAuth();
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando...</div>;
 
@@ -293,13 +313,45 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                             {cierreHoy ? 'Iniciar Nueva Sesión Admin' : 'Iniciar Jornada Admin'}
                         </h3>
 
-                        <p className="text-sm text-gray-500 mb-4">
-                            Se heredarán automáticamente los saldos del último cierre.
-                        </p>
+                        <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-900/20 p-4 mb-4">
+                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                <Info size={14} />
+                                Origen de los Saldos
+                            </p>
+                            <div className="space-y-1 text-sm text-blue-800 dark:text-blue-200">
+                                <p>
+                                    {ultimoCierre?.fecha === yesterdayStr
+                                        ? `Se hereda el cierre físico del día de ayer (${yesterdayStr}).`
+                                        : ultimoCierre
+                                            ? `Se hereda el último cierre físico disponible (${ultimoCierre.fecha}) más los movimientos posteriores.`
+                                            : 'No hay cierres previos. Los saldos se calculan desde el primer movimiento.'}
+                                </p>
+                                {inheritedMetrics && (
+                                    <div className="pt-2 border-t border-blue-200 dark:border-blue-800/50 mt-2 space-y-1 text-xs opacity-90">
+                                        <div className="flex justify-between">
+                                            <span>Saldo Inicial (Cierre Anterior):</span>
+                                            <span className="font-mono">${inheritedMetrics.saldosInicialesUsd.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>(+) Ingresos / Aportes:</span>
+                                            <span className="font-mono text-emerald-600 dark:text-emerald-400">+${inheritedMetrics.ingresosUsd.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                                            <span>(-) Egresos / Gastos:</span>
+                                            <span className="font-mono">-${inheritedMetrics.egresosUsd.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-semibold border-t border-blue-200 dark:border-blue-800/50 pt-1 mt-1">
+                                            <span>Subtotal Teórico:</span>
+                                            <span className="font-mono">${(inheritedMetrics.saldosInicialesUsd + inheritedMetrics.ingresosUsd - inheritedMetrics.egresosUsd).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
                         <div className="rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-900/20 p-4 mb-4">
                             <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide mb-2">
-                                Saldo inicial sugerido
+                                Saldo inicial calculado
                             </p>
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between text-gray-700 dark:text-gray-200">

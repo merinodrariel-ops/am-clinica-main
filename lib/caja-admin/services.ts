@@ -513,12 +513,14 @@ export async function abrirCajaAdminDelDia(params: {
     fecha: string;
     usuario: string;
     tcBna?: number | null;
+    saldosIniciales?: Record<string, number>;
 }): Promise<CajaAdminArqueo> {
     const { data: rpcData, error: rpcError } = await getSupabase().rpc('abrir_caja_admin', {
         p_sucursal_id: params.sucursalId,
         p_fecha: params.fecha,
         p_usuario: params.usuario,
         p_tc_bna: params.tcBna || null,
+        p_saldos_iniciales: params.saldosIniciales || null,
     });
 
     if (!rpcError && rpcData) {
@@ -542,8 +544,12 @@ export async function abrirCajaAdminDelDia(params: {
     }
 
     const ultimoCierre = await getUltimoCierreAdmin(params.sucursalId, params.fecha);
-    const saldosIniciales = ultimoCierre?.saldos_finales || {};
-    const saldoInicialUsdEq = Number(ultimoCierre?.saldo_final_usd_equivalente || 0);
+    const saldosInherited = ultimoCierre?.saldos_finales || {};
+    const saldoInheritedUsdEq = Number(ultimoCierre?.saldo_final_usd_equivalente || 0);
+
+    const saldosToUse = params.saldosIniciales && Object.keys(params.saldosIniciales).length > 0
+        ? params.saldosIniciales
+        : saldosInherited;
 
     const { data, error } = await getSupabase()
         .from('caja_admin_arqueos')
@@ -553,16 +559,17 @@ export async function abrirCajaAdminDelDia(params: {
             usuario: params.usuario,
             hora_inicio: new Date().toISOString(),
             hora_cierre: null,
-            saldos_iniciales: saldosIniciales,
-            saldos_finales: saldosIniciales,
-            saldo_final_usd_equivalente: saldoInicialUsdEq,
+            saldos_iniciales: saldosToUse,
+            saldos_finales: saldosToUse,
+            saldo_final_usd_equivalente: params.saldosIniciales ? 0 : saldoInheritedUsdEq,
             tc_bna_venta_dia: params.tcBna || null,
             diferencia_usd: 0,
-            observaciones: 'Apertura automatica',
+            observaciones: 'Apertura de caja',
             estado: 'Abierto',
             snapshot_datos: {
                 apertura_automatica: true,
-                origen: 'sistema'
+                origen: 'sistema',
+                saldos_proporcionados: !!params.saldosIniciales
             }
         })
         .select('*')
@@ -571,6 +578,7 @@ export async function abrirCajaAdminDelDia(params: {
     if (error) throw error;
     return data as CajaAdminArqueo;
 }
+
 
 // Deprecated or Aliased
 export async function getArqueoAbierto(): Promise<CajaAdminArqueo | null> {
@@ -1839,7 +1847,7 @@ export async function getGlobalAdminCashBalance(): Promise<{ ars: number, usd: n
 
 // ===================== BALANCE HELPERS =====================
 
-export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
+export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: string): Promise<{
     status: 'Abierto' | 'Cerrado';
     lastCloseDate: string | null;
     saldoArs: number;
@@ -1848,6 +1856,14 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     giroArs: number;
     giroUsd: number;
     saldosPorCuenta: Record<string, number>;
+    metrics?: {
+        ingresosUsd: number;
+        egresosUsd: number;
+        transferenciasInUsd: number;
+        transferenciasOutUsd: number;
+        saldosInicialesUsd: number;
+    };
+    lastClosure?: CajaAdminArqueo | null;
 }> {
     const today = getLocalISODate();
     // 1. Get the absolute latest closure
@@ -1908,12 +1924,13 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
 
     // 2. Add Movements
     // Fetch movements where cierre_id IS NULL (pending closure)
-    const { data: movs } = await getSupabase()
+    let movQuery = getSupabase()
         .from('caja_admin_movimientos')
         .select(`
             tipo_movimiento,
             usd_equivalente_total,
             subtipo,
+            fecha_hora,
             caja_admin_movimiento_lineas (
                 cuenta_id,
                 importe,
@@ -1925,6 +1942,14 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         .is('cierre_id', null)
         .neq('estado', 'Anulado')
         .eq('is_deleted', false);
+
+    if (upToDate) {
+        // If upToDate is just YYYY-MM-DD, we treat it as EOD
+        const endTs = upToDate.length <= 10 ? `${upToDate}T23:59:59` : upToDate;
+        movQuery = movQuery.lte('fecha_hora', endTs);
+    }
+
+    const { data: movs } = await movQuery;
 
     let gastosTotalesUsd = 0;
 
@@ -1993,9 +2018,13 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         if (ultimo?.hora_cierre) {
             transQuery = transQuery.gt('fecha_hora', ultimo.hora_cierre);
         } else if (ultimo?.fecha) {
-            // Fallback: search since day of last closure (inclusive start to avoid missing gaps, 
-            // but might require manual review if overlaps happen)
+            // Fallback: search since day of last closure (inclusive start to avoid missing gaps)
             transQuery = transQuery.gte('fecha_hora', `${ultimo.fecha}T00:00:00`);
+        }
+
+        if (upToDate) {
+            const endTs = upToDate.length <= 10 ? `${upToDate}T23:59:59` : upToDate;
+            transQuery = transQuery.lte('fecha_hora', endTs);
         }
 
         const { data: adminTrans } = await transQuery;
@@ -2064,6 +2093,31 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         giroUsdTotal -= Number(m.usd_equivalente_total || 0);
     });
 
+    // Calculate breakdown metrics for reporting
+    const metrics = {
+        saldosInicialesUsd: 0,
+        ingresosUsd: 0,
+        egresosUsd: 0,
+        transferenciasInUsd: 0,
+        transferenciasOutUsd: 0,
+    };
+
+    // Calculate initial USD eq from ultimo closure
+    if (ultimo) {
+        metrics.saldosInicialesUsd = Number(ultimo.saldo_final_usd_equivalente || 0);
+    }
+
+    // Sum income/expenses from movements (theoretical)
+    movimientos?.forEach(m => {
+        if (m.estado === 'Anulado') return;
+        const val = Number(m.usd_equivalente_total || 0);
+        if (m.tipo_movimiento.startsWith('INGRESO') || m.tipo_movimiento === 'APORTE_CAPITAL') {
+            metrics.ingresosUsd += val;
+        } else if (m.tipo_movimiento === 'EGRESO' || m.tipo_movimiento === 'RETIRO') {
+            metrics.egresosUsd += val;
+        }
+    });
+
     return {
         status: 'Abierto',
         lastCloseDate: ultimo?.fecha || null,
@@ -2072,7 +2126,9 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         gastosTotalesUsd,
         giroArs: 0,
         giroUsd: Math.max(0, giroUsdTotal),
-        saldosPorCuenta
+        saldosPorCuenta,
+        metrics,
+        lastClosure: ultimo
     };
 }
 

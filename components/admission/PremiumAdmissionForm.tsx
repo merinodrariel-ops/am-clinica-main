@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { useAdmissionTriggers } from '@/hooks/useAdmissionTriggers';
 import { submitAdmissionAction, upsertAdmissionLeadAction, checkAdmissionIdentityAction } from '@/app/actions/admission';
+import { ADMISSION_BOOKING_PATHS } from '@/lib/admission-booking-links';
 
 
 // --- Types ---
@@ -1014,12 +1015,22 @@ export default function PremiumAdmissionForm() {
 
                 <div className="space-y-3 pt-4">
                     <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider ml-1">2. Reserva tu horario</p>
-                    <a href="https://calendar.app.google/oc4VZPzsDkhwB3r58" target="_blank" className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group">
+                    <a href={ADMISSION_BOOKING_PATHS.merino} className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><Calendar className="w-5 h-5" /></div>
                             <div>
-                                <h4 className="text-base font-medium text-white group-hover:text-zinc-300 transition-colors">Agendar turno online</h4>
-                                <p className="text-zinc-500 text-xs mt-0.5">Presencial o videollamada</p>
+                                <h4 className="text-base font-medium text-white group-hover:text-zinc-300 transition-colors">Agendar con Dr. Merino</h4>
+                                <p className="text-zinc-500 text-xs mt-0.5">Primera consulta en agenda AM</p>
+                            </div>
+                        </div>
+                    </a>
+
+                    <a href={ADMISSION_BOOKING_PATHS.staff} className="block w-full p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></div>
+                            <div>
+                                <h4 className="text-base font-medium text-white group-hover:text-zinc-300 transition-colors">Agendar con Staff</h4>
+                                <p className="text-zinc-500 text-xs mt-0.5">Selecciona profesional del staff</p>
                             </div>
                         </div>
                     </a>

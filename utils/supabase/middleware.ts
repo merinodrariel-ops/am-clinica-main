@@ -58,6 +58,7 @@ export async function updateSession(request: NextRequest) {
         path === '/terms' ||
         path.startsWith('/forgot-password') ||
         path.startsWith('/api/patient-portal/') ||
+        path.startsWith('/api/public-booking') ||
         path.startsWith('/api/sync-') ||
         path.startsWith('/api/import-') ||
         path.startsWith('/api/workflows/') ||

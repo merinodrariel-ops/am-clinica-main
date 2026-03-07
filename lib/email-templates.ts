@@ -1,4 +1,9 @@
+import { getAdmissionBookingUrl } from '@/lib/admission-booking-links';
+
 export function generatePremiumWelcomeEmail(nombre: string, portalUrl?: string): string {
+    const appBase = process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica.ar';
+    const bookingLink = getAdmissionBookingUrl('all', appBase);
+
     return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -78,7 +83,7 @@ export function generatePremiumWelcomeEmail(nombre: string, portalUrl?: string):
                                         <td>
                                             <h3 style="margin:0 0 10px;color:#ffffff;font-size:16px;font-weight:600;">Elige tu horario</h3>
                                             <p style="margin:0 0 20px;color:rgba(255,255,255,0.5);font-size:14px;line-height:1.6;">Una vez acreditado el pago, podrás acceder al calendario en tiempo real y seleccionar la ventana horaria que prefieras.</p>
-                                            <a href="https://calendar.app.google/oc4VZPzsDkhwB3r58" style="display:inline-block;padding:12px 25px;background-color:#C9A96E;color:#000;text-decoration:none;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;border-radius:2px;">
+                                            <a href="${bookingLink}" style="display:inline-block;padding:12px 25px;background-color:#C9A96E;color:#000;text-decoration:none;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;border-radius:2px;">
                                                 Ver Disponibilidad
                                             </a>
                                         </td>
@@ -590,4 +595,3 @@ export function generatePaymentConfirmationEmail(nombre: string, amountUsd: numb
 </body>
 </html>`;
 }
-

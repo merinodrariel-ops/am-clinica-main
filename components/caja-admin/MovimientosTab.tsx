@@ -355,9 +355,11 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     // Exclude Transfers and Exchanges from "Operating" metrics
     const relevantMovs = movimientos.filter(
       (m) =>
+        m &&
         !["CAMBIO_MONEDA", "TRANSFERENCIA", "AJUSTE_CAJA"].includes(
-          m.tipo_movimiento,
-        ) && m.estado !== "Anulado",
+          m.tipo_movimiento || "",
+        ) &&
+        m.estado !== "Anulado",
     );
 
     const egresos = relevantMovs.filter((m) => m.tipo_movimiento === "EGRESO");
@@ -459,7 +461,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     if (updates.importe !== undefined) {
       if (
         ["CAMBIO_MONEDA", "TRANSFERENCIA", "AJUSTE_CAJA"].includes(
-          formData.tipo_movimiento,
+          formData.tipo_movimiento || "",
         )
       ) {
         // Allow negative for these types (Source in Exchange, Outflow in Transfer, Shortage in Adjustment)
@@ -957,7 +959,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   const filteredMovimientos = movimientos.filter((m) => {
     if (
       searchTerm &&
-      !(m.descripcion || "").toLowerCase().includes(searchTerm.toLowerCase())
+      !(m.descripcion || "").toLowerCase().includes((searchTerm || "").toLowerCase())
     ) {
       return false;
     }
@@ -1873,7 +1875,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${mov.tipo_movimiento === "EGRESO"
                           ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          : (mov.tipo_movimiento || "").includes("INGRESO")
+                          : String(mov.tipo_movimiento || "").includes("INGRESO")
                             ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                             : mov.tipo_movimiento === "APORTE_CAPITAL"
                               ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"

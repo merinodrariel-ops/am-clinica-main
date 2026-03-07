@@ -19,8 +19,8 @@ const GOLD = '#C9A96E';
 const BLACK = '#0d0d0d';
 const DARK_CARD = '#1a1a1a';
 const WA_LINK = 'https://wa.link/zolb52';
-const CALENDAR_LINK = 'https://calendar.app.google/oc4VZPzsDkhwB3r58';
 const PORTAL_BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica.vercel.app';
+const CALENDAR_LINK = `${PORTAL_BASE}/admision/agendar`;
 
 function emailWrapper(content: string, preheader = ''): string {
     return `<!DOCTYPE html>
