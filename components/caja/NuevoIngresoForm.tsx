@@ -212,6 +212,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 .from('pacientes')
                 .select('id_paciente, nombre, apellido, whatsapp, documento')
                 .eq('id_paciente', initialPatientId)
+                .eq('is_deleted', false)
                 .single();
 
             if (cancelled || error || !data) return;
@@ -241,6 +242,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 .from('pacientes')
                 .select('id_paciente, nombre, apellido, whatsapp, documento')
                 .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%,documento.ilike.%${query}%`)
+                .eq('is_deleted', false)
                 .limit(10);
 
             if (error) throw error;
@@ -266,28 +268,26 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
         // Background fetch for financing data
         try {
-            const { data: pData } = await supabase
-                .from('pacientes')
-                .select('financ_estado, financ_cuotas_total, financ_monto_total')
-                .eq('id_paciente', patient.id_paciente)
-                .single();
+            const { data: activePlan } = await supabase
+                .from('planes_financiacion')
+                .select('id, cuotas_pagadas, cuotas_total, estado')
+                .eq('paciente_id', patient.id_paciente)
+                .eq('estado', 'En curso')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
-            if (pData?.financ_estado === 'activo') {
-                const { count } = await supabase
-                    .from('caja_recepcion_movimientos')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('paciente_id', patient.id_paciente)
-                    .neq('estado', 'Anulado')
-                    .gt('cuota_nro', 0);
+            if (activePlan) {
+                const cuotasPagadas = Number(activePlan.cuotas_pagadas || 0);
+                const cuotasTotal = Number(activePlan.cuotas_total || 0);
+                const nextQuota = cuotasPagadas + 1;
 
-                const nextQuota = (count || 0) + 1;
-
-                if (nextQuota <= (pData.financ_cuotas_total || 0)) {
+                if (cuotasTotal > 0 && nextQuota <= cuotasTotal) {
                     setFormData(prev => ({
                         ...prev,
                         es_cuota: true,
                         cuota_nro: nextQuota,
-                        cuotas_total: pData.financ_cuotas_total || 0
+                        cuotas_total: cuotasTotal,
                     }));
                 }
             }

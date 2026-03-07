@@ -167,6 +167,10 @@ function findPatientByNameFuzzy(
     return null;
 }
 
+function pickPatientName(patient: Record<string, unknown>) {
+    return `${String(patient.apellido || '')} ${String(patient.nombre || '')}`.trim();
+}
+
 async function savePendingPayment(admin: ReturnType<typeof createAdminClient>, params: SyncCuotaParams, reason: string, matchSnapshot?: Record<string, unknown>, errorMessage?: string) {
     const payload = {
         movement_id: params.movementId,
@@ -204,12 +208,53 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
 
         const { data: patientRow } = await admin
             .from('pacientes')
-            .select('id_paciente, documento, nombre, apellido')
+            .select('id_paciente, documento, nombre, apellido, is_deleted')
             .eq('id_paciente', params.pacienteId)
             .maybeSingle();
 
-        const patientDni = normalizeDigits((patientRow as Record<string, unknown> | null)?.documento as string | undefined);
-        const patientName = params.pacienteNombre || `${(patientRow as Record<string, unknown> | null)?.apellido || ''} ${(patientRow as Record<string, unknown> | null)?.nombre || ''}`.trim();
+        const patientRecord = (patientRow as Record<string, unknown> | null) || null;
+
+        let effectivePatientId = params.pacienteId;
+        let effectivePatientDni = normalizeDigits(patientRecord?.documento as string | undefined);
+        let effectivePatientName = params.pacienteNombre || `${patientRecord?.apellido || ''} ${patientRecord?.nombre || ''}`.trim();
+
+        if (patientRecord?.is_deleted === true) {
+            const { data: activePatients, error: activePatientsError } = await admin
+                .from('pacientes')
+                .select('id_paciente, nombre, apellido, documento')
+                .eq('is_deleted', false)
+                .limit(5000);
+
+            if (!activePatientsError && activePatients && activePatients.length > 0) {
+                const activeRows = activePatients as Array<Record<string, unknown>>;
+                let canonicalPatient: Record<string, unknown> | null = null;
+
+                if (effectivePatientDni) {
+                    canonicalPatient = activeRows.find((row) => normalizeDigits(String(row.documento || '')) === effectivePatientDni) || null;
+                }
+
+                if (!canonicalPatient) {
+                    const deletedName = pickPatientName(patientRecord);
+                    canonicalPatient = findPatientByNameFuzzy(activeRows, deletedName || effectivePatientName);
+                }
+
+                if (canonicalPatient) {
+                    const canonicalId = String(canonicalPatient.id_paciente || '');
+                    if (canonicalId) {
+                        effectivePatientId = canonicalId;
+                        effectivePatientName = `${String(canonicalPatient.apellido || '')}, ${String(canonicalPatient.nombre || '')}`.trim();
+                        effectivePatientDni = normalizeDigits(String(canonicalPatient.documento || ''));
+
+                        await admin
+                            .from('caja_recepcion_movimientos')
+                            .update({ paciente_id: canonicalId })
+                            .eq('id', params.movementId);
+                    }
+                }
+            }
+        }
+
+        const patientName = effectivePatientName;
 
         const { data: plansRaw, error: plansError } = await admin
             .from('planes_financiacion')
@@ -219,7 +264,13 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
             .limit(300);
 
         if (plansError) {
-            const pendingSaved = await savePendingPayment(admin, params, 'error_consulta_planes', undefined, plansError.message);
+            const pendingSaved = await savePendingPayment(
+                admin,
+                { ...params, pacienteId: effectivePatientId, pacienteNombre: patientName },
+                'error_consulta_planes',
+                undefined,
+                plansError.message,
+            );
             return {
                 success: false,
                 error: `Pago registrado en caja, pero falló la consulta de financiación: ${plansError.message}`,
@@ -233,7 +284,7 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
         let matched: Record<string, unknown> | null = null;
         let matchMethod: MatchMethod | undefined;
 
-        matched = plans.find((plan) => String(plan.paciente_id || '') === params.pacienteId) || null;
+        matched = plans.find((plan) => String(plan.paciente_id || '') === effectivePatientId) || null;
         if (matched) matchMethod = 'paciente_id';
 
         if (!matched && params.presupuestoRef) {
@@ -241,8 +292,8 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
             if (matched) matchMethod = 'presupuesto_id';
         }
 
-        if (!matched && patientDni) {
-            matched = findByDni(plans, patientDni);
+        if (!matched && effectivePatientDni) {
+            matched = findByDni(plans, effectivePatientDni);
             if (matched) matchMethod = 'dni';
         }
 
@@ -252,9 +303,13 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
         }
 
         if (!matched) {
-            const pendingSaved = await savePendingPayment(admin, params, 'plan_no_encontrado', {
+            const pendingSaved = await savePendingPayment(
+                admin,
+                { ...params, pacienteId: effectivePatientId, pacienteNombre: patientName },
+                'plan_no_encontrado',
+                {
                 patient_name: patientName,
-                patient_dni: patientDni,
+                patient_dni: effectivePatientDni,
                 presupuesto_ref: params.presupuestoRef || null,
                 candidates: plans.slice(0, 15).map((plan) => ({
                     id: plan.id,
@@ -262,7 +317,8 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
                     paciente_id: plan.paciente_id,
                     cuit: plan.cuit,
                 })),
-            });
+                },
+            );
 
             return {
                 success: false,
@@ -274,7 +330,12 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
 
         const planId = String(matched.id || '');
         if (!planId) {
-            const pendingSaved = await savePendingPayment(admin, params, 'plan_sin_id', { matched });
+            const pendingSaved = await savePendingPayment(
+                admin,
+                { ...params, pacienteId: effectivePatientId, pacienteNombre: patientName },
+                'plan_sin_id',
+                { matched },
+            );
             return {
                 success: false,
                 error: 'Pago registrado en caja, pero el plan encontrado no tiene ID válido.',
@@ -299,8 +360,8 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
             updated_at: new Date().toISOString(),
         };
 
-        if (!matched.paciente_id || String(matched.paciente_id) !== params.pacienteId) {
-            updatePayload.paciente_id = params.pacienteId;
+        if (!matched.paciente_id || String(matched.paciente_id) !== effectivePatientId) {
+            updatePayload.paciente_id = effectivePatientId;
         }
 
         const { error: updateError } = await admin
@@ -309,7 +370,13 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
             .eq('id', planId);
 
         if (updateError) {
-            const pendingSaved = await savePendingPayment(admin, params, 'error_actualizacion_plan', { matched, matchMethod }, updateError.message);
+            const pendingSaved = await savePendingPayment(
+                admin,
+                { ...params, pacienteId: effectivePatientId, pacienteNombre: patientName },
+                'error_actualizacion_plan',
+                { matched, matchMethod },
+                updateError.message,
+            );
             return {
                 success: false,
                 error: `Pago registrado en caja, pero no se pudo actualizar el plan: ${updateError.message}`,
@@ -326,11 +393,17 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
             .single();
 
         if (verifyError || !verifyRow || Number(verifyRow.cuotas_pagadas || 0) !== nextPaid) {
-            const pendingSaved = await savePendingPayment(admin, params, 'confirmacion_escritura_fallida', {
+            const pendingSaved = await savePendingPayment(
+                admin,
+                { ...params, pacienteId: effectivePatientId, pacienteNombre: patientName },
+                'confirmacion_escritura_fallida',
+                {
                 expected: { cuotas_pagadas: nextPaid, saldo_restante_usd: nextSaldo },
                 got: verifyRow || null,
                 matchMethod,
-            }, verifyError?.message);
+                },
+                verifyError?.message,
+            );
 
             return {
                 success: false,
