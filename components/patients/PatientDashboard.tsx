@@ -775,7 +775,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                     {Array.from({ length: totalCuotasDisplay || 0 }).map((_, i) => {
                                                         const quotaNum = i + 1;
                                                         const paidPayment = payments.find(p => p.cuota_nro === quotaNum && p.estado !== 'Anulado');
-                                                        const isPaid = sheetFinance ? quotaNum <= cuotasPagadasDisplay : !!paidPayment;
+                                                        const isPaid = financingPlan ? quotaNum <= cuotasPagadasDisplay : !!paidPayment;
                                                         const isNext = !isPaid && quotaNum === (cuotasPagadasDisplay + 1);
 
                                                         return (
