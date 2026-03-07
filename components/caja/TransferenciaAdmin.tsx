@@ -101,6 +101,7 @@ export default function TransferenciaAdmin({
             const opsTag = `[OPS:${tipoTransferencia}|${cajaOrigen}|${tipoTransferencia === 'RETIRO_EFECTIVO' ? 'EXT' : cajaDestino}]`;
 
             const insertPayload: Record<string, unknown> = {
+                movimiento_grupo_id: crypto.randomUUID(),
                 moneda,
                 monto,
                 tc_bna_venta: moneda === 'ARS' ? bnaRate : null,
@@ -112,7 +113,6 @@ export default function TransferenciaAdmin({
                 observaciones: observaciones || null,
                 usuario: 'Recepcion',
                 estado: 'confirmada',
-                comprobante_url: comprobanteUrl
             };
 
             let { error } = await supabase
@@ -122,6 +122,7 @@ export default function TransferenciaAdmin({
             if (error && (error.message.includes('tipo_transferencia') || error.message.includes('caja_origen') || error.message.includes('caja_destino'))) {
                 // Backward-compatible insert for environments that do not have the migration yet
                 const fallbackPayload = {
+                    movimiento_grupo_id: crypto.randomUUID(),
                     moneda,
                     monto,
                     tc_bna_venta: moneda === 'ARS' ? bnaRate : null,
