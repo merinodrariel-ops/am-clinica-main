@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -56,6 +56,15 @@ interface Movement {
     cuota_nro?: number | null;
     cuotas_total?: number | null;
     comprobante_url?: string | null;
+}
+
+interface FinanceSheetSnapshot {
+    cuotasAbonadas: number | null;
+    saldoFaltante: number | null;
+    totalPlan: number | null;
+    cuotasTotal: number | null;
+    matchedBy: 'dni' | 'nombre';
+    fetchedAt: string;
 }
 
 interface AppointmentSignal {
@@ -136,17 +145,56 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     });
     const [savingFin, setSavingFin] = useState(false);
     const [isEditingFin, setIsEditingFin] = useState(false);
+    const [sheetFinance, setSheetFinance] = useState<FinanceSheetSnapshot | null>(null);
+    const [sheetFinanceLoading, setSheetFinanceLoading] = useState(false);
+    const [sheetFinanceError, setSheetFinanceError] = useState<string | null>(null);
 
-    // Calculate financing progress
-    // We sum payments that are explicitly marked as installments (cuota_nro > 0)
-    // OR if financing is active, we could consider all payments, but using explicit flag is safer.
-    // For now, let's look for payments with 'cuota' in concept or explicitly set field if we had it.
-    // Checking the data, we will use cuota_nro > 0.
+    async function fetchFinanceFromSheet() {
+        setSheetFinanceLoading(true);
+        setSheetFinanceError(null);
+        try {
+            const response = await fetch(`/api/patients/${patient.id_paciente}/finance-sheet`, {
+                method: 'GET',
+                cache: 'no-store',
+            });
+
+            const json = await response.json();
+            if (!response.ok) {
+                throw new Error(json?.error || 'No se pudo actualizar Finanzas desde Google Sheets.');
+            }
+
+            setSheetFinance({
+                cuotasAbonadas: typeof json.cuotasAbonadas === 'number' ? json.cuotasAbonadas : null,
+                saldoFaltante: typeof json.saldoFaltante === 'number' ? json.saldoFaltante : null,
+                totalPlan: typeof json.totalPlan === 'number' ? json.totalPlan : null,
+                cuotasTotal: typeof json.cuotasTotal === 'number' ? json.cuotasTotal : null,
+                matchedBy: json.matchedBy === 'dni' ? 'dni' : 'nombre',
+                fetchedAt: json.fetchedAt || new Date().toISOString(),
+            });
+        } catch (error) {
+            setSheetFinance(null);
+            setSheetFinanceError(error instanceof Error ? error.message : 'No se pudo consultar la hoja de Finanzas.');
+        } finally {
+            setSheetFinanceLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        if (activeTab === 'finanzas') {
+            void fetchFinanceFromSheet();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, patient.id_paciente]);
+
     const totalPagadoFinanc = payments
         .filter(p => p.estado !== 'Anulado' && (p.cuota_nro && p.cuota_nro > 0))
         .reduce((sum, p) => sum + (p.usd_equivalente || 0), 0);
 
-    const saldoFinanc = Math.max(0, finData.monto - totalPagadoFinanc);
+    const cuotasPagadasByPayments = payments.filter(p => (p.cuota_nro || 0) > 0 && p.estado !== 'Anulado').length;
+    const cuotasPagadasDisplay = sheetFinance?.cuotasAbonadas ?? cuotasPagadasByPayments;
+    const totalCuotasDisplay = sheetFinance?.cuotasTotal ?? finData.cuotas;
+    const totalPlanDisplay = sheetFinance?.totalPlan ?? finData.monto;
+    const saldoFinanc = sheetFinance?.saldoFaltante ?? Math.max(0, totalPlanDisplay - totalPagadoFinanc);
 
     async function handleSaveFinancing() {
         setSavingFin(true);
@@ -648,6 +696,9 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         <div>
                                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                                 Plan de Financiación
+                                                {sheetFinance && (
+                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">Google Sheets</span>
+                                                )}
                                                 {finData.estado === 'activo' && (
                                                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">Activo</span>
                                                 )}
@@ -659,6 +710,14 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 )}
                                             </h2>
                                             <p className="text-gray-500 text-sm mt-1">Gestión de cuotas y saldos</p>
+                                            {sheetFinance && (
+                                                <p className="text-xs text-emerald-600 mt-1">
+                                                    Datos sincronizados por {sheetFinance.matchedBy === 'dni' ? 'DNI' : 'nombre'} · {new Date(sheetFinance.fetchedAt).toLocaleString('es-AR')}
+                                                </p>
+                                            )}
+                                            {sheetFinanceError && (
+                                                <p className="text-xs text-amber-600 mt-1">{sheetFinanceError}</p>
+                                            )}
                                             <Link
                                                 href={`/caja-recepcion?tab=contratos&patientId=${patient.id_paciente}`}
                                                 className="inline-flex items-center gap-1 text-xs mt-2 text-blue-600 hover:underline"
@@ -667,25 +726,36 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 <ExternalLink size={12} />
                                             </Link>
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                if (isEditingFin) handleSaveFinancing();
-                                                else setIsEditingFin(true);
-                                            }}
-                                            disabled={savingFin}
-                                            className={clsx(
-                                                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                                                isEditingFin
-                                                    ? "bg-green-600 hover:bg-green-700 text-white"
-                                                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200"
-                                            )}
-                                        >
-                                            {isEditingFin ? (
-                                                <>{savingFin ? 'Guardando...' : <><Save size={16} /> Guardar Cambios</>}</>
-                                            ) : (
-                                                <><Edit2 size={16} /> Configurar Plan</>
-                                            )}
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => { void fetchFinanceFromSheet(); }}
+                                                disabled={sheetFinanceLoading}
+                                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 transition-colors"
+                                            >
+                                                {sheetFinanceLoading ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
+                                                {sheetFinanceLoading ? 'Actualizando...' : 'Releer Sheet'}
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    if (isEditingFin) handleSaveFinancing();
+                                                    else setIsEditingFin(true);
+                                                }}
+                                                disabled={savingFin || !!sheetFinance}
+                                                className={clsx(
+                                                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                                                    isEditingFin
+                                                        ? "bg-green-600 hover:bg-green-700 text-white"
+                                                        : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 disabled:opacity-50"
+                                                )}
+                                            >
+                                                {isEditingFin ? (
+                                                    <>{savingFin ? 'Guardando...' : <><Save size={16} /> Guardar Cambios</>}</>
+                                                ) : (
+                                                    <><Edit2 size={16} /> Configurar Plan</>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {isEditingFin ? (
@@ -740,12 +810,13 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                                                     <p className="text-sm text-gray-500 mb-1">Total Financiado</p>
-                                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">${finData.monto.toLocaleString('es-AR')}</p>
+                                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalPlanDisplay.toLocaleString('es-AR')}</p>
                                                 </div>
                                                 <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
-                                                    <p className="text-sm text-green-600 dark:text-green-400 mb-1">Pagado hasta hoy</p>
+                                                    <p className="text-sm text-green-600 dark:text-green-400 mb-1">Cuotas Abonadas</p>
                                                     <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                                                        ${totalPagadoFinanc.toLocaleString('es-AR')}
+                                                        {cuotasPagadasDisplay}
+                                                        <span className="text-base font-medium ml-1">/ {totalCuotasDisplay || 0}</span>
                                                     </p>
                                                 </div>
                                                 <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/30">
@@ -761,15 +832,15 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 <div className="flex justify-between items-end mb-4">
                                                     <h3 className="font-medium text-gray-900 dark:text-white">Estado de Cuotas</h3>
                                                     <span className="text-sm text-gray-500">
-                                                        {payments.filter(p => (p.cuota_nro || 0) > 0).length} pagadas de {finData.cuotas || 0}
+                                                        {cuotasPagadasDisplay} pagadas de {totalCuotasDisplay || 0}
                                                     </span>
                                                 </div>
                                                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                                                    {Array.from({ length: finData.cuotas }).map((_, i) => {
+                                                    {Array.from({ length: totalCuotasDisplay || 0 }).map((_, i) => {
                                                         const quotaNum = i + 1;
                                                         const paidPayment = payments.find(p => p.cuota_nro === quotaNum && p.estado !== 'Anulado');
-                                                        const isPaid = !!paidPayment;
-                                                        const isNext = !isPaid && quotaNum === (payments.filter(p => (p.cuota_nro || 0) > 0).length + 1);
+                                                        const isPaid = sheetFinance ? quotaNum <= cuotasPagadasDisplay : !!paidPayment;
+                                                        const isNext = !isPaid && quotaNum === (cuotasPagadasDisplay + 1);
 
                                                         return (
                                                             <div
