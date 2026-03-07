@@ -38,6 +38,7 @@ import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
+import type { PlanFinanciacion } from '@/lib/financiacion';
 import PatientCommandCenter from './PatientCommandCenter';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
@@ -58,15 +59,6 @@ interface Movement {
     comprobante_url?: string | null;
 }
 
-interface FinanceSheetSnapshot {
-    cuotasAbonadas: number | null;
-    saldoFaltante: number | null;
-    totalPlan: number | null;
-    cuotasTotal: number | null;
-    matchedBy: 'dni' | 'nombre';
-    fetchedAt: string;
-}
-
 interface AppointmentSignal {
     id: string;
     patient_id?: string;
@@ -83,6 +75,7 @@ interface PatientDashboardProps {
     payments: Movement[];
     appointments: AppointmentSignal[];
     prestaciones?: PrestacionConProfesional[];
+    financingPlan?: PlanFinanciacion | null;
 }
 
 const TABS = [
@@ -98,7 +91,7 @@ const TABS = [
 // Payment-related tabs hidden from restricted clinical/ops roles
 const PAYMENT_TABS = new Set(['finanzas']);
 
-export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [] }: PatientDashboardProps) {
+export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { categoria: role } = useAuth();
@@ -145,56 +138,16 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     });
     const [savingFin, setSavingFin] = useState(false);
     const [isEditingFin, setIsEditingFin] = useState(false);
-    const [sheetFinance, setSheetFinance] = useState<FinanceSheetSnapshot | null>(null);
-    const [sheetFinanceLoading, setSheetFinanceLoading] = useState(false);
-    const [sheetFinanceError, setSheetFinanceError] = useState<string | null>(null);
-
-    async function fetchFinanceFromSheet() {
-        setSheetFinanceLoading(true);
-        setSheetFinanceError(null);
-        try {
-            const response = await fetch(`/api/patients/${patient.id_paciente}/finance-sheet`, {
-                method: 'GET',
-                cache: 'no-store',
-            });
-
-            const json = await response.json();
-            if (!response.ok) {
-                throw new Error(json?.error || 'No se pudo actualizar Finanzas desde Google Sheets.');
-            }
-
-            setSheetFinance({
-                cuotasAbonadas: typeof json.cuotasAbonadas === 'number' ? json.cuotasAbonadas : null,
-                saldoFaltante: typeof json.saldoFaltante === 'number' ? json.saldoFaltante : null,
-                totalPlan: typeof json.totalPlan === 'number' ? json.totalPlan : null,
-                cuotasTotal: typeof json.cuotasTotal === 'number' ? json.cuotasTotal : null,
-                matchedBy: json.matchedBy === 'dni' ? 'dni' : 'nombre',
-                fetchedAt: json.fetchedAt || new Date().toISOString(),
-            });
-        } catch (error) {
-            setSheetFinance(null);
-            setSheetFinanceError(error instanceof Error ? error.message : 'No se pudo consultar la hoja de Finanzas.');
-        } finally {
-            setSheetFinanceLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        if (activeTab === 'finanzas') {
-            void fetchFinanceFromSheet();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, patient.id_paciente]);
 
     const totalPagadoFinanc = payments
         .filter(p => p.estado !== 'Anulado' && (p.cuota_nro && p.cuota_nro > 0))
         .reduce((sum, p) => sum + (p.usd_equivalente || 0), 0);
 
     const cuotasPagadasByPayments = payments.filter(p => (p.cuota_nro || 0) > 0 && p.estado !== 'Anulado').length;
-    const cuotasPagadasDisplay = sheetFinance?.cuotasAbonadas ?? cuotasPagadasByPayments;
-    const totalCuotasDisplay = sheetFinance?.cuotasTotal ?? finData.cuotas;
-    const totalPlanDisplay = sheetFinance?.totalPlan ?? finData.monto;
-    const saldoFinanc = sheetFinance?.saldoFaltante ?? Math.max(0, totalPlanDisplay - totalPagadoFinanc);
+    const cuotasPagadasDisplay = financingPlan?.cuotas_pagadas ?? cuotasPagadasByPayments;
+    const totalCuotasDisplay = financingPlan?.cuotas_total ?? finData.cuotas;
+    const totalPlanDisplay = financingPlan?.monto_total_usd ?? finData.monto;
+    const saldoFinanc = financingPlan?.saldo_restante_usd ?? Math.max(0, totalPlanDisplay - totalPagadoFinanc);
 
     async function handleSaveFinancing() {
         setSavingFin(true);
@@ -696,7 +649,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         <div>
                                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                                 Plan de Financiación
-                                                {sheetFinance && (
+                                                {financingPlan?.estado === 'En curso' && (
                                                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">En curso</span>
                                                 )}
                                                 {finData.estado === 'activo' && (
@@ -710,14 +663,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 )}
                                             </h2>
                                             <p className="text-gray-500 text-sm mt-1">Gestión de cuotas y saldos</p>
-                                            {sheetFinance && (
-                                                <p className="text-xs text-emerald-600 mt-1">
-                                                    Actualizado · {new Date(sheetFinance.fetchedAt).toLocaleString('es-AR')}
-                                                </p>
-                                            )}
-                                            {sheetFinanceError && (
-                                                <p className="text-xs text-amber-600 mt-1">{sheetFinanceError}</p>
-                                            )}
                                             <Link
                                                 href={`/caja-recepcion?tab=contratos&patientId=${patient.id_paciente}`}
                                                 className="inline-flex items-center gap-1 text-xs mt-2 text-blue-600 hover:underline"
@@ -728,20 +673,11 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
-                                                onClick={() => { void fetchFinanceFromSheet(); }}
-                                                disabled={sheetFinanceLoading}
-                                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 transition-colors"
-                                            >
-                                                {sheetFinanceLoading ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
-                                                {sheetFinanceLoading ? 'Actualizando...' : 'Actualizar'}
-                                            </button>
-
-                                            <button
                                                 onClick={() => {
                                                     if (isEditingFin) handleSaveFinancing();
                                                     else setIsEditingFin(true);
                                                 }}
-                                                disabled={savingFin || !!sheetFinance}
+                                                disabled={savingFin}
                                                 className={clsx(
                                                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                                                     isEditingFin
@@ -862,7 +798,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                                         {i + 1}
                                                                     </span>
                                                                 )}
-                                                                {isPaid && (
+                                                                {isPaid && paidPayment && (
                                                                     <span className="text-[10px] leading-tight opacity-75">
                                                                         {new Date(paidPayment.fecha_hora).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                                                                     </span>

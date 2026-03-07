@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import PatientDashboard from '@/components/patients/PatientDashboard';
 import { getPrestacionesByPaciente } from '@/app/actions/prestaciones';
 import { getMovimientosPorPaciente } from '@/lib/caja-recepcion';
+import type { PlanFinanciacion } from '@/lib/financiacion';
 
 export const revalidate = 0; // Always get fresh data
 
@@ -16,6 +17,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     let payments;
     let appointments;
     let prestaciones;
+    let financingPlan: PlanFinanciacion | null = null;
     let errorMsg;
 
     try {
@@ -41,6 +43,15 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             payments = relatedData[2] || [];
             appointments = relatedData[3].data || [];
             prestaciones = relatedData[4];
+
+            const { data: fpData } = await supabase
+                .from('planes_financiacion')
+                .select('*')
+                .eq('paciente_id', id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            financingPlan = fpData as PlanFinanciacion | null;
         }
     } catch (error) {
         console.error('Error fetching patient details:', error);
@@ -74,6 +85,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             payments={payments || []}
             appointments={appointments || []}
             prestaciones={prestaciones || []}
+            financingPlan={financingPlan}
         />
     );
 }
