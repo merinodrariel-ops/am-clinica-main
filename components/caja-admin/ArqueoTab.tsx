@@ -430,6 +430,15 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Observaciones
                                 </label>
+                                {Math.abs(totalCountedUsdEqCurrent - totalExpectedUsdEq) > 0.01 && (
+                                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
+                                        <AlertTriangle className="text-red-400 w-5 h-5 shrink-0 mt-0.5" />
+                                        <div className="text-xs text-red-200">
+                                            <p className="font-bold mb-1 uppercase">Diferencia Detectada</p>
+                                            <p>Hay una diferencia de <strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalCountedUsdEqCurrent - totalExpectedUsdEq)}</strong> respecto al saldo esperado. Esta diferencia quedará registrada en el historial de cierres para auditoría.</p>
+                                        </div>
+                                    </div>
+                                )}
                                 <Textarea
                                     value={observaciones}
                                     onChange={(e) => setObservaciones(e.target.value)}

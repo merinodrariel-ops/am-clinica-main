@@ -261,7 +261,6 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
         .from("transferencias_caja")
         .select("*")
         .or(`caja_origen.eq.ADMIN,caja_destino.eq.ADMIN`)
-        .eq("sucursal_id", sucursal.id)
         .eq("estado", "confirmada")
         .order("fecha_hora", { ascending: false });
 
@@ -958,7 +957,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   const filteredMovimientos = movimientos.filter((m) => {
     if (
       searchTerm &&
-      !m.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+      !(m.descripcion || "").toLowerCase().includes(searchTerm.toLowerCase())
     ) {
       return false;
     }
@@ -988,8 +987,8 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
         id: t.id,
         fecha_hora: t.fecha_hora,
         fecha_movimiento: t.fecha_hora.split('T')[0],
-        tipo_movimiento: t.tipo as any,
-        descripcion: t.motivo || t.tipo,
+        tipo_movimiento: t.tipo_transferencia as any,
+        descripcion: t.motivo || (t.tipo_transferencia === 'RETIRO_EFECTIVO' ? 'Retiro de efectivo' : 'Traspaso interno'),
         usd_equivalente_total: t.moneda === 'USD' ? t.monto : (t.monto / (tcBna || 1)),
         estado: 'Registrado',
         nota: t.observaciones,
@@ -1874,7 +1873,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${mov.tipo_movimiento === "EGRESO"
                           ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          : mov.tipo_movimiento.includes("INGRESO")
+                          : (mov.tipo_movimiento || "").includes("INGRESO")
                             ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                             : mov.tipo_movimiento === "APORTE_CAPITAL"
                               ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
@@ -1883,7 +1882,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                                 : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                           }`}
                       >
-                        {mov.tipo_movimiento === "GIRO_ACTIVO" ? "GIRO ACTIVO" : mov.tipo_movimiento.replace("_", " ")}
+                        {mov.tipo_movimiento === "GIRO_ACTIVO" ? "GIRO ACTIVO" : (mov.tipo_movimiento || "").replace("_", " ")}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium">

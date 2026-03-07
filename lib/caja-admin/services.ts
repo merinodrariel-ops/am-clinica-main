@@ -467,6 +467,8 @@ export async function getUltimoCierreAdmin(sucursalId: string, fechaLimite?: str
         .eq('sucursal_id', sucursalId)
         .in('estado', ['Cerrado', 'cerrado'])
         .order('fecha', { ascending: false })
+        .order('hora_cierre', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1);
 
     if (fechaLimite) {
@@ -1848,10 +1850,16 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
     saldosPorCuenta: Record<string, number>;
 }> {
     const today = getLocalISODate();
+    // 1. Get the absolute latest closure
     const ultimo = await getUltimoCierreAdmin(sucursalId);
 
     // Get Cash Accounts
     const cuentas = await getCuentas(sucursalId);
+
+    // Find default efectivo accounts for each currency (to map transfers)
+    const defaultArsAccount = cuentas.find((c: any) => c.tipo_cuenta === 'EFECTIVO' && c.moneda === 'ARS')?.id;
+    const defaultUsdAccount = cuentas.find((c: any) => c.tipo_cuenta === 'EFECTIVO' && c.moneda === 'USD')?.id;
+
     const efectivas = cuentas.filter((c: any) => c.tipo_cuenta === 'EFECTIVO');
     const idsArs = new Set(efectivas.filter((c: any) => c.moneda === 'ARS').map((c: any) => c.id));
     const idsUsd = new Set(efectivas.filter((c: any) => c.moneda === 'USD').map((c: any) => c.id));
@@ -1984,8 +1992,10 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         // Only count transfers since last closure
         if (ultimo?.hora_cierre) {
             transQuery = transQuery.gt('fecha_hora', ultimo.hora_cierre);
-        } else if (ultimo) {
-            transQuery = transQuery.gt('fecha_hora', `${ultimo.fecha}T23:59:59`);
+        } else if (ultimo?.fecha) {
+            // Fallback: search since day of last closure (inclusive start to avoid missing gaps, 
+            // but might require manual review if overlaps happen)
+            transQuery = transQuery.gte('fecha_hora', `${ultimo.fecha}T00:00:00`);
         }
 
         const { data: adminTrans } = await transQuery;
@@ -1998,8 +2008,14 @@ export async function getCurrentBalanceAdmin(sucursalId: string): Promise<{
         }) => {
             const delta = Number(t.monto || 0);
             const applyDelta = (sign: 1 | -1) => {
-                if (t.moneda === 'ARS') totalArs += sign * delta;
-                if (t.moneda === 'USD') totalUsd += sign * delta;
+                if (t.moneda === 'ARS') {
+                    totalArs += sign * delta;
+                    if (defaultArsAccount) saldosPorCuenta[defaultArsAccount] = (saldosPorCuenta[defaultArsAccount] || 0) + (sign * delta);
+                }
+                if (t.moneda === 'USD') {
+                    totalUsd += sign * delta;
+                    if (defaultUsdAccount) saldosPorCuenta[defaultUsdAccount] = (saldosPorCuenta[defaultUsdAccount] || 0) + (sign * delta);
+                }
             };
             if (t.caja_origen === 'ADMIN') applyDelta(-1); // money leaves admin
             if (t.caja_destino === 'ADMIN') applyDelta(1);  // money enters admin

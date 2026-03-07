@@ -13,6 +13,7 @@ import {
     RefreshCw,
     Settings,
     AlertTriangle,
+    History,
 } from 'lucide-react';
 import { getObservadosCriticalLeaders, getObservadosSlaSummary, getSucursales, type Sucursal } from '@/lib/caja-admin';
 import MovimientosTab from '@/components/caja-admin/MovimientosTab';
@@ -20,11 +21,13 @@ import ArqueoTab from '@/components/caja-admin/ArqueoTab';
 import PersonalTab from '@/components/caja-admin/PersonalTab';
 import ReportesTab from '@/components/caja-admin/ReportesTab';
 import ConfiguracionTab from '@/components/caja-admin/ConfiguracionTab';
+import CierresHistoricosTab from '@/components/caja-admin/CierresHistoricosTab';
 import CategoriaGuard from "@/components/auth/CategoriaGuard";
 
 const TABS = [
     { id: 'movimientos', label: 'Movimientos', icon: Receipt },
     { id: 'arqueo', label: 'Inicio / Cierre', icon: Archive },
+    { id: 'cierres', label: 'Historial', icon: History },
     { id: 'personal', label: 'Liquidaciones', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
@@ -152,6 +155,8 @@ function CajaAdminContent() {
                 );
             case 'arqueo':
                 return <ArqueoTab sucursal={selectedSucursal} tcBna={tcBna} />;
+            case 'cierres':
+                return <CierresHistoricosTab sucursal={selectedSucursal} />;
             case 'personal':
                 return (
                     <PersonalTab

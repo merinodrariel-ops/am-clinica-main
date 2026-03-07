@@ -11,668 +11,167 @@
 
 ✓ Starting...
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
-✓ Ready in 2.3s
- GET /caja-admin?tab=personal 200 in 2.3s (compile: 1798ms, proxy.ts: 313ms, render: 178ms)
- GET /api/bna-cotizacion 200 in 300ms (compile: 121ms, proxy.ts: 164ms, render: 15ms)
- GET /caja-admin?tab=personal 200 in 331ms (compile: 5ms, proxy.ts: 260ms, render: 66ms)
- GET /dashboard 200 in 415ms (compile: 95ms, proxy.ts: 250ms, render: 69ms)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 906ms (compile: 98ms, proxy.ts: 267ms, render: 541ms)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 702ms (compile: 41ms, proxy.ts: 221ms, render: 440ms)
- GET /admision 200 in 3.7s (compile: 3.3s, proxy.ts: 236ms, render: 150ms)
- GET /logo.png 404 in 309ms (compile: 221ms, render: 88ms)
- POST /dashboard 200 in 1538ms (compile: 29ms, proxy.ts: 972ms, render: 538ms)
- POST /dashboard 200 in 666ms (compile: 32ms, proxy.ts: 229ms, render: 404ms)
- POST /dashboard 200 in 330ms (compile: 7ms, proxy.ts: 211ms, render: 112ms)
- POST /dashboard 200 in 395ms (compile: 4ms, proxy.ts: 150ms, render: 242ms)
- POST /dashboard 200 in 530ms (compile: 15ms, proxy.ts: 122ms, render: 393ms)
- POST /dashboard 200 in 220ms (compile: 2ms, proxy.ts: 149ms, render: 69ms)
-✓ Compiled in 1731ms
- GET /caja-admin?tab=personal 200 in 256ms (compile: 17ms, proxy.ts: 206ms, render: 32ms)
- GET /api/bna-cotizacion 200 in 161ms (compile: 5ms, proxy.ts: 150ms, render: 5ms)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 662ms (compile: 5ms, proxy.ts: 186ms, render: 471ms)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 593ms (compile: 3ms, proxy.ts: 225ms, render: 365ms)
- GET /caja-admin?tab=personal 200 in 238ms (compile: 6ms, proxy.ts: 203ms, render: 30ms)
- GET /api/bna-cotizacion 200 in 140ms (compile: 3ms, proxy.ts: 134ms, render: 4ms)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 575ms (compile: 4ms, proxy.ts: 166ms, render: 406ms)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 545ms (compile: 5ms, proxy.ts: 141ms, render: 400ms)
- GET /caja-admin?tab=personal 200 in 1672ms (compile: 160ms, proxy.ts: 943ms, render: 569ms)
- GET /api/bna-cotizacion 200 in 383ms (compile: 20ms, proxy.ts: 241ms, render: 122ms)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 3.5s (compile: 10ms, proxy.ts: 262ms, render: 3.2s)
-⨯ Error: Could not find the table 'public.internal_services' in the schema cache
-    at getLiquidacionesConfig (app/actions/caja-liquidaciones.ts:213:15)
-  211 |
-  212 |     if (servicesError) {
-> 213 |         throw new Error(servicesError.message);
-      |               ^
-  214 |     }
-  215 |
-  216 |     return { {
-  digest: '2860485829'
-}
- POST /caja-admin?tab=personal 500 in 1010ms (compile: 38ms, proxy.ts: 334ms, render: 638ms)
- GET /patients 200 in 1618ms (compile: 1034ms, proxy.ts: 488ms, render: 96ms)
- POST /patients 200 in 1535ms (compile: 2ms, proxy.ts: 192ms, render: 1340ms)
- POST /patients 200 in 439ms (compile: 7ms, proxy.ts: 150ms, render: 283ms)
- GET /caja-admin 200 in 160ms (compile: 8ms, proxy.ts: 139ms, render: 12ms)
- GET /api/bna-cotizacion 200 in 318ms (compile: 2ms, proxy.ts: 135ms, render: 180ms)
- GET /api/bna-cotizacion 200 in 173ms (compile: 6ms, proxy.ts: 132ms, render: 35ms)
- GET /caja-admin?tab=personal 200 in 229ms (compile: 8ms, proxy.ts: 200ms, render: 22ms)
- POST /caja-admin?tab=personal 200 in 437ms (compile: 3ms, proxy.ts: 174ms, render: 260ms)
- POST /caja-admin?tab=personal 200 in 394ms (compile: 3ms, proxy.ts: 143ms, render: 247ms)
- POST /caja-admin?tab=personal 200 in 443ms (compile: 8ms, proxy.ts: 193ms, render: 242ms)
- POST /caja-admin?tab=personal 200 in 425ms (compile: 14ms, proxy.ts: 178ms, render: 233ms)
- GET /caja-admin?tab=configuracion 200 in 921ms (compile: 124ms, proxy.ts: 650ms, render: 147ms)
- GET /caja-admin?tab=personal 200 in 524ms (compile: 34ms, proxy.ts: 421ms, render: 70ms)
- POST /caja-admin?tab=personal 200 in 485ms (compile: 11ms, proxy.ts: 169ms, render: 306ms)
- POST /caja-admin?tab=personal 200 in 672ms (compile: 181ms, proxy.ts: 189ms, render: 302ms)
- POST /caja-admin?tab=personal 200 in 783ms (compile: 48ms, proxy.ts: 413ms, render: 321ms)
-✓ Compiled in 8.8s
- GET /caja-admin?tab=personal 200 in 3.8s (compile: 1204ms, proxy.ts: 1254ms, render: 1351ms)
- GET /api/bna-cotizacion 200 in 2.6s (compile: 19ms, proxy.ts: 2.4s, render: 131ms)
- GET /api/bna-cotizacion 200 in 158ms (compile: 7ms, proxy.ts: 145ms, render: 6ms)
- GET /api/bna-cotizacion 200 in 308ms (compile: 18ms, proxy.ts: 270ms, render: 19ms)
- GET /caja-admin?tab=personal 200 in 510ms (compile: 109ms, proxy.ts: 310ms, render: 91ms)
- GET /api/bna-cotizacion 200 in 200ms (compile: 18ms, proxy.ts: 165ms, render: 16ms)
- GET /api/bna-cotizacion 200 in 158ms (compile: 8ms, proxy.ts: 145ms, render: 5ms)
- GET /api/bna-cotizacion 200 in 232ms (compile: 43ms, proxy.ts: 182ms, render: 7ms)
- POST /caja-admin?tab=personal 200 in 591ms (compile: 8ms, proxy.ts: 183ms, render: 401ms)
- POST /caja-admin?tab=personal 200 in 554ms (compile: 33ms, proxy.ts: 183ms, render: 338ms)
- POST /caja-admin?tab=personal 200 in 519ms (compile: 31ms, proxy.ts: 167ms, render: 320ms)
- POST /caja-admin?tab=personal 200 in 519ms (compile: 4ms, proxy.ts: 210ms, render: 305ms)
-✓ Finished filesystem cache database compaction in 34.4s
-✓ Finished writing to filesystem cache in 36.8s
- GET /caja-admin?tab=personal 200 in 1249ms (compile: 162ms, proxy.ts: 848ms, render: 239ms)
- GET /api/bna-cotizacion 200 in 3.4s (compile: 102ms, proxy.ts: 2.6s, render: 706ms)
- POST /caja-admin?tab=personal 200 in 3.3s (compile: 858ms, proxy.ts: 2.0s, render: 442ms)
- POST /caja-admin?tab=personal 200 in 1049ms (compile: 352ms, proxy.ts: 240ms, render: 456ms)
- GET /patients 200 in 16.0s (compile: 15.1s, proxy.ts: 583ms, render: 330ms)
- POST /patients 200 in 2.7s (compile: 143ms, proxy.ts: 478ms, render: 2.0s)
- POST /patients 200 in 2.1s (compile: 124ms, proxy.ts: 723ms, render: 1294ms)
- POST /patients 200 in 6.0s (compile: 486ms, proxy.ts: 1660ms, render: 3.9s)
- POST /patients 200 in 1021ms (compile: 123ms, proxy.ts: 408ms, render: 491ms)
-✓ Finished filesystem cache database compaction in 55s
-✓ Finished writing to filesystem cache in 44s
- GET /caja-admin 200 in 956ms (compile: 173ms, proxy.ts: 291ms, render: 493ms)
+✓ Ready in 849ms
+○ Compiling /workflows ...
+ GET /dashboard 200 in 4.2s (compile: 3.6s, proxy.ts: 297ms, render: 241ms)
+ GET /workflows?section=laboratorio 200 in 4.6s (compile: 3.8s, proxy.ts: 368ms, render: 381ms)
+ GET /dashboard 200 in 422ms (compile: 13ms, proxy.ts: 282ms, render: 128ms)
+ POST /dashboard 200 in 580ms (compile: 4ms, proxy.ts: 163ms, render: 413ms)
+ POST /dashboard 200 in 456ms (compile: 3ms, proxy.ts: 135ms, render: 318ms)
+ POST /dashboard 200 in 900ms (compile: 2ms, proxy.ts: 122ms, render: 776ms)
+ POST /dashboard 200 in 786ms (compile: 3ms, proxy.ts: 126ms, render: 656ms)
+ POST /dashboard 200 in 563ms (compile: 4ms, proxy.ts: 116ms, render: 443ms)
+ POST /dashboard 200 in 578ms (compile: 7ms, proxy.ts: 126ms, render: 445ms)
+ POST /dashboard 200 in 488ms (compile: 2ms, proxy.ts: 123ms, render: 363ms)
+ POST /dashboard 200 in 510ms (compile: 1776µs, proxy.ts: 130ms, render: 379ms)
+ POST /dashboard 200 in 455ms (compile: 4ms, proxy.ts: 138ms, render: 313ms)
+ POST /dashboard 200 in 492ms (compile: 1947µs, proxy.ts: 118ms, render: 372ms)
+ POST /dashboard 200 in 593ms (compile: 3ms, proxy.ts: 124ms, render: 466ms)
+ POST /dashboard 200 in 626ms (compile: 1951µs, proxy.ts: 118ms, render: 507ms)
+ POST /dashboard 200 in 390ms (compile: 2ms, proxy.ts: 125ms, render: 263ms)
+ POST /dashboard 200 in 387ms (compile: 3ms, proxy.ts: 124ms, render: 261ms)
+ POST /dashboard 200 in 413ms (compile: 1932µs, proxy.ts: 117ms, render: 294ms)
+ POST /dashboard 200 in 440ms (compile: 1925µs, proxy.ts: 115ms, render: 323ms)
+ POST /dashboard 200 in 191ms (compile: 4ms, proxy.ts: 126ms, render: 62ms)
+ POST /dashboard 200 in 201ms (compile: 2ms, proxy.ts: 138ms, render: 60ms)
+ POST /dashboard 200 in 184ms (compile: 1919µs, proxy.ts: 120ms, render: 62ms)
+ POST /dashboard 200 in 182ms (compile: 3ms, proxy.ts: 116ms, render: 63ms)
+ GET /caja-admin 200 in 2.1s (compile: 1833ms, proxy.ts: 194ms, render: 89ms)
+ GET /api/bna-cotizacion 200 in 642ms (compile: 331ms, proxy.ts: 209ms, render: 102ms)
+ GET /caja-admin?tab=personal 200 in 492ms (compile: 25ms, proxy.ts: 441ms, render: 26ms)
+ POST /caja-admin?tab=personal 200 in 497ms (compile: 5ms, proxy.ts: 217ms, render: 276ms)
+ POST /caja-admin?tab=personal 200 in 348ms (compile: 6ms, proxy.ts: 138ms, render: 204ms)
+ GET /caja-admin?tab=movimientos 200 in 480ms (compile: 34ms, proxy.ts: 421ms, render: 26ms)
+⨯ The file "./proxy.ts" must export a function, either as a default export or as a named "proxy" export.
+This function is what Next.js runs for every request handled by this proxy (previously called middleware).
+
+Why this happens:
+- You are migrating from `middleware` to `proxy`, but haven't updated the exported function.
+- The file exists but doesn't export a function.
+- The export is not a function (e.g., an object or constant).
+- There's a syntax error preventing the export from being recognized.
+
+To fix it:
+- Ensure this file has either a default or "proxy" function export.
+
+Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+ GET /dashboard 404 in 1608ms (compile: -115732µs, proxy.ts: 1550ms, render: 173ms)
+ GET /caja-admin?tab=movimientos 404 in 1544ms (compile: -6198µs, proxy.ts: 1504ms, render: 46ms)
+ GET /workflows?section=laboratorio 404 in 1490ms (compile: -28081µs, proxy.ts: 1487ms, render: 31ms)
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+ GET /caja-admin?tab=movimientos 404 in 102ms (compile: -29169µs, proxy.ts: 46ms, render: 85ms)
+ GET /workflows?section=laboratorio 404 in 121ms (compile: -11700µs, proxy.ts: 77ms, render: 55ms)
+ GET /dashboard 404 in 121ms (compile: -16794µs, proxy.ts: 99ms, render: 39ms)
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+ GET /dashboard 404 in 58ms (compile: -5749µs, proxy.ts: 42ms, render: 22ms)
+ GET /caja-admin?tab=movimientos 404 in 56ms (compile: -9096µs, proxy.ts: 49ms, render: 16ms)
+ GET /caja-admin?tab=movimientos 404 in 171ms (compile: -12200µs, proxy.ts: 164ms, render: 20ms)
+ GET /workflows?section=laboratorio 404 in 179ms (compile: -41280µs, proxy.ts: 138ms, render: 82ms)
+ GET /workflows?section=laboratorio 404 in 212ms (compile: -10322µs, proxy.ts: 151ms, render: 71ms)
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+ GET /dashboard 404 in 95ms (compile: -6449µs, proxy.ts: 78ms, render: 23ms)
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+ GET /dashboard 404 in 104ms (compile: -4047µs, proxy.ts: 83ms, render: 25ms)
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+⨯ [Error: The Proxy file "/proxy" must export a function named `proxy` or a default function.]
+ GET /sw.js 404 in 16ms (compile: -4910µs, proxy.ts: 8ms, render: 12ms)
+ GET /sw.js 404 in 16ms (compile: -3263µs, proxy.ts: 13ms, render: 7ms)
+✓ Compiled in 310ms
+ GET /caja-admin?tab=movimientos 200 in 711ms (compile: 9ms, proxy.ts: 674ms, render: 29ms)
+ GET /workflows?section=laboratorio 200 in 996ms (compile: 16ms, proxy.ts: 742ms, render: 239ms)
+ GET /api/bna-cotizacion 200 in 453ms (compile: 48ms, proxy.ts: 348ms, render: 57ms)
+✓ Compiled in 187ms
+✓ Compiled in 325ms
+ GET /dashboard 200 in 860ms (compile: 38ms, proxy.ts: 760ms, render: 62ms)
+ POST /dashboard 200 in 784ms (compile: 7ms, proxy.ts: 242ms, render: 535ms)
+ POST /dashboard 200 in 816ms (compile: 5ms, proxy.ts: 152ms, render: 659ms)
+ POST /dashboard 200 in 616ms (compile: 5ms, proxy.ts: 141ms, render: 470ms)
+ POST /dashboard 200 in 591ms (compile: 38ms, proxy.ts: 183ms, render: 370ms)
+ POST /dashboard 200 in 281ms (compile: 26ms, proxy.ts: 154ms, render: 100ms)
+ POST /dashboard 200 in 454ms (compile: 5ms, proxy.ts: 131ms, render: 317ms)
+ POST /dashboard 200 in 652ms (compile: 4ms, proxy.ts: 125ms, render: 523ms)
+ POST /dashboard 200 in 490ms (compile: 2ms, proxy.ts: 130ms, render: 358ms)
+ POST /dashboard 200 in 539ms (compile: 35ms, proxy.ts: 175ms, render: 329ms)
+ POST /dashboard 200 in 267ms (compile: 8ms, proxy.ts: 162ms, render: 98ms)
+○ Compiling /caja-admin/liquidaciones ...
+ GET /caja-admin/liquidaciones 200 in 6.8s (compile: 6.1s, proxy.ts: 134ms, render: 612ms)
+ POST /caja-admin/liquidaciones 200 in 1114ms (compile: 229ms, proxy.ts: 440ms, render: 444ms)
+ POST /caja-admin/liquidaciones 200 in 720ms (compile: 49ms, proxy.ts: 247ms, render: 424ms)
+ POST /caja-admin/liquidaciones 200 in 504ms (compile: 51ms, proxy.ts: 148ms, render: 304ms)
+ POST /caja-admin/liquidaciones 200 in 566ms (compile: 13ms, proxy.ts: 322ms, render: 231ms)
+ POST /caja-admin/liquidaciones 200 in 309ms (compile: 5ms, proxy.ts: 119ms, render: 185ms)
+ POST /caja-admin/liquidaciones 200 in 500ms (compile: 4ms, proxy.ts: 122ms, render: 374ms)
 ○ Compiling /caja-recepcion ...
- GET /api/bna-cotizacion 200 in 330ms (compile: 8ms, proxy.ts: 202ms, render: 121ms)
- GET /api/bna-cotizacion 200 in 196ms (compile: 5ms, proxy.ts: 187ms, render: 4ms)
- GET /caja-recepcion 200 in 4.7s (compile: 3.5s, proxy.ts: 1131ms, render: 48ms)
- GET /caja-recepcion 200 in 286ms (compile: 3ms, proxy.ts: 270ms, render: 14ms)
- GET /caja-recepcion 200 in 241ms (compile: 7ms, proxy.ts: 215ms, render: 19ms)
- GET /api/bna-cotizacion 200 in 205ms (compile: 3ms, proxy.ts: 196ms, render: 6ms)
- GET /api/bna-cotizacion 200 in 175ms (compile: 2ms, proxy.ts: 171ms, render: 3ms)
-✓ Compiled in 1353ms
- POST /caja-admin?tab=personal 200 in 1830ms (compile: 382ms, proxy.ts: 766ms, render: 682ms)
- GET /admision 200 in 7.0s (compile: 6.1s, proxy.ts: 648ms, render: 313ms)
-✓ Finished filesystem cache database compaction in 23.3s
-✓ Finished writing to filesystem cache in 22.5s
-Persisting failed: Unable to write SST file 00004458.sst
-
-Caused by:
-    No such file or directory (os error 2)
-
-thread '<unnamed>' (1402674) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Meta for get_source_map_rope_operation (TaskId 958634))
-
-Caused by:
-    0: Looking up data for TaskId 958634 from database failed
-    1: Unable to open static sorted file referenced from 00004456.meta
-    2: Unable to open static sorted file 00004452.sst
-    3: No such file or directory (os error 2)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-⨯ Error: ENOENT: no such file or directory, open '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
-    at ignore-listed frames {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
-}
-
-thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
------
-[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /var/folders/3t/0382vlg545910rm3mgtp2wg40000gn/T/next-panic-85e229f831010b9726e9d16869d3972.log.
-
-To help make Turbopack better, report this error by ]8;;https://github.com/vercel/next.js/discussions/new?category=turbopack-error-report&title=Turbopack%20Error%3A%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29&body=Turbopack%20version%3A%20%60v16.1.0-canary.19-84-g3aa53984e%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0AFailed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%0ADebug%20info%3A%0A-%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%20%20%0A%20%20Caused%20by%3A%0A%20%20%20%20%20%200%3A%20Looking%20up%20data%20for%20TaskId%20920747%20from%20database%20failed%0A%20%20%20%20%20%201%3A%20Unable%20to%20open%20static%20sorted%20file%20referenced%20from%2000004408.meta%0A%20%20%20%20%20%202%3A%20Unable%20to%20open%20static%20sorted%20file%2000004401.sst%0A%20%20%20%20%20%203%3A%20No%20such%20file%20or%20directory%20%28os%20error%202%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace\clicking here.]8;;\
------
-
-⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Debug info:
-- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-  
-  Caused by:
-      0: Looking up data for TaskId 920747 from database failed
-      1: Unable to open static sorted file referenced from 00004408.meta
-      2: Unable to open static sorted file 00004401.sst
-      3: No such file or directory (os error 2)
-    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
-  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
-}
-
-thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
-thread '<unnamed>' (1402674) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Meta for get_source_map_rope_operation (TaskId 958634))
-
-Caused by:
-    0: Looking up data for TaskId 958634 from database failed
-    1: Unable to open static sorted file referenced from 00004456.meta
-    2: Unable to open static sorted file 00004452.sst
-    3: No such file or directory (os error 2)
-Error: ENOENT: no such file or directory, open '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
-    at ignore-listed frames {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/am/Downloads/antigravity apps/am-clinica-main/.next/dev/server/app/admision/page/build-manifest.json'
-}
-
-thread 'tokio-runtime-worker' (1640828) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
------
-[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /var/folders/3t/0382vlg545910rm3mgtp2wg40000gn/T/next-panic-85e229f831010b9726e9d16869d3972.log.
-
-To help make Turbopack better, report this error by ]8;;https://github.com/vercel/next.js/discussions/new?category=turbopack-error-report&title=Turbopack%20Error%3A%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29&body=Turbopack%20version%3A%20%60v16.1.0-canary.19-84-g3aa53984e%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0AFailed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%0ADebug%20info%3A%0A-%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20get_written_endpoint_with_issues_operation%20%28TaskId%20920747%29%29%0A%20%20%0A%20%20Caused%20by%3A%0A%20%20%20%20%20%200%3A%20Looking%20up%20data%20for%20TaskId%20920747%20from%20database%20failed%0A%20%20%20%20%20%201%3A%20Unable%20to%20open%20static%20sorted%20file%20referenced%20from%2000004408.meta%0A%20%20%20%20%20%202%3A%20Unable%20to%20open%20static%20sorted%20file%2000004401.sst%0A%20%20%20%20%20%203%3A%20No%20such%20file%20or%20directory%20%28os%20error%202%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace\clicking here.]8;;\
------
-
-⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Debug info:
-- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-  
-  Caused by:
-      0: Looking up data for TaskId 920747 from database failed
-      1: Unable to open static sorted file referenced from 00004408.meta
-      2: Unable to open static sorted file 00004401.sst
-      3: No such file or directory (os error 2)
-    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
-  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
-}
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Debug info:
-- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-  
-  Caused by:
-      0: Looking up data for TaskId 920747 from database failed
-      1: Unable to open static sorted file referenced from 00004408.meta
-      2: Unable to open static sorted file 00004401.sst
-      3: No such file or directory (os error 2)
-    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
-  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
-}
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for PlainSource::from_source (TaskId 918501))
-
-Caused by:
-    0: Looking up data for TaskId 918501 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004400.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <FileSource as Asset>::content (TaskId 162588))
-
-Caused by:
-    0: Looking up data for TaskId 162588 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004404.sst
-    3: No such file or directory (os error 2)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-
-thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Meta for endpoint_write_to_disk_operation (TaskId 737185))
-
-Caused by:
-    0: Looking up data for TaskId 737185 from database failed
-    1: Unable to open static sorted file referenced from 00004456.meta
-    2: Unable to open static sorted file 00004452.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741015))
-
-Caused by:
-    0: Looking up data for TaskId 741015 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004403.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741001))
-
-Caused by:
-    0: Looking up data for TaskId 741001 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004399.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for endpoint_write_to_disk_operation (TaskId 737185))
-
-Caused by:
-    0: Looking up data for TaskId 737185 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004403.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741050))
-
-Caused by:
-    0: Looking up data for TaskId 741050 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004400.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for PlainIssue::from_issue (TaskId 741107))
-
-Caused by:
-    0: Looking up data for TaskId 741107 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004400.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))
-
-Caused by:
-    0: Looking up data for TaskId 738130 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004407.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740964))
-
-Caused by:
-    0: Looking up data for TaskId 740964 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741072))
-
-Caused by:
-    0: Looking up data for TaskId 741072 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004404.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740989))
-
-Caused by:
-    0: Looking up data for TaskId 740989 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004400.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740867))
-
-Caused by:
-    0: Looking up data for TaskId 740867 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004402.sst
-    3: No such file or directory (os error 2)
-
------
-[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /var/folders/3t/0382vlg545910rm3mgtp2wg40000gn/T/next-panic-85e229f831010b9726e9d16869d3972.log.
-
-To help make Turbopack better, report this error by ]8;;https://github.com/vercel/next.js/discussions/new?category=turbopack-error-report&title=Turbopack%20Error%3A%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Araw_read_dir%20%28TaskId%20738130%29%29&body=Turbopack%20version%3A%20%60v16.1.0-canary.19-84-g3aa53984e%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0AFailed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Araw_read_dir%20%28TaskId%20738130%29%29%0A%0ADebug%20info%3A%0A-%20Failed%20to%20restore%20task%20data%20%28corrupted%20database%20or%20bug%29%3A%20Data%20for%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Araw_read_dir%20%28TaskId%20738130%29%29%0A%20%20%0A%20%20Caused%20by%3A%0A%20%20%20%20%20%200%3A%20Looking%20up%20data%20for%20TaskId%20738130%20from%20database%20failed%0A%20%20%20%20%20%201%3A%20Unable%20to%20open%20static%20sorted%20file%20referenced%20from%2000004408.meta%0A%20%20%20%20%20%202%3A%20Unable%20to%20open%20static%20sorted%20file%2000004407.sst%0A%20%20%20%20%20%203%3A%20No%20such%20file%20or%20directory%20%28os%20error%202%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace\clicking here.]8;;\
------
-
-
-thread 'tokio-runtime-worker' (1642824) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741099))
-
-Caused by:
-    0: Looking up data for TaskId 741099 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004399.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740995))
-
-Caused by:
-    0: Looking up data for TaskId 740995 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740942))
-
-Caused by:
-    0: Looking up data for TaskId 740942 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004402.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/mod.rs:963:22:
-Failed to lookup task type: Looking up task type for TaskId 741000 from database failed
-
-Caused by:
-    0: Unable to open static sorted file referenced from 00004389.meta
-    1: Unable to open static sorted file 00004387.sst
-    2: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for PlainIssue::from_issue (TaskId 741106))
-
-Caused by:
-    0: Looking up data for TaskId 741106 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004399.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for VersionedContentMap::insert_output_assets (TaskId 740826))
-
-Caused by:
-    0: Looking up data for TaskId 740826 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004404.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741051))
-
-Caused by:
-    0: Looking up data for TaskId 741051 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740961))
-
-Caused by:
-    0: Looking up data for TaskId 740961 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004400.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740902))
-
-Caused by:
-    0: Looking up data for TaskId 740902 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004402.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1642824) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740889))
-
-Caused by:
-    0: Looking up data for TaskId 740889 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004407.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637611) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741048))
-
-Caused by:
-    0: Looking up data for TaskId 741048 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004404.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1682286) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741093))
-
-Caused by:
-    0: Looking up data for TaskId 741093 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1663223) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 741055))
-
-Caused by:
-    0: Looking up data for TaskId 741055 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004404.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1647701) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::write (TaskId 740838))
-
-Caused by:
-    0: Looking up data for TaskId 740838 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for <AppEndpoint as Endpoint>::output (TaskId 737188))
-
-Caused by:
-    0: Looking up data for TaskId 737188 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1651291) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for endpoint_write_to_disk (TaskId 737186))
-
-Caused by:
-    0: Looking up data for TaskId 737186 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004407.sst
-    3: No such file or directory (os error 2)
-
-thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Debug info:
-- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-  
-  Caused by:
-      0: Looking up data for TaskId 920747 from database failed
-      1: Unable to open static sorted file referenced from 00004408.meta
-      2: Unable to open static sorted file 00004401.sst
-      3: No such file or directory (os error 2)
-    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
-  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
-}
-
-thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))
-
-Debug info:
-- Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))
-  
-  Caused by:
-      0: Looking up data for TaskId 738130 from database failed
-      1: Unable to open static sorted file referenced from 00004408.meta
-      2: Unable to open static sorted file 00004407.sst
-      3: No such file or directory (os error 2)
-    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for <DiskFileSystem as FileSystem>::raw_read_dir (TaskId 738130))) {
-  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
-}
-
-thread 'tokio-runtime-worker' (1637610) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-⨯ Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Debug info:
-- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-  
-  Caused by:
-      0: Looking up data for TaskId 920747 from database failed
-      1: Unable to open static sorted file referenced from 00004408.meta
-      2: Unable to open static sorted file 00004401.sst
-      3: No such file or directory (os error 2)
-    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
-  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
-}
-
-thread 'tokio-runtime-worker' (1634416) panicked at /Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17:
-Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Caused by:
-    0: Looking up data for TaskId 920747 from database failed
-    1: Unable to open static sorted file referenced from 00004408.meta
-    2: Unable to open static sorted file 00004401.sst
-    3: No such file or directory (os error 2)
-Error [TurbopackInternalError]: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-
-Debug info:
-- Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))
-  
-  Caused by:
-      0: Looking up data for TaskId 920747 from database failed
-      1: Unable to open static sorted file referenced from 00004408.meta
-      2: Unable to open static sorted file 00004401.sst
-      3: No such file or directory (os error 2)
-    at <unknown> (TurbopackInternalError: Failed to restore task data (corrupted database or bug): Data for get_written_endpoint_with_issues_operation (TaskId 920747))) {
-  location: '/Users/geist/dev/actions-runner/_work/next.js/next.js/turbopack/crates/turbo-tasks-backend/src/backend/operation/mod.rs:156:17'
-}
-Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
-[?25h
+ GET /caja-recepcion 200 in 4.5s (compile: 4.1s, proxy.ts: 454ms, render: 29ms)
+ GET /api/bna-cotizacion 200 in 365ms (compile: 4ms, proxy.ts: 204ms, render: 157ms)
+ GET /api/bna-cotizacion 200 in 202ms (compile: 2ms, proxy.ts: 197ms, render: 2ms)
+ GET /caja-admin 200 in 479ms (compile: 258ms, proxy.ts: 187ms, render: 34ms)
+ GET /api/bna-cotizacion 200 in 180ms (compile: 6ms, proxy.ts: 164ms, render: 10ms)
+ GET /api/bna-cotizacion 200 in 181ms (compile: 1885µs, proxy.ts: 177ms, render: 2ms)
+ GET /workflows 200 in 753ms (compile: 14ms, proxy.ts: 291ms, render: 448ms)
+✓ Compiled in 473ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /caja-admin 200 in 504ms (compile: 151ms, proxy.ts: 170ms, render: 183ms)
+ GET /api/bna-cotizacion 200 in 140ms (compile: 1781µs, proxy.ts: 135ms, render: 3ms)
+ GET /dashboard 200 in 904ms (compile: 23ms, proxy.ts: 846ms, render: 34ms)
+ POST /dashboard 200 in 3.1s (compile: 9ms, proxy.ts: 2.1s, render: 972ms)
+ POST /dashboard 200 in 1174ms (compile: 3ms, proxy.ts: 190ms, render: 980ms)
+ GET /caja-admin 200 in 216ms (compile: 7ms, proxy.ts: 195ms, render: 14ms)
+ POST /dashboard 200 in 683ms (compile: 5ms, proxy.ts: 166ms, render: 512ms)
+ GET /api/bna-cotizacion 200 in 186ms (compile: 1633µs, proxy.ts: 181ms, render: 3ms)
+ GET /api/bna-cotizacion 200 in 157ms (compile: 1411µs, proxy.ts: 154ms, render: 2ms)
+ POST /dashboard 200 in 318ms (compile: 3ms, proxy.ts: 240ms, render: 74ms)
+ POST /caja-admin 200 in 493ms (compile: 4ms, proxy.ts: 162ms, render: 326ms)
+ POST /dashboard 200 in 634ms (compile: 3ms, proxy.ts: 171ms, render: 460ms)
+ POST /caja-admin 200 in 888ms (compile: 3ms, proxy.ts: 241ms, render: 643ms)
+ POST /dashboard 200 in 633ms (compile: 3ms, proxy.ts: 158ms, render: 472ms)
+ POST /caja-admin 200 in 854ms (compile: 4ms, proxy.ts: 210ms, render: 640ms)
+ POST /dashboard 200 in 1587ms (compile: 3ms, proxy.ts: 798ms, render: 785ms)
+ POST /caja-admin 200 in 1802ms (compile: 5ms, proxy.ts: 200ms, render: 1597ms)
+ POST /dashboard 200 in 703ms (compile: 4ms, proxy.ts: 267ms, render: 433ms)
+ POST /caja-admin 200 in 1062ms (compile: 3ms, proxy.ts: 343ms, render: 715ms)
+ POST /dashboard 200 in 240ms (compile: 5ms, proxy.ts: 152ms, render: 83ms)
+ POST /caja-admin 200 in 375ms (compile: 5ms, proxy.ts: 125ms, render: 246ms)
+ POST /dashboard 200 in 591ms (compile: 2ms, proxy.ts: 159ms, render: 430ms)
+ POST /caja-admin 200 in 843ms (compile: 5ms, proxy.ts: 240ms, render: 598ms)
+✓ Compiled in 704ms
+✓ Compiled in 140ms
+✓ Compiled in 2.1s
+ GET /caja-admin 200 in 748ms (compile: 246ms, proxy.ts: 379ms, render: 123ms)
+ GET /caja-admin 200 in 690ms (compile: 202ms, proxy.ts: 321ms, render: 167ms)
+ GET /caja-admin?tab=movimientos 200 in 741ms (compile: 281ms, proxy.ts: 371ms, render: 89ms)
+ GET /workflows?section=laboratorio 200 in 746ms (compile: 229ms, proxy.ts: 376ms, render: 141ms)
+ GET /caja-admin 200 in 236ms (compile: 9ms, proxy.ts: 197ms, render: 30ms)
+ GET /caja-admin 200 in 237ms (compile: 14ms, proxy.ts: 200ms, render: 23ms)
+ GET /caja-admin?tab=movimientos 200 in 238ms (compile: 11ms, proxy.ts: 213ms, render: 14ms)
+ GET /workflows?section=laboratorio 200 in 242ms (compile: 2ms, proxy.ts: 182ms, render: 59ms)
+✓ Compiled in 755ms
+✓ Compiled in 134ms
+✓ Compiled in 138ms
