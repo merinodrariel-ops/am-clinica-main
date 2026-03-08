@@ -30,7 +30,7 @@ WITH CHECK (
 
 WITH active_doctors AS (
   SELECT DISTINCT
-    p.id AS doctor_id,
+    p.user_id AS doctor_id,
     COALESCE(pr.full_name, TRIM(COALESCE(p.nombre, '') || ' ' || COALESCE(p.apellido, ''))) AS doctor_name
   FROM public.personal p
   JOIN public.profiles pr ON pr.id = p.user_id
@@ -62,7 +62,7 @@ SET booking_mode = EXCLUDED.booking_mode,
 
 WITH active_doctors AS (
   SELECT DISTINCT
-    p.id AS doctor_id,
+    p.user_id AS doctor_id,
     COALESCE(pr.full_name, TRIM(COALESCE(p.nombre, '') || ' ' || COALESCE(p.apellido, ''))) AS doctor_name
   FROM public.personal p
   JOIN public.profiles pr ON pr.id = p.user_id

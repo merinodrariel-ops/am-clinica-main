@@ -2108,12 +2108,12 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
     }
 
     // Sum income/expenses from movements (theoretical)
-    movimientos?.forEach(m => {
-        if (m.estado === 'Anulado') return;
+    movs?.forEach((m: { usd_equivalente_total?: number | null; tipo_movimiento?: string }) => {
         const val = Number(m.usd_equivalente_total || 0);
-        if (m.tipo_movimiento.startsWith('INGRESO') || m.tipo_movimiento === 'APORTE_CAPITAL') {
+        const tipo = m.tipo_movimiento || '';
+        if (tipo.startsWith('INGRESO') || tipo === 'APORTE_CAPITAL') {
             metrics.ingresosUsd += val;
-        } else if (m.tipo_movimiento === 'EGRESO' || m.tipo_movimiento === 'RETIRO') {
+        } else if (tipo === 'EGRESO' || tipo === 'RETIRO') {
             metrics.egresosUsd += val;
         }
     });

@@ -93,7 +93,7 @@ export default function PatientsPage() {
         <CategoriaGuard allowedCategorias={['reception', 'admin', 'recaptacion']}>
             <div className="p-6 max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-30">
                     <div>
                         <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-md">
                             Pacientes

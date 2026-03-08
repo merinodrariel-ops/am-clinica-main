@@ -6,7 +6,8 @@ import {
     AlertTriangle,
     Loader2,
     PlayCircle,
-    CheckCircle
+    CheckCircle,
+    Info
 } from 'lucide-react';
 import {
     type Sucursal,
