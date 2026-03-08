@@ -981,3 +981,94 @@ export async function getDriveItemAccess(fileId: string): Promise<{
         };
     }
 }
+
+/**
+ * Ensures the [EXOCAD] and [EXOCAD]/HTML subfolders exist for a patient.
+ * The mother folder is the patient's root Drive folder (e.g. "HAHN, Carolina").
+ * Returns the HTML subfolder ID where the designer uploads the Exocad design.
+ */
+export async function ensureExocadHtmlFolder(
+    motherFolderId: string
+): Promise<{ htmlFolderId?: string; exocadFolderId?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+
+        // Get mother folder name to compose subfolder name
+        const motherFile = await drive.files.get({
+            fileId: motherFolderId,
+            supportsAllDrives: true,
+            fields: 'name',
+        });
+        const motherName = motherFile.data.name || 'PACIENTE';
+
+        // Ensure [EXOCAD] subfolder
+        const exocadName = `[EXOCAD] ${motherName}`;
+        const exocadResult = await createDriveFolder(drive, motherFolderId, exocadName);
+        if (exocadResult.error || !exocadResult.folderId) {
+            return { error: exocadResult.error || 'No se pudo crear carpeta EXOCAD' };
+        }
+
+        // Ensure HTML subfolder inside [EXOCAD]
+        const htmlResult = await createDriveFolder(drive, exocadResult.folderId, 'HTML');
+        if (htmlResult.error || !htmlResult.folderId) {
+            return { error: htmlResult.error || 'No se pudo crear carpeta HTML' };
+        }
+
+        return {
+            exocadFolderId: exocadResult.folderId,
+            htmlFolderId: htmlResult.folderId,
+        };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Finds the latest HTML file inside a Drive folder (most recently modified).
+ * Used to detect when the designer uploaded a new Exocad design to [EXOCAD]/HTML/.
+ */
+export async function getLatestHtmlFileInFolder(
+    folderId: string
+): Promise<{ fileId?: string; fileName?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const res = await drive.files.list({
+            q: `'${folderId}' in parents and mimeType='text/html' and trashed=false`,
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
+            fields: 'files(id, name, modifiedTime)',
+            orderBy: 'modifiedTime desc',
+            pageSize: 1,
+        });
+
+        const files = res.data.files || [];
+        if (!files.length) return {};
+
+        return {
+            fileId: files[0].id!,
+            fileName: files[0].name!,
+        };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Downloads the raw content of a Drive file by ID.
+ * Used to proxy the Exocad HTML file to the patient portal iframe.
+ * The HTML is self-contained (includes all assets inline).
+ */
+export async function getDriveFileContent(
+    fileId: string
+): Promise<{ content?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const res = await drive.files.get(
+            { fileId, supportsAllDrives: true, alt: 'media' },
+            { responseType: 'text' }
+        );
+        return { content: res.data as string };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
