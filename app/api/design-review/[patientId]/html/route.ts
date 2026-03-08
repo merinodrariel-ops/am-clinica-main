@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { getDriveFileContent } from '@/lib/google-drive';
-
-const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ patientId: string }> }
 ) {
+    const admin = createAdminClient();
     const { patientId } = await params;
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
@@ -22,12 +18,12 @@ export async function GET(
     // Validar token
     const { data: tokenData } = await admin
         .from('patient_portal_tokens')
-        .select('patient_id, expires_at, is_active')
+        .select('patient_id, expires_at, used')
         .eq('token', token)
         .eq('patient_id', patientId)
         .single();
 
-    if (!tokenData || !tokenData.is_active || new Date(tokenData.expires_at) < new Date()) {
+    if (!tokenData || new Date(tokenData.expires_at) < new Date()) {
         return new NextResponse('Token inválido o expirado', { status: 401 });
     }
 

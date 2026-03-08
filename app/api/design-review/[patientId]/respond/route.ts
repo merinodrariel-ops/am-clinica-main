@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { Resend } from 'resend';
-
-const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const APP_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || '';
@@ -16,6 +11,7 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ patientId: string }> }
 ) {
+    const admin = createAdminClient();
     const { patientId } = await params;
     const body = await request.json().catch(() => ({}));
     const { token, action, comment } = body as { token: string; action: Action; comment?: string };
@@ -27,12 +23,12 @@ export async function POST(
     // Validar token
     const { data: tokenData } = await admin
         .from('patient_portal_tokens')
-        .select('patient_id, expires_at, is_active')
+        .select('patient_id, expires_at, used')
         .eq('token', token)
         .eq('patient_id', patientId)
         .single();
 
-    if (!tokenData || !tokenData.is_active || new Date(tokenData.expires_at) < new Date()) {
+    if (!tokenData || new Date(tokenData.expires_at) < new Date()) {
         return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
     }
 
@@ -85,7 +81,7 @@ export async function POST(
     // Notificar (no bloquear la respuesta si falla)
     const shouldNotify = action !== 'viewed' || review.status === 'pending';
     if (shouldNotify) {
-        sendNotifications(patientId, patientName, action, comment, review.label).catch(err => {
+        sendNotifications(admin, patientId, patientName, action, comment, review.label).catch(err => {
             console.error('[design-review/respond] Error in notifications:', err);
         });
     }
@@ -94,6 +90,7 @@ export async function POST(
 }
 
 async function sendNotifications(
+    admin: ReturnType<typeof createAdminClient>,
     patientId: string,
     patientName: string,
     action: Action,
