@@ -1,8 +1,8 @@
 -- patient_design_reviews: estado de revisión de cada diseño de sonrisa
 CREATE TABLE IF NOT EXISTS public.patient_design_reviews (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- C1: patient_id es TEXT (pacientes.id_paciente es TEXT, no UUID)
-  patient_id          TEXT NOT NULL REFERENCES public.pacientes(id_paciente) ON DELETE CASCADE,
+  -- pacientes.id_paciente es UUID
+  patient_id          UUID NOT NULL REFERENCES public.pacientes(id_paciente) ON DELETE CASCADE,
   drive_html_file_id  TEXT NULL,
   exocad_folder_id    TEXT NULL,
   label               TEXT NOT NULL DEFAULT 'Diseño de Sonrisa',
