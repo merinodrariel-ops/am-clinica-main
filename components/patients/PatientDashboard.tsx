@@ -32,6 +32,7 @@ import PatientPortalPanel from './PatientPortalPanel';
 import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
 const PatientDriveTab = dynamic(() => import('@/components/patients/drive/PatientDriveTab'), { ssr: false });
+const DesignReviewTab = dynamic(() => import('@/components/patients/DesignReviewTab'), { ssr: false });
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -68,6 +69,18 @@ interface AppointmentSignal {
     type?: string;
 }
 
+interface DesignReview {
+    id: string;
+    status: string;
+    label: string;
+    drive_html_file_id: string | null;
+    exocad_folder_id: string | null;
+    patient_comment: string | null;
+    viewed_at: string | null;
+    responded_at: string | null;
+    created_at: string;
+}
+
 interface PatientDashboardProps {
     patient: Paciente;
     historiaClinica: HistoriaClinica[];
@@ -76,6 +89,7 @@ interface PatientDashboardProps {
     appointments: AppointmentSignal[];
     prestaciones?: PrestacionConProfesional[];
     financingPlan?: PlanFinanciacion | null;
+    designReview?: DesignReview | null;
 }
 
 const TABS = [
@@ -85,13 +99,14 @@ const TABS = [
     { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
     { id: 'archivos', label: 'Archivos', icon: FolderOpen },
     { id: 'smile_design', label: 'Smile Design ✨', icon: Sparkles },
+    { id: 'diseno', label: 'Diseño Digital', icon: Sparkles },
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
 ];
 
 // Payment-related tabs hidden from restricted clinical/ops roles
 const PAYMENT_TABS = new Set(['finanzas']);
 
-export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null }: PatientDashboardProps) {
+export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null, designReview = null }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { categoria: role } = useAuth();
@@ -893,6 +908,17 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     patientId={patient.id_paciente}
                                     patientName={`${patient.apellido}, ${patient.nombre}`}
                                     motherFolderUrl={patient.link_historia_clinica}
+                                />
+                            </div>
+                        )}
+
+                        {/* Tab: Diseño Digital */}
+                        {activeTab === 'diseno' && (
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
+                                <DesignReviewTab
+                                    patientId={patient.id_paciente}
+                                    motherFolderUrl={patient.link_historia_clinica ?? null}
+                                    initialReview={designReview}
                                 />
                             </div>
                         )}

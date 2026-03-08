@@ -4,6 +4,7 @@ import PatientDashboard from '@/components/patients/PatientDashboard';
 import { getPrestacionesByPaciente } from '@/app/actions/prestaciones';
 import { getMovimientosPorPaciente } from '@/lib/caja-recepcion';
 import type { PlanFinanciacion } from '@/lib/financiacion';
+import { getPatientDesignReview } from '@/app/actions/design-review';
 
 export const revalidate = 0; // Always get fresh data
 
@@ -18,6 +19,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     let appointments;
     let prestaciones;
     let financingPlan: PlanFinanciacion | null = null;
+    let designReview: Awaited<ReturnType<typeof getPatientDesignReview>>['review'] = null;
     let errorMsg;
 
     try {
@@ -52,6 +54,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 .limit(1)
                 .maybeSingle();
             financingPlan = fpData as PlanFinanciacion | null;
+
+            const { review: dr } = await getPatientDesignReview(patient.id_paciente);
+            designReview = dr;
         }
     } catch (error) {
         console.error('Error fetching patient details:', error);
@@ -86,6 +91,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             appointments={appointments || []}
             prestaciones={prestaciones || []}
             financingPlan={financingPlan}
+            designReview={designReview}
         />
     );
 }
