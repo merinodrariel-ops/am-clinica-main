@@ -32,6 +32,15 @@ const STLSection = dynamic(() => import('@/components/portal-paciente/STLSection
     ),
 });
 
+const DesignReviewSection = dynamic(() => import('@/components/portal-paciente/DesignReviewSection'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex items-center justify-center h-48 rounded-2xl bg-white/5 border border-white/10">
+            <Loader2 size={28} className="text-[#C9A96E] animate-spin" />
+        </div>
+    ),
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PortalData {
@@ -85,6 +94,12 @@ interface PortalData {
         thumbnail_url: string | null;
         created_at: string;
     }[];
+    designReview?: {
+        id: string;
+        status: string;
+        label: string;
+        drive_html_file_id: string | null;
+    } | null;
 }
 
 // ─── Smile before/after slider ────────────────────────────────────────────────
@@ -229,7 +244,7 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
         </div>
     );
 
-    const { patient, treatment, allStages, plan, payments, nextAppointment, files } = data;
+    const { patient, treatment, allStages, plan, payments, nextAppointment, files, designReview } = data;
 
     const stlFiles = files.filter(f => f.file_type === 'stl');
     const smileFiles = files.filter(f => f.file_type === 'smile_design');
@@ -486,6 +501,17 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                                 </div>
                             )}
                         </div>
+                    </FadeIn>
+                )}
+
+                {designReview && (
+                    <FadeIn delay={0.18}>
+                        <DesignReviewSection
+                            patientId={patient.id_paciente}
+                            token={token}
+                            label={designReview.label}
+                            hasHtml={!!designReview.drive_html_file_id}
+                        />
                     </FadeIn>
                 )}
 

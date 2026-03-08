@@ -42,6 +42,7 @@ export async function GET(
         planRes,
         filesRes,
         appointmentRes,
+        designReviewRes,
     ] = await Promise.all([
         supabase
             .from('pacientes')
@@ -86,6 +87,14 @@ export async function GET(
             .gte('start_time', new Date().toISOString())
             .order('start_time', { ascending: true })
             .limit(1),
+
+        supabase
+            .from('patient_design_reviews')
+            .select('id, status, label, drive_html_file_id, patient_comment, viewed_at, responded_at')
+            .eq('patient_id', patientId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
     ]);
 
     if (!patientRes.data) {
@@ -208,5 +217,6 @@ export async function GET(
         plan: planRes.data?.[0] || null,
         files: allFiles,
         nextAppointment: appointmentRes.data?.[0] || null,
+        designReview: designReviewRes.data || null,
     });
 }
