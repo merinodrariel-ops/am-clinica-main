@@ -174,7 +174,6 @@ export default function StaffDetailView({
                     <div className="grid grid-cols-2 gap-4">
                         {[
                             { label: 'Valor/hora', value: `$${(worker.valor_hora_ars || 0).toLocaleString()}` },
-                            { label: '% Honorarios', value: `${worker.porcentaje_honorarios || 0}%` },
                             { label: 'Ingresó', value: worker.fecha_ingreso ? new Date(worker.fecha_ingreso + 'T12:00:00').toLocaleDateString('es-AR') : '---' },
                             { label: 'Último pago', value: worker.ultimo_pago_fecha ? new Date(worker.ultimo_pago_fecha + 'T12:00:00').toLocaleDateString('es-AR') : '---' },
                         ].map(({ label, value }) => (

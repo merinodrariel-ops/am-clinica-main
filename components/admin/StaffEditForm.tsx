@@ -62,7 +62,6 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             direccion: fd.get('direccion') as string,
             barrio_localidad: fd.get('barrio_localidad') as string,
             valor_hora_ars: Number(fd.get('valor_hora_ars')),
-            porcentaje_honorarios: Number(fd.get('porcentaje_honorarios')),
             activo: fd.get('activo') === 'on',
             matricula_provincial: fd.get('matricula_provincial') as string,
             user_id: linkedUserId || undefined,
@@ -286,21 +285,15 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                             <p className="text-xs text-slate-500 mt-0.5">
                                 {cobraPorHoras
                                     ? 'Entra en la lógica de Horarios · Se usa el valor hora ARS'
-                                    : 'Entra en la lógica de Lista de Prestaciones · Se usa el % de honorarios'
+                                    : 'Entra en la lógica de Lista de Prestaciones'
                                 }
                             </p>
                         </div>
                     </button>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Valor Hora (ARS)</label>
-                            <input name="valor_hora_ars" type="number" defaultValue={worker.valor_hora_ars || 0} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-white outline-none transition-all font-mono" />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">% Honorarios</label>
-                            <input name="porcentaje_honorarios" type="number" defaultValue={worker.porcentaje_honorarios || 0} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-white outline-none transition-all font-mono" />
-                        </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase ml-1">Valor Hora (ARS)</label>
+                        <input name="valor_hora_ars" type="number" defaultValue={worker.valor_hora_ars || 0} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-white outline-none transition-all font-mono" />
                     </div>
                 </div>
 

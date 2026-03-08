@@ -42,7 +42,6 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
         documento: '',
         condicion_afip: 'monotributista',
         valor_hora_ars: 0,
-        porcentaje_honorarios: 0,
         fecha_ingreso: new Date().toISOString().split('T')[0],
         especialidad: '',
         empresa_prestadora_id: '',
@@ -292,20 +291,6 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     className={inputClass}
                                 />
                             </Field>
-                            {tipo === 'odontologo' && (
-                                <Field label="% Honorarios">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        step={0.5}
-                                        value={form.porcentaje_honorarios || ''}
-                                        onChange={e => setField('porcentaje_honorarios', parseFloat(e.target.value) || 0)}
-                                        placeholder="0"
-                                        className={inputClass}
-                                    />
-                                </Field>
-                            )}
                         </div>
                     </div>
 
