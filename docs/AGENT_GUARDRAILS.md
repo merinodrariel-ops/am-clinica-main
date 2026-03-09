@@ -21,6 +21,7 @@ Un cambio está terminado cuando:
 - El build pasa (`npm run build`)
 - No hay errores TS en archivos tocados
 - Se probó el flujo en UI o con query SQL
+- **Se realizó Commit, Push y verificación en vivo en Vercel (sin errores)**
 - Se entregó el formato de handoff completo
 
 ### ❌ Nunca usar `profiles.role`
@@ -122,6 +123,8 @@ const localDate = new Date(y, m - 1, d);
 - [ ] No se usa `useAuth().role` (usar `.categoria`)
 - [ ] No se usa `worker.rol` (usar `.categoria`)
 - [ ] Build pasa sin errores TS
+- [ ] **Commit & Push realizado**
+- [ ] **Vercel deployment verificado (online, sin errores)**
 - [ ] Entrega en formato handoff completo
 
 ---

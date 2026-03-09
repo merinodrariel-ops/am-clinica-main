@@ -996,39 +996,47 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
                             {/* Payment Method */}
                             <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
                                         Método de Pago
                                     </label>
-                                    <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={useMultiplePayments}
-                                            onChange={(e) => {
-                                                const next = e.target.checked;
-                                                setUseMultiplePayments(next);
-                                                if (next) {
-                                                    setPaymentSplits((prev) => {
-                                                        if (prev.length > 0 && prev.some((split) => split.monto > 0)) return prev;
-                                                        return [createSplitFromCurrentForm()];
-                                                    });
-                                                } else {
-                                                    const first = paymentSplits[0];
-                                                    if (first) {
-                                                        setFormData((prev) => ({
-                                                            ...prev,
-                                                            metodo_pago: first.metodo_pago,
-                                                            moneda: first.moneda,
-                                                            monto: first.monto > 0 ? first.monto : prev.monto,
-                                                            canal_destino: first.canal_destino,
-                                                        }));
-                                                    }
+                                    <div
+                                        onClick={() => {
+                                            const next = !useMultiplePayments;
+                                            setUseMultiplePayments(next);
+                                            if (next) {
+                                                setPaymentSplits((prev) => {
+                                                    if (prev.length > 0 && prev.some((split) => split.monto > 0)) return prev;
+                                                    return [createSplitFromCurrentForm()];
+                                                });
+                                            } else {
+                                                const first = paymentSplits[0];
+                                                if (first) {
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        metodo_pago: first.metodo_pago,
+                                                        moneda: first.moneda,
+                                                        monto: first.monto > 0 ? first.monto : prev.monto,
+                                                        canal_destino: first.canal_destino,
+                                                    }));
                                                 }
-                                            }}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        />
+                                            }
+                                        }}
+                                        className={clsx(
+                                            "flex items-center gap-2 text-xs font-bold cursor-pointer select-none px-3 py-1.5 rounded-full transition-all border",
+                                            useMultiplePayments
+                                                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                                                : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:border-blue-400"
+                                        )}
+                                    >
+                                        <div className={clsx(
+                                            "w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all",
+                                            useMultiplePayments ? "bg-white border-white" : "border-gray-300 dark:border-gray-600"
+                                        )}>
+                                            {useMultiplePayments && <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />}
+                                        </div>
                                         Pago mixto (varios medios)
-                                    </label>
+                                    </div>
                                 </div>
 
                                 {!useMultiplePayments && (
@@ -1052,93 +1060,199 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 )}
 
                                 {useMultiplePayments && (
-                                    <div className="space-y-3">
-                                        {paymentSplits.map((split, idx) => {
-                                            const splitUsd = calculateUsdEquivalentForAmount(split.monto, split.moneda);
-                                            return (
-                                                <div key={split.id} className="p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900/40 space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <p className="text-xs font-semibold text-gray-500 uppercase">Pago {idx + 1}</p>
-                                                        {paymentSplits.length > 1 && (
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                onClick={() => removePaymentSplit(idx)}
-                                                                className="text-xs text-red-500 hover:text-red-600 h-auto p-0"
-                                                            >
-                                                                Quitar
-                                                            </Button>
-                                                        )}
+                                    <div className="space-y-4">
+                                        {/* Balance Indicator Widget */}
+                                        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm overflow-hidden relative group">
+                                            <div className="absolute top-0 left-0 h-1 bg-gray-100 dark:bg-gray-700 w-full" />
+                                            <div
+                                                className={clsx(
+                                                    "absolute top-0 left-0 h-1 transition-all duration-700 ease-out",
+                                                    Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5
+                                                        ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                                                        : getMixedUsdTotal(paymentSplits) > calculateUsdEquivalent()
+                                                            ? "bg-amber-500"
+                                                            : "bg-blue-500"
+                                                )}
+                                                style={{ width: `${Math.min(100, (getMixedUsdTotal(paymentSplits) / calculateUsdEquivalent()) * 100)}%` }}
+                                            />
+
+                                            <div className="flex justify-between items-end">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Estado de Cobertura</p>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className={clsx(
+                                                            "text-xl font-bold font-mono tabular-nums",
+                                                            Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5
+                                                                ? "text-green-600 dark:text-green-400"
+                                                                : getMixedUsdTotal(paymentSplits) > calculateUsdEquivalent()
+                                                                    ? "text-amber-600"
+                                                                    : "text-blue-600 dark:text-blue-400"
+                                                        )}>
+                                                            {formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')}
+                                                        </span>
+                                                        <span className="text-gray-400 text-sm font-medium">/ {formatCurrency(calculateUsdEquivalent(), 'USD')}</span>
                                                     </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    {Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5 ? (
+                                                        <span className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase flex items-center gap-1 animate-in zoom-in duration-300">
+                                                            <Check size={10} strokeWidth={3} /> Cubierto
+                                                        </span>
+                                                    ) : getMixedUsdTotal(paymentSplits) > calculateUsdEquivalent() ? (
+                                                        <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+                                                            Excedido
+                                                        </span>
+                                                    ) : (
+                                                        <span className="bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+                                                            Falta {formatCurrency(calculateUsdEquivalent() - getMixedUsdTotal(paymentSplits), 'USD')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
 
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                        <select
-                                                            value={split.metodo_pago}
-                                                            onChange={(e) => setSplitValue(idx, { metodo_pago: e.target.value as MetodoPagoIngreso })}
-                                                            className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"
-                                                        >
-                                                            {METODOS_PAGO.map((metodo) => (
-                                                                <option key={metodo.value} value={metodo.value}>{metodo.label}</option>
-                                                            ))}
-                                                        </select>
+                                            {/* Distribution Summary */}
+                                            {paymentSplits.some(s => s.monto > 0) && (
+                                                <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700/50 flex flex-wrap gap-2">
+                                                    {paymentSplits.filter(s => s.monto > 0).map((s, i) => (
+                                                        <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 dark:bg-gray-900/50 rounded-full border border-gray-100 dark:border-gray-800 transition-all hover:bg-white dark:hover:bg-gray-800">
+                                                            <span className="text-[11px] filter grayscale-[0.5] group-hover:grayscale-0">
+                                                                {METODOS_PAGO.find(m => m.value === s.metodo_pago)?.icon}
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 font-mono">
+                                                                {formatCurrency(s.monto, s.moneda)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
 
-                                                        <select
-                                                            value={split.canal_destino}
-                                                            onChange={(e) => setSplitValue(idx, { canal_destino: e.target.value as CanalDestinoIngreso })}
-                                                            className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"
-                                                        >
-                                                            <option value="Empresa">Empresa</option>
-                                                            <option value="Personal">Personal</option>
-                                                            <option value="MP">MP</option>
-                                                            <option value="USDT">USDT</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                                                        <MoneyInput
-                                                            value={split.monto || 0}
-                                                            onChange={(val) => setSplitValue(idx, { monto: val })}
-                                                            className="w-full h-auto"
-                                                            placeholder="0"
-                                                        />
-                                                        <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                                                            {(['ARS', 'USD', 'USDT'] as MonedaIngreso[]).map((currency) => (
+                                        <div className="space-y-3">
+                                            {paymentSplits.map((split, idx) => {
+                                                const splitUsd = calculateUsdEquivalentForAmount(split.monto, split.moneda);
+                                                return (
+                                                    <div key={split.id} className="p-4 border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900/40 shadow-sm space-y-4 hover:border-blue-200 dark:hover:border-blue-900/30 transition-all">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                                                                    {idx + 1}
+                                                                </div>
+                                                                <p className="text-[10px] font-bold text-gray-400 uppercase">Línea de Pago</p>
+                                                            </div>
+                                                            {paymentSplits.length > 1 && (
                                                                 <Button
-                                                                    key={currency}
                                                                     type="button"
-                                                                    onClick={() => setSplitValue(idx, { moneda: currency })}
-                                                                    className={clsx(
-                                                                        'px-2 py-1 text-xs font-bold rounded-none h-auto',
-                                                                        split.moneda === currency
-                                                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                                                            : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                                                    )}
+                                                                    variant="ghost"
+                                                                    onClick={() => removePaymentSplit(idx)}
+                                                                    className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-all"
                                                                 >
-                                                                    {currency}
+                                                                    <X size={16} />
                                                                 </Button>
-                                                            ))}
+                                                            )}
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Medio</label>
+                                                                <select
+                                                                    value={split.metodo_pago}
+                                                                    onChange={(e) => setSplitValue(idx, { metodo_pago: e.target.value as MetodoPagoIngreso })}
+                                                                    className="w-full px-3 py-2.5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500/10 transition-all"
+                                                                >
+                                                                    {METODOS_PAGO.map((metodo) => (
+                                                                        <option key={metodo.value} value={metodo.value}>{metodo.icon} {metodo.label}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Destino</label>
+                                                                <select
+                                                                    value={split.canal_destino}
+                                                                    onChange={(e) => setSplitValue(idx, { canal_destino: e.target.value as CanalDestinoIngreso })}
+                                                                    className="w-full px-3 py-2.5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500/10 transition-all"
+                                                                >
+                                                                    <option value="Empresa">🏢 Empresa</option>
+                                                                    <option value="Personal">🔑 Personal</option>
+                                                                    <option value="MP">📱 Mercado Pago</option>
+                                                                    <option value="USDT">₿ USDT / Crypto</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-[1fr_auto] gap-3 items-end pt-1">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monto en {split.moneda}</label>
+                                                                <MoneyInput
+                                                                    value={split.monto || 0}
+                                                                    onChange={(val) => setSplitValue(idx, { monto: val })}
+                                                                    className="w-full h-auto py-3 text-lg font-bold"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1.5 h-full justify-end pb-0.5">
+                                                                <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 border border-gray-100 dark:border-gray-700">
+                                                                    {(['ARS', 'USD', 'USDT'] as MonedaIngreso[]).map((currency) => (
+                                                                        <button
+                                                                            key={currency}
+                                                                            type="button"
+                                                                            onClick={() => setSplitValue(idx, { moneda: currency })}
+                                                                            className={clsx(
+                                                                                'px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all',
+                                                                                split.moneda === currency
+                                                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                                                            )}
+                                                                        >
+                                                                            {currency}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                                {split.moneda === 'ARS' && (
+                                                                    <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 text-right px-1">
+                                                                        ≈ {formatCurrency(splitUsd, 'USD')}
+                                                                    </p>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                );
+                                            })}
 
-                                                    <p className="text-xs text-gray-500">≈ {formatCurrency(splitUsd, 'USD')}</p>
+                                            <div className="pt-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={addPaymentSplit}
+                                                    className="w-full py-4 border-dashed border-2 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all h-auto group"
+                                                >
+                                                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors">
+                                                        <span className="text-lg">+</span>
+                                                    </div>
+                                                    Agregar medio de pago
+                                                </Button>
+                                            </div>
+
+                                            <div className="mt-2 flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-gray-900/60 rounded-2xl border border-blue-100/50 dark:border-blue-900/30 shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
+                                                        <DollarSign size={16} className="text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-tight">Total acumulado</p>
+                                                        <p className="text-xs font-medium text-blue-600/70 dark:text-blue-400/70">Monto total cubierto</p>
+                                                    </div>
                                                 </div>
-                                            );
-                                        })}
-
-                                        <div className="flex items-center justify-between gap-3">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={addPaymentSplit}
-                                                className="text-xs h-auto py-2"
-                                            >
-                                                + Agregar forma de pago
-                                            </Button>
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-gray-500 uppercase">Total en formas de pago</p>
-                                                <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                                                    {formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')}
-                                                </p>
+                                                <div className="text-right">
+                                                    <p className={clsx(
+                                                        "text-2xl font-black font-mono tracking-tighter tabular-nums",
+                                                        Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5
+                                                            ? "text-green-600 dark:text-green-400"
+                                                            : "text-blue-600 dark:text-blue-400"
+                                                    )}>
+                                                        {formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1207,27 +1321,27 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                             {/* Ticket Upload for non-cash payments */}
                             {((!useMultiplePayments && formData.metodo_pago !== 'Efectivo') ||
                                 (useMultiplePayments && paymentSplits.some((split) => split.metodo_pago !== 'Efectivo'))) && (
-                                <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-xl bg-blue-50/30 dark:bg-blue-900/10">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <FileText size={16} className="text-blue-600" />
-                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            {useMultiplePayments ? 'Comprobante del pago mixto' : 'Comprobante de operación'}
-                                        </label>
+                                    <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-xl bg-blue-50/30 dark:bg-blue-900/10">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <FileText size={16} className="text-blue-600" />
+                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                {useMultiplePayments ? 'Comprobante del pago mixto' : 'Comprobante de operación'}
+                                            </label>
+                                        </div>
+
+                                        <ComprobanteUpload
+                                            area="caja-recepcion"
+                                            onUploadComplete={(res) => setFormData(prev => ({ ...prev, comprobante_url: res.path || res.url }))}
+                                            className="w-full"
+                                        />
+
+                                        {formData.comprobante_url && (
+                                            <p className="mt-2 text-xs text-green-600 font-medium flex items-center gap-1">
+                                                <Check size={12} /> Comprobante adjuntado correctamente
+                                            </p>
+                                        )}
                                     </div>
-
-                                    <ComprobanteUpload
-                                        area="caja-recepcion"
-                                        onUploadComplete={(res) => setFormData(prev => ({ ...prev, comprobante_url: res.path || res.url }))}
-                                        className="w-full"
-                                    />
-
-                                    {formData.comprobante_url && (
-                                        <p className="mt-2 text-xs text-green-600 font-medium flex items-center gap-1">
-                                            <Check size={12} /> Comprobante adjuntado correctamente
-                                        </p>
-                                    )}
-                                </div>
-                            )}
+                                )}
 
                             {/* Status */}
                             <div>
@@ -1526,7 +1640,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         </div >
     );
 }
