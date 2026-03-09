@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon } from 'lucide-react';
+import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon, Plus, Trash2 } from 'lucide-react';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -12,7 +12,7 @@ import { createClient } from '@/utils/supabase/client';
 import type { TarifarioItem } from '@/lib/supabase';
 
 const supabase = createClient();
-import { formatCurrency } from '@/lib/bna';
+import { formatCurrency, getBnaRate } from '@/lib/bna';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerWorkflowFromSenaPayment } from '@/app/actions/clinical-workflows';
 import { getLocalISODate } from '@/lib/local-date';
@@ -61,13 +61,6 @@ function normalizeComparableText(value: string) {
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .trim();
-}
-
-function isConceptRelatedToSena(tipo: SenaTipo, categoria: string, concepto: string) {
-    if (!tipo) return true;
-    const keywords = SENA_CONCEPTO_KEYWORDS[tipo as Exclude<SenaTipo, ''>] || [];
-    const haystack = normalizeComparableText(`${categoria} ${concepto}`);
-    return keywords.some(keyword => haystack.includes(keyword));
 }
 
 function getSenaLabel(tipo: SenaTipo) {
@@ -123,8 +116,6 @@ const METODOS_PAGO = [
     { value: 'Cripto', label: 'Cripto (USDT)', icon: '₿' },
 ];
 
-
-
 export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, initialPatientId }: NuevoIngresoFormProps) {
     const [step, setStep] = useState(1);
     const [saving, setSaving] = useState(false);
@@ -141,12 +132,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     const [conceptoSearch, setConceptoSearch] = useState('');
 
     // Tarifario
-    // const [tarifarioItems, setTarifarioItems] = useState<TarifarioItem[]>([]);
     const [tarifarioByCategoria, setTarifarioByCategoria] = useState<Record<string, TarifarioItem[]>>({});
 
     // Historical load
     const { user } = useAuth();
-    const canUseHistoricalLoad = user?.role === 'owner' || user?.role === 'admin';
     const [cargaHistorica, setCargaHistorica] = useState(false);
     const [fechaMovimiento, setFechaMovimiento] = useState(getLocalISODate());
 
@@ -184,13 +173,17 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         },
     ]);
 
-    const createSplitFromCurrentForm = (): PaymentSplit => ({
-        id: makeUuid(),
-        monto: formData.monto || 0,
-        moneda: formData.moneda,
-        metodo_pago: formData.metodo_pago,
-        canal_destino: formData.canal_destino,
-    });
+    // Effect to sync the first split with currency changes if it hasn't been edited
+    useEffect(() => {
+        if (!useMultiplePayments && paymentSplits.length === 1 && paymentSplits[0].monto === 0) {
+            setPaymentSplits([{
+                ...paymentSplits[0],
+                moneda: formData.moneda,
+                metodo_pago: formData.metodo_pago,
+                canal_destino: formData.canal_destino
+            }]);
+        }
+    }, [formData.moneda, formData.metodo_pago, formData.canal_destino, useMultiplePayments]);
 
     function setSplitValue(index: number, updates: Partial<PaymentSplit>) {
         setPaymentSplits((prev) => {
@@ -236,9 +229,6 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
             if (error) throw error;
 
-            // setTarifarioItems(data || []);
-
-            // Group by category
             const grouped = (data || []).reduce((acc: Record<string, TarifarioItem[]>, item: TarifarioItem) => {
                 if (!acc[item.categoria]) acc[item.categoria] = [];
                 acc[item.categoria].push(item);
@@ -285,16 +275,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 paciente_nombre: `${data.apellido}, ${data.nombre}`,
             }));
             setPatientWhatsapp(data.whatsapp || '');
-            setSearchQuery('');
-            setPatients([]);
             setStep(prev => (prev < 2 ? 2 : prev));
         }
 
         prefillPatient();
-
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [isOpen, initialPatientId, formData.paciente_id]);
 
     async function searchPatients(query: string) {
@@ -317,18 +302,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     }
 
     async function selectPatient(patient: Paciente) {
-        // Optimistic UI update
         setFormData(prev => ({
             ...prev,
             paciente_id: patient.id_paciente,
             paciente_nombre: `${patient.apellido}, ${patient.nombre}`,
         }));
         setPatientWhatsapp(patient.whatsapp || '');
-        setSearchQuery('');
-        setPatients([]);
-        setStep(2); // Move to next step immediately
+        setStep(2);
 
-        // Background fetch for financing data
         try {
             const { data: activePlan } = await supabase
                 .from('planes_financiacion')
@@ -365,9 +346,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             concepto_nombre: item.concepto_nombre,
             categoria: item.categoria,
             precio_lista_usd: item.precio_base_usd,
-            // Only set monto if not already entered in Step 1
             monto: prev.monto > 0 ? prev.monto : item.precio_base_usd,
-            // If we are defaulting to the reference price, use USD
             moneda: prev.monto > 0 ? prev.moneda : 'USD'
         }));
         setStep(3);
@@ -384,19 +363,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             concepto_nombre: senaConcepto,
             categoria: tipo ? 'Senas' : prev.categoria,
         }));
-
         setConceptoSearch('');
     }
 
-
-
     function calculateUsdEquivalentForAmount(monto: number, moneda: MonedaIngreso): number {
-        if (moneda === 'USD' || moneda === 'USDT') {
-            return monto;
-        }
-        if (moneda === 'ARS' && bnaRate > 0) {
-            return Math.round((monto / bnaRate) * 100) / 100;
-        }
+        if (moneda === 'USD' || moneda === 'USDT') return monto;
+        if (moneda === 'ARS' && bnaRate > 0) return Math.round((monto / bnaRate) * 100) / 100;
         return 0;
     }
 
@@ -409,7 +381,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     }
 
     async function handleSubmit() {
-        if (!formData.paciente_id || !formData.concepto_nombre || formData.monto <= 0) {
+        if (!formData.paciente_id || !formData.concepto_nombre || (formData.monto <= 0 && !useMultiplePayments)) {
             alert('Complete todos los campos requeridos');
             return;
         }
@@ -419,137 +391,110 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             return;
         }
 
-        setSaving(true);
         try {
-            const usdEquivalente = calculateUsdEquivalent();
-            const senaLabel = getSenaLabel(formData.sena_tipo);
-            const conceptoFinal = formData.es_sena && senaLabel
-                ? `Sena - ${senaLabel}`
-                : formData.concepto_nombre;
-            const categoriaFinal = formData.es_sena ? 'Senas' : formData.categoria;
+            setSaving(true);
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
 
-            const referenceUsd = usdEquivalente;
-            const validPaymentSplits = useMultiplePayments
-                ? paymentSplits.filter((split) => split.monto > 0)
-                : [];
+            if (!user) throw new Error('No autenticado');
 
-            if (useMultiplePayments && validPaymentSplits.length === 0) {
-                alert('Debes cargar al menos una forma de pago con monto mayor a 0.');
-                return;
+            // 1. Preparation
+            const bnaRateEffective = await getBnaRate(new Date());
+            const conceptoFinal = formData.concepto_nombre || 'Sin concepto';
+            const categoriaFinal = formData.categoria || 'Sin categoría';
+            const cleanedObservation = formData.observaciones?.trim() || '';
+
+            // 2. Identify and Process payments
+            const activeSplits = paymentSplits.filter(s => s.monto > 0);
+
+            let finalUsdEquiv = 0;
+            let totalArsEquivalent = 0;
+            let finalObservations = cleanedObservation;
+            let finalMonto = formData.monto;
+            let finalMoneda = formData.moneda;
+            let finalMetodo = formData.metodo_pago;
+            let finalCanal = formData.canal_destino;
+
+            if (useMultiplePayments && activeSplits.length > 0) {
+                finalUsdEquiv = getMixedUsdTotal(activeSplits);
+                finalMonto = finalUsdEquiv;
+                finalMoneda = 'USD';
+                finalMetodo = 'Mixto';
+                finalCanal = 'Mixto';
+
+                totalArsEquivalent = activeSplits.reduce((acc, s) => {
+                    const equiv = s.moneda === 'ARS' ? s.monto : (s.monto * bnaRateEffective);
+                    return acc + equiv;
+                }, 0);
+
+                const splitSummary = activeSplits.map(s =>
+                    `${formatCurrency(s.monto, s.moneda)} (${s.metodo_pago} - ${s.canal_destino})`
+                ).join(' + ');
+
+                finalObservations = cleanedObservation
+                    ? `${cleanedObservation} | Detalles pagos mixtos: ${splitSummary}`
+                    : `Detalles pagos mixtos: ${splitSummary}`;
+            } else {
+                finalUsdEquiv = calculateUsdEquivalent();
+                finalObservations = cleanedObservation;
             }
 
-            if (useMultiplePayments) {
-                const mixedUsdTotal = getMixedUsdTotal(validPaymentSplits);
-                const difference = Math.abs(mixedUsdTotal - referenceUsd);
-                if (difference > 1) {
-                    alert(`El total de formas de pago no coincide con el monto cargado. Diferencia aproximada: USD ${difference.toFixed(2)}`);
-                    return;
-                }
-            }
-
-            const movementGroupTag = useMultiplePayments && validPaymentSplits.length > 1
-                ? `PAGO_MIXTO:${makeUuid()}`
-                : null;
-            const cleanedObservation = (formData.observaciones || '').trim();
-
-            const paymentsToInsert = useMultiplePayments
-                ? validPaymentSplits.map((split, index) => ({
-                    monto: split.monto,
-                    moneda: split.moneda,
-                    metodo_pago: split.metodo_pago,
-                    canal_destino: split.canal_destino,
-                    usd_equivalente: calculateUsdEquivalentForAmount(split.monto, split.moneda),
-                    cuota_nro: formData.es_cuota && index === 0 ? formData.cuota_nro : null,
-                    cuotas_total: formData.es_cuota && index === 0 ? formData.cuotas_total : null,
-                    observaciones: [
-                        movementGroupTag ? `[${movementGroupTag}]` : '',
-                        useMultiplePayments && validPaymentSplits.length > 1 ? `Linea ${index + 1}/${validPaymentSplits.length}` : '',
-                        cleanedObservation,
-                    ].filter(Boolean).join(' · '),
-                }))
-                : [{
-                    monto: formData.monto,
-                    moneda: formData.moneda,
-                    metodo_pago: formData.metodo_pago,
-                    canal_destino: formData.canal_destino,
-                    usd_equivalente: referenceUsd,
-                    cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
-                    cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
-                    observaciones: cleanedObservation,
-                }];
-
-            const payload = paymentsToInsert.map((payment) => ({
+            const payload = {
                 paciente_id: formData.paciente_id,
-                concepto_id: formData.concepto_id || null,
-                concepto_nombre: conceptoFinal,
+                paciente_nombre: formData.paciente_nombre,
+                descripcion: conceptoFinal,
                 categoria: categoriaFinal,
                 precio_lista_usd: formData.precio_lista_usd,
-                monto: payment.monto,
-                moneda: payment.moneda,
-                metodo_pago: payment.metodo_pago,
-                canal_destino: payment.canal_destino,
-                tipo_comprobante: formData.tipo_comprobante,
+                monto: finalMonto,
+                moneda: finalMoneda,
+                metodo_pago: finalMetodo,
+                canal_destino: finalCanal,
                 estado: formData.estado,
-                observaciones: payment.observaciones,
-                tc_bna_venta: payment.moneda === 'ARS' ? bnaRate : null,
-                tc_fuente: payment.moneda === 'ARS' ? 'BNA_AUTO' : 'N/A',
-                tc_fecha_hora: payment.moneda === 'ARS' ? new Date().toISOString() : null,
-                usd_equivalente: payment.usd_equivalente,
-                usuario: 'Recepción',
-                created_by: user?.id || null,
-                fecha_movimiento: cargaHistorica ? fechaMovimiento : getLocalISODate(),
-                origen: cargaHistorica ? 'carga_historica' : 'manual',
-                cuota_nro: payment.cuota_nro,
-                cuotas_total: payment.cuotas_total,
-                comprobante_url: formData.comprobante_url || null,
-            }));
+                observaciones: finalObservations,
+                usd_equivalente: finalUsdEquiv,
+                monto_usd: finalUsdEquiv,
+                monto_original: totalArsEquivalent > 0 ? totalArsEquivalent : finalMonto,
+                tipo_comprobante: formData.tipo_comprobante,
+                created_at: fechaMovimiento,
+                created_by: user.id,
+                es_sena: formData.es_sena,
+                sena_tipo: formData.sena_tipo,
+                es_cuota: formData.es_cuota,
+                cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
+                cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
+                presupuesto_ref: formData.presupuesto_ref || null,
+            };
 
-            const { data: insertedMovements, error } = await supabase
+            const { data: movementData, error: movementError } = await supabase
                 .from('caja_recepcion_movimientos')
-                .insert(payload)
-                .select('id, monto, moneda, usd_equivalente, metodo_pago');
+                .insert([payload])
+                .select()
+                .single();
 
-            if (error) throw error;
+            if (movementError) throw movementError;
 
-            const primaryMovement = insertedMovements?.[0];
-            const totalUsdFromSplits = paymentsToInsert.reduce((acc, payment) => acc + (payment.usd_equivalente || 0), 0);
-
-            // Sync planes_financiacion when a cuota payment is registered
-            if (formData.es_cuota && formData.paciente_id && primaryMovement?.id) {
-                const syncResult = await syncPagoCuotaAction({
-                    movementId: primaryMovement.id,
+            // 7. Sync with Cuotas Plan
+            if (formData.es_cuota && movementData) {
+                await syncPagoCuotaAction({
+                    movementId: movementData.id,
                     pacienteId: formData.paciente_id,
                     pacienteNombre: formData.paciente_nombre,
-                    montoUsd: Math.round(totalUsdFromSplits * 100) / 100,
-                    montoOriginal: formData.monto,
-                    moneda: formData.moneda,
+                    montoUsd: finalUsdEquiv,
+                    montoOriginal: totalArsEquivalent > 0 ? totalArsEquivalent : finalMonto,
+                    moneda: totalArsEquivalent > 0 ? 'ARS' : finalMoneda as any,
                     cuotaNro: formData.cuota_nro,
                     cuotasTotal: formData.cuotas_total,
-                    presupuestoRef: formData.presupuesto_ref?.trim() || null,
-                    observaciones: formData.observaciones?.trim() || null,
+                    presupuestoRef: formData.presupuesto_ref,
+                    observaciones: finalObservations,
                 });
-
-                if (!syncResult.success) {
-                    const pendingText = syncResult.pendingSaved
-                        ? ' Se guardo automaticamente en Pagos Pendientes de Asignar.'
-                        : '';
-
-                    if (syncResult.failureCode === 'plan_not_found') {
-                        const wantsCreate = window.confirm(
-                            `Paciente no encontrado en el plan de cuotas. ¿Desea crear una financiación nueva?${pendingText}`
-                        );
-
-                        if (wantsCreate) {
-                            window.location.assign('/caja-recepcion?tab=contratos');
-                        }
-                    } else {
-                        alert((syncResult.error || 'Pago registrado en caja, pero no se pudo acreditar la cuota.') + pendingText);
-                    }
-                }
             }
 
-            // Generate receipt and show to user before closing
-            if (primaryMovement?.id) {
+            // 8. Generate Receipt
+            const receiptMetodo = useMultiplePayments
+                ? activeSplits.map(s => s.metodo_pago).join('/')
+                : formData.metodo_pago;
+
+            if (movementData) {
                 try {
                     const canvas = receiptCanvasRef.current;
                     if (canvas) {
@@ -557,60 +502,49 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                         const cuotaInfo = formData.es_cuota
                             ? `${formData.cuota_nro}/${formData.cuotas_total}`
                             : undefined;
-                        const receiptMonto = useMultiplePayments ? Math.round(totalUsdFromSplits * 100) / 100 : formData.monto;
-                        const receiptMoneda: MonedaIngreso = useMultiplePayments ? 'USD' : formData.moneda;
-                        const receiptMetodo = useMultiplePayments
-                            ? `Mixto (${paymentsToInsert.length} pagos)`
-                            : formData.metodo_pago;
+
                         const imageDataUrl = drawReceiptOnCanvas(canvas, {
                             numero: receiptNumber,
                             fecha: new Date(),
                             paciente: formData.paciente_nombre,
                             concepto: conceptoFinal,
-                            monto: receiptMonto,
-                            moneda: receiptMoneda,
+                            monto: finalUsdEquiv,
+                            moneda: 'USD',
                             metodoPago: receiptMetodo,
                             atendidoPor: 'AM Clínica',
                             cuotaInfo,
                         });
+
                         setGeneratedReceiptUrl(imageDataUrl);
                         const base64Data = imageDataUrl.split(',')[1];
-                        saveReceiptAndLinkToMovement(
-                            primaryMovement.id,
+                        await saveReceiptAndLinkToMovement(
+                            movementData.id,
                             receiptNumber,
                             base64Data
-                        ).catch(err => console.error('Auto-receipt save failed:', err));
+                        );
                     }
                 } catch (receiptError) {
-                    console.error('Auto-receipt generation failed:', receiptError);
+                    console.error('Receipt generation failed:', receiptError);
                 }
             }
 
-            if (formData.es_sena && formData.sena_tipo) {
-                try {
-                    const workflowResult = await triggerWorkflowFromSenaPayment({
-                        patientId: formData.paciente_id,
-                        senaTipo: formData.sena_tipo,
-                        movementId: primaryMovement?.id || null,
-                        conceptoNombre: conceptoFinal,
-                        monto: formData.monto,
-                        moneda: formData.moneda,
-                    });
-
-                    if (!workflowResult.success) {
-                        alert('Ingreso guardado, pero no se pudo activar el workflow automaticamente. Revisalo en Workflows.');
-                    }
-                } catch (workflowError) {
-                    console.error('Error triggering workflow from sena payment:', workflowError);
-                    alert('Ingreso guardado, pero fallo la activacion del workflow.');
-                }
+            // 9. Extra flows
+            if (formData.es_sena && formData.sena_tipo && movementData) {
+                await triggerWorkflowFromSenaPayment({
+                    patientId: formData.paciente_id,
+                    senaTipo: formData.sena_tipo,
+                    movementId: movementData.id,
+                    conceptoNombre: conceptoFinal,
+                    monto: finalMonto,
+                    moneda: finalMoneda,
+                }).catch(e => console.error("Sena workflow trigger failed:", e));
             }
 
             onSuccess();
             setStep(5);
         } catch (error) {
-            console.error('Error saving movement:', error);
-            alert('Error al guardar el ingreso');
+            console.error('Error saving income:', error);
+            alert('Error al guardar el ingreso: ' + (error instanceof Error ? error.message : 'Error desconocido'));
         } finally {
             setSaving(false);
         }
@@ -620,15 +554,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         setStep(1);
         setGeneratedReceiptUrl(null);
         setUseMultiplePayments(false);
-        setPaymentSplits([
-            {
-                id: makeUuid(),
-                monto: 0,
-                moneda: 'USD',
-                metodo_pago: 'Efectivo',
-                canal_destino: 'Empresa',
-            },
-        ]);
+        setPaymentSplits([{
+            id: makeUuid(),
+            monto: 0,
+            moneda: 'USD',
+            metodo_pago: 'Efectivo',
+            canal_destino: 'Empresa',
+        }]);
         setPatientWhatsapp('');
         setSearchQuery('');
         setPatients([]);
@@ -661,9 +593,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
     if (!isOpen) return null;
 
+    const currentTotalUsd = useMultiplePayments ? getMixedUsdTotal(paymentSplits) : calculateUsdEquivalent();
+    const coveragePercentage = formData.monto > 0 ? Math.min(100, (currentTotalUsd / calculateUsdEquivalent()) * 100) : 0;
+    const remainingUsd = calculateUsdEquivalent() - currentTotalUsd;
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            {/* Hidden canvas for auto-receipt generation */}
             <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
             <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-xl">
                 {/* Header */}
@@ -692,12 +627,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     </Button>
                 </div>
 
-                {/* Content */}
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-                    {/* Step 1: Amount and Patient */}
                     {step === 1 && (
                         <div className="space-y-6">
-                            {/* Amount and Currency - NOW FIRST */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                                     Monto del Ingreso *
@@ -717,7 +649,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             <Button
                                                 key={m}
                                                 type="button"
-                                                onClick={() => setFormData({ ...formData, moneda: m as FormData['moneda'] })}
+                                                onClick={() => setFormData({ ...formData, moneda: m as any })}
                                                 className={clsx(
                                                     "px-4 py-2 text-sm font-bold transition-colors rounded-none h-auto",
                                                     formData.moneda === m
@@ -739,7 +671,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 dark:bg-amber-900/20 dark:border-amber-800 p-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
-                                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Este pago es una sena</p>
+                                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Este pago es una seña</p>
                                             <p className="text-xs text-amber-700 dark:text-amber-300">Si activas esta opcion, se dispara el workflow clinico automaticamente.</p>
                                         </div>
                                         <Button
@@ -750,18 +682,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     ...prev,
                                                     es_sena: nextValue,
                                                     sena_tipo: nextValue ? prev.sena_tipo : '',
-                                                    categoria: nextValue ? prev.categoria : (prev.categoria === 'Senas' ? '' : prev.categoria),
                                                 }));
-
-                                                if (!nextValue) {
-                                                    setConceptoSearch('');
-                                                }
                                             }}
                                             className={clsx(
                                                 'px-3 py-1.5 rounded-lg text-xs font-bold transition-colors h-auto',
                                                 formData.es_sena
-                                                    ? 'bg-amber-600 text-white hover:bg-amber-700 border-transparent'
-                                                    : 'bg-white text-amber-700 border border-amber-300 hover:bg-amber-50'
+                                                    ? 'bg-amber-600 text-white'
+                                                    : 'bg-white text-amber-700 border border-amber-300'
                                             )}
                                         >
                                             {formData.es_sena ? 'ACTIVA' : 'Activar'}
@@ -776,10 +703,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     type="button"
                                                     onClick={() => applySenaTipo(option.value)}
                                                     className={clsx(
-                                                        'px-3 py-2 rounded-lg text-xs font-semibold border transition-colors justify-start h-auto whitespace-normal text-left',
+                                                        'px-3 py-2 rounded-lg text-xs font-semibold border transition-colors h-auto text-left justify-start',
                                                         formData.sena_tipo === option.value
-                                                            ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
-                                                            : 'bg-white dark:bg-gray-800 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                                                            ? 'bg-amber-600 text-white border-amber-600'
+                                                            : 'bg-white text-amber-900 border-amber-200 hover:bg-amber-50'
                                                     )}
                                                 >
                                                     {option.label}
@@ -790,651 +717,318 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 </div>
                             </div>
 
-                            <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
+                            <div className="relative">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Buscar Paciente *
+                                    Paciente *
                                 </label>
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                     <Input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Nombre, apellido o documento..."
-                                        className="w-full pl-10 pr-4 py-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 focus-visible:ring-blue-500 h-auto"
-                                    />
-                                    {searchLoading && (
-                                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" size={20} />
-                                    )}
-                                </div>
-
-                                {patients.length > 0 && (
-                                    <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm max-h-[300px] overflow-y-auto">
-                                        {patients.map((patient) => (
-                                            <Button
-                                                key={patient.id_paciente}
-                                                variant="ghost"
-                                                onClick={() => selectPatient(patient)}
-                                                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-left justify-start h-auto font-normal rounded-none"
-                                            >
-                                                <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                                    <User size={20} className="text-blue-600 dark:text-blue-400" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-gray-900 dark:text-white">
-                                                        {patient.apellido}, {patient.nombre}
-                                                    </p>
-                                                    <p className="text-sm text-gray-500">
-                                                        {patient.documento || 'Sin documento'}
-                                                    </p>
-                                                </div>
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 2: Concept and Categorization */}
-                    {step === 2 && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
-                                <div>
-                                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase">Monto Seleccionado</p>
-                                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                        {formatCurrency(formData.monto, formData.moneda)}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase">Paciente</p>
-                                    <p className="font-medium text-blue-900 dark:text-white">{formData.paciente_nombre}</p>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 text-center">
-                                    ¿A qué corresponde este ingreso?
-                                </label>
-
-                                {formData.es_sena && (
-                                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3">
-                                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Pago de sena detectado</p>
-                                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                                            Se registrara como <span className="font-bold">{formData.concepto_nombre || 'Sena - (definir)'}</span>
-                                            {formData.sena_tipo ? ` y activara el workflow ${getSenaWorkflowLabel(formData.sena_tipo)}.` : '.'}
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* Manual entry and SEARCH option */}
-                                <div className="mb-6 space-y-3">
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <Input
-                                            type="text"
-                                            placeholder={formData.es_sena && formData.sena_tipo
-                                                ? 'Filtrar conceptos relacionados al flujo de sena...'
-                                                : 'Buscar servicio o escribir concepto libre...'}
-                                            value={conceptoSearch}
-                                            onChange={(e) => {
-                                                setConceptoSearch(e.target.value);
-                                                setFormData({ ...formData, concepto_nombre: e.target.value, concepto_id: '' });
-                                            }}
-                                            className="w-full pl-10 pr-4 py-3 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus-visible:ring-blue-500 font-medium h-auto"
-                                        />
-                                    </div>
-                                    {conceptoSearch && !Object.values(tarifarioByCategoria).some(items => items.some(item => item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()))) && (
-                                        <p className="text-xs text-amber-600 font-medium px-1">
-                                            ✨ No hay coincidencias exactas. Se registrará como concepto libre.
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                                    {Object.entries(tarifarioByCategoria).map(([categoria, items]) => {
-                                        const filteredItems = items.filter(item =>
-                                            (item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()) ||
-                                                categoria.toLowerCase().includes(conceptoSearch.toLowerCase())) &&
-                                            (!formData.es_sena || !formData.sena_tipo || isConceptRelatedToSena(formData.sena_tipo, categoria, item.concepto_nombre))
-                                        );
-
-                                        if (filteredItems.length === 0) return null;
-
-                                        return (
-                                            <div key={categoria} className="animate-in fade-in duration-300">
-                                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 dark:border-gray-700 pb-1 flex justify-between">
-                                                    <span>{categoria}</span>
-                                                    <span className="text-[9px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{filteredItems.length}</span>
-                                                </h4>
-                                                <div className="grid grid-cols-1 gap-2">
-                                                    {filteredItems.map((item) => (
-                                                        <Button
-                                                            key={item.id}
-                                                            onClick={() => {
-                                                                selectConcepto(item);
-                                                                setConceptoSearch(item.concepto_nombre);
-                                                            }}
-                                                            className={clsx(
-                                                                "p-3 text-left border rounded-xl transition-all group h-auto justify-start w-full whitespace-normal",
-                                                                formData.concepto_id === item.id
-                                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm hover:bg-blue-100"
-                                                                    : "border-gray-100 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/5 bg-transparent"
-                                                            )}
-                                                        >
-                                                            <div className="flex justify-between items-center w-full">
-                                                                <span className="font-medium text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                                                    {item.concepto_nombre}
-                                                                </span>
-                                                                <span className="text-[10px] font-bold text-gray-400 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors">
-                                                                    REF: {formatCurrency(item.precio_base_usd, 'USD')}
-                                                                </span>
-                                                            </div>
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-
-                                    {formData.es_sena && formData.sena_tipo &&
-                                        Object.entries(tarifarioByCategoria).every(([categoria, items]) =>
-                                            items.filter(item =>
-                                                (item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase()) ||
-                                                    categoria.toLowerCase().includes(conceptoSearch.toLowerCase())) &&
-                                                isConceptRelatedToSena(formData.sena_tipo, categoria, item.concepto_nombre)
-                                            ).length === 0
-                                        ) && (
-                                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-                                                No hay conceptos del tarifario para este tipo de sena con ese filtro. Puedes cargar un concepto libre igualmente.
-                                            </div>
-                                        )}
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setStep(1)}
-                                    className="flex-1 py-3 border-gray-200 dark:border-gray-700 rounded-xl font-medium text-gray-600 dark:text-gray-400 h-auto"
-                                >
-                                    Atrás
-                                </Button>
-                                <Button
-                                    onClick={() => setStep(3)}
-                                    disabled={!formData.concepto_nombre || (formData.es_sena && !formData.sena_tipo)}
-                                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-medium transition-colors h-auto"
-                                >
-                                    Continuar
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 3: Payment Method and Details */}
-                    {step === 3 && (
-                        <div className="space-y-6">
-                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-700 flex justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                        <FileText size={18} className="text-blue-600 dark:text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-gray-900 dark:text-white">
-                                            {useMultiplePayments
-                                                ? formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')
-                                                : formatCurrency(formData.monto, formData.moneda)}
-                                        </p>
-                                        <p className="text-xs text-gray-500">{formData.concepto_nombre}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] text-gray-500 uppercase">Paciente</p>
-                                    <p className="font-medium text-gray-900 dark:text-white">{formData.paciente_nombre}</p>
-                                </div>
-                            </div>
-
-                            {/* Payment Method */}
-                            <div>
-                                <div className="flex items-center justify-between mb-3">
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
-                                        Método de Pago
-                                    </label>
-                                    <div
-                                        onClick={() => {
-                                            const next = !useMultiplePayments;
-                                            setUseMultiplePayments(next);
-                                            if (next) {
-                                                setPaymentSplits((prev) => {
-                                                    if (prev.length > 0 && prev.some((split) => split.monto > 0)) return prev;
-                                                    return [createSplitFromCurrentForm()];
-                                                });
-                                            } else {
-                                                const first = paymentSplits[0];
-                                                if (first) {
-                                                    setFormData((prev) => ({
-                                                        ...prev,
-                                                        metodo_pago: first.metodo_pago,
-                                                        moneda: first.moneda,
-                                                        monto: first.monto > 0 ? first.monto : prev.monto,
-                                                        canal_destino: first.canal_destino,
-                                                    }));
-                                                }
+                                        value={formData.paciente_id ? formData.paciente_nombre : searchQuery}
+                                        onChange={(e) => {
+                                            if (formData.paciente_id) {
+                                                setFormData({ ...formData, paciente_id: '', paciente_nombre: '' });
+                                                setPatientWhatsapp('');
                                             }
+                                            setSearchQuery(e.target.value);
                                         }}
-                                        className={clsx(
-                                            "flex items-center gap-2 text-xs font-bold cursor-pointer select-none px-3 py-1.5 rounded-full transition-all border",
-                                            useMultiplePayments
-                                                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                                : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:border-blue-400"
-                                        )}
-                                    >
-                                        <div className={clsx(
-                                            "w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all",
-                                            useMultiplePayments ? "bg-white border-white" : "border-gray-300 dark:border-gray-600"
-                                        )}>
-                                            {useMultiplePayments && <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />}
-                                        </div>
-                                        Pago mixto (varios medios)
-                                    </div>
+                                        className="pl-10 py-3 rounded-xl focus:ring-blue-500"
+                                        placeholder="Buscar por nombre o DNI..."
+                                    />
+                                    {formData.paciente_id && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => {
+                                                setFormData({ ...formData, paciente_id: '', paciente_nombre: '' });
+                                                setPatientWhatsapp('');
+                                                setSearchQuery('');
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
+                                        >
+                                            <X size={16} />
+                                        </Button>
+                                    )}
                                 </div>
 
-                                {!useMultiplePayments && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {METODOS_PAGO.map((metodo) => (
-                                            <Button
-                                                key={metodo.value}
-                                                onClick={() => setFormData({ ...formData, metodo_pago: metodo.value as FormData['metodo_pago'] })}
-                                                className={clsx(
-                                                    "p-3 border rounded-xl text-left transition-colors h-auto justify-start",
-                                                    formData.metodo_pago === metodo.value
-                                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100"
-                                                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 bg-transparent"
-                                                )}
+                                {searchLoading && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-xl z-10 border border-gray-100 dark:border-gray-700 flex justify-center">
+                                        <Loader2 className="animate-spin text-blue-500" size={20} />
+                                    </div>
+                                )}
+
+                                {patients.length > 0 && !formData.paciente_id && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl z-10 border border-gray-100 dark:border-gray-700 overflow-hidden">
+                                        {patients.map((patient) => (
+                                            <button
+                                                key={patient.id_paciente}
+                                                onClick={() => selectPatient(patient)}
+                                                className="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-3 transition-colors border-b border-gray-50 dark:border-gray-700/50 last:border-0"
                                             >
-                                                <span className="mr-2">{metodo.icon}</span>
-                                                {metodo.label}
-                                            </Button>
+                                                <div className="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                                    <User size={20} />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{patient.apellido}, {patient.nombre}</p>
+                                                    <p className="text-xs text-gray-500">DNI: {patient.documento || 'No cargo'}</p>
+                                                </div>
+                                            </button>
                                         ))}
                                     </div>
                                 )}
-
-                                {useMultiplePayments && (
-                                    <div className="space-y-4">
-                                        {/* Balance Indicator Widget */}
-                                        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm overflow-hidden relative group">
-                                            <div className="absolute top-0 left-0 h-1 bg-gray-100 dark:bg-gray-700 w-full" />
-                                            <div
-                                                className={clsx(
-                                                    "absolute top-0 left-0 h-1 transition-all duration-700 ease-out",
-                                                    Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5
-                                                        ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
-                                                        : getMixedUsdTotal(paymentSplits) > calculateUsdEquivalent()
-                                                            ? "bg-amber-500"
-                                                            : "bg-blue-500"
-                                                )}
-                                                style={{ width: `${Math.min(100, (getMixedUsdTotal(paymentSplits) / calculateUsdEquivalent()) * 100)}%` }}
-                                            />
-
-                                            <div className="flex justify-between items-end">
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Estado de Cobertura</p>
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className={clsx(
-                                                            "text-xl font-bold font-mono tabular-nums",
-                                                            Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5
-                                                                ? "text-green-600 dark:text-green-400"
-                                                                : getMixedUsdTotal(paymentSplits) > calculateUsdEquivalent()
-                                                                    ? "text-amber-600"
-                                                                    : "text-blue-600 dark:text-blue-400"
-                                                        )}>
-                                                            {formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')}
-                                                        </span>
-                                                        <span className="text-gray-400 text-sm font-medium">/ {formatCurrency(calculateUsdEquivalent(), 'USD')}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    {Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5 ? (
-                                                        <span className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase flex items-center gap-1 animate-in zoom-in duration-300">
-                                                            <Check size={10} strokeWidth={3} /> Cubierto
-                                                        </span>
-                                                    ) : getMixedUsdTotal(paymentSplits) > calculateUsdEquivalent() ? (
-                                                        <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
-                                                            Excedido
-                                                        </span>
-                                                    ) : (
-                                                        <span className="bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
-                                                            Falta {formatCurrency(calculateUsdEquivalent() - getMixedUsdTotal(paymentSplits), 'USD')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Distribution Summary */}
-                                            {paymentSplits.some(s => s.monto > 0) && (
-                                                <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700/50 flex flex-wrap gap-2">
-                                                    {paymentSplits.filter(s => s.monto > 0).map((s, i) => (
-                                                        <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 dark:bg-gray-900/50 rounded-full border border-gray-100 dark:border-gray-800 transition-all hover:bg-white dark:hover:bg-gray-800">
-                                                            <span className="text-[11px] filter grayscale-[0.5] group-hover:grayscale-0">
-                                                                {METODOS_PAGO.find(m => m.value === s.metodo_pago)?.icon}
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 font-mono">
-                                                                {formatCurrency(s.monto, s.moneda)}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            {paymentSplits.map((split, idx) => {
-                                                const splitUsd = calculateUsdEquivalentForAmount(split.monto, split.moneda);
-                                                return (
-                                                    <div key={split.id} className="p-4 border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900/40 shadow-sm space-y-4 hover:border-blue-200 dark:hover:border-blue-900/30 transition-all">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-500">
-                                                                    {idx + 1}
-                                                                </div>
-                                                                <p className="text-[10px] font-bold text-gray-400 uppercase">Línea de Pago</p>
-                                                            </div>
-                                                            {paymentSplits.length > 1 && (
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    onClick={() => removePaymentSplit(idx)}
-                                                                    className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-all"
-                                                                >
-                                                                    <X size={16} />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Medio</label>
-                                                                <select
-                                                                    value={split.metodo_pago}
-                                                                    onChange={(e) => setSplitValue(idx, { metodo_pago: e.target.value as MetodoPagoIngreso })}
-                                                                    className="w-full px-3 py-2.5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500/10 transition-all"
-                                                                >
-                                                                    {METODOS_PAGO.map((metodo) => (
-                                                                        <option key={metodo.value} value={metodo.value}>{metodo.icon} {metodo.label}</option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Destino</label>
-                                                                <select
-                                                                    value={split.canal_destino}
-                                                                    onChange={(e) => setSplitValue(idx, { canal_destino: e.target.value as CanalDestinoIngreso })}
-                                                                    className="w-full px-3 py-2.5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500/10 transition-all"
-                                                                >
-                                                                    <option value="Empresa">🏢 Empresa</option>
-                                                                    <option value="Personal">🔑 Personal</option>
-                                                                    <option value="MP">📱 Mercado Pago</option>
-                                                                    <option value="USDT">₿ USDT / Crypto</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="grid grid-cols-[1fr_auto] gap-3 items-end pt-1">
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monto en {split.moneda}</label>
-                                                                <MoneyInput
-                                                                    value={split.monto || 0}
-                                                                    onChange={(val) => setSplitValue(idx, { monto: val })}
-                                                                    className="w-full h-auto py-3 text-lg font-bold"
-                                                                    placeholder="0"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1.5 h-full justify-end pb-0.5">
-                                                                <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 border border-gray-100 dark:border-gray-700">
-                                                                    {(['ARS', 'USD', 'USDT'] as MonedaIngreso[]).map((currency) => (
-                                                                        <button
-                                                                            key={currency}
-                                                                            type="button"
-                                                                            onClick={() => setSplitValue(idx, { moneda: currency })}
-                                                                            className={clsx(
-                                                                                'px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all',
-                                                                                split.moneda === currency
-                                                                                    ? 'bg-blue-600 text-white shadow-sm'
-                                                                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                                                                            )}
-                                                                        >
-                                                                            {currency}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                                {split.moneda === 'ARS' && (
-                                                                    <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 text-right px-1">
-                                                                        ≈ {formatCurrency(splitUsd, 'USD')}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-
-                                            <div className="pt-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={addPaymentSplit}
-                                                    className="w-full py-4 border-dashed border-2 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all h-auto group"
-                                                >
-                                                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600 transition-colors">
-                                                        <span className="text-lg">+</span>
-                                                    </div>
-                                                    Agregar medio de pago
-                                                </Button>
-                                            </div>
-
-                                            <div className="mt-2 flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-gray-900/60 rounded-2xl border border-blue-100/50 dark:border-blue-900/30 shadow-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
-                                                        <DollarSign size={16} className="text-white" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-tight">Total acumulado</p>
-                                                        <p className="text-xs font-medium text-blue-600/70 dark:text-blue-400/70">Monto total cubierto</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className={clsx(
-                                                        "text-2xl font-black font-mono tracking-tighter tabular-nums",
-                                                        Math.abs(getMixedUsdTotal(paymentSplits) - calculateUsdEquivalent()) < 0.5
-                                                            ? "text-green-600 dark:text-green-400"
-                                                            : "text-blue-600 dark:text-blue-400"
-                                                    )}>
-                                                        {formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
-
-                            {useMultiplePayments && (
-                                <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-900/10 p-3 text-xs text-blue-700 dark:text-blue-300">
-                                    Carga todas las formas de pago y el sistema registra el ingreso en un solo paso sin duplicar la cuota.
-                                </div>
-                            )}
-
-                            {/* Financiación / Cuotas */}
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 space-y-3">
-                                <label className="flex items-center gap-2.5 text-sm font-medium text-gray-900 dark:text-white cursor-pointer w-fit">
-                                    <div className={`w-5 h-5 flex items-center justify-center rounded border transition-colors ${formData.es_cuota ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300 dark:border-gray-600 dark:bg-gray-800'}`}>
-                                        {formData.es_cuota && <Check size={14} className="text-white" />}
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.es_cuota}
-                                        onChange={(e) => setFormData({ ...formData, es_cuota: e.target.checked })}
-                                        className="sr-only"
-                                    />
-                                    <span>Es pago de financiación / cuota</span>
-                                </label>
-
-                                {formData.es_cuota && (
-                                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-500 mb-1">Cuota Nro.</label>
-                                                <Input
-                                                    type="number"
-                                                    min="1"
-                                                    value={formData.cuota_nro}
-                                                    onChange={(e) => setFormData({ ...formData, cuota_nro: Math.max(1, parseInt(e.target.value) || 0) })}
-                                                    className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-500 mb-1">De un total de</label>
-                                                <Input
-                                                    type="number"
-                                                    min="1"
-                                                    value={formData.cuotas_total}
-                                                    onChange={(e) => setFormData({ ...formData, cuotas_total: Math.max(1, parseInt(e.target.value) || 0) })}
-                                                    className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">Referencia presupuesto (opcional)</label>
-                                            <Input
-                                                type="text"
-                                                value={formData.presupuesto_ref}
-                                                onChange={(e) => setFormData({ ...formData, presupuesto_ref: e.target.value })}
-                                                placeholder="Ej: PRES-2026-031"
-                                                className="w-full px-3 py-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus-visible:ring-blue-500 h-auto"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Ticket Upload for non-cash payments */}
-                            {((!useMultiplePayments && formData.metodo_pago !== 'Efectivo') ||
-                                (useMultiplePayments && paymentSplits.some((split) => split.metodo_pago !== 'Efectivo'))) && (
-                                    <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-xl bg-blue-50/30 dark:bg-blue-900/10">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <FileText size={16} className="text-blue-600" />
-                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                {useMultiplePayments ? 'Comprobante del pago mixto' : 'Comprobante de operación'}
-                                            </label>
-                                        </div>
-
-                                        <ComprobanteUpload
-                                            area="caja-recepcion"
-                                            onUploadComplete={(res) => setFormData(prev => ({ ...prev, comprobante_url: res.path || res.url }))}
-                                            className="w-full"
-                                        />
-
-                                        {formData.comprobante_url && (
-                                            <p className="mt-2 text-xs text-green-600 font-medium flex items-center gap-1">
-                                                <Check size={12} /> Comprobante adjuntado correctamente
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-
-                            {/* Status */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Estado
-                                </label>
-                                <div className="flex gap-3">
-                                    <Button
-                                        onClick={() => setFormData({ ...formData, estado: 'pagado' })}
-                                        className={clsx(
-                                            "flex-1 p-3 border rounded-xl transition-colors h-auto",
-                                            formData.estado === 'pagado'
-                                                ? "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 hover:bg-green-100"
-                                                : "border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50"
-                                        )}
-                                    >
-                                        ✓ Pagado
-                                    </Button>
-                                    <Button
-                                        onClick={() => setFormData({ ...formData, estado: 'pendiente' })}
-                                        className={clsx(
-                                            "flex-1 p-3 border rounded-xl transition-colors h-auto",
-                                            formData.estado === 'pendiente'
-                                                ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 hover:bg-yellow-100"
-                                                : "border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50"
-                                        )}
-                                    >
-                                        ⏳ Pendiente
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Historical Load Toggle - Only for admin/owner */}
-                            {canUseHistoricalLoad && (
-                                <div className="p-4 border border-amber-200 dark:border-amber-800 rounded-xl bg-amber-50 dark:bg-amber-900/20">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div>
-                                            <p className="font-medium text-amber-800 dark:text-amber-300">Carga histórica</p>
-                                            <p className="text-xs text-amber-600 dark:text-amber-400">Registrar ingreso en fecha pasada</p>
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            onClick={() => setCargaHistorica(!cargaHistorica)}
-                                            className={clsx(
-                                                "w-12 h-6 rounded-full p-0 transition-colors relative hover:bg-transparent",
-                                                cargaHistorica ? "bg-amber-500 hover:bg-amber-600" : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400"
-                                            )}
-                                        >
-                                            <span
-                                                className={clsx(
-                                                    "absolute w-5 h-5 bg-white rounded-full top-0.5 transition-all shadow",
-                                                    cargaHistorica ? "right-0.5" : "left-0.5"
-                                                )}
-                                            />
-                                        </Button>
-                                    </div>
-                                    {cargaHistorica && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-amber-700 dark:text-amber-300 mb-2">
-                                                <Calendar size={14} className="inline mr-1" />
-                                                Fecha del movimiento
-                                            </label>
-                                            <Input
-                                                type="date"
-                                                value={fechaMovimiento}
-                                                onChange={(e) => setFechaMovimiento(e.target.value)}
-                                                max={getLocalISODate()}
-                                                className="w-full px-4 py-2 border-amber-300 dark:border-amber-700 rounded-xl bg-white dark:bg-gray-800 focus-visible:ring-amber-500 h-auto"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
 
                             <Button
-                                onClick={() => setStep(4)}
-                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors h-auto"
+                                onClick={() => setStep(2)}
+                                disabled={!formData.paciente_id || formData.monto <= 0}
+                                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all h-auto disabled:bg-gray-300 dark:disabled:bg-gray-700"
                             >
                                 Continuar
                             </Button>
+                        </div>
+                    )}
+
+                    {step === 2 && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Seleccionar Concepto</h3>
+                                <Button
+                                    variant="link"
+                                    onClick={() => setStep(1)}
+                                    className="text-sm text-blue-600 p-0 h-auto"
+                                >
+                                    ← Cambiar paciente/monto
+                                </Button>
+                            </div>
+
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <Input
+                                    value={conceptoSearch}
+                                    onChange={(e) => setConceptoSearch(e.target.value)}
+                                    className="pl-10 py-3 rounded-xl"
+                                    placeholder="Buscar en el tarifario..."
+                                />
+                            </div>
+
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                                {Object.entries(tarifarioByCategoria).map(([categoria, items]) => {
+                                    const filteredItems = items.filter(item =>
+                                        item.concepto_nombre.toLowerCase().includes(conceptoSearch.toLowerCase())
+                                    );
+
+                                    if (filteredItems.length === 0) return null;
+
+                                    return (
+                                        <div key={categoria} className="space-y-2">
+                                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider sticky top-0 bg-white dark:bg-gray-800 py-1">{categoria}</h4>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {filteredItems.map((item) => (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => selectConcepto(item)}
+                                                        className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-blue-200 hover:bg-blue-50/10 dark:hover:bg-blue-900/10 transition-all text-left group"
+                                                    >
+                                                        <div className="flex-1">
+                                                            <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">{item.concepto_nombre}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="font-bold text-gray-900 dark:text-white">{formatCurrency(item.precio_base_usd, 'USD')}</p>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+                                <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wider">O cargar manualmente:</p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Concepto personalizado..."
+                                        className="flex-1 rounded-xl"
+                                        value={formData.concepto_nombre}
+                                        onChange={(e) => setFormData({ ...formData, concepto_nombre: e.target.value })}
+                                    />
+                                    <Button
+                                        onClick={() => setStep(3)}
+                                        disabled={!formData.concepto_nombre}
+                                        className="bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-xl h-auto"
+                                    >
+                                        Siguiente
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 3 && (
+                        <div className="space-y-6">
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600">
+                                        <DollarSign size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">A recaudar</p>
+                                        <p className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                                            {formatCurrency(formData.monto, formData.moneda)}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] text-blue-400 uppercase tracking-tighter">Equiv. Total</p>
+                                    <p className="font-bold text-blue-500">{formatCurrency(calculateUsdEquivalent(), 'USD')}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Forma de Pago</label>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setUseMultiplePayments(!useMultiplePayments)}
+                                        className={clsx(
+                                            "text-xs font-bold rounded-lg px-3 py-1.5 h-auto transition-all",
+                                            useMultiplePayments
+                                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30"
+                                                : "bg-gray-100 text-gray-600 dark:bg-gray-700/50"
+                                        )}
+                                    >
+                                        {useMultiplePayments ? "Cerrar Split ⨉" : "+ Pago Mixto"}
+                                    </Button>
+                                </div>
+
+                                {!useMultiplePayments ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {METODOS_PAGO.map((m) => (
+                                            <button
+                                                key={m.value}
+                                                onClick={() => setFormData({ ...formData, metodo_pago: m.value as any, canal_destino: m.value === 'MercadoPago' ? 'MP' : m.value === 'Cripto' ? 'USDT' : 'Empresa' })}
+                                                className={clsx(
+                                                    "p-3 rounded-xl border flex flex-col items-center gap-2 transition-all",
+                                                    formData.metodo_pago === m.value
+                                                        ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
+                                                        : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-200"
+                                                )}
+                                            >
+                                                <span className="text-xl">{m.icon}</span>
+                                                <span className="text-xs font-bold">{m.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between text-xs font-bold px-1">
+                                            <span className="text-gray-400 uppercase tracking-widest">Distribución de pago</span>
+                                            <div className="flex gap-3">
+                                                <span className={clsx(remainingUsd > 1 ? "text-amber-600" : remainingUsd < -1 ? "text-red-500" : "text-green-600")}>
+                                                    Restan: {formatCurrency(Math.max(0, remainingUsd), 'USD')}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden flex shadow-inner">
+                                            <div
+                                                className={clsx(
+                                                    "h-full transition-all duration-500",
+                                                    coveragePercentage >= 100 ? "bg-green-500" : "bg-blue-500"
+                                                )}
+                                                style={{ width: `${coveragePercentage}%` }}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+                                            {paymentSplits.map((split, index) => (
+                                                <div key={split.id} className="relative bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                    <div className="grid grid-cols-12 gap-3">
+                                                        <div className="col-span-12 sm:col-span-5">
+                                                            <div className="relative">
+                                                                <MoneyInput
+                                                                    value={split.monto}
+                                                                    onChange={(val) => setSplitValue(index, { monto: val })}
+                                                                    className="w-full text-lg font-bold pl-8 py-3 bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 rounded-xl"
+                                                                />
+                                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="col-span-7 sm:col-span-4 flex rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+                                                            {['ARS', 'USD'].map(m => (
+                                                                <button
+                                                                    key={m}
+                                                                    onClick={() => setSplitValue(index, { moneda: m as any })}
+                                                                    className={clsx(
+                                                                        "flex-1 text-[10px] font-bold py-1",
+                                                                        split.moneda === m ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900" : "text-gray-400"
+                                                                    )}
+                                                                >
+                                                                    {m}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <div className="col-span-5 sm:col-span-3 flex justify-end">
+                                                            {paymentSplits.length > 1 && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => removePaymentSplit(index)}
+                                                                    className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                                >
+                                                                    <Trash2 size={18} />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-2 mt-3">
+                                                        {METODOS_PAGO.map((m) => (
+                                                            <button
+                                                                key={m.value}
+                                                                onClick={() => setSplitValue(index, {
+                                                                    metodo_pago: m.value as any,
+                                                                    canal_destino: m.value === 'MercadoPago' ? 'MP' : m.value === 'Cripto' ? 'USDT' : 'Empresa'
+                                                                })}
+                                                                className={clsx(
+                                                                    "flex flex-col items-center py-2 rounded-lg border transition-all",
+                                                                    split.metodo_pago === m.value
+                                                                        ? "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/30 dark:border-blue-800"
+                                                                        : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-400"
+                                                                )}
+                                                            >
+                                                                <span className="text-xs">{m.icon}</span>
+                                                                <span className="text-[9px] font-bold">{m.label}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <Button
+                                                variant="outline"
+                                                onClick={addPaymentSplit}
+                                                className="w-full py-3 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-blue-600 hover:border-blue-300 dark:hover:bg-blue-900/20 rounded-xl flex items-center justify-center gap-2 h-auto text-xs font-bold uppercase tracking-wider"
+                                            >
+                                                <Plus size={16} /> Agregar otra forma
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             <Button
-                                variant="link"
-                                onClick={() => setStep(2)}
-                                className="w-full text-sm text-blue-600 hover:underline h-auto p-0"
+                                onClick={() => setStep(4)}
+                                className="w-full py-4 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-xl font-bold transition-all h-auto"
                             >
-                                ← Cambiar concepto
+                                Revisar Confirmación
                             </Button>
                         </div>
                     )}
 
-                    {/* Step 4: Confirm */}
                     {step === 4 && (
                         <div className="space-y-6">
                             <h3 className="font-semibold text-gray-900 dark:text-white">Confirmar Ingreso</h3>
@@ -1450,197 +1044,90 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 </div>
                                 {formData.es_sena && formData.sena_tipo && (
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Workflow a activar:</span>
-                                        <span className="font-medium text-amber-700 dark:text-amber-300">{getSenaWorkflowLabel(formData.sena_tipo)}</span>
+                                        <span className="text-gray-500">Workflow:</span>
+                                        <span className="font-medium text-amber-600">{getSenaWorkflowLabel(formData.sena_tipo)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Categoría:</span>
-                                    <span>{formData.categoria}</span>
-                                </div>
-                                <hr className="border-gray-200 dark:border-gray-700" />
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Monto:</span>
+                                    <span className="text-gray-500">Monto Total:</span>
                                     <span className="font-bold text-lg">
                                         {useMultiplePayments
                                             ? formatCurrency(getMixedUsdTotal(paymentSplits), 'USD')
                                             : formatCurrency(formData.monto, formData.moneda)}
                                     </span>
                                 </div>
-                                {formData.es_cuota && (
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Cuota:</span>
-                                        <span className="font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-sm">
-                                            {formData.cuota_nro} de {formData.cuotas_total}
-                                        </span>
-                                    </div>
-                                )}
-                                {formData.moneda === 'ARS' && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Equivalente USD:</span>
-                                        <span>{formatCurrency(calculateUsdEquivalent(), 'USD')}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Método:</span>
-                                    <span>{useMultiplePayments ? `Mixto (${paymentSplits.filter((split) => split.monto > 0).length} pagos)` : formData.metodo_pago}</span>
-                                </div>
-
                                 {useMultiplePayments && (
-                                    <div className="space-y-1 pt-1">
-                                        {paymentSplits.filter((split) => split.monto > 0).map((split, idx) => (
-                                            <div key={split.id} className="flex justify-between text-xs text-gray-500">
-                                                <span>Pago {idx + 1}: {split.metodo_pago}</span>
-                                                <span>{formatCurrency(split.monto, split.moneda)}</span>
+                                    <div className="space-y-1 pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+                                        {paymentSplits.filter(s => s.monto > 0).map((s, idx) => (
+                                            <div key={idx} className="flex justify-between text-xs text-gray-500">
+                                                <span>Pago {idx + 1}: {s.metodo_pago}</span>
+                                                <span>{formatCurrency(s.monto, s.moneda)}</span>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Estado:</span>
-                                    <span className={formData.estado === 'pagado' ? 'text-green-600' : 'text-yellow-600'}>
-                                        {formData.estado === 'pagado' ? '✓ Pagado' : '⏳ Pendiente'}
-                                    </span>
-                                </div>
-                                {formData.comprobante_url && (
-                                    <div className="flex justify-between items-center py-2">
-                                        <span className="text-gray-500">Comprobante:</span>
-                                        <div className="flex items-center gap-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs">
-                                            <ImageIcon size={14} /> Adjunto
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
-                            {/* Observations */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Observaciones (opcional)
-                                </label>
-                                <Textarea
-                                    value={formData.observaciones}
-                                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                                    className="w-full p-3 border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 resize-none min-h-[80px]"
-                                    rows={3}
-                                    placeholder="Notas adicionales..."
-                                />
-                            </div>
+                            <Textarea
+                                value={formData.observaciones}
+                                onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                                className="w-full rounded-xl bg-gray-50 border-gray-200"
+                                placeholder="Observaciones adicionales..."
+                                rows={3}
+                            />
 
                             <Button
                                 onClick={handleSubmit}
                                 disabled={saving}
-                                className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 h-auto"
+                                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 h-auto"
                             >
-                                {saving ? (
-                                    <>
-                                        <Loader2 size={20} className="animate-spin" />
-                                        Guardando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check size={20} />
-                                        Confirmar Ingreso
-                                    </>
-                                )}
-                            </Button>
-
-                            <Button
-                                variant="link"
-                                onClick={() => setStep(3)}
-                                className="w-full text-sm text-blue-600 hover:underline h-auto p-0"
-                            >
-                                ← Volver
+                                {saving ? <Loader2 className="animate-spin" /> : <Check />}
+                                {saving ? 'Guardando...' : 'Confirmar Todo'}
                             </Button>
                         </div>
                     )}
 
                     {step === 5 && (
-                        <div className="space-y-5">
-                            {/* Success header */}
-                            <div className="flex flex-col items-center gap-2 pt-2 pb-1">
-                                <div className="h-14 w-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                    <Check size={28} className="text-green-600 dark:text-green-400" />
-                                </div>
-                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">¡Ingreso registrado!</h3>
-                                <p className="text-sm text-gray-500 text-center">Tu comprobante está listo para compartir</p>
+                        <div className="space-y-5 flex flex-col items-center">
+                            <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center text-green-600">
+                                <Check size={40} />
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-xl font-bold">¡Ingreso Exitoso!</h3>
+                                <p className="text-gray-500 text-sm">El movimiento ha sido registrado correctamente.</p>
                             </div>
 
-                            {/* Receipt preview */}
-                            {generatedReceiptUrl ? (
-                                <div className="rounded-2xl overflow-hidden shadow-2xl border border-gray-100 dark:border-gray-700">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={generatedReceiptUrl}
-                                        alt="Comprobante de pago"
-                                        className="w-full object-contain"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="h-32 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                    <Loader2 size={24} className="animate-spin text-gray-400" />
+                            {generatedReceiptUrl && (
+                                <div className="w-full border rounded-xl overflow-hidden shadow-sm">
+                                    <img src={generatedReceiptUrl} alt="Comprobante" className="w-full" />
                                 </div>
                             )}
 
-                            {/* Sharing actions */}
-                            {/* PRIMARY: Send as image via WhatsApp app (Windows/mobile) */}
-                            <Button
-                                onClick={() => {
-                                    if (!generatedReceiptUrl || !receiptCanvasRef.current) return;
-                                    receiptCanvasRef.current.toBlob(async (blob) => {
-                                        if (!blob) return;
-                                        const file = new File([blob], 'comprobante-AM-Clinica.jpg', { type: 'image/jpeg' });
-                                        if (navigator.canShare?.({ files: [file] })) {
-                                            try {
-                                                await navigator.share({
-                                                    files: [file],
-                                                    title: 'Comprobante AM Clínica',
-                                                });
-                                            } catch { /* cancelled */ }
-                                        } else {
-                                            // Fallback: download so user can attach manually
-                                            const link = document.createElement('a');
-                                            link.href = generatedReceiptUrl;
-                                            link.download = 'comprobante-AM-Clinica.jpg';
-                                            link.click();
-                                        }
-                                    }, 'image/jpeg', 0.95);
-                                }}
-                                disabled={!generatedReceiptUrl}
-                                className="w-full py-4 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2 text-base"
-                            >
-                                📲 Enviar como imagen por WhatsApp
-                            </Button>
-                            <p className="text-xs text-center text-gray-400 -mt-2">
-                                Abre WhatsApp (app de Windows o móvil) y adjunta la imagen automáticamente
-                            </p>
-
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="flex gap-3 w-full">
                                 <Button
                                     onClick={() => {
-                                        if (!generatedReceiptUrl) return;
-                                        const link = document.createElement('a');
-                                        link.href = generatedReceiptUrl;
-                                        link.download = 'comprobante-AM-Clinica.jpg';
-                                        link.click();
+                                        if (generatedReceiptUrl) {
+                                            const link = document.createElement('a');
+                                            link.href = generatedReceiptUrl;
+                                            link.download = `comprobante-${formData.paciente_nombre}.jpg`;
+                                            link.click();
+                                        }
                                     }}
-                                    disabled={!generatedReceiptUrl}
-                                    className="py-3 bg-gray-700 hover:bg-gray-800 text-white font-bold rounded-xl h-auto border-none flex items-center justify-center gap-2"
+                                    className="flex-1 bg-gray-100 text-gray-900 hover:bg-gray-200 h-auto py-3 rounded-xl font-bold"
                                 >
-                                    💾 Descargar JPG
+                                    Descargar
                                 </Button>
-
                                 <Button
                                     onClick={handleClose}
-                                    className="py-3 bg-transparent border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold rounded-xl h-auto flex items-center justify-center gap-2"
+                                    className="flex-1 bg-blue-600 text-white hover:bg-blue-700 h-auto py-3 rounded-xl font-bold"
                                 >
-                                    ✕ Cerrar
+                                    Cerrar
                                 </Button>
                             </div>
                         </div>
                     )}
                 </div>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 }

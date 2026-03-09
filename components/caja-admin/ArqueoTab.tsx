@@ -32,7 +32,7 @@ interface Props {
 }
 
 export default function ArqueoTab({ sucursal, tcBna }: Props) {
-    const { user, profile, categoria: role } = useAuth();
+    const { user: authUser, profile: authProfile, categoria: role } = useAuth();
     const [cierreHoy, setCierreHoy] = useState<CajaAdminArqueo | null>(null);
     const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
     const [ultimoCierre, setUltimoCierre] = useState<CajaAdminArqueo | null>(null);
@@ -126,15 +126,15 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
             const today = getLocalISODate();
             const yesterdayDate = new Date();
             yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-            const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+            const yesterdayStrValue = yesterdayDate.toISOString().split('T')[0];
 
             // Re-fetch yesterday balance to ensure no cache issues just before opening
-            const balanceYesterday = await getCurrentBalanceAdmin(sucursal.id, yesterdayStr);
+            const balanceYesterday = await getCurrentBalanceAdmin(sucursal.id, yesterdayStrValue);
 
             await abrirCajaAdminDelDia({
                 sucursalId: sucursal.id,
                 fecha: today,
-                usuario: profile?.full_name || user?.email || 'Admin',
+                usuario: authProfile?.full_name || authUser?.email || 'Admin',
                 tcBna: tcBna || null,
                 saldosIniciales: balanceYesterday.saldosPorCuenta,
             });
@@ -172,7 +172,7 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
             const { success, error } = await cerrarCajaAdmin({
                 sucursalId: sucursal.id,
                 fecha: getLocalISODate(),
-                usuario: profile?.full_name || user?.email || 'Admin',
+                usuario: authProfile?.full_name || authUser?.email || 'Admin',
                 saldosFinales: saldos,
                 saldoFinalUsdEq: totalCountedUsdEq,
                 diferenciaUsd: totalCountedUsdEq - totalExpectedUsdEq,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { Box, FolderOpen, RefreshCw, Eye, CheckCircle2, Clock, AlertCircle, ExternalLink, Smartphone, Upload, UploadCloud } from 'lucide-react';
+import { Box, Eye, FolderOpen, RefreshCw, CheckCircle2, Clock, AlertCircle, ExternalLink, Smartphone, Upload, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     activateDesignFlow,
@@ -301,6 +301,17 @@ export default function DesignReviewTab({ patientId, motherFolderUrl, initialRev
                     </p>
                 )}
             </div>
+
+            {/* Inline 3D preview */}
+            {hasFile && (
+                <div className="rounded-2xl overflow-hidden border border-white/10 bg-black" style={{ height: '480px' }}>
+                    <iframe
+                        src={`/api/design-review/${patientId}/preview`}
+                        className="w-full h-full border-0"
+                        title="Vista previa del diseño"
+                    />
+                </div>
+            )}
 
             {/* Upload zone — primary if no file, compact replace if file exists */}
             {!hasFile ? (
