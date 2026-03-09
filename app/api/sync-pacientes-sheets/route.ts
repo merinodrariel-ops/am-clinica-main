@@ -1,10 +1,12 @@
 import { createAdminClient } from '@/utils/supabase/admin';
-import { NextResponse } from 'next/server';
+import { authorizeRequest } from '@/lib/api-auth';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Initialize Supabase Client lazily
 const getSupabase = () => createAdminClient();
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQwXYeMlpxFSKlCi6tOiJtaxQqcAHUPOAAqVPpzalimICRNj0QsfRcDR3ye2Cr80TOH1xSN6QYsHTYc/pub?gid=1185177260&single=true&output=csv';
+const ENABLE_SYNC_PACIENTES_SHEETS = process.env.ENABLE_SYNC_PACIENTES_SHEETS === 'true';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,16 +24,22 @@ interface ExistingPatientRow {
     documento: string | null;
 }
 
-interface PatientUpdates {
-    link_google_slides?: string;
-    observaciones_generales?: string;
-    referencia_origen?: string;
-    [key: string]: any; // Allow other fields
-}
-
 // ... imports
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    if (process.env.NODE_ENV === 'production' && !ENABLE_SYNC_PACIENTES_SHEETS) {
+        return NextResponse.json(
+            { success: false, error: 'Endpoint disabled in production' },
+            { status: 410 }
+        );
+    }
+
+    const auth = await authorizeRequest(request);
+    if (!auth.authorized) {
+        const status = auth.error?.toLowerCase().includes('forbidden') ? 403 : 401;
+        return NextResponse.json({ success: false, error: auth.error }, { status });
+    }
+
     const supabase = getSupabase();
     try {
         const response = await fetch(SHEET_URL);
@@ -102,7 +110,7 @@ export async function GET() {
                 let existing: ExistingPatientRow | null = null;
 
                 if (dni) {
-                    const { data, error } = await supabase
+                    const { data } = await supabase
                         .from('pacientes')
                         .select('id_paciente, nombre, apellido, email, whatsapp, ciudad, link_google_slides, observaciones_generales, documento')
                         .eq('documento', dni)
@@ -116,7 +124,7 @@ export async function GET() {
 
                 // Fallback to Email only if DNI wasn't found (or wasn't provided)
                 if (!existing && email) {
-                    const { data, error } = await supabase
+                    const { data } = await supabase
                         .from('pacientes')
                         .select('id_paciente, nombre, apellido, email, whatsapp, ciudad, link_google_slides, observaciones_generales, documento')
                         .eq('email', email)
@@ -130,7 +138,7 @@ export async function GET() {
 
                 // Fallback to Nombre + Apellido if neither DNI nor Email matched
                 if (!existing && nombre && apellido) {
-                    const { data, error } = await supabase
+                    const { data } = await supabase
                         .from('pacientes')
                         .select('id_paciente, nombre, apellido, email, whatsapp, ciudad, link_google_slides, observaciones_generales, documento')
                         .eq('nombre', nombre)
@@ -145,7 +153,7 @@ export async function GET() {
 
                 if (existing) {
                     // DUPLICATE FOUND - UPDATE LOGIC
-                    const updates: Record<string, any> = {};
+                    const updates: Record<string, unknown> = {};
 
                     // Helper: Update field if new value is present and different.
                     // "Nunca reemplazar un campo completo con uno vacío"

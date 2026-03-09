@@ -49,6 +49,8 @@ interface SyncIdentidadesResult {
 
 const PRESUPUESTO_KEYS = ['presupuesto_id', 'id_presupuesto', 'presupuesto_ref', 'id_presupuesto_externo', 'presupuesto'];
 const DNI_KEYS = ['dni', 'documento', 'paciente_documento', 'dni_paciente', 'cuit'];
+const PLAN_STATE_IN_COURSE = 'En curso';
+const PLAN_STATE_COMPLETED_CANDIDATES = ['Finalizado', 'Completado'] as const;
 
 function normalizeText(value?: string | null) {
     return (value || '')
@@ -94,6 +96,10 @@ function getPlanText(plan: Record<string, unknown>, key: string) {
 function getPlanNumber(plan: Record<string, unknown>, key: string) {
     const value = Number(plan[key]);
     return Number.isFinite(value) ? value : 0;
+}
+
+function isPlanEstadoConstraintError(message?: string) {
+    return (message || '').includes('planes_financiacion_estado_check');
 }
 
 function findByPresupuestoRef(plans: Array<Record<string, unknown>>, presupuestoRef: string) {
@@ -259,7 +265,7 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
         const { data: plansRaw, error: plansError } = await admin
             .from('planes_financiacion')
             .select('*')
-            .eq('estado', 'En curso')
+            .eq('estado', PLAN_STATE_IN_COURSE)
             .order('created_at', { ascending: false })
             .limit(300);
 
@@ -351,23 +357,50 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
 
         const nextPaid = totalCuotas > 0 ? Math.min(totalCuotas, prevPaid + 1) : prevPaid + 1;
         const nextSaldo = Math.max(0, currentSaldo - cuotaValue);
-        const nextEstado = totalCuotas > 0 && nextPaid >= totalCuotas ? 'Finalizado' : 'En curso';
+        const shouldMarkCompleted = totalCuotas > 0 && nextPaid >= totalCuotas;
 
-        const updatePayload: Record<string, unknown> = {
+        const updatePayloadBase: Record<string, unknown> = {
             cuotas_pagadas: nextPaid,
             saldo_restante_usd: nextSaldo,
-            estado: nextEstado,
             updated_at: new Date().toISOString(),
         };
 
         if (!matched.paciente_id || String(matched.paciente_id) !== effectivePatientId) {
-            updatePayload.paciente_id = effectivePatientId;
+            updatePayloadBase.paciente_id = effectivePatientId;
         }
 
-        const { error: updateError } = await admin
-            .from('planes_financiacion')
-            .update(updatePayload)
-            .eq('id', planId);
+        const estadoCandidates = shouldMarkCompleted
+            ? [...PLAN_STATE_COMPLETED_CANDIDATES]
+            : [PLAN_STATE_IN_COURSE];
+
+        let updateError: { message: string } | null = null;
+
+        for (const estadoCandidate of estadoCandidates) {
+            const { error } = await admin
+                .from('planes_financiacion')
+                .update({ ...updatePayloadBase, estado: estadoCandidate })
+                .eq('id', planId);
+
+            if (!error) {
+                updateError = null;
+                break;
+            }
+
+            updateError = { message: error.message };
+        }
+
+        if (updateError && shouldMarkCompleted && isPlanEstadoConstraintError(updateError.message)) {
+            const { error: fallbackError } = await admin
+                .from('planes_financiacion')
+                .update(updatePayloadBase)
+                .eq('id', planId);
+
+            if (!fallbackError) {
+                updateError = null;
+            } else {
+                updateError = { message: fallbackError.message };
+            }
+        }
 
         if (updateError) {
             const pendingSaved = await savePendingPayment(

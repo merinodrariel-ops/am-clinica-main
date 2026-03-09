@@ -59,12 +59,7 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/forgot-password') ||
         path.startsWith('/api/patient-portal/') ||
         path.startsWith('/api/public-booking') ||
-        path.startsWith('/api/sync-') ||
-        path.startsWith('/api/import-') ||
         path.startsWith('/api/workflows/') ||
-        path === '/api/setup-sucursales' ||
-        path === '/api/check-sucursales' ||
-        path === '/api/check-profiles' ||
         path === '/api/admission';
 
     // NOTE: If '/' is the landing page and public, keep it here. 
