@@ -99,6 +99,7 @@ interface PortalData {
         status: string;
         label: string;
         drive_html_file_id: string | null;
+        storage_html_url: string | null;
     } | null;
 }
 
@@ -510,7 +511,7 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                             patientId={patient.id_paciente}
                             token={token}
                             label={designReview.label}
-                            hasHtml={!!designReview.drive_html_file_id}
+                            hasHtml={!!(designReview.drive_html_file_id || designReview.storage_html_url)}
                         />
                     </FadeIn>
                 )}

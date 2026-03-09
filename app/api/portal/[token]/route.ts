@@ -90,7 +90,7 @@ export async function GET(
 
         supabase
             .from('patient_design_reviews')
-            .select('id, status, label, drive_html_file_id, patient_comment, viewed_at, responded_at')
+            .select('id, status, label, drive_html_file_id, storage_html_url, patient_comment, viewed_at, responded_at')
             .eq('patient_id', patientId)
             .order('created_at', { ascending: false })
             .limit(1)

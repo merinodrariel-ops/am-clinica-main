@@ -74,6 +74,7 @@ interface DesignReview {
     status: string;
     label: string;
     drive_html_file_id: string | null;
+    storage_html_url: string | null;
     exocad_folder_id: string | null;
     patient_comment: string | null;
     viewed_at: string | null;

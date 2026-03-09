@@ -11,21 +11,31 @@ import crypto from 'crypto';
 
 const APP_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || '';
 
-/** Activa el flujo de diseño digital: crea carpeta EXOCAD/HTML en Drive y registra en DB */
+/** Activa el flujo de diseño digital: crea registro en DB y opcionalmente carpeta EXOCAD/HTML en Drive */
 export async function activateDesignFlow(
     patientId: string,
-    motherFolderUrl: string
-): Promise<{ success: boolean; reviewId?: string; htmlFolderId?: string; error?: string }> {
+    motherFolderUrl: string | null
+): Promise<{ success: boolean; reviewId?: string; htmlFolderId?: string; driveWarning?: string; error?: string }> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autenticado' };
 
-    const motherFolderId = extractFolderIdFromUrl(motherFolderUrl);
-    if (!motherFolderId) return { success: false, error: 'El paciente no tiene carpeta de Drive configurada' };
+    // Drive folder creation is optional — if it fails we still activate the flow
+    let htmlFolderId: string | undefined;
+    let driveWarning: string | undefined;
 
-    const folderResult = await ensureExocadHtmlFolder(motherFolderId);
-    if (folderResult.error || !folderResult.htmlFolderId) {
-        return { success: false, error: folderResult.error };
+    const motherFolderId = extractFolderIdFromUrl(motherFolderUrl);
+    if (motherFolderId) {
+        try {
+            const folderResult = await ensureExocadHtmlFolder(motherFolderId);
+            if (folderResult.htmlFolderId) {
+                htmlFolderId = folderResult.htmlFolderId;
+            } else {
+                driveWarning = folderResult.error || 'No se pudo crear la carpeta en Drive (podés subir el archivo directamente)';
+            }
+        } catch {
+            driveWarning = 'Error al conectar con Drive — podés subir el archivo directamente desde este panel';
+        }
     }
 
     const admin = createAdminClient();
@@ -34,7 +44,7 @@ export async function activateDesignFlow(
         .upsert(
             {
                 patient_id: patientId,
-                exocad_folder_id: folderResult.htmlFolderId,
+                exocad_folder_id: htmlFolderId ?? null,
                 label: 'Diseño de Sonrisa',
                 status: 'pending',
                 uploaded_by: user.id,
@@ -49,7 +59,8 @@ export async function activateDesignFlow(
     return {
         success: true,
         reviewId: data.id,
-        htmlFolderId: folderResult.htmlFolderId,
+        htmlFolderId,
+        driveWarning,
     };
 }
 
@@ -127,6 +138,54 @@ export async function generateDesignReviewToken(
     return { success: true, url: portalUrl, whatsappUrl };
 }
 
+/** Genera una URL firmada para que el cliente suba el HTML directamente a Supabase Storage */
+export async function getDesignUploadUrl(
+    reviewId: string,
+    patientId: string
+): Promise<{ success: boolean; signedUrl?: string; storagePath?: string; error?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const storagePath = `${patientId}/${reviewId}.html`;
+    const admin = createAdminClient();
+
+    const { data, error } = await admin.storage
+        .from('design-files')
+        .createSignedUploadUrl(storagePath, { upsert: true });
+
+    if (error || !data?.signedUrl) {
+        return { success: false, error: error?.message || 'No se pudo generar la URL de subida' };
+    }
+
+    return { success: true, signedUrl: data.signedUrl, storagePath };
+}
+
+/** Guarda el storage path en el DB luego de una subida exitosa */
+export async function saveDesignFileUrl(
+    reviewId: string,
+    storagePath: string
+): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const admin = createAdminClient();
+
+    // Store the storage PATH directly (not a public URL) so the HTML proxy
+    // route can download it via admin client regardless of bucket visibility.
+    const { error } = await admin
+        .from('patient_design_reviews')
+        .update({
+            storage_html_url: storagePath,
+            status: 'pending',
+        })
+        .eq('id', reviewId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
 /** Obtiene el design review activo de un paciente */
 export async function getPatientDesignReview(
     patientId: string
@@ -136,6 +195,7 @@ export async function getPatientDesignReview(
         status: string;
         label: string;
         drive_html_file_id: string | null;
+        storage_html_url: string | null;
         exocad_folder_id: string | null;
         patient_comment: string | null;
         viewed_at: string | null;
@@ -147,7 +207,7 @@ export async function getPatientDesignReview(
     const admin = createAdminClient();
     const { data, error } = await admin
         .from('patient_design_reviews')
-        .select('id, status, label, drive_html_file_id, exocad_folder_id, patient_comment, viewed_at, responded_at, created_at')
+        .select('id, status, label, drive_html_file_id, storage_html_url, exocad_folder_id, patient_comment, viewed_at, responded_at, created_at')
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(1)
