@@ -114,7 +114,6 @@ const METODOS_PAGO = [
     { value: 'Transferencia', label: 'Transferencia', icon: '🏦' },
     { value: 'MercadoPago', label: 'Mercado Pago', icon: '📱' },
     { value: 'Cripto', label: 'Cripto (USDT)', icon: '₿' },
-    { value: 'Mixto', label: 'Pago Mixto', icon: '🎨' },
 ];
 
 export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, initialPatientId }: NuevoIngresoFormProps) {
@@ -461,11 +460,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     created_by: user.id,
                     es_sena: formData.es_sena,
                     sena_tipo: formData.sena_tipo,
-                    es_cuota: formData.es_cuota,
+                    es_ingreso: true,
                     cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
                     cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
                     presupuesto_ref: formData.presupuesto_ref || null,
-                    pago_detalles: useMultiplePayments ? activeSplits : null, // Store splits only once or per row (better once in first row or null if not used)
+                    pago_detalles: useMultiplePayments ? activeSplits : null,
                     split_group_id: splitGroupId,
                     comprobante_url: formData.comprobante_url || null,
                 };
@@ -719,72 +718,40 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         )}
                                     </div>
 
-                                    <div className="flex flex-col gap-6 bg-gradient-to-br from-blue-50/50 to-amber-50/30 dark:from-blue-900/10 dark:to-amber-950/10 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-12 w-12 rounded-2xl bg-white dark:bg-gray-800 flex items-center justify-center text-blue-600 shadow-sm border border-gray-100 dark:border-gray-700">
-                                                <Layout size={24} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">Modalidad de Cobro</h3>
-                                                <p className="text-xs text-gray-500 font-medium">Define cómo vas a recibir este pago</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3 p-1.5 bg-gray-100/80 dark:bg-gray-900/50 rounded-[22px] border border-gray-200/50 dark:border-gray-700/50">
-                                            <button
-                                                type="button"
-                                                onClick={() => setUseMultiplePayments(false)}
-                                                className={clsx(
-                                                    "relative flex flex-col items-center justify-center gap-1.5 py-4 rounded-[18px] transition-all overflow-hidden",
-                                                    !useMultiplePayments
-                                                        ? "bg-white dark:bg-gray-800 shadow-xl text-blue-600 ring-1 ring-black/5"
-                                                        : "text-gray-400 hover:text-gray-500 hover:bg-gray-200/50 dark:hover:bg-gray-800/30"
-                                                )}
-                                            >
-                                                {!useMultiplePayments && <div className="absolute top-0 left-0 w-full h-1 bg-blue-500" />}
-                                                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Pago Único</span>
-                                                <span className="text-[9px] opacity-60 font-medium">Un solo método</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setUseMultiplePayments(true)}
-                                                className={clsx(
-                                                    "relative flex flex-col items-center justify-center gap-1.5 py-4 rounded-[18px] transition-all overflow-hidden",
-                                                    useMultiplePayments
-                                                        ? "bg-amber-500 shadow-xl text-white shadow-amber-500/20"
-                                                        : "text-gray-400 hover:text-gray-500 hover:bg-gray-200/50 dark:hover:bg-gray-800/30"
-                                                )}
-                                            >
-                                                {useMultiplePayments && <div className="absolute top-0 left-0 w-full h-1 bg-white/30" />}
-                                                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Pago Mixto</span>
-                                                <span className="text-[9px] opacity-80 font-medium font-bold">Dividir montos</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
                                     {!useMultiplePayments ? (
                                         <div className="space-y-4">
-                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
-                                                Monto del Ingreso *
-                                            </label>
+                                            <div className="flex items-center justify-between">
+                                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                                    Monto del Ingreso *
+                                                </label>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    onClick={() => setUseMultiplePayments(true)}
+                                                    className="h-8 text-[10px] font-black uppercase text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-3 rounded-lg flex items-center gap-1.5 shadow-sm border border-blue-100 dark:border-blue-900/30"
+                                                >
+                                                    <Plus size={14} />
+                                                    Dividir Pago
+                                                </Button>
+                                            </div>
                                             <div className="flex gap-3">
                                                 <div className="relative flex-1">
                                                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                                                     <MoneyInput
                                                         value={formData.monto || 0}
                                                         onChange={(val) => setFormData({ ...formData, monto: val })}
-                                                        className="w-full h-auto text-3xl font-black py-4 focus-visible:ring-blue-500 bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800"
+                                                        className="w-full h-auto text-3xl font-black py-4 focus-visible:ring-blue-500 bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 shadow-inner"
                                                         placeholder="0"
                                                     />
                                                 </div>
-                                                <div className="flex rounded-2xl overflow-hidden border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                                                <div className="flex rounded-2xl overflow-hidden border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 shadow-sm">
                                                     {['ARS', 'USD', 'USDT'].map((m) => (
                                                         <Button
                                                             key={m}
                                                             type="button"
                                                             onClick={() => setFormData({ ...formData, moneda: m as any })}
                                                             className={clsx(
-                                                                "px-4 py-2 text-[11px] font-black transition-all rounded-none h-auto",
+                                                                "px-5 py-2 text-[11px] font-black transition-all rounded-none h-auto",
                                                                 formData.moneda === m
                                                                     ? "bg-blue-600 text-white shadow-lg"
                                                                     : "bg-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -799,8 +766,18 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                     ) : (
                                         <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                             <div className="flex items-center justify-between">
-                                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Desglose de Pagos Mixtos</label>
-                                                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[10px] font-black rounded uppercase">Multimoneda</span>
+                                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                                    Desglose de Pago Mixto
+                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded-lg uppercase tracking-widest">Multimoneda</span>
+                                                </label>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    onClick={() => setUseMultiplePayments(false)}
+                                                    className="h-7 text-[9px] font-black uppercase text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 rounded-lg"
+                                                >
+                                                    Volver a Pago Único
+                                                </Button>
                                             </div>
 
                                             <div className="space-y-3">
@@ -1094,16 +1071,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         <button
                                             key={m.value}
                                             onClick={() => {
-                                                if (m.value === 'Mixto') {
-                                                    setUseMultiplePayments(true);
-                                                    setStep(1);
-                                                } else {
-                                                    setFormData({ ...formData, metodo_pago: m.value as any, canal_destino: m.value === 'MercadoPago' ? 'MP' : m.value === 'Cripto' ? 'USDT' : 'Empresa' });
-                                                }
+                                                setFormData({ ...formData, metodo_pago: m.value as any, canal_destino: m.value === 'MercadoPago' ? 'MP' : m.value === 'Cripto' ? 'USDT' : 'Empresa' });
                                             }}
                                             className={clsx(
                                                 "p-5 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all",
-                                                (formData.metodo_pago === m.value && !useMultiplePayments) || (useMultiplePayments && m.value === 'Mixto')
+                                                (formData.metodo_pago === m.value && !useMultiplePayments)
                                                     ? "bg-blue-600 border-blue-600 text-white shadow-lg scale-[1.02]"
                                                     : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-600 hover:border-blue-200"
                                             )}
