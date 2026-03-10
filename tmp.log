@@ -4710,3 +4710,5 @@ Import traces:
  GET /api/bna-cotizacion 200 in 826ms (compile: 45ms, proxy.ts: 366ms, render: 415ms)
  GET /api/bna-cotizacion 200 in 313ms (compile: 7ms, proxy.ts: 230ms, render: 76ms)
 ✓ Finished writing to filesystem cache in 14.2s
+ POST /caja-recepcion 200 in 2.3s (compile: 138ms, proxy.ts: 1249ms, render: 956ms)
+✓ Compiled in 471ms

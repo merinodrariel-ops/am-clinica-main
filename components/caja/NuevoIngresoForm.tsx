@@ -443,7 +443,6 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
                 return {
                     paciente_id: formData.paciente_id,
-                    paciente_nombre: formData.paciente_nombre,
                     concepto_nombre: conceptoFinal,
                     categoria: categoriaFinal,
                     precio_lista_usd: formData.precio_lista_usd,
@@ -463,6 +462,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     cuotas_total: formData.cuotas_total,
                     tc_bna_venta: bnaRate,
                     tc_fuente: 'MANUAL',
+                    split_group_id: splitGroupId,
                 };
             });
 
@@ -725,11 +725,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                 <button
                                                     type="button"
                                                     onClick={() => setUseMultiplePayments(true)}
-                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all border border-blue-100 dark:border-blue-900/30 flex items-center gap-1.5"
+                                                    className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded flex items-center gap-1 transition-colors"
                                                     title="Dividir Pago"
                                                 >
                                                     <Plus className="w-3.5 h-3.5" />
-                                                    <span className="text-[10px] font-bold uppercase">Dividir</span>
+                                                    <span className="text-[9px] font-bold uppercase">Pago Mixto</span>
                                                 </button>
                                             </div>
                                             <div className="flex gap-3">
