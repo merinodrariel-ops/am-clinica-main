@@ -32,10 +32,83 @@ interface ContratosFinanciacionTabProps {
 
 const EXECUTIVE_WHATSAPP_NUMBER = '5491100000000';
 
+interface InlineEditFieldProps {
+  value: string;
+  placeholder?: string;
+  onSave: (val: string) => void;
+  multiline?: boolean;
+}
+
+function InlineEditField({ value, placeholder = '___________________________', onSave, multiline = false }: InlineEditFieldProps) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+
+  React.useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const handleSave = () => {
+    setEditing(false);
+    onSave(draft);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !multiline) {
+      e.preventDefault();
+      handleSave();
+    }
+    if (e.key === 'Escape') {
+      setDraft(value);
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    if (multiline) {
+      return (
+        <textarea
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="inline-block w-full border-b-2 border-blue-500 outline-none bg-blue-50 text-black px-1 text-sm resize-none"
+          rows={2}
+        />
+      );
+    }
+    return (
+      <input
+        autoFocus
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        className="inline-block border-b-2 border-blue-500 outline-none bg-blue-50 text-black px-1 text-sm"
+        style={{ minWidth: '120px', width: Math.max((draft.length || 10) * 8, 120) + 'px' }}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      className="group/inline relative cursor-text"
+      title="Clic para editar"
+    >
+      <span className={`border-b border-dashed border-gray-400 hover:border-blue-400 transition-colors ${!value ? 'text-gray-400 italic' : ''}`}>
+        {value || placeholder}
+      </span>
+      <span className="print:hidden ml-1 opacity-0 group-hover/inline:opacity-60 transition-opacity text-blue-500 text-[10px] select-none">✏</span>
+    </span>
+  );
+}
+
 export default function ContratosFinanciacionTab({ initialPatientId }: ContratosFinanciacionTabProps) {
   // Estados del Simulador
   const [totalAmount, setTotalAmount] = useState<string>('');
-  const [downPaymentPct, setDownPaymentPct] = useState<number>(30);
+  const [totalRecibido, setTotalRecibido] = useState<string>('');
   const [cuit, setCuit] = useState<string>('');
   const [cuitError, setCuitError] = useState<string | null>(null);
   const [isCuitValid, setIsCuitValid] = useState<boolean | null>(null);
@@ -50,10 +123,20 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     direccion: '',
     cuitCuil: '',
     email: '',
+    tipoTratamiento: '',
     tratamiento: '',
-    piezas: '',
-    plazo: ''
+    maxilar: '',
+    plazo: '',
+    materiales: ''
   });
+
+  const handleTipoTratamientoChange = (tipo: string) => {
+    const updates: Partial<typeof patientData> = { tipoTratamiento: tipo };
+    if (tipo === 'ortodoncia') updates.materiales = 'Alineadores invisibles';
+    else if (tipo !== 'diseno_sonrisa') updates.materiales = '';
+    else updates.materiales = '';
+    setPatientData(prev => ({ ...prev, ...updates }));
+  };
   const [selectedPlanForContract, setSelectedPlanForContract] = useState<PlanOption | null>(null);
 
   // Estados de Búsqueda de Pacientes
@@ -196,7 +279,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
       '',
       'Quiero hablar con un ejecutivo para avanzar con mi sonrisa y resolver dudas sobre los planes.',
       `Monto estimado: ${totalText}`,
-      `Anticipo: ${downPaymentPct}%`,
+      `Recibido: ${calculations ? formatCurrency(calculations.recibido) : 'A definir'}`,
       `Plan de cuotas: ${selectedPlanText}`,
       '',
       'Me ayudan por favor?',
@@ -216,53 +299,81 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     const printContent = document.getElementById('printable-contract');
     if (!printContent) return;
 
+    // Clone the contract HTML and make InlineEditField spans editable
+    const clone = printContent.cloneNode(true) as HTMLElement;
+
+    // Replace InlineEditField interactive spans with contentEditable spans
+    clone.querySelectorAll('[title="Clic para editar"]').forEach(el => {
+      const span = el as HTMLElement;
+      const textNode = span.querySelector('span:first-child');
+      const text = textNode?.textContent || '';
+      const editable = document.createElement('span');
+      editable.contentEditable = 'true';
+      editable.setAttribute('data-editable', 'true');
+      editable.textContent = text;
+      span.replaceWith(editable);
+    });
+
+    // Also make .value divs in financial-box editable
+    clone.querySelectorAll('.value').forEach(el => {
+      (el as HTMLElement).contentEditable = 'true';
+      (el as HTMLElement).setAttribute('data-editable', 'true');
+    });
+
     const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Contrato de Prestación de Servicios Odontológicos</title>
-            <style>
-              body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #000; padding: 40px; max-width: 800px; margin: 0 auto; }
-              h1 { text-align: center; font-size: 18px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 30px; }
-              h2 { font-size: 14px; text-transform: uppercase; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-              p { font-size: 12px; margin-bottom: 10px; text-align: justify; }
-              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-              .field { margin-bottom: 10px; }
-              .label { font-weight: bold; font-size: 10px; text-transform: uppercase; color: #555; }
-              .value { font-size: 12px; border-bottom: 1px solid #000; padding-bottom: 2px; min-height: 18px; }
-              .signatures { margin-top: 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: center; }
-              .signature-line { border-top: 1px solid #000; padding-top: 10px; font-size: 12px; }
-              .financial-box { border: 1px solid #000; padding: 15px; margin-top: 20px; background-color: #f9f9f9; }
-              @media print {
-                body { padding: 0; }
-                button { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-            <script>
-              window.onload = () => {
-                window.print();
-                setTimeout(() => window.close(), 500);
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    } else {
+    if (!printWindow) {
       window.print();
+      return;
     }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Contrato de Prestación de Servicios Odontológicos</title>
+          <style>
+            body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #000; padding: 40px; max-width: 800px; margin: 0 auto; }
+            h1 { text-align: center; font-size: 18px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 30px; }
+            h2 { font-size: 14px; text-transform: uppercase; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+            p { font-size: 12px; margin-bottom: 10px; text-align: justify; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+            .field { margin-bottom: 10px; }
+            .label { font-weight: bold; font-size: 10px; text-transform: uppercase; color: #555; }
+            .value { font-size: 12px; border-bottom: 1px solid #000; padding-bottom: 2px; min-height: 18px; }
+            .signatures { margin-top: 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: center; }
+            .signature-line { border-top: 1px solid #000; padding-top: 10px; font-size: 12px; }
+            .financial-box { border: 1px solid #000; padding: 15px; margin-top: 20px; background-color: #f9f9f9; }
+            [data-editable] { outline: none; cursor: text; }
+            [data-editable]:hover { background-color: #fffbeb; }
+            [data-editable]:focus { background-color: #eff6ff; }
+            #edit-banner { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 10px 16px; margin-bottom: 24px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: Arial, sans-serif; }
+            #print-btn { background: #10b981; color: white; border: none; padding: 8px 20px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
+            #print-btn:hover { background: #059669; }
+            @media print {
+              #edit-banner { display: none !important; }
+              body { padding: 0; }
+              [data-editable] { cursor: default; }
+            }
+          </style>
+        </head>
+        <body>
+          <div id="edit-banner">
+            <span>&#9998; <strong>Podés editar cualquier campo antes de imprimir.</strong> Hacé clic sobre el texto subrayado para corregirlo.</span>
+            <button id="print-btn" onclick="window.print()">Imprimir ahora</button>
+          </div>
+          ${clone.outerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const calculations = useMemo(() => {
     const amount = parseFloat(totalAmount.replace(/\./g, ''));
     if (isNaN(amount) || amount <= 0) return null;
 
-    const downPayment = amount * (downPaymentPct / 100);
-    const amountToFinance = amount - downPayment;
+    const recibido = parseFloat(totalRecibido.replace(/\./g, '')) || 0;
+    const amountToFinance = Math.max(amount - recibido, 0);
+    const pctRecibido = amount > 0 ? Math.round((recibido / amount) * 100) : 0;
 
     const plans: PlanOption[] = [
       {
@@ -289,8 +400,8 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
       }
     ];
 
-    return { amount, downPayment, amountToFinance, plans };
-  }, [totalAmount, downPaymentPct]);
+    return { amount, recibido, amountToFinance, pctRecibido, plans };
+  }, [totalAmount, totalRecibido]);
 
   return (
     <div className="bg-[#0a0a0a] text-white p-4 md:p-8 font-sans selection:bg-emerald-500/30 rounded-2xl max-w-full overflow-hidden">
@@ -360,53 +471,6 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                     />
                     <span className="text-xl md:text-3xl text-gray-500 font-medium mb-3 md:mb-4 ml-4">USD</span>
                   </div>
-                </div>
-
-                {/* Anticipo slider */}
-                <div className="mb-12 relative z-10">
-                  <label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-gray-400 mb-6 block">
-                    ANTICIPO INICIAL ({downPaymentPct}%)
-                  </label>
-                  <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8">
-                    <div className="flex-1 relative flex items-center h-8">
-                      <input
-                        type="range"
-                        min="30"
-                        max="50"
-                        step="10"
-                        value={downPaymentPct}
-                        onChange={(e) => setDownPaymentPct(Number(e.target.value))}
-                        className="w-full absolute inset-0 opacity-0 cursor-pointer z-10"
-                      />
-                      {/* Interfaz Custom del Slider */}
-                      <div className="w-full h-3 bg-zinc-800 rounded-full border border-white/5 overflow-hidden relative pointer-events-none shadow-inner">
-                        <div
-                          className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-emerald-500 to-blue-500 transition-all duration-300"
-                          style={{ width: `${(downPaymentPct - 30) / 20 * 100}%` }}
-                        ></div>
-                      </div>
-                      <div
-                        className="absolute w-6 h-6 bg-emerald-400 rounded-full shadow-[0_0_20px_rgba(52,211,153,0.8)] transition-all pointer-events-none transform -translate-y-1/2 top-1/2 border-[3px] border-[#111]"
-                        style={{ left: `calc(${(downPaymentPct - 30) / 20 * 100}% - 12px)` }}
-                      ></div>
-                    </div>
-                    {/* Botones de Porcentaje Rápido */}
-                    <div className="flex gap-2 justify-between md:justify-end">
-                      {[30, 40, 50].map((pct) => (
-                        <button
-                          key={pct}
-                          onClick={() => setDownPaymentPct(pct)}
-                          className={`px-4 md:px-5 py-2 md:py-3 rounded-xl text-sm font-bold transition-all flex-1 md:flex-none uppercase tracking-wider ${downPaymentPct === pct
-                              ? 'bg-emerald-400 text-black shadow-[0_0_20px_rgba(52,211,153,0.4)]'
-                              : 'bg-zinc-800/80 text-gray-400 hover:text-white border border-white/5 hover:border-white/20'
-                            }`}
-                        >
-                          {pct}%
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-5 italic font-medium">Mínimo 30%, máximo 50% para financiación directa.</p>
                 </div>
 
                 {/* Botón Simular */}
@@ -500,8 +564,8 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                       <div className="space-y-4 mb-10">
                         <div className="flex justify-between items-center text-sm border-b border-white/5 pb-4">
-                          <span className="text-gray-500 font-medium">Anticipo Integrado</span>
-                          <span className="font-mono text-white text-base">{formatCurrency(calculations.downPayment)}</span>
+                          <span className="text-gray-500 font-medium">Ya Recibido</span>
+                          <span className="font-mono text-white text-base">{formatCurrency(calculations.recibido)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm border-b border-white/5 pb-4">
                           <span className="text-gray-500 font-medium">A Financiar</span>
@@ -668,37 +732,86 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                 <div className="space-y-4">
                   <div className="space-y-2">
+                    <label className="text-[10px] uppercase text-gray-500 font-bold">Tipo de tratamiento</label>
+                    <select
+                      value={patientData.tipoTratamiento}
+                      onChange={(e) => handleTipoTratamientoChange(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500 text-white"
+                    >
+                      <option value="" className="bg-zinc-900">Seleccionar...</option>
+                      <option value="ortodoncia" className="bg-zinc-900">Ortodoncia</option>
+                      <option value="diseno_sonrisa" className="bg-zinc-900">Diseño de Sonrisa</option>
+                      <option value="otro" className="bg-zinc-900">Otro</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-[10px] uppercase text-gray-500 font-bold">Descripción</label>
                     <textarea
                       value={patientData.tratamiento}
                       onChange={(e) => setPatientData({ ...patientData, tratamiento: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500 h-20"
-                      placeholder="Ej: Diseño de sonrisa con carillas"
+                      placeholder="Ej: Tratamiento de ortodoncia con alineadores"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] uppercase text-gray-500 font-bold">Piezas</label>
-                      <input
-                        type="text"
-                        value={patientData.piezas}
-                        onChange={(e) => setPatientData({ ...patientData, piezas: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                        placeholder="Ej: 10 piezas"
-                      />
+                      <label className="text-[10px] uppercase text-gray-500 font-bold">Maxilar</label>
+                      <select
+                        value={patientData.maxilar}
+                        onChange={(e) => setPatientData({ ...patientData, maxilar: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500 text-white"
+                      >
+                        <option value="" className="bg-zinc-900">Seleccionar...</option>
+                        <option value="Maxilar Superior" className="bg-zinc-900">Maxilar Superior</option>
+                        <option value="Maxilar Inferior" className="bg-zinc-900">Maxilar Inferior</option>
+                        <option value="Ambos maxilares" className="bg-zinc-900">Ambos maxilares</option>
+                      </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] uppercase text-gray-500 font-bold">Plazo</label>
-                      <input
-                        type="text"
+                      <label className="text-[10px] uppercase text-gray-500 font-bold">Plazo estimado</label>
+                      <select
                         value={patientData.plazo}
                         onChange={(e) => setPatientData({ ...patientData, plazo: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                        placeholder="Ej: 15 días"
-                      />
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500 text-white"
+                      >
+                        <option value="" className="bg-zinc-900">Seleccionar...</option>
+                        <option value="Aproximadamente 1 año" className="bg-zinc-900">Aproximadamente 1 año</option>
+                        <option value="Aproximadamente 2 años" className="bg-zinc-900">Aproximadamente 2 años</option>
+                      </select>
                     </div>
                   </div>
+                  {patientData.tipoTratamiento && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase text-gray-500 font-bold">Materiales</label>
+                      {patientData.tipoTratamiento === 'ortodoncia' ? (
+                        <input
+                          type="text"
+                          value="Alineadores invisibles"
+                          readOnly
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                        />
+                      ) : patientData.tipoTratamiento === 'diseno_sonrisa' ? (
+                        <select
+                          value={patientData.materiales}
+                          onChange={(e) => setPatientData({ ...patientData, materiales: e.target.value })}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500 text-white"
+                        >
+                          <option value="" className="bg-zinc-900">Seleccionar...</option>
+                          <option value="Resina" className="bg-zinc-900">Resina</option>
+                          <option value="Cerámica" className="bg-zinc-900">Cerámica</option>
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={patientData.materiales}
+                          onChange={(e) => setPatientData({ ...patientData, materiales: e.target.value })}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                          placeholder="Especificar materiales"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <h3 className="text-xs font-bold uppercase tracking-widest text-emerald-400 border-b border-white/10 pb-4 pt-4 mb-4">Datos Financieros</h3>
@@ -711,20 +824,31 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                       value={totalAmount}
                       onChange={(e) => setTotalAmount(formatInput(e.target.value))}
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                      placeholder="Ej: 2.000"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase text-gray-500 font-bold">Total ya recibido (USD)</label>
+                    <input
+                      type="text"
+                      value={totalRecibido}
+                      onChange={(e) => setTotalRecibido(formatInput(e.target.value))}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
                       placeholder="Ej: 1.000"
                     />
+                    {calculations && calculations.recibido > 0 && (
+                      <p className="text-[10px] text-emerald-400 font-medium">
+                        {calculations.pctRecibido}% recibido · {formatCurrency(calculations.amountToFinance)} a financiar
+                      </p>
+                    )}
+                    {(!calculations || calculations.recibido === 0) && (
+                      <p className="text-[10px] text-gray-500 italic">
+                        Si el paciente no adelantó nada, dejá en blanco.
+                      </p>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase text-gray-500 font-bold">Anticipo (%)</label>
-                    <input
-                      type="number"
-                      value={downPaymentPct}
-                      onChange={(e) => setDownPaymentPct(Number(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                      min="0"
-                      max="100"
-                    />
-                  </div>
+
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase text-gray-500 font-bold">Plan de Cuotas</label>
                     <select
@@ -773,93 +897,181 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                 {/* Contenido Imprimible */}
                 <div id="printable-contract" className="max-w-3xl mx-auto">
-                  <h1>Contrato de Prestación de Servicios Odontológicos</h1>
+                  <h1>CONTRATO DE FINANCIACIÓN DE TRATAMIENTO ODONTOLÓGICO CON GARANTÍA DE PAGARÉ</h1>
 
-                  <p>Entre <strong>ANTIGRAVITY DENTAL CLINIC</strong>, en adelante "LA CLÍNICA", y el paciente detallado a continuación, en adelante "EL PACIENTE", se celebra el presente contrato sujeto a las siguientes cláusulas:</p>
+                  <p style={{ textAlign: 'center', fontSize: '12px', marginBottom: '20px' }}>
+                    Lugar y Fecha: Buenos Aires, CABA, a los {new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}.
+                  </p>
 
-                  <h2>1. Datos del Paciente</h2>
-                  <div className="grid">
+                  <h2>PARTES INTERVINIENTES</h2>
+                  <p><strong>LA CLÍNICA:</strong> FULLSTHETIC S.A., CUIT N.º 30-71774842-1, domiciliada en Camila O'Gorman 412 - 101, CABA, representada por su Presidente Ariel Merino.</p>
+                  <p>
+                    <strong>EL PACIENTE:</strong>{' '}
+                    <InlineEditField
+                      value={patientData.nombre}
+                      placeholder="Nombre y Apellido"
+                      onSave={(v) => setPatientData(prev => ({ ...prev, nombre: v }))}
+                    />{', DNI N.º '}
+                    <InlineEditField
+                      value={patientData.dni}
+                      placeholder="___________"
+                      onSave={(v) => setPatientData(prev => ({ ...prev, dni: v }))}
+                    />{', domicilio en '}
+                    <InlineEditField
+                      value={patientData.direccion}
+                      placeholder="___________________________"
+                      onSave={(v) => setPatientData(prev => ({ ...prev, direccion: v }))}
+                    />{', CUIT/CUIL N.º '}
+                    <InlineEditField
+                      value={patientData.cuitCuil}
+                      placeholder="_______________"
+                      onSave={(v) => setPatientData(prev => ({ ...prev, cuitCuil: v }))}
+                    />{', correo '}
+                    <InlineEditField
+                      value={patientData.email}
+                      placeholder="___________________________"
+                      onSave={(v) => setPatientData(prev => ({ ...prev, email: v }))}
+                    />.
+                  </p>
+
+                  <h2>CLÁUSULA PRIMERA: OBJETO DEL CONTRATO</h2>
+                  <p>LA CLÍNICA se obliga a prestar servicios profesionales odontológicos con los siguientes detalles:</p>
+                  <div className="grid" style={{ marginTop: '8px' }}>
                     <div className="field">
-                      <div className="label">Nombre y Apellido</div>
-                      <div className="value">{patientData.nombre || '___________________________'}</div>
+                      <div className="label">Descripción</div>
+                      <div className="value">
+                        <InlineEditField
+                          value={patientData.tratamiento}
+                          placeholder="_________________________________________________________________________________"
+                          onSave={(v) => setPatientData(prev => ({ ...prev, tratamiento: v }))}
+                          multiline
+                        />
+                      </div>
                     </div>
                     <div className="field">
-                      <div className="label">DNI</div>
-                      <div className="value">{patientData.dni || '___________________________'}</div>
+                      <div className="label">Maxilar</div>
+                      <div className="value">
+                        <InlineEditField
+                          value={patientData.maxilar}
+                          placeholder="___________________________"
+                          onSave={(v) => setPatientData(prev => ({ ...prev, maxilar: v }))}
+                        />
+                      </div>
                     </div>
+                    {patientData.materiales && (
+                      <div className="field">
+                        <div className="label">Materiales Principales</div>
+                        <div className="value">
+                          <InlineEditField
+                            value={patientData.materiales}
+                            placeholder="___________________________"
+                            onSave={(v) => setPatientData(prev => ({ ...prev, materiales: v }))}
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div className="field">
-                      <div className="label">CUIT/CUIL</div>
-                      <div className="value">{patientData.cuitCuil || '___________________________'}</div>
-                    </div>
-                    <div className="field">
-                      <div className="label">Dirección</div>
-                      <div className="value">{patientData.direccion || '___________________________'}</div>
+                      <div className="label">Plazo Estimado</div>
+                      <div className="value">
+                        <InlineEditField
+                          value={patientData.plazo}
+                          placeholder="___________________________"
+                          onSave={(v) => setPatientData(prev => ({ ...prev, plazo: v }))}
+                        />
+                      </div>
                     </div>
                   </div>
+                  <p style={{ fontSize: '11px', marginTop: '8px', fontStyle: 'italic' }}>Se advierte que la inasistencia no justificada podrá ocasionar una reprogramación del plazo.</p>
 
-                  <h2>2. Detalle del Tratamiento</h2>
-                  <div className="field">
-                    <div className="label">Descripción Clínica</div>
-                    <div className="value">{patientData.tratamiento || '_________________________________________________________________________________'}</div>
-                  </div>
-                  <div className="grid" style={{ marginTop: '10px' }}>
-                    <div className="field">
-                      <div className="label">Piezas Dentales Involucradas</div>
-                      <div className="value">{patientData.piezas || '___________________________'}</div>
-                    </div>
-                    <div className="field">
-                      <div className="label">Plazo Estimado de Ejecución</div>
-                      <div className="value">{patientData.plazo || '___________________________'}</div>
-                    </div>
-                  </div>
-
-                  <h2>3. Condiciones Económicas y Financiación</h2>
-                  <p>EL PACIENTE se compromete a abonar el tratamiento bajo las siguientes condiciones financieras acordadas:</p>
-
+                  <h2>CLÁUSULA SEGUNDA: PRESUPUESTO Y FORMA DE PAGO</h2>
                   <div className="financial-box">
                     <div className="grid" style={{ marginBottom: 0 }}>
                       <div className="field">
-                        <div className="label">Monto Total del Tratamiento</div>
+                        <div className="label">Costo total del tratamiento</div>
                         <div className="value" style={{ border: 'none', fontSize: '14px', fontWeight: 'bold' }}>
-                          {totalAmount ? formatCurrency(parseFloat(totalAmount.replace(/\./g, ''))) : 'USD 0'}
+                          {totalAmount ? formatCurrency(parseFloat(totalAmount.replace(/\./g, ''))) : '___________'} (USD)
                         </div>
                       </div>
-                      <div className="field">
-                        <div className="label">Anticipo Abonado ({downPaymentPct}%)</div>
-                        <div className="value" style={{ border: 'none', fontSize: '14px', fontWeight: 'bold' }}>
-                          {calculations ? formatCurrency(calculations.downPayment) : 'USD 0'}
-                        </div>
-                      </div>
-                    </div>
 
-                    <div style={{ borderTop: '1px solid #ddd', margin: '15px 0', paddingTop: '15px' }}>
-                      <div className="label" style={{ color: '#000', marginBottom: '5px' }}>Plan de Financiación Seleccionado</div>
-                      {selectedPlanForContract ? (
-                        <p style={{ fontSize: '14px', margin: 0 }}>
-                          Saldo a financiar abonable en <strong>{selectedPlanForContract.months} cuotas fijas</strong> de <strong>{formatCurrency(selectedPlanForContract.installmentValue)}</strong>.
-                        </p>
-                      ) : (
-                        <p style={{ fontSize: '14px', margin: 0, color: '#888', fontStyle: 'italic' }}>
-                          (Seleccione un plan de cuotas en el panel lateral)
-                        </p>
+                      {calculations && calculations.recibido > 0 && (
+                        <div className="field">
+                          <div className="label">Recibido con anterioridad a la firma</div>
+                          <div className="value" style={{ border: 'none', fontSize: '14px', fontWeight: 'bold' }}>
+                            {formatCurrency(calculations.recibido)} (USD)
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="field">
+                        <div className="label">Saldo a financiar</div>
+                        <div className="value" style={{ border: 'none', fontSize: '14px', fontWeight: 'bold' }}>
+                          {calculations ? formatCurrency(calculations.amountToFinance) : '___________'} (USD)
+                        </div>
+                      </div>
+
+                      {selectedPlanForContract && (
+                        <div className="field">
+                          <div className="label">Plan de financiación</div>
+                          <div className="value" style={{ border: 'none', fontSize: '13px', fontWeight: 'bold' }}>
+                            {selectedPlanForContract.months} cuotas mensuales de {formatCurrency(selectedPlanForContract.installmentValue)} (USD)
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  <h2>4. Cláusulas Generales</h2>
-                  <p>1. El incumplimiento en el pago de dos (2) cuotas consecutivas facultará a LA CLÍNICA a suspender el tratamiento hasta la regularización de la deuda.</p>
-                  <p>2. Los valores expresados en USD (Dólares Estadounidenses) serán abonados en dicha moneda o en su equivalente en Pesos Argentinos a la cotización del dólar MEP del día del efectivo pago.</p>
-                  <p>3. EL PACIENTE declara haber sido informado detalladamente sobre los alcances, riesgos y alternativas del tratamiento descrito en el apartado 2.</p>
+                  {calculations && calculations.recibido > 0 && (
+                    <p style={{ fontSize: '11px', marginTop: '8px', fontStyle: 'italic', color: '#92400e' }}>
+                      LA CLÍNICA deja constancia de haber recibido la suma de {formatCurrency(calculations.recibido)} (USD) con anterioridad a la presente firma. El presente contrato regula exclusivamente la financiación del saldo restante de {formatCurrency(calculations.amountToFinance)} (USD).
+                    </p>
+                  )}
+
+                  <h2>CLÁUSULA TERCERA: CONDICIONES DE LA FINANCIACIÓN</h2>
+                  {selectedPlanForContract ? (
+                    <p>El saldo se pagará en <strong>{selectedPlanForContract.months} cuotas mensuales, iguales y consecutivas</strong> de <strong>{formatCurrency(selectedPlanForContract.installmentValue)} (USD)</strong> cada una, con vencimiento el día <strong>7</strong> de cada mes, siendo la primera cuota con vencimiento el día 7 del mes inmediato siguiente a la firma del presente.</p>
+                  ) : (
+                    <p style={{ color: '#888', fontStyle: 'italic' }}>(Seleccione un plan de cuotas en el panel lateral)</p>
+                  )}
+                  <p><strong>Medios de Pago Aceptados:</strong> Efectivo en sede; transferencia bancaria o tarjeta de crédito/débito (sujetos a recargos). Los pagos podrán realizarse en Pesos Argentinos (ARS) según la cotización vendedora del Banco Nación Argentina (BNA) del día anterior al efectivo pago.</p>
+
+                  <h2>CLÁUSULA CUARTA: GARANTÍA</h2>
+                  <p>EL PACIENTE suscribe y entrega {selectedPlanForContract ? <strong>{selectedPlanForContract.months} pagaré(s)</strong> : '___'}, cada uno por el valor de una cuota, con vencimientos coincidentes con las fechas de pago pactadas. Dichos pagarés serán devueltos al PACIENTE contra la cancelación de cada cuota correspondiente.</p>
+
+                  <h2>CLÁUSULA QUINTA: MORA E INCUMPLIMIENTO</h2>
+                  <p>La falta de pago en la fecha de vencimiento constituirá mora automática, sin necesidad de interpelación judicial o extrajudicial alguna. En tal caso:</p>
+                  <p>a) Se devengará un interés punitorio del <strong>3% diario</strong> sobre el capital adeudado.</p>
+                  <p>b) La mora en el pago de dos (2) cuotas consecutivas facultará a LA CLÍNICA a: declarar la caducidad de todos los plazos; suspender la continuación del Tratamiento hasta la regularización total de la deuda; e iniciar la ejecución judicial de los pagarés suscriptos.</p>
+
+                  <h2>CLÁUSULA SEXTA: DESISTIMIENTO</h2>
+                  <p>EL PACIENTE podrá desistir del Tratamiento en cualquier momento, notificando fehacientemente a LA CLÍNICA. En dicho caso, deberá abonar los honorarios profesionales correspondientes a los servicios ya prestados y el costo de los materiales específicamente adquiridos para su tratamiento que no sean reutilizables. No se realizarán reintegros por pagos ya efectuados correspondientes a etapas del tratamiento completadas.</p>
+
+                  <h2>CLÁUSULA SÉPTIMA: CONSENTIMIENTO INFORMADO</h2>
+                  <p>EL PACIENTE declara haber recibido de LA CLÍNICA información clara, precisa y detallada sobre la naturaleza del Tratamiento, sus beneficios, riesgos potenciales, alternativas disponibles y costos involucrados, mediante Consentimiento Informado firmado en este acto como Anexo al presente contrato.</p>
+
+                  <h2>CLÁUSULA OCTAVA: JURISDICCIÓN Y DOMICILIOS</h2>
+                  <p>Las partes constituyen domicilios especiales en los indicados en el encabezado del presente y se someten a la jurisdicción y competencia de los Tribunales Ordinarios en lo Comercial de la Ciudad Autónoma de Buenos Aires, renunciando expresamente a cualquier otro fuero o jurisdicción que pudiere corresponderles.</p>
 
                   <div className="signatures">
                     <div>
                       <div className="signature-line">Firma del Paciente</div>
-                      <div style={{ fontSize: '10px', marginTop: '5px', color: '#555' }}>Aclaración: {patientData.nombre}</div>
-                      <div style={{ fontSize: '10px', color: '#555' }}>DNI: {patientData.dni}</div>
+                      <div style={{ fontSize: '10px', marginTop: '5px', color: '#555' }}>
+                        Aclaración: <InlineEditField
+                          value={patientData.nombre}
+                          placeholder="___________________________"
+                          onSave={(v) => setPatientData(prev => ({ ...prev, nombre: v }))}
+                        />
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#555' }}>
+                        DNI: <InlineEditField
+                          value={patientData.dni}
+                          placeholder="___________"
+                          onSave={(v) => setPatientData(prev => ({ ...prev, dni: v }))}
+                        />
+                      </div>
                     </div>
                     <div>
-                      <div className="signature-line">Por Antigravity Dental Clinic</div>
-                      <div style={{ fontSize: '10px', marginTop: '5px', color: '#555' }}>Firma y Sello del Profesional</div>
+                      <div className="signature-line">Presidente de FULLSTHETIC S.A.</div>
+                      <div style={{ fontSize: '10px', marginTop: '5px', color: '#555' }}>Ariel Merino</div>
                     </div>
                   </div>
                 </div>
