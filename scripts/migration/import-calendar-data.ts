@@ -37,6 +37,12 @@ async function importData() {
 
     for (const appt of appointments) {
         try {
+            if (appt.is_potential_noise) {
+                console.log(`- Skipping appointment (potential noise): ${appt.summary}`);
+                skipCount++;
+                continue;
+            }
+
             // Check if already exists (prevent duplicates if script is re-run)
             const { data: existing } = await supabase
                 .from('agenda_appointments')
