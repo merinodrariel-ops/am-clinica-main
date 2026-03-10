@@ -760,6 +760,52 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     ))}
                                                 </div>
                                             </div>
+
+                                            {/* Simplified Payment Method Selection directly in Step 1 */}
+                                            <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-400">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Medio de Pago</label>
+                                                </div>
+                                                <div className="grid grid-cols-4 gap-2">
+                                                    {METODOS_PAGO.map((m) => (
+                                                        <button
+                                                            key={m.value}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setFormData({
+                                                                    ...formData,
+                                                                    metodo_pago: m.value as any,
+                                                                    canal_destino: m.value === 'MercadoPago' ? 'MP' : m.value === 'Cripto' ? 'USDT' : 'Empresa'
+                                                                });
+                                                            }}
+                                                            className={clsx(
+                                                                "py-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all",
+                                                                formData.metodo_pago === m.value
+                                                                    ? "bg-blue-600 border-blue-600 shadow-md transform scale-[1.03]"
+                                                                    : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-blue-100"
+                                                            )}
+                                                        >
+                                                            <span className="text-xl">{m.icon}</span>
+                                                            <span className={clsx(
+                                                                "text-[8px] font-black uppercase tracking-tighter",
+                                                                formData.metodo_pago === m.value ? "text-white" : "text-gray-500"
+                                                            )}>{m.label.split(' ')[0]}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Attach file if Transfer or MP */}
+                                            {(formData.metodo_pago === 'Transferencia' || formData.metodo_pago === 'MercadoPago') && (
+                                                <div className="pt-2 animate-in zoom-in-95 duration-300">
+                                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 px-1">Adjuntar Comprobante</p>
+                                                    <ComprobanteUpload
+                                                        area="caja-recepcion"
+                                                        onUploadComplete={({ url }) => setFormData(prev => ({ ...prev, comprobante_url: url }))}
+                                                        className="w-full scale-95 origin-left"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -1010,18 +1056,29 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider sticky top-0 bg-white dark:bg-gray-800 py-1">{categoria}</h4>
                                             <div className="grid grid-cols-1 gap-2">
                                                 {filteredItems.map((item) => (
-                                                    <button
+                                                    <div
                                                         key={item.id}
-                                                        onClick={() => selectConcepto(item)}
                                                         className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-blue-200 hover:bg-blue-50/10 dark:hover:bg-blue-900/10 transition-all text-left group"
                                                     >
                                                         <div className="flex-1">
                                                             <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">{item.concepto_nombre}</p>
                                                         </div>
                                                         <div className="text-right">
-                                                            <p className="font-bold text-gray-900 dark:text-white">{formatCurrency(item.precio_base_usd, 'USD')}</p>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        concepto_nombre: item.concepto_nombre,
+                                                                        precio_lista_usd: item.precio_base_usd
+                                                                    });
+                                                                    setStep(4);
+                                                                }}
+                                                                className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-sm hover:bg-blue-700 transition-colors"
+                                                            >
+                                                                Seleccionar
+                                                            </button>
                                                         </div>
-                                                    </button>
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
@@ -1039,7 +1096,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         onChange={(e) => setFormData({ ...formData, concepto_nombre: e.target.value })}
                                     />
                                     <Button
-                                        onClick={() => setStep(3)}
+                                        onClick={() => setStep(4)}
                                         disabled={!formData.concepto_nombre}
                                         className="bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-xl h-auto"
                                     >
@@ -1116,39 +1173,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         </div>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    {METODOS_PAGO.map((m) => (
-                                        <button
-                                            key={m.value}
-                                            onClick={() => {
-                                                setFormData({ ...formData, metodo_pago: m.value as any, canal_destino: m.value === 'MercadoPago' ? 'MP' : m.value === 'Cripto' ? 'USDT' : 'Empresa' });
-                                            }}
-                                            className={clsx(
-                                                "p-5 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all",
-                                                (formData.metodo_pago === m.value && !useMultiplePayments)
-                                                    ? "bg-blue-600 border-blue-600 text-white shadow-lg scale-[1.02]"
-                                                    : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-600 hover:border-blue-200"
-                                            )}
-                                        >
-                                            <span className="text-3xl">{m.icon}</span>
-                                            <span className="text-[11px] font-black uppercase">{m.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {((!useMultiplePayments && (formData.metodo_pago === 'Transferencia' || formData.metodo_pago === 'MercadoPago')) ||
-                                (useMultiplePayments && paymentSplits.some(s => s.monto > 0 && (s.metodo_pago === 'Transferencia' || s.metodo_pago === 'MercadoPago')))) && (
-                                    <div className="mt-4">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1">Adjuntar Comprobante</p>
-                                        <ComprobanteUpload
-                                            area="caja-recepcion"
-                                            onUploadComplete={({ url }) => setFormData(prev => ({ ...prev, comprobante_url: url }))}
-                                            className="w-full"
-                                        />
-                                    </div>
-                                )}
+                            ) : null}
 
                             <div className="mt-8">
                                 <Button
@@ -1167,10 +1192,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 <h3 className="font-bold text-gray-900 dark:text-white uppercase text-xs tracking-widest">Confirmar Ingreso</h3>
                                 <Button
                                     variant="link"
-                                    onClick={() => setStep(3)}
+                                    onClick={() => setStep(useMultiplePayments ? 3 : 2)}
                                     className="text-[10px] text-blue-600 p-0 h-auto font-bold uppercase"
                                 >
-                                    ← Volver al Pago
+                                    ← Volver {useMultiplePayments ? 'al Resumen' : 'al Concepto'}
                                 </Button>
                             </div>
 
