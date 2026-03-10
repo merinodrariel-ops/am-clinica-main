@@ -112,7 +112,7 @@ async function analyzeMigration() {
 
     // 2. Load Calendar Events
     console.log('Loading calendar data...');
-    const loadEvents = (filePath: string) => {
+    const loadEvents = (filePath: string): CalendarEvent[] => {
         if (!fs.existsSync(filePath)) return [];
         try {
             const content = fs.readFileSync(filePath, 'utf8').trim();
@@ -123,7 +123,7 @@ async function analyzeMigration() {
             } catch (e) {
                 // If it fails, it might be multiple JSON objects (one per line)
                 const lines = content.split('\n').filter(l => l.trim().startsWith('{'));
-                const allItems: any[] = [];
+                const allItems: CalendarEvent[] = [];
                 for (const line of lines) {
                     try {
                         const data = JSON.parse(line);
@@ -143,8 +143,8 @@ async function analyzeMigration() {
     const DOCTOR_ARIEL = 'f160be8c-6014-4cba-bdde-b2d926eb8831'; // Ariel Merino
     const DOCTOR_EMILY = 'd5d96db1-b93f-4c54-ae3a-3044d64f52bd'; // Emily Lugo
 
-    const primaryEvents = loadEvents(PRIMARY_CALENDAR_PATH).map(e => ({ ...e, doctor_id: DOCTOR_ARIEL }));
-    const emilyEvents = loadEvents(EMILY_CALENDAR_PATH).map(e => ({ ...e, doctor_id: DOCTOR_EMILY }));
+    const primaryEvents = loadEvents(PRIMARY_CALENDAR_PATH).map((e: CalendarEvent) => ({ ...e, doctor_id: DOCTOR_ARIEL }));
+    const emilyEvents = loadEvents(EMILY_CALENDAR_PATH).map((e: CalendarEvent) => ({ ...e, doctor_id: DOCTOR_EMILY }));
     const allEvents = [...primaryEvents, ...emilyEvents];
 
     console.log(`Loaded ${allEvents.length} events total.`);

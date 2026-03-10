@@ -12,7 +12,7 @@ import { createClient } from '@/utils/supabase/client';
 import type { TarifarioItem } from '@/lib/supabase';
 
 const supabase = createClient();
-import { formatCurrency, getBnaRate } from '@/lib/bna';
+import { formatCurrency } from '@/lib/bna';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerWorkflowFromSenaPayment } from '@/app/actions/clinical-workflows';
 import { getLocalISODate } from '@/lib/local-date';
@@ -39,8 +39,8 @@ interface NuevoIngresoFormProps {
 
 type SenaTipo = '' | 'diseno_sonrisa' | 'ortodoncia_invisible' | 'cirugia_implantes';
 type MonedaIngreso = 'USD' | 'ARS' | 'USDT';
-type MetodoPagoIngreso = 'Efectivo' | 'Transferencia' | 'MercadoPago' | 'Cripto';
-type CanalDestinoIngreso = 'Empresa' | 'Personal' | 'MP' | 'USDT';
+type MetodoPagoIngreso = 'Efectivo' | 'Transferencia' | 'MercadoPago' | 'Cripto' | 'Mixto';
+type CanalDestinoIngreso = 'Empresa' | 'Personal' | 'MP' | 'USDT' | 'Mixto';
 type TipoComprobanteIngreso = 'Factura A' | 'Tipo C' | 'Sin factura' | 'Otro';
 
 const SENA_OPCIONES: Array<{ value: SenaTipo; label: string; workflow: string }> = [
@@ -399,7 +399,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             if (!user) throw new Error('No autenticado');
 
             // 1. Preparation
-            const bnaRateEffective = await getBnaRate(new Date());
+            const bnaRateEffective = bnaRate;
             const conceptoFinal = formData.concepto_nombre || 'Sin concepto';
             const categoriaFinal = formData.categoria || 'Sin categoría';
             const cleanedObservation = formData.observaciones?.trim() || '';
