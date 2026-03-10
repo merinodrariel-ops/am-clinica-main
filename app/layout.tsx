@@ -7,6 +7,8 @@ import Providers from "@/components/Providers";
 import MainLayout from "@/components/MainLayout";
 import CategoriaSwitcher from "@/components/CategoriaSwitcher";
 
+// Re-triggering Vercel deployment due to previous infrastructure delay
+
 const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
