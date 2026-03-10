@@ -44,6 +44,7 @@ import PatientCommandCenter from './PatientCommandCenter';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
+import { calculateFinancingBreakdown, DEFAULT_MONTHLY_INTEREST_PCT } from '@/lib/financial-engine';
 
 interface Movement {
     id: string;
@@ -165,9 +166,22 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
         montoTotalUsd: '',
         cuotasTotal: '',
         montoCuotaUsd: '',
+        tasaMensual: String(DEFAULT_MONTHLY_INTEREST_PCT),
         fechaInicio: '',
         notas: '',
     });
+
+    // Auto-recalculate installment when monto/cuotas/tasa change
+    function recalcCuota(monto: string, cuotas: string, tasa: string): string {
+        const m = parseFloat(monto);
+        const c = parseInt(cuotas);
+        const t = parseFloat(tasa);
+        if (m > 0 && c > 0 && !isNaN(t)) {
+            const bd = calculateFinancingBreakdown({ totalUsd: m, upfrontPct: 0, installments: c, monthlyInterestPct: t });
+            return bd.installmentUsd.toFixed(2);
+        }
+        return '';
+    }
 
     async function handleCrearPlan() {
         setCrearPlanError(null);
@@ -738,7 +752,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 <button
                                                     onClick={() => {
                                                         setCrearPlanError(null);
-                                                        setPlanForm({ tratamiento: '', montoTotalUsd: '', cuotasTotal: '', montoCuotaUsd: '', fechaInicio: '', notas: '' });
+                                                        setPlanForm({ tratamiento: '', montoTotalUsd: '', cuotasTotal: '', montoCuotaUsd: '', tasaMensual: String(DEFAULT_MONTHLY_INTEREST_PCT), fechaInicio: '', notas: '' });
                                                         setShowCrearPlan(true);
                                                     }}
                                                     className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
@@ -1022,13 +1036,10 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         value={planForm.montoTotalUsd}
                                         onChange={e => {
                                             const monto = e.target.value;
-                                            const cuotas = parseInt(planForm.cuotasTotal);
                                             setPlanForm(p => ({
                                                 ...p,
                                                 montoTotalUsd: monto,
-                                                montoCuotaUsd: (!isNaN(cuotas) && cuotas > 0 && parseFloat(monto) > 0)
-                                                    ? (parseFloat(monto) / cuotas).toFixed(2)
-                                                    : p.montoCuotaUsd,
+                                                montoCuotaUsd: recalcCuota(monto, p.cuotasTotal, p.tasaMensual),
                                             }));
                                         }}
                                         placeholder="0.00"
@@ -1044,13 +1055,10 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         value={planForm.cuotasTotal}
                                         onChange={e => {
                                             const cuotas = e.target.value;
-                                            const monto = parseFloat(planForm.montoTotalUsd);
                                             setPlanForm(p => ({
                                                 ...p,
                                                 cuotasTotal: cuotas,
-                                                montoCuotaUsd: (!isNaN(monto) && monto > 0 && parseInt(cuotas) > 0)
-                                                    ? (monto / parseInt(cuotas)).toFixed(2)
-                                                    : p.montoCuotaUsd,
+                                                montoCuotaUsd: recalcCuota(p.montoTotalUsd, cuotas, p.tasaMensual),
                                             }));
                                         }}
                                         placeholder="Ej: 3"
@@ -1058,18 +1066,40 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Monto por cuota (USD) *</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={planForm.montoCuotaUsd}
-                                    onChange={e => setPlanForm(p => ({ ...p, montoCuotaUsd: e.target.value }))}
-                                    placeholder="0.00"
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                                />
-                                <p className="text-xs text-gray-400 mt-0.5">Se calcula automáticamente; podés ajustarlo.</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Tasa mensual (%) *</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.1"
+                                        value={planForm.tasaMensual}
+                                        onChange={e => {
+                                            const tasa = e.target.value;
+                                            setPlanForm(p => ({
+                                                ...p,
+                                                tasaMensual: tasa,
+                                                montoCuotaUsd: recalcCuota(p.montoTotalUsd, p.cuotasTotal, tasa),
+                                            }));
+                                        }}
+                                        placeholder="1.5"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-0.5">Default: {DEFAULT_MONTHLY_INTEREST_PCT}%</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Monto por cuota (USD) *</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={planForm.montoCuotaUsd}
+                                        onChange={e => setPlanForm(p => ({ ...p, montoCuotaUsd: e.target.value }))}
+                                        placeholder="0.00"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-0.5">Ajustable manualmente.</p>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Fecha primera cuota *</label>
