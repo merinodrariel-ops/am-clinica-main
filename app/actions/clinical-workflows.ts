@@ -608,6 +608,7 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
         .select(`
             id,
             next_milestone_date,
+            metadata,
             patient:pacientes(nombre, apellido, documento, email),
             workflow:clinical_workflows(name)
         `)
@@ -634,20 +635,33 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
         ? new Date(treatmentData.next_milestone_date).toLocaleDateString('es-AR')
         : 'No definido';
 
+    const driveFolderUrl = getMetadataString(treatmentData.metadata, 'drive_folder_url') || '';
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://amclinica.vercel.app';
+
     // Helper for variable replacement
-    const replaceVars = (text: string) => {
+    // isHtml=true → renders drive_url / app_url as clickable <a> tags (for email body)
+    // isHtml=false → raw text/URL only (for subject lines)
+    const replaceVars = (text: string, isHtml = false) => {
+        const driveVal = isHtml && driveFolderUrl
+            ? `<a href="${driveFolderUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline">&#128193; Ver carpeta en Drive</a>`
+            : driveFolderUrl;
+        const appVal = isHtml
+            ? `<a href="${appBaseUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline">&#128279; Abrir app AM Cl&iacute;nica</a>`
+            : appBaseUrl;
         return text
             .replace(/{{paciente}}/g, patientFullName)
             .replace(/{{etapa}}/g, stageConfig.name)
             .replace(/{{workflow}}/g, workflowName || 'Workflow')
-            .replace(/{{hito}}/g, milestoneText);
+            .replace(/{{hito}}/g, milestoneText)
+            .replace(/{{drive_url}}/g, driveVal)
+            .replace(/{{app_url}}/g, appVal);
     };
 
     // 1. Send to Staff (notify_emails)
     if (notifyOnEntry && notifyEmails.length > 0) {
         let staffHtml = '';
         if (stageConfig.staff_email_template && stageConfig.staff_email_template.trim()) {
-            staffHtml = replaceVars(stageConfig.staff_email_template).replace(/\n/g, '<br/>');
+            staffHtml = replaceVars(stageConfig.staff_email_template, true).replace(/\n/g, '<br/>');
         } else {
             staffHtml = `
                 <div style="font-family: Arial, sans-serif; color: #111827;">
@@ -692,7 +706,7 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
     if (stageConfig.notify_patient_on_entry && patientData?.email) {
         let patientHtml = '';
         if (stageConfig.patient_email_template && stageConfig.patient_email_template.trim()) {
-            patientHtml = replaceVars(stageConfig.patient_email_template).replace(/\n/g, '<br/>');
+            patientHtml = replaceVars(stageConfig.patient_email_template, true).replace(/\n/g, '<br/>');
         } else {
             // Fetch all stages to build the timeline email
             const { data: allStagesData } = await supabase
@@ -701,7 +715,6 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
                 .eq('workflow_id', stageConfig.workflow_id)
                 .order('order_index', { ascending: true });
 
-            const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
             const portalUrl = `${appBaseUrl}/mi-clinica`;
 
             const nextApptFormatted = treatmentData.next_milestone_date
@@ -2034,22 +2047,27 @@ export async function sendTestWorkflowEmail(params: {
     body: string;
     stageName: string;
     workflowName: string;
+    driveUrl?: string;
 }): Promise<{ ok: boolean; error?: string }> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: 'No autenticado' };
 
+    const testDriveUrl = params.driveUrl?.trim() || 'https://drive.google.com/drive/folders/CARPETA-EJEMPLO';
+
     const filledSubject = params.subject
         .replace(/\{\{paciente\}\}/g, 'Milena Prueba')
         .replace(/\{\{etapa\}\}/g, params.stageName)
         .replace(/\{\{workflow\}\}/g, params.workflowName)
-        .replace(/\{\{hito\}\}/g, '2026-04-01');
+        .replace(/\{\{hito\}\}/g, '01/04/2026')
+        .replace(/\{\{drive_url\}\}/g, testDriveUrl);
 
     const filledBody = params.body
         .replace(/\{\{paciente\}\}/g, 'Milena Prueba')
         .replace(/\{\{etapa\}\}/g, params.stageName)
         .replace(/\{\{workflow\}\}/g, params.workflowName)
-        .replace(/\{\{hito\}\}/g, '2026-04-01');
+        .replace(/\{\{hito\}\}/g, '01/04/2026')
+        .replace(/\{\{drive_url\}\}/g, testDriveUrl);
 
     try {
         await sendEmail({

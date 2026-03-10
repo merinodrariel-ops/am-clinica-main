@@ -25,6 +25,7 @@ type AppointmentUpdatePayload = Partial<{
     notes: string | null;
     created_at: string;
     created_by: string;
+    is_primera_vez: boolean;
 }>;
 
 export async function getAppointments(start: string, end: string) {
@@ -113,8 +114,12 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     delete safeUpdates.id;
     delete safeUpdates.created_at;
     delete safeUpdates.created_by;
+    const isPrimeraVez = safeUpdates.is_primera_vez;
+    delete safeUpdates.is_primera_vez;
 
-    const { error } = await getAdminClient()
+    const adminClient = getAdminClient();
+
+    const { error } = await adminClient
         .from('agenda_appointments')
         .update({
             ...safeUpdates,
@@ -125,6 +130,33 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     if (error) {
         console.error('Error updating appointment:', error);
         return { success: false, error: error.message };
+    }
+
+    // Si el turno pasa a completado/arrived → auto-detectar si es primera consulta
+    if (updates.status === 'completed' || updates.status === 'arrived') {
+        const { data: apt } = await adminClient
+            .from('agenda_appointments')
+            .select('patient_id, start_time, type')
+            .eq('id', id)
+            .single();
+
+        // Solo aplica a consultas donde el checkbox fue explícitamente marcado como primera vez
+        const esConsulta = apt?.type === 'consulta';
+
+        if (apt?.patient_id && esConsulta && isPrimeraVez === true) {
+            const { data: paciente } = await adminClient
+                .from('pacientes')
+                .select('primera_consulta_fecha')
+                .eq('id_paciente', apt.patient_id)
+                .single();
+
+            if (paciente && !paciente.primera_consulta_fecha) {
+                await adminClient
+                    .from('pacientes')
+                    .update({ primera_consulta_fecha: apt.start_time.split('T')[0] })
+                    .eq('id_paciente', apt.patient_id);
+            }
+        }
     }
 
     revalidatePath('/agenda');

@@ -547,6 +547,7 @@ export default function AgendaCalendar() {
                         eventDrop={handleEventDrop}
                         slotMinTime="07:30:00"
                         slotMaxTime="21:00:00"
+                        scrollTime="12:00:00"
                         allDaySlot={false}
                         slotDuration="00:15:00"
                         slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}

@@ -246,6 +246,14 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                     <p className="font-medium text-white group-hover:text-teal-400 transition-colors drop-shadow-sm">
                                                         {patient.apellido}, {patient.nombre}
                                                     </p>
+                                                    {!patient.primera_consulta_fecha && patient.fecha_alta && (new Date().getTime() - new Date(patient.fecha_alta).getTime()) < 60 * 24 * 60 * 60 * 1000 && (
+                                                        <span
+                                                            className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 uppercase tracking-wider"
+                                                            title="Paciente registrado hace menos de 60 días — aún sin primera consulta confirmada"
+                                                        >
+                                                            nuevo
+                                                        </span>
+                                                    )}
                                                     {missingCount > 0 && (
                                                         <span
                                                             className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30"

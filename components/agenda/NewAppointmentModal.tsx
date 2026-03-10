@@ -58,6 +58,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [status, setStatus] = useState('confirmed');
     const [type, setType] = useState('consulta');
     const [notes, setNotes] = useState('');
+    const [isPrimeraVez, setIsPrimeraVez] = useState(false);
 
     // Patient Search State
     const [searchTerm, setSearchTerm] = useState('');
@@ -203,7 +204,8 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     end_time: new Date(endTime).toISOString(),
                     status,
                     type,
-                    notes
+                    notes,
+                    is_primera_vez: type === 'consulta' ? isPrimeraVez : false
                 };
                 const result = await updateAppointment(initialData.id, updates);
                 if (!result.success) {
@@ -513,6 +515,22 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 <option value="urgencia">Urgencia</option>
                                 <option value="cirugia">Cirugía</option>
                             </select>
+                            {type === 'consulta' && (
+                                <label className="flex items-center gap-2 mt-2 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={isPrimeraVez}
+                                        onChange={(e) => setIsPrimeraVez(e.target.checked)}
+                                        className="w-4 h-4 rounded accent-violet-500"
+                                    />
+                                    <span className="text-xs font-semibold text-violet-500 group-hover:text-violet-400 transition-colors">
+                                        Primera consulta
+                                    </span>
+                                    <span className="text-[10px] text-gray-400">
+                                        (se confirma al marcar como completado)
+                                    </span>
+                                </label>
+                            )}
                         </div>
                     </div>
 

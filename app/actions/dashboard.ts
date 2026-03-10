@@ -115,27 +115,30 @@ export async function getOwnerDashboardStatsAction(): Promise<OwnerDashboardStat
             .select('*', { count: 'exact', head: true })
             .eq('is_deleted', false);
 
-        const { data: primeraVezData } = await supabase
+        // Contar primeras consultas desde pacientes.primera_consulta_fecha (fuente de verdad)
+        // Este campo solo se setea cuando un turno tipo 'consulta' pasa a completado/arrived
+        // y el paciente no tenía fecha previa — evita contar pacientes existentes puestos como notas en la agenda
+        const { data: primerasConsultasData } = await supabase
             .from('pacientes')
             .select('id_paciente, nombre, apellido, primera_consulta_fecha')
-            .eq('is_deleted', false)
             .gte('primera_consulta_fecha', comparisonMonthStart)
             .lt('primera_consulta_fecha', nextMonthStart)
+            .eq('is_deleted', false)
             .order('primera_consulta_fecha', { ascending: false });
 
         const currentMonthKey = monthStart.slice(0, 7);
         const monthlyCounts = monthWindows.reduce<Record<string, number>>((acc, m) => { acc[m.key] = 0; return acc; }, {});
 
-        const primerasConsultasRecientes = (primeraVezData || []).map((p: { id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha?: string | null }) => {
-            const monthKey = (p.primera_consulta_fecha || '').slice(0, 7);
+        const primerasConsultasRecientes = (primerasConsultasData || []).map((p: any) => {
+            const monthKey = (p.primera_consulta_fecha as string).slice(0, 7);
             if (monthKey in monthlyCounts) monthlyCounts[monthKey] += 1;
-            return { id_paciente: p.id_paciente, nombre: p.nombre, apellido: p.apellido, primera_consulta_fecha: p.primera_consulta_fecha, monthKey };
+            return { id_paciente: p.id_paciente, nombre: p.nombre, apellido: p.apellido, primera_consulta_fecha: p.primera_consulta_fecha as string, monthKey };
         });
 
         const primeraVezMensual = monthWindows.map((m) => ({ ...m, count: monthlyCounts[m.key] || 0 }));
         const listaPrimeraVez = primerasConsultasRecientes
-            .filter((p: { monthKey: string }) => p.monthKey === currentMonthKey)
-            .map(({ monthKey: _mk, ...rest }: { monthKey: string; id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha?: string | null }) => rest);
+            .filter((p: any) => p.monthKey === currentMonthKey)
+            .map(({ monthKey: _mk, ...rest }: any) => rest);
         const primeraVezMes = monthlyCounts[currentMonthKey] || 0;
 
         const { data: incomeData } = await supabase

@@ -29,7 +29,7 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             .from('pacientes')
             .select('*')
             .eq('is_deleted', false)
-            .order('apellido', { ascending: true });
+            .order('fecha_alta', { ascending: false });
 
         if (filters.search) {
             const term = `%${filters.search}%`;

@@ -43,6 +43,7 @@ export interface Paciente {
     is_deleted?: boolean;
     welcome_email_sent?: boolean; // tracks if welcome email was sent
     como_nos_conocio?: string | null;
+    primera_consulta_fecha?: string | null;
 }
 
 export interface HistoriaClinica {

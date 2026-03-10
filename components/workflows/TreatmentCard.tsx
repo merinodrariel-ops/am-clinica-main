@@ -222,8 +222,19 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
             {timeLimit ? (
                 <div className="mt-2">
                     <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400 mb-1">
-                        <span>Consumo SLA</span>
-                        <span>{slaProgressPercent}%</span>
+                        <span>SLA</span>
+                        <span className={clsx(
+                            'font-bold px-1.5 py-0.5 rounded-full text-[10px]',
+                            slaProgressPercent >= 100
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                                : slaProgressPercent >= 80
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
+                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        )}>
+                            {slaProgressPercent >= 100
+                                ? `Vencido ${daysInStage - timeLimit}d`
+                                : `${timeLimit - daysInStage}d restantes`}
+                        </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <div

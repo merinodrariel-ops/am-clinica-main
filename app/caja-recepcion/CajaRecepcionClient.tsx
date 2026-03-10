@@ -1293,8 +1293,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase">Paciente</th>
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-center">Concepto</th>
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase">Método</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-right">Monto USD</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-right">Monto ARS</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-right">USD</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-right">ARS</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-right">≈ USD</th>
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-center">Acciones</th>
                                                 </tr>
                                             </thead>
@@ -1374,12 +1375,16 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
-                                                            <span className={clsx(
-                                                                "text-lg font-black tracking-tight",
-                                                                mov.categoria === 'Egreso' ? "text-rose-500" : "text-white"
-                                                            )}>
-                                                                {formatPrivacy(formatCurrency(mov.usd_equivalente || mov.monto, 'USD'))}
-                                                            </span>
+                                                            {(mov.moneda === 'USD' || mov.moneda === 'USDT') ? (
+                                                                <span className={clsx(
+                                                                    "text-lg font-black tracking-tight",
+                                                                    mov.categoria === 'Egreso' ? "text-rose-500" : "text-white"
+                                                                )}>
+                                                                    {formatPrivacy(formatCurrency(mov.usd_equivalente || mov.monto, 'USD'))}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-600 text-sm">—</span>
+                                                            )}
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             {(mov.categoria === 'Caja' || mov.concepto_nombre.toLowerCase().includes('cierre') || mov.concepto_nombre.toLowerCase().includes('inicio')) ? (
@@ -1389,17 +1394,21 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                 )}>
                                                                     {mov.concepto_nombre.toLowerCase().includes('cierre') ? 'Cierre' : 'Inicio'}
                                                                 </span>
-                                                            ) : (
+                                                            ) : mov.moneda === 'ARS' ? (
                                                                 <span className="text-lg font-black tracking-tight text-slate-400">
-                                                                    {formatPrivacy(formatCurrency(
-                                                                        mov.moneda === 'ARS'
-                                                                            ? mov.monto
-                                                                            : (mov.usd_equivalente && mov.tc_bna_venta
-                                                                                ? mov.usd_equivalente * mov.tc_bna_venta
-                                                                                : (mov.usd_equivalente && bnaRate?.venta ? mov.usd_equivalente * bnaRate.venta : 0)),
-                                                                        'ARS'
-                                                                    ))}
+                                                                    {formatPrivacy(formatCurrency(mov.monto, 'ARS'))}
                                                                 </span>
+                                                            ) : (
+                                                                <span className="text-slate-600 text-sm">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            {mov.moneda === 'ARS' && mov.monto > 0 && mov.tc_bna_venta ? (
+                                                                <span className="text-xs font-medium text-slate-500" title={`TC del día: $${mov.tc_bna_venta}`}>
+                                                                    {formatPrivacy(formatCurrency(mov.monto / mov.tc_bna_venta, 'USD'))}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-700 text-xs">—</span>
                                                             )}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
