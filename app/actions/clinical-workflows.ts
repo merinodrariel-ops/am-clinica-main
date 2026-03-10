@@ -817,18 +817,38 @@ async function ensurePatientDriveFolder(treatmentId: string) {
     }
 
     // Step B: Create the specific treatment subfolder inside the parent
-    const result = await createWorkflowFolder(folderName, hierarchy.motherFolderId);
+    // For EXOCAD (Diseño de Sonrisa), also create the HTML subfolder inside [EXOCAD]
+    let workflowFolderId: string;
+    let workflowFolderUrl: string;
+    let htmlFolderNote = '';
 
-    if (result.error || !result.folderId) {
-        console.error('Error creating workflow subfolder:', result.error);
-        return;
+    if (suffix === 'EXOCAD') {
+        const { ensureExocadHtmlFolder } = await import('@/lib/google-drive');
+        const exocadResult = await ensureExocadHtmlFolder(hierarchy.motherFolderId);
+        if (exocadResult.error || !exocadResult.exocadFolderId) {
+            console.error('Error creating EXOCAD/HTML subfolders:', exocadResult.error);
+            return;
+        }
+        workflowFolderId = exocadResult.exocadFolderId;
+        workflowFolderUrl = `https://drive.google.com/drive/folders/${exocadResult.exocadFolderId}`;
+        htmlFolderNote = exocadResult.htmlFolderId
+            ? `<li><strong>Subcarpeta HTML (subir caso aquí):</strong> <a href="https://drive.google.com/drive/folders/${exocadResult.htmlFolderId}">Abrir subcarpeta HTML</a></li>`
+            : '';
+    } else {
+        const result = await createWorkflowFolder(folderName, hierarchy.motherFolderId);
+        if (result.error || !result.folderId) {
+            console.error('Error creating workflow subfolder:', result.error);
+            return;
+        }
+        workflowFolderId = result.folderId;
+        workflowFolderUrl = result.webViewLink || `https://drive.google.com/drive/folders/${result.folderId}`;
     }
 
     // 5. Update treatment metadata
     const updatedMetadata = {
         ...metadata,
-        drive_folder_id: result.folderId,
-        drive_folder_url: result.webViewLink
+        drive_folder_id: workflowFolderId,
+        drive_folder_url: workflowFolderUrl,
     };
 
     await supabase
@@ -836,19 +856,19 @@ async function ensurePatientDriveFolder(treatmentId: string) {
         .update({ metadata: updatedMetadata })
         .eq('id', treatmentId);
 
-
-    // 5. Send notification email to lab
+    // 6. Send notification email to lab
     const { sendEmail } = await import('@/lib/nodemailer');
     const labEmail = 'amesteticadentallab@gmail.com';
     const subject = `Nueva Carpeta de Paciente: ${folderName}`;
     const html = `
         <div style="font-family: Arial, sans-serif; color: #111827;">
             <h2 style="margin: 0 0 8px;">Nueva Carpeta en Google Drive</h2>
-            <p style="margin: 0 0 8px;">Se ha creado automáticamente la carpeta para el paciente en el flujo de Ortodoncia.</p>
+            <p style="margin: 0 0 8px;">Se ha creado automáticamente la carpeta para el paciente.</p>
             <ul style="margin: 0; padding-left: 18px;">
                 <li><strong>Paciente:</strong> ${folderName}</li>
                 <li><strong>Workflow:</strong> ${workflowName}</li>
-                <li><strong>Enlace:</strong> <a href="${result.webViewLink}">Ver Carpeta en Drive</a></li>
+                <li><strong>Carpeta principal:</strong> <a href="${workflowFolderUrl}">Ver Carpeta en Drive</a></li>
+                ${htmlFolderNote}
             </ul>
         </div>
     `;
@@ -938,7 +958,9 @@ async function checkAndTriggerLaboratorioCase(treatmentId: string, stageId: stri
     const today = new Date();
     const fechaEnvio = today.toISOString().slice(0, 10);
     const fechaEntregaEstimada = addDays(today, 10).toISOString().slice(0, 10);
-    const folderUrl = `https://drive.google.com/drive/folders/${LAB_CASE_FOLDER_ID}`;
+    // Use patient-specific folder from treatment metadata; fall back to generic lab folder
+    const patientDriveFolderUrl = getMetadataString(treatmentData.metadata, 'drive_folder_url');
+    const folderUrl = patientDriveFolderUrl || `https://drive.google.com/drive/folders/${LAB_CASE_FOLDER_ID}`;
     const notesParts = [
         'Caso generado automaticamente desde workflow.',
         `Workflow: ${workflowName}.`,
@@ -996,8 +1018,8 @@ async function checkAndTriggerLaboratorioCase(treatmentId: string, stageId: stri
                 <li><strong>Etapa activadora:</strong> ${stageData.name}</li>
                 <li><strong>Entrega estimada:</strong> ${fechaEntregaEstimada}</li>
             </ul>
-            <p style="margin-top: 10px;">Subir el caso clinico y los archivos al espacio de laboratorio.</p>
-            <p style="margin-top: 10px;"><a href="${folderUrl}"><strong>ACCEDER A CARPETA DE CASOS</strong></a></p>
+            <p style="margin-top: 10px;">Subir el caso clinico y los archivos a la carpeta del paciente.</p>
+            <p style="margin-top: 10px;"><a href="${folderUrl}" style="background:#000;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">📁 ABRIR CARPETA EXOCAD DEL PACIENTE</a></p>
             <p style="margin-top: 6px;"><a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/workflows?section=laboratorio"><strong>ABRIR TAB DE LABORATORIO EN WORKFLOWS</strong></a></p>
         </div>
     `;

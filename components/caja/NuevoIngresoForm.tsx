@@ -94,7 +94,7 @@ interface FormData {
     estado: 'pagado' | 'pendiente';
     observaciones: string;
     es_sena: boolean;
-    sena_tipo: SenaTipo;
+    sena_tipos: SenaTipo[];
     es_cuota: boolean;
     cuota_nro: number;
     cuotas_total: number;
@@ -156,7 +156,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         estado: 'pagado',
         observaciones: '',
         es_sena: false,
-        sena_tipo: '',
+        sena_tipos: [],
         es_cuota: false,
         cuota_nro: 1,
         cuotas_total: 1,
@@ -364,17 +364,21 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         setStep(3);
     }
 
-    function applySenaTipo(tipo: SenaTipo) {
-        const senaLabel = getSenaLabel(tipo);
-        const senaConcepto = senaLabel ? `Sena - ${senaLabel}` : '';
-
-        setFormData(prev => ({
-            ...prev,
-            sena_tipo: tipo,
-            concepto_id: '',
-            concepto_nombre: senaConcepto,
-            categoria: tipo ? 'Senas' : prev.categoria,
-        }));
+    function toggleSenaTipo(tipo: SenaTipo) {
+        setFormData(prev => {
+            const already = prev.sena_tipos.includes(tipo);
+            const next = already
+                ? prev.sena_tipos.filter(t => t !== tipo)
+                : [...prev.sena_tipos, tipo];
+            const labels = next.map(getSenaLabel).filter(Boolean).join(' + ');
+            return {
+                ...prev,
+                sena_tipos: next,
+                concepto_id: '',
+                concepto_nombre: labels ? `Sena - ${labels}` : '',
+                categoria: next.length > 0 ? 'Senas' : prev.categoria,
+            };
+        });
         setConceptoSearch('');
     }
 
@@ -398,8 +402,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             return;
         }
 
-        if (formData.es_sena && !formData.sena_tipo) {
-            alert('Selecciona a que corresponde la sena para activar el workflow correcto.');
+        if (formData.es_sena && formData.sena_tipos.length === 0) {
+            alert('Selecciona al menos un flujo para la seña.');
             return;
         }
 
@@ -534,16 +538,20 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 // We continue as database entries are already saved
             }
 
-            // 9. Extra flows (Sena)
-            if (formData.es_sena && formData.sena_tipo) {
-                await triggerWorkflowFromSenaPayment({
-                    patientId: formData.paciente_id,
-                    senaTipo: formData.sena_tipo,
-                    movementId: mainMovement.id,
-                    conceptoNombre: conceptoFinal,
-                    monto: totalUsdEquiv,
-                    moneda: 'USD',
-                }).catch(e => console.error("Sena workflow trigger failed:", e));
+            // 9. Extra flows (Sena) — trigger one workflow per selected tipo
+            if (formData.es_sena && formData.sena_tipos.length > 0) {
+                await Promise.all(
+                    formData.sena_tipos.filter((t): t is Exclude<SenaTipo, ''> => t !== '').map(senaTipo =>
+                        triggerWorkflowFromSenaPayment({
+                            patientId: formData.paciente_id,
+                            senaTipo,
+                            movementId: mainMovement.id,
+                            conceptoNombre: conceptoFinal,
+                            monto: totalUsdEquiv,
+                            moneda: 'USD',
+                        }).catch(e => console.error(`Sena workflow trigger failed (${senaTipo}):`, e))
+                    )
+                );
             }
 
             onSuccess();
@@ -588,7 +596,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             estado: 'pagado',
             observaciones: '',
             es_sena: false,
-            sena_tipo: '',
+            sena_tipos: [],
             es_cuota: false,
             cuota_nro: 1,
             cuotas_total: 1,
@@ -950,7 +958,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                 setFormData(prev => ({
                                                     ...prev,
                                                     es_sena: nextValue,
-                                                    sena_tipo: nextValue ? prev.sena_tipo : '',
+                                                    sena_tipos: nextValue ? prev.sena_tipos : [],
+                                                    concepto_nombre: nextValue ? prev.concepto_nombre : '',
+                                                    categoria: nextValue ? prev.categoria : '',
                                                 }));
                                             }}
                                             className={clsx(
@@ -966,21 +976,24 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
                                     {formData.es_sena && (
                                         <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                            {SENA_OPCIONES.map(option => (
-                                                <Button
-                                                    key={option.value}
-                                                    type="button"
-                                                    onClick={() => applySenaTipo(option.value)}
-                                                    className={clsx(
-                                                        'px-3 py-3 rounded-xl text-[9px] font-black uppercase tracking-tighter border-2 transition-all h-auto text-left justify-start shadow-sm',
-                                                        formData.sena_tipo === option.value
-                                                            ? 'bg-amber-600 text-white border-amber-600'
-                                                            : 'bg-white text-amber-900 border-amber-100 hover:bg-amber-50'
-                                                    )}
-                                                >
-                                                    {option.label}
-                                                </Button>
-                                            ))}
+                                            {SENA_OPCIONES.map(option => {
+                                                const selected = formData.sena_tipos.includes(option.value);
+                                                return (
+                                                    <Button
+                                                        key={option.value}
+                                                        type="button"
+                                                        onClick={() => toggleSenaTipo(option.value)}
+                                                        className={clsx(
+                                                            'px-3 py-3 rounded-xl text-[9px] font-black uppercase tracking-tighter border-2 transition-all h-auto text-left justify-start shadow-sm',
+                                                            selected
+                                                                ? 'bg-amber-600 text-white border-amber-600'
+                                                                : 'bg-white text-amber-900 border-amber-100 hover:bg-amber-50'
+                                                        )}
+                                                    >
+                                                        {selected ? '✓ ' : ''}{option.label}
+                                                    </Button>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -1197,10 +1210,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto</span>
                                     <span className="font-black text-gray-900 dark:text-white text-right max-w-[200px]">{formData.concepto_nombre}</span>
                                 </div>
-                                {formData.es_sena && formData.sena_tipo && (
+                                {formData.es_sena && formData.sena_tipos.length > 0 && (
                                     <div className="flex justify-between items-center py-2 px-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30">
                                         <span className="text-[9px] font-black text-amber-600 uppercase">Workflow Clínico</span>
-                                        <span className="font-black text-amber-700 text-[10px] uppercase">{getSenaWorkflowLabel(formData.sena_tipo)}</span>
+                                        <span className="font-black text-amber-700 text-[10px] uppercase">
+                                            {formData.sena_tipos.map(getSenaWorkflowLabel).filter(Boolean).join(' + ')}
+                                        </span>
                                     </div>
                                 )}
                                 <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
