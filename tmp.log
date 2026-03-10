@@ -4635,3 +4635,20 @@ Import traces:
 ✓ Compiled in 423ms
  GET /caja-recepcion 200 in 965ms (compile: 612ms, proxy.ts: 232ms, render: 122ms)
  GET /api/bna-cotizacion 200 in 246ms (compile: 12ms, proxy.ts: 157ms, render: 77ms)
+✓ Compiled in 554ms
+ GET /dashboard 200 in 365ms (compile: 165ms, proxy.ts: 152ms, render: 48ms)
+ POST /dashboard 200 in 687ms (compile: 1869µs, proxy.ts: 232ms, render: 453ms)
+ POST /dashboard 200 in 723ms (compile: 6ms, proxy.ts: 133ms, render: 583ms)
+ POST /dashboard 200 in 501ms (compile: 8ms, proxy.ts: 144ms, render: 350ms)
+ POST /dashboard 200 in 584ms (compile: 8ms, proxy.ts: 166ms, render: 410ms)
+ POST /dashboard 200 in 672ms (compile: 13ms, proxy.ts: 266ms, render: 393ms)
+ POST /dashboard 200 in 646ms (compile: 5ms, proxy.ts: 147ms, render: 494ms)
+ GET /caja-recepcion 200 in 684ms (compile: 510ms, proxy.ts: 163ms, render: 11ms)
+ POST /dashboard 200 in 874ms (compile: 2ms, proxy.ts: 572ms, render: 300ms)
+ POST /dashboard 200 in 311ms (compile: 8ms, proxy.ts: 177ms, render: 127ms)
+ POST /dashboard 200 in 506ms (compile: 5ms, proxy.ts: 161ms, render: 340ms)
+ POST /caja-recepcion 200 in 772ms (compile: 5ms, proxy.ts: 249ms, render: 518ms)
+ GET /api/bna-cotizacion 200 in 272ms (compile: 8ms, proxy.ts: 163ms, render: 101ms)
+ GET /api/bna-cotizacion 200 in 159ms (compile: 3ms, proxy.ts: 151ms, render: 5ms)
+ POST /dashboard 200 in 235ms (compile: 3ms, proxy.ts: 160ms, render: 72ms)
+✓ Compiled in 385ms

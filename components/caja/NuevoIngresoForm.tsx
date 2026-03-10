@@ -455,7 +455,6 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     estado: formData.estado,
                     observaciones: isFirst ? cleanedObservation : `(Pago Mixto ${index + 1}/${activeSplits.length}) ${cleanedObservation}`,
                     usd_equivalente: usdEquiv,
-                    monto_usd: usdEquiv, // Mirroring for compatibility
                     tipo_comprobante: formData.tipo_comprobante,
                     recibo_nro: receiptNumber,
                     fecha_movimiento: fechaMovimiento,
@@ -466,8 +465,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
                     cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
                     presupuesto_ref: formData.presupuesto_ref || null,
-                    pago_detalles: useMultiplePayments ? activeSplits : [],
+                    pago_detalles: useMultiplePayments ? activeSplits : null, // Store splits only once or per row (better once in first row or null if not used)
                     split_group_id: splitGroupId,
+                    comprobante_url: formData.comprobante_url || null,
                 };
             });
 
@@ -550,9 +550,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
             onSuccess();
             setStep(5);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving income:', error);
-            alert('Error al guardar el ingreso: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+            const errorMessage = error.message || error.details || (typeof error === 'string' ? error : 'Error desconocido');
+            alert('Error al guardar el ingreso: ' + errorMessage);
         } finally {
             setSaving(false);
         }
@@ -879,6 +880,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     <Plus size={16} className="mr-2" /> Agregar medio de pago
                                                 </Button>
 
+                                                {(paymentSplits.some(s => s.metodo_pago === 'Transferencia' || s.metodo_pago === 'MercadoPago')) && (
+                                                    <div className="flex-1">
+                                                        <ComprobanteUpload
+                                                            area="caja-recepcion"
+                                                            onUploadComplete={({ url }) => setFormData(prev => ({ ...prev, comprobante_url: url }))}
+                                                            className="w-full"
+                                                        />
+                                                    </div>
+                                                )}
+
                                                 <div className="flex-1 bg-gray-950 dark:bg-black text-white p-4 rounded-2xl flex flex-col justify-center items-end shadow-xl border border-gray-800">
                                                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Acumulado</span>
                                                     <span className="text-xl font-black text-blue-400 tabular-nums">
@@ -1101,6 +1112,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             <span className="text-[11px] font-black uppercase">{m.label}</span>
                                         </button>
                                     ))}
+
+                                    {(formData.metodo_pago === 'Transferencia' || formData.metodo_pago === 'MercadoPago') && (
+                                        <div className="col-span-full mt-4">
+                                            <ComprobanteUpload
+                                                area="caja-recepcion"
+                                                onUploadComplete={({ url }) => setFormData(prev => ({ ...prev, comprobante_url: url }))}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
