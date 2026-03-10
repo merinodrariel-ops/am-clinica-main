@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon, Plus, Trash2, Layout } from 'lucide-react';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { Button } from "@/components/ui/Button";
@@ -607,33 +608,21 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
             <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-xl">
+                {/* Barra de progreso — estilo admisión */}
+                {step < 5 && (
+                    <div className="w-full h-1 bg-gray-100 dark:bg-gray-700 rounded-t-2xl overflow-hidden">
+                        <motion.div
+                            className="h-full bg-gradient-to-r from-blue-500 to-blue-300"
+                            initial={false}
+                            animate={{ width: `${((step - 1) / 3) * 100}%` }}
+                            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        />
+                    </div>
+                )}
                 {/* Header */}
                 <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                     <div>
                         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Nuevo Ingreso</h2>
-                        <div className="flex items-center gap-2 mt-2">
-                            {[
-                                { n: 1, l: 'Monto' },
-                                { n: 2, l: 'Concepto' },
-                                { n: 3, l: 'Pago' },
-                                { n: 4, l: 'Confirmar' }
-                            ].map((s) => (
-                                <div key={s.n} className="flex flex-col items-center gap-1">
-                                    <div
-                                        className={clsx(
-                                            "h-1.5 rounded-full transition-all",
-                                            s.n === step ? "w-8 bg-blue-500" : s.n < step ? "w-8 bg-green-500" : "w-4 bg-gray-200 dark:bg-gray-700"
-                                        )}
-                                    />
-                                    <span className={clsx(
-                                        "text-[8px] font-black uppercase tracking-tighter",
-                                        s.n === step ? "text-blue-500" : s.n < step ? "text-green-600" : "text-gray-400"
-                                    )}>
-                                        {s.l}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
                     </div>
                     {useMultiplePayments && (
                         <div className="hidden sm:flex px-3 py-1 bg-amber-500 text-white text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-amber-500/20 animate-bounce">
@@ -1295,6 +1284,34 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 >
                                     Descargar
                                 </Button>
+                                {generatedReceiptUrl && (
+                                    <Button
+                                        onClick={() => {
+                                            const [, base64] = generatedReceiptUrl.split(',');
+                                            const binary = atob(base64);
+                                            const array = new Uint8Array(binary.length);
+                                            for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+                                            const blob = new Blob([array], { type: 'image/jpeg' });
+                                            const file = new File([blob], `comprobante-${formData.paciente_nombre}.jpg`, { type: 'image/jpeg' });
+                                            if (navigator.share && navigator.canShare?.({ files: [file] })) {
+                                                navigator.share({
+                                                    files: [file],
+                                                    title: 'Comprobante de Pago',
+                                                    text: `Comprobante AM Clínica — ${formData.paciente_nombre}`,
+                                                }).catch(() => {});
+                                            } else {
+                                                // Fallback: abrir WhatsApp web con link de storage si hay, sino descargar
+                                                const link = document.createElement('a');
+                                                link.href = generatedReceiptUrl;
+                                                link.download = `comprobante-${formData.paciente_nombre}.jpg`;
+                                                link.click();
+                                            }
+                                        }}
+                                        className="flex-1 bg-[#25D366] hover:bg-[#20bd5a] text-white h-auto py-4 rounded-2xl font-black uppercase tracking-widest border-none"
+                                    >
+                                        📱 Compartir
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={handleClose}
                                     className="flex-1 bg-blue-600 text-white hover:bg-blue-700 h-auto py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-500/20"
