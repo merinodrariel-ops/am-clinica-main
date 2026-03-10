@@ -1012,10 +1012,16 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
             {showCrearPlan && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Crear Plan de Financiación</h2>
-                        <p className="text-sm text-gray-500">Paciente: <strong>{patient.nombre} {patient.apellido}</strong></p>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Crear Plan de Financiación</h2>
+                                <p className="text-sm text-gray-500">{patient.nombre} {patient.apellido}</p>
+                            </div>
+                            <button onClick={() => setShowCrearPlan(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+                        </div>
 
                         <div className="space-y-3">
+                            {/* Tratamiento */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Tratamiento *</label>
                                 <input
@@ -1026,49 +1032,60 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Monto total (USD) *</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={planForm.montoTotalUsd}
-                                        onChange={e => {
-                                            const monto = e.target.value;
-                                            setPlanForm(p => ({
-                                                ...p,
-                                                montoTotalUsd: monto,
-                                                montoCuotaUsd: recalcCuota(monto, p.cuotasTotal, p.tasaMensual),
-                                            }));
-                                        }}
-                                        placeholder="0.00"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Cant. cuotas *</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        value={planForm.cuotasTotal}
-                                        onChange={e => {
-                                            const cuotas = e.target.value;
-                                            setPlanForm(p => ({
-                                                ...p,
-                                                cuotasTotal: cuotas,
-                                                montoCuotaUsd: recalcCuota(p.montoTotalUsd, cuotas, p.tasaMensual),
-                                            }));
-                                        }}
-                                        placeholder="Ej: 3"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                                    />
+
+                            {/* Monto a financiar */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Monto a financiar (USD) *</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={planForm.montoTotalUsd}
+                                    onChange={e => {
+                                        const monto = e.target.value;
+                                        setPlanForm(p => ({
+                                            ...p,
+                                            montoTotalUsd: monto,
+                                            montoCuotaUsd: recalcCuota(monto, p.cuotasTotal, p.tasaMensual),
+                                        }));
+                                    }}
+                                    placeholder="0.00"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                />
+                            </div>
+
+                            {/* Cuotas (botones como en calculadora pública) */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-2">Cantidad de cuotas *</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[3, 6, 9, 12].map(n => (
+                                        <button
+                                            key={n}
+                                            type="button"
+                                            onClick={() => {
+                                                const cuotas = String(n);
+                                                setPlanForm(p => ({
+                                                    ...p,
+                                                    cuotasTotal: cuotas,
+                                                    montoCuotaUsd: recalcCuota(p.montoTotalUsd, cuotas, p.tasaMensual),
+                                                }));
+                                            }}
+                                            className={`py-2 rounded-lg text-sm font-medium transition-all ${
+                                                planForm.cuotasTotal === String(n)
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            {n}x
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+
+                            {/* Tasa mensual */}
+                            <div className="grid grid-cols-2 gap-3 items-end">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Tasa mensual (%) *</label>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Tasa mensual (%)</label>
                                     <input
                                         type="number"
                                         min="0"
@@ -1082,25 +1099,58 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 montoCuotaUsd: recalcCuota(p.montoTotalUsd, p.cuotasTotal, tasa),
                                             }));
                                         }}
-                                        placeholder="1.5"
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
                                     />
-                                    <p className="text-xs text-gray-400 mt-0.5">Default: {DEFAULT_MONTHLY_INTEREST_PCT}%</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Estándar: {DEFAULT_MONTHLY_INTEREST_PCT}% mensual</p>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Monto por cuota (USD) *</label>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Monto cuota (USD)</label>
                                     <input
                                         type="number"
                                         min="0"
                                         step="0.01"
                                         value={planForm.montoCuotaUsd}
                                         onChange={e => setPlanForm(p => ({ ...p, montoCuotaUsd: e.target.value }))}
-                                        placeholder="0.00"
+                                        placeholder="auto"
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
                                     />
-                                    <p className="text-xs text-gray-400 mt-0.5">Ajustable manualmente.</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Ajustable manualmente</p>
                                 </div>
                             </div>
+
+                            {/* Preview en vivo (igual que calculadora pública) */}
+                            {(() => {
+                                const m = parseFloat(planForm.montoTotalUsd);
+                                const c = parseInt(planForm.cuotasTotal);
+                                const t = parseFloat(planForm.tasaMensual);
+                                if (m > 0 && c > 0 && !isNaN(t)) {
+                                    const bd = calculateFinancingBreakdown({ totalUsd: m, upfrontPct: 0, installments: c, monthlyInterestPct: t });
+                                    return (
+                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 space-y-2">
+                                            <div className="text-center pb-2 border-b border-emerald-200 dark:border-emerald-800">
+                                                <p className="text-xs text-gray-500 mb-0.5">Cuota mensual</p>
+                                                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                                                    USD {bd.installmentUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
+                                                <p className="text-xs text-gray-500">por {c} {c === 1 ? 'mes' : 'meses'}</p>
+                                            </div>
+                                            <div className="space-y-1 text-sm">
+                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                                                    <span>Interés ({t}% × {c} meses)</span>
+                                                    <span>USD {bd.totalInterestUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <div className="flex justify-between font-medium text-gray-900 dark:text-white border-t border-emerald-200 dark:border-emerald-800 pt-1">
+                                                    <span>Total a pagar</span>
+                                                    <span>USD {bd.financedTotalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
+                            {/* Fecha y notas */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Fecha primera cuota *</label>
                                 <input

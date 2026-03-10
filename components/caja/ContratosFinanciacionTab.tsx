@@ -818,7 +818,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase text-gray-500 font-bold">Monto Total (USD)</label>
+                    <label className="text-[10px] uppercase text-gray-500 font-bold">Monto a financiar (USD)</label>
                     <input
                       type="text"
                       value={totalAmount}
@@ -986,12 +986,14 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                   <h2>CLÁUSULA SEGUNDA: PRESUPUESTO Y FORMA DE PAGO</h2>
                   <div className="financial-box">
                     <div className="grid" style={{ marginBottom: 0 }}>
-                      <div className="field">
-                        <div className="label">Costo total del tratamiento</div>
-                        <div className="value" style={{ border: 'none', fontSize: '14px', fontWeight: 'bold' }}>
-                          {totalAmount ? formatCurrency(parseFloat(totalAmount.replace(/\./g, ''))) : '___________'} (USD)
+                      {calculations && calculations.recibido > 0 && (
+                        <div className="field">
+                          <div className="label">Costo total del tratamiento</div>
+                          <div className="value" style={{ border: 'none', fontSize: '14px', fontWeight: 'bold' }}>
+                            {totalAmount ? formatCurrency(parseFloat(totalAmount.replace(/\./g, ''))) : '___________'} (USD)
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {calculations && calculations.recibido > 0 && (
                         <div className="field">
@@ -1003,7 +1005,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                       )}
 
                       <div className="field">
-                        <div className="label">Saldo a financiar</div>
+                        <div className="label">Monto a financiar</div>
                         <div className="value" style={{ border: 'none', fontSize: '14px', fontWeight: 'bold' }}>
                           {calculations ? formatCurrency(calculations.amountToFinance) : '___________'} (USD)
                         </div>
