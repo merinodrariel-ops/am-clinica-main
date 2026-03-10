@@ -4652,3 +4652,61 @@ Import traces:
  GET /api/bna-cotizacion 200 in 159ms (compile: 3ms, proxy.ts: 151ms, render: 5ms)
  POST /dashboard 200 in 235ms (compile: 3ms, proxy.ts: 160ms, render: 72ms)
 ✓ Compiled in 385ms
+ GET /caja-recepcion 200 in 1050ms (compile: 735ms, proxy.ts: 297ms, render: 17ms)
+ GET /caja-recepcion 200 in 401ms (compile: 10ms, proxy.ts: 199ms, render: 192ms)
+ GET /api/bna-cotizacion 200 in 240ms (compile: 6ms, proxy.ts: 173ms, render: 61ms)
+✓ Compiled in 374ms
+✓ Compiled in 239ms
+ GET /caja-recepcion 200 in 1086ms (compile: 728ms, proxy.ts: 337ms, render: 20ms)
+ GET /caja-recepcion 200 in 220ms (compile: 12ms, proxy.ts: 148ms, render: 60ms)
+✓ Compiled in 820ms
+ GET /caja-recepcion 200 in 2.4s (compile: 1586ms, proxy.ts: 366ms, render: 406ms)
+ GET /api/bna-cotizacion 200 in 243ms (compile: 6ms, proxy.ts: 146ms, render: 91ms)
+✓ Compiled in 398ms
+✓ Compiled in 296ms
+✓ Compiled in 325ms
+✓ Compiled in 226ms
+ GET /caja-recepcion 200 in 1681ms (compile: 729ms, proxy.ts: 637ms, render: 314ms)
+ GET /api/bna-cotizacion 200 in 234ms (compile: 5ms, proxy.ts: 153ms, render: 75ms)
+✓ Compiled in 137ms
+✓ Compiled in 198ms
+ GET /caja-recepcion 200 in 2.1s (compile: 951ms, proxy.ts: 1094ms, render: 26ms)
+ GET /caja-recepcion 200 in 435ms (compile: 19ms, proxy.ts: 400ms, render: 16ms)
+✓ Compiled in 305ms
+✓ Compiled in 180ms
+ GET /dashboard 200 in 371ms (compile: 36ms, proxy.ts: 280ms, render: 55ms)
+ POST /dashboard 200 in 848ms (compile: 2ms, proxy.ts: 208ms, render: 637ms)
+ POST /dashboard 200 in 738ms (compile: 9ms, proxy.ts: 181ms, render: 548ms)
+ POST /dashboard 200 in 582ms (compile: 5ms, proxy.ts: 155ms, render: 422ms)
+ POST /dashboard 200 in 678ms (compile: 41ms, proxy.ts: 151ms, render: 486ms)
+ POST /dashboard 200 in 411ms (compile: 6ms, proxy.ts: 149ms, render: 257ms)
+ GET /patients 200 in 1687ms (compile: 1485ms, proxy.ts: 186ms, render: 16ms)
+ POST /dashboard 200 in 532ms (compile: 8ms, proxy.ts: 141ms, render: 383ms)
+ POST /dashboard 200 in 229ms (compile: 3ms, proxy.ts: 147ms, render: 80ms)
+ POST /patients 200 in 424ms (compile: 3ms, proxy.ts: 164ms, render: 256ms)
+ POST /dashboard 200 in 410ms (compile: 9ms, proxy.ts: 139ms, render: 262ms)
+ POST /dashboard 200 in 431ms (compile: 3ms, proxy.ts: 349ms, render: 78ms)
+ POST /dashboard 200 in 640ms (compile: 3ms, proxy.ts: 283ms, render: 354ms)
+ POST /patients 200 in 891ms (compile: 3ms, proxy.ts: 130ms, render: 759ms)
+ POST /patients 200 in 2.3s (compile: 319ms, proxy.ts: 153ms, render: 1794ms)
+ POST /patients 200 in 643ms (compile: 16ms, proxy.ts: 171ms, render: 456ms)
+ POST /dashboard 200 in 3.0s (compile: 1916ms, proxy.ts: 197ms, render: 928ms)
+ POST /patients 200 in 583ms (compile: 19ms, proxy.ts: 335ms, render: 229ms)
+ POST /patients 200 in 639ms (compile: 11ms, proxy.ts: 408ms, render: 220ms)
+ POST /dashboard 200 in 908ms (compile: 5ms, proxy.ts: 141ms, render: 763ms)
+ POST /dashboard 200 in 1029ms (compile: 164ms, proxy.ts: 325ms, render: 540ms)
+○ Compiling /admision ...
+ POST /dashboard 200 in 790ms (compile: 30ms, proxy.ts: 211ms, render: 548ms)
+ POST /dashboard 200 in 454ms (compile: 14ms, proxy.ts: 153ms, render: 287ms)
+ POST /dashboard 200 in 628ms (compile: 15ms, proxy.ts: 172ms, render: 441ms)
+ POST /dashboard 200 in 369ms (compile: 22ms, proxy.ts: 234ms, render: 114ms)
+ POST /dashboard 200 in 639ms (compile: 15ms, proxy.ts: 164ms, render: 460ms)
+ POST /dashboard 200 in 685ms (compile: 18ms, proxy.ts: 223ms, render: 444ms)
+ POST /dashboard 200 in 1645ms (compile: 14ms, proxy.ts: 171ms, render: 1460ms)
+ GET /admision 200 in 8.9s (compile: 7.8s, proxy.ts: 176ms, render: 946ms)
+ POST /dashboard 200 in 739ms (compile: 55ms, proxy.ts: 250ms, render: 435ms)
+ POST /dashboard 200 in 252ms (compile: 6ms, proxy.ts: 151ms, render: 95ms)
+ GET /caja-recepcion 200 in 2.8s (compile: 2.3s, proxy.ts: 164ms, render: 319ms)
+ GET /api/bna-cotizacion 200 in 826ms (compile: 45ms, proxy.ts: 366ms, render: 415ms)
+ GET /api/bna-cotizacion 200 in 313ms (compile: 7ms, proxy.ts: 230ms, render: 76ms)
+✓ Finished writing to filesystem cache in 14.2s
