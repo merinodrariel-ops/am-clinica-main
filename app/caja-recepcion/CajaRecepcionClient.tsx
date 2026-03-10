@@ -98,6 +98,7 @@ interface Movimiento {
     registro_editado?: boolean;
     comprobante_url?: string | null;
     origen?: string;
+    tc_bna_venta?: number | null;
 }
 
 interface BnaRate {
@@ -1293,7 +1294,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-center">Concepto</th>
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase">Método</th>
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-right">Monto USD</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-center">Estado</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-right">Monto ARS</th>
                                                     <th className="px-6 py-4 text-[10px] font-black tracking-widest text-slate-500 uppercase text-center">Acciones</th>
                                                 </tr>
                                             </thead>
@@ -1380,21 +1381,26 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                 {formatPrivacy(formatCurrency(mov.usd_equivalente || mov.monto, 'USD'))}
                                                             </span>
                                                         </td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <span className={clsx(
-                                                                "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
-                                                                (mov.categoria === 'Caja' || mov.concepto_nombre.toLowerCase().includes('cierre') || mov.concepto_nombre.toLowerCase().includes('inicio'))
-                                                                    ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                                                                    : (
-                                                                        mov.estado === 'pagado' ? "bg-teal-500/10 text-teal-400 border-teal-500/20" :
-                                                                            mov.estado === 'pendiente' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                                                                                "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                                                                    )
-                                                            )}>
-                                                                {(mov.categoria === 'Caja' || mov.concepto_nombre.toLowerCase().includes('cierre') || mov.concepto_nombre.toLowerCase().includes('inicio'))
-                                                                    ? (mov.concepto_nombre.toLowerCase().includes('cierre') ? 'Cierre' : 'Inicio')
-                                                                    : mov.estado}
-                                                            </span>
+                                                        <td className="px-6 py-4 text-right">
+                                                            {(mov.categoria === 'Caja' || mov.concepto_nombre.toLowerCase().includes('cierre') || mov.concepto_nombre.toLowerCase().includes('inicio')) ? (
+                                                                <span className={clsx(
+                                                                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
+                                                                    "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                                                )}>
+                                                                    {mov.concepto_nombre.toLowerCase().includes('cierre') ? 'Cierre' : 'Inicio'}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-lg font-black tracking-tight text-slate-400">
+                                                                    {formatPrivacy(formatCurrency(
+                                                                        mov.moneda === 'ARS'
+                                                                            ? mov.monto
+                                                                            : (mov.usd_equivalente && mov.tc_bna_venta
+                                                                                ? mov.usd_equivalente * mov.tc_bna_venta
+                                                                                : (mov.usd_equivalente && bnaRate?.venta ? mov.usd_equivalente * bnaRate.venta : 0)),
+                                                                        'ARS'
+                                                                    ))}
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             <div className="flex items-center justify-center gap-2">

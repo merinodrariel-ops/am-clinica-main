@@ -743,7 +743,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     />
                                                 </div>
                                                 <div className="flex rounded-2xl overflow-hidden border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 shadow-sm">
-                                                    {['ARS', 'USD', 'USDT'].map((m) => (
+                                                    {['ARS', 'USD'].map((m) => (
                                                         <Button
                                                             key={m}
                                                             type="button"
@@ -796,7 +796,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                         placeholder="0"
                                                                     />
                                                                     <div className="flex border rounded-lg overflow-hidden shrink-0">
-                                                                        {['ARS', 'USD', 'USDT'].map(curr => (
+                                                                        {['ARS', 'USD'].map(curr => (
                                                                             <button
                                                                                 key={curr}
                                                                                 type="button"
