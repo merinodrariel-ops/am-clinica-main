@@ -605,3 +605,51 @@ export async function syncFinanciacionIdentidadesAction(): Promise<SyncIdentidad
         };
     }
 }
+
+export interface CrearPlanFinanciacionParams {
+    pacienteId: string;
+    pacienteNombre: string;
+    tratamiento: string;
+    montoTotalUsd: number;
+    cuotasTotal: number;
+    montoCuotaUsd: number;
+    fechaInicio: string; // YYYY-MM-DD
+    notas?: string;
+}
+
+export async function crearPlanFinanciacionAction(
+    params: CrearPlanFinanciacionParams
+): Promise<{ success: boolean; error?: string; planId?: string }> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autenticado' };
+
+        const adminClient = createAdminClient();
+        const { data, error } = await adminClient
+            .from('planes_financiacion')
+            .insert({
+                paciente_id: params.pacienteId,
+                paciente_nombre: params.pacienteNombre,
+                tratamiento: params.tratamiento,
+                monto_total_usd: params.montoTotalUsd,
+                cuotas_total: params.cuotasTotal,
+                cuotas_pagadas: 0,
+                monto_cuota_usd: params.montoCuotaUsd,
+                saldo_restante_usd: params.montoTotalUsd,
+                fecha_inicio: params.fechaInicio,
+                estado: 'En curso',
+                notas: params.notas || null,
+            })
+            .select('id')
+            .single();
+
+        if (error) return { success: false, error: error.message };
+        return { success: true, planId: data?.id };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Error inesperado al crear plan',
+        };
+    }
+}

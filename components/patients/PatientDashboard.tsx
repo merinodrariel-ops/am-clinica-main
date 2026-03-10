@@ -43,6 +43,7 @@ import type { PlanFinanciacion } from '@/lib/financiacion';
 import PatientCommandCenter from './PatientCommandCenter';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
+import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
 
 interface Movement {
     id: string;
@@ -154,6 +155,51 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     });
     const [savingFin, setSavingFin] = useState(false);
     const [isEditingFin, setIsEditingFin] = useState(false);
+
+    // Crear Plan de Financiación modal
+    const [showCrearPlan, setShowCrearPlan] = useState(false);
+    const [creandoPlan, setCreandoPlan] = useState(false);
+    const [crearPlanError, setCrearPlanError] = useState<string | null>(null);
+    const [planForm, setPlanForm] = useState({
+        tratamiento: '',
+        montoTotalUsd: '',
+        cuotasTotal: '',
+        montoCuotaUsd: '',
+        fechaInicio: '',
+        notas: '',
+    });
+
+    async function handleCrearPlan() {
+        setCrearPlanError(null);
+        const monto = parseFloat(planForm.montoTotalUsd);
+        const cuotas = parseInt(planForm.cuotasTotal);
+        const cuotaMonto = parseFloat(planForm.montoCuotaUsd);
+        if (!planForm.tratamiento || isNaN(monto) || monto <= 0 || isNaN(cuotas) || cuotas < 1 || isNaN(cuotaMonto) || cuotaMonto <= 0 || !planForm.fechaInicio) {
+            setCrearPlanError('Completá todos los campos requeridos.');
+            return;
+        }
+        setCreandoPlan(true);
+        try {
+            const result = await crearPlanFinanciacionAction({
+                pacienteId: patient.id_paciente,
+                pacienteNombre: `${patient.nombre} ${patient.apellido}`.trim(),
+                tratamiento: planForm.tratamiento,
+                montoTotalUsd: monto,
+                cuotasTotal: cuotas,
+                montoCuotaUsd: cuotaMonto,
+                fechaInicio: planForm.fechaInicio,
+                notas: planForm.notas || undefined,
+            });
+            if (result.success) {
+                setShowCrearPlan(false);
+                router.refresh();
+            } else {
+                setCrearPlanError(result.error || 'Error al crear el plan');
+            }
+        } finally {
+            setCreandoPlan(false);
+        }
+    }
 
     const totalPagadoFinanc = payments
         .filter(p => p.estado !== 'Anulado' && (p.cuota_nro && p.cuota_nro > 0))
@@ -688,6 +734,18 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             </Link>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {!financingPlan && (
+                                                <button
+                                                    onClick={() => {
+                                                        setCrearPlanError(null);
+                                                        setPlanForm({ tratamiento: '', montoTotalUsd: '', cuotasTotal: '', montoCuotaUsd: '', fechaInicio: '', notas: '' });
+                                                        setShowCrearPlan(true);
+                                                    }}
+                                                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                                                >
+                                                    <Plus size={16} /> Crear Plan
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     if (isEditingFin) handleSaveFinancing();
@@ -935,6 +993,127 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                     </motion.div>
                 </AnimatePresence>
             </div>
+
+            {/* Modal: Crear Plan de Financiación */}
+            {showCrearPlan && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Crear Plan de Financiación</h2>
+                        <p className="text-sm text-gray-500">Paciente: <strong>{patient.nombre} {patient.apellido}</strong></p>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Tratamiento *</label>
+                                <input
+                                    type="text"
+                                    value={planForm.tratamiento}
+                                    onChange={e => setPlanForm(p => ({ ...p, tratamiento: e.target.value }))}
+                                    placeholder="Ej: Ortodoncia, Diseño de Sonrisa..."
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Monto total (USD) *</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={planForm.montoTotalUsd}
+                                        onChange={e => {
+                                            const monto = e.target.value;
+                                            const cuotas = parseInt(planForm.cuotasTotal);
+                                            setPlanForm(p => ({
+                                                ...p,
+                                                montoTotalUsd: monto,
+                                                montoCuotaUsd: (!isNaN(cuotas) && cuotas > 0 && parseFloat(monto) > 0)
+                                                    ? (parseFloat(monto) / cuotas).toFixed(2)
+                                                    : p.montoCuotaUsd,
+                                            }));
+                                        }}
+                                        placeholder="0.00"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Cant. cuotas *</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        value={planForm.cuotasTotal}
+                                        onChange={e => {
+                                            const cuotas = e.target.value;
+                                            const monto = parseFloat(planForm.montoTotalUsd);
+                                            setPlanForm(p => ({
+                                                ...p,
+                                                cuotasTotal: cuotas,
+                                                montoCuotaUsd: (!isNaN(monto) && monto > 0 && parseInt(cuotas) > 0)
+                                                    ? (monto / parseInt(cuotas)).toFixed(2)
+                                                    : p.montoCuotaUsd,
+                                            }));
+                                        }}
+                                        placeholder="Ej: 3"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Monto por cuota (USD) *</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={planForm.montoCuotaUsd}
+                                    onChange={e => setPlanForm(p => ({ ...p, montoCuotaUsd: e.target.value }))}
+                                    placeholder="0.00"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                />
+                                <p className="text-xs text-gray-400 mt-0.5">Se calcula automáticamente; podés ajustarlo.</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Fecha primera cuota *</label>
+                                <input
+                                    type="date"
+                                    value={planForm.fechaInicio}
+                                    onChange={e => setPlanForm(p => ({ ...p, fechaInicio: e.target.value }))}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Notas (opcional)</label>
+                                <textarea
+                                    value={planForm.notas}
+                                    onChange={e => setPlanForm(p => ({ ...p, notas: e.target.value }))}
+                                    placeholder="Observaciones, referencia de contrato..."
+                                    rows={2}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        {crearPlanError && (
+                            <p className="text-sm text-red-600">{crearPlanError}</p>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setShowCrearPlan(false)}
+                                className="flex-1 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCrearPlan}
+                                disabled={creandoPlan}
+                                className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-60"
+                            >
+                                {creandoPlan ? 'Creando...' : 'Crear Plan'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

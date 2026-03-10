@@ -386,7 +386,7 @@ export async function createPlanTratamiento(plan: Partial<PlanTratamiento>): Pro
     // Calculate cuota if financiado
     let cuotaEstimada = 0;
     if (plan.financiado && plan.plazo_meses && plan.plazo_meses > 0) {
-        const interes = (plan.interes_mensual_pct || 1) / 100;
+        const interes = (plan.interes_mensual_pct || 1.5) / 100;
         cuotaEstimada = (saldo * (1 + interes * plan.plazo_meses)) / plan.plazo_meses;
     }
 

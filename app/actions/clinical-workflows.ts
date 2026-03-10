@@ -2010,3 +2010,66 @@ export async function updateWorkflowStagesOrder(
     );
     revalidatePath('/workflows');
 }
+
+export async function getWorkflowStaffEmailList(): Promise<{ name: string; email: string }[]> {
+    const supabase = await createClient();
+    const { data } = await supabase
+        .from('personal')
+        .select('nombre, apellido, email')
+        .not('email', 'is', null)
+        .eq('activo', true)
+        .order('apellido');
+    if (!data) return [];
+    return data
+        .filter((p) => p.email)
+        .map((p) => ({
+            name: [p.nombre, p.apellido].filter(Boolean).join(' '),
+            email: p.email as string,
+        }));
+}
+
+export async function sendTestWorkflowEmail(params: {
+    toEmail: string;
+    subject: string;
+    body: string;
+    stageName: string;
+    workflowName: string;
+}): Promise<{ ok: boolean; error?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: 'No autenticado' };
+
+    const filledSubject = params.subject
+        .replace(/\{\{paciente\}\}/g, 'Milena Prueba')
+        .replace(/\{\{etapa\}\}/g, params.stageName)
+        .replace(/\{\{workflow\}\}/g, params.workflowName)
+        .replace(/\{\{hito\}\}/g, '2026-04-01');
+
+    const filledBody = params.body
+        .replace(/\{\{paciente\}\}/g, 'Milena Prueba')
+        .replace(/\{\{etapa\}\}/g, params.stageName)
+        .replace(/\{\{workflow\}\}/g, params.workflowName)
+        .replace(/\{\{hito\}\}/g, '2026-04-01');
+
+    try {
+        await sendEmail({
+            to: params.toEmail,
+            subject: `[TEST] ${filledSubject}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+<div style="background:#f59e0b;color:#fff;padding:8px 16px;border-radius:6px 6px 0 0;font-size:12px;font-weight:bold">
+EMAIL DE PRUEBA — ${params.workflowName} / ${params.stageName}
+</div>
+<div style="border:1px solid #e5e7eb;border-top:none;padding:20px;border-radius:0 0 6px 6px">
+<p style="white-space:pre-wrap;margin:0">${filledBody}</p>
+</div>
+<p style="font-size:11px;color:#9ca3af;margin-top:12px">
+Este es un email de prueba. Paciente de ejemplo: Milena Prueba.
+</p>
+</div>`,
+        });
+        return { ok: true };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error al enviar';
+        return { ok: false, error: msg };
+    }
+}
