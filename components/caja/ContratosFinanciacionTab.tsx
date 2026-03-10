@@ -1028,7 +1028,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                   <h2>CLÁUSULA TERCERA: CONDICIONES DE LA FINANCIACIÓN</h2>
                   {selectedPlanForContract ? (
-                    <p>El saldo se pagará en <strong>{selectedPlanForContract.months} cuotas mensuales, iguales y consecutivas</strong> de <strong>{formatCurrency(selectedPlanForContract.installmentValue)} (USD)</strong> cada una, con vencimiento el día <strong>7</strong> de cada mes, siendo la primera cuota con vencimiento el día 7 del mes inmediato siguiente a la firma del presente.</p>
+                    <p>El saldo se pagará en <strong>{selectedPlanForContract.months} cuotas mensuales, iguales y consecutivas</strong> de <strong>{formatCurrency(selectedPlanForContract.installmentValue)} (USD)</strong> cada una, con vencimiento el día <strong>7</strong> de cada mes calendario. La primera cuota vencerá el día 7 del mes siguiente a la firma del presente, contando EL PACIENTE con los días 1 al 7 de dicho mes para efectuar el pago sin recargo.</p>
                   ) : (
                     <p style={{ color: '#888', fontStyle: 'italic' }}>(Seleccione un plan de cuotas en el panel lateral)</p>
                   )}
