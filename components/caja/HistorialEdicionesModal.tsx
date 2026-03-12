@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { X, Clock, User, FileEdit, AlertCircle } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { Button } from "@/components/ui/Button";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 interface HistorialItem {
     id: string;
@@ -27,7 +24,9 @@ interface HistorialItem {
 interface HistorialEdicionesModalProps {
     isOpen: boolean;
     onClose: () => void;
-    registroId: string;
+    // Pass registroId for single-movement mode, or mes (YYYY-MM) for monthly audit mode
+    registroId?: string;
+    mes?: string;
     tabla: string;
 }
 
@@ -35,31 +34,31 @@ export default function HistorialEdicionesModal({
     isOpen,
     onClose,
     registroId,
+    mes,
     tabla
 }: HistorialEdicionesModalProps) {
     const [historial, setHistorial] = useState<HistorialItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const isMesMode = !!mes && !registroId;
+
     useEffect(() => {
-        if (isOpen && registroId) {
-            fetchHistorial();
+        if (isOpen) {
+            if (registroId) fetchHistorialPorRegistro();
+            else if (mes) fetchHistorialMes();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, registroId]);
+    }, [isOpen, registroId, mes]);
 
-    const fetchHistorial = async () => {
+    const fetchHistorialPorRegistro = async () => {
+        if (!registroId) return;
         setLoading(true);
         setError(null);
-
-        const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
-
+        const supabase = createClient();
         const { data, error: fetchError } = await supabase
             .from('historial_ediciones')
-            .select(`
-                *,
-                profiles:usuario_editor (full_name)
-            `)
+            .select('*, profiles:usuario_editor(full_name)')
             .eq('id_registro', registroId)
             .eq('tabla_origen', tabla)
             .order('fecha_edicion', { ascending: false });
@@ -70,7 +69,33 @@ export default function HistorialEdicionesModal({
         } else {
             setHistorial(data || []);
         }
+        setLoading(false);
+    };
 
+    const fetchHistorialMes = async () => {
+        if (!mes) return;
+        setLoading(true);
+        setError(null);
+        const supabase = createClient();
+
+        const [y, m] = mes.split('-').map(Number);
+        const nextMonth = new Date(y, m, 1); // m is 1-indexed, Date(y, m, 1) = first of next month
+        const nextMonthStr = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+
+        const { data, error: fetchError } = await supabase
+            .from('historial_ediciones')
+            .select('*, profiles:usuario_editor(full_name)')
+            .gte('fecha_edicion', `${mes}-01`)
+            .lt('fecha_edicion', `${nextMonthStr}-01`)
+            .eq('tabla_origen', tabla)
+            .order('fecha_edicion', { ascending: false });
+
+        if (fetchError) {
+            setError('Error al cargar el historial de ediciones');
+            console.error('Historial fetch error:', fetchError);
+        } else {
+            setHistorial(data || []);
+        }
         setLoading(false);
     };
 
@@ -93,6 +118,10 @@ export default function HistorialEdicionesModal({
         });
     };
 
+    const mesLabel = mes
+        ? new Date(`${mes}-02`).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+        : '';
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Backdrop */}
@@ -114,7 +143,11 @@ export default function HistorialEdicionesModal({
                                 Historial de Ediciones
                             </h2>
                             <p className="text-sm text-gray-500">
-                                Registro: {registroId.slice(0, 8)}...
+                                {isMesMode
+                                    ? `Auditoría mensual: ${mesLabel}`
+                                    : registroId
+                                        ? `Registro: ${registroId.slice(0, 8)}...`
+                                        : ''}
                             </p>
                         </div>
                     </div>
@@ -142,7 +175,11 @@ export default function HistorialEdicionesModal({
                     ) : historial.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">
                             <Clock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                            <p>No hay ediciones registradas para este movimiento</p>
+                            <p>
+                                {isMesMode
+                                    ? 'No hay ediciones registradas en este mes'
+                                    : 'No hay ediciones registradas para este movimiento'}
+                            </p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -164,6 +201,18 @@ export default function HistorialEdicionesModal({
                                             {formatDate(item.fecha_edicion)}
                                         </div>
                                     </div>
+
+                                    {/* Movement ID — only shown in monthly mode */}
+                                    {isMesMode && (
+                                        <div className="mb-2">
+                                            <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                                                Movimiento
+                                            </span>
+                                            <p className="font-mono text-xs text-gray-500">
+                                                {item.id_registro.slice(0, 8)}…
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {/* Field changed */}
                                     <div className="mb-3">

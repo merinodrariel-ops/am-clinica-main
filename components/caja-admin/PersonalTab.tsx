@@ -29,7 +29,9 @@ import {
     ExternalLink,
     Settings,
     Info,
+    Link2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import MoneyInput from "@/components/ui/MoneyInput";
@@ -66,6 +68,7 @@ import PrestacionesTab from './PrestacionesTab';
 import HorariosTab from './HorariosTab';
 import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
+import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
@@ -153,7 +156,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         monto_mensual: 0,
         moneda_mensual: 'ARS',
         activo: true,
-        porcentaje_honorarios: 0,
         datos_bancarios: '',
     });
 
@@ -172,6 +174,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         staffGeneralHourValue: 0,
     });
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [linkCopied, setLinkCopied] = useState(false);
+    const [activatingPrestador, setActivatingPrestador] = useState<Personal | null>(null);
+    const [activationData, setActivationData] = useState<{
+        area: string;
+        modelo_pago: 'horas' | 'prestaciones' | 'mensual';
+    }>({ area: '', modelo_pago: 'prestaciones' });
+    const [activating, setActivating] = useState(false);
 
     function normalizeText(value?: string | null) {
         return (value || '')
@@ -312,7 +321,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             matricula_provincial: p.matricula_provincial || '',
             especialidad: p.especialidad || '',
             poliza_url: p.poliza_url || '',
-            porcentaje_honorarios: p.porcentaje_honorarios || 0,
             modelo_pago: getEffectiveModeloPago(p),
             monto_mensual: p.monto_mensual || 0,
             moneda_mensual: p.moneda_mensual || 'ARS',
@@ -356,7 +364,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             matricula_provincial: '',
             especialidad: '',
             poliza_url: '',
-            porcentaje_honorarios: 0,
             modelo_pago: defaults.modelo_pago,
             monto_mensual: 0,
             moneda_mensual: 'ARS',
@@ -977,6 +984,18 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     const odontologiaAreas = personalAreas.filter((a) => normalizeText(a.nombre).includes('odont'));
 
+    const pendingCount = personal.filter(
+        (p) => !p.activo && p.fuente_registro === 'autoregistro'
+    ).length;
+
+    function copyRegistroLink() {
+        const url = `${window.location.origin}/registro-prestador`;
+        navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        toast.success('Link copiado al portapapeles');
+        setTimeout(() => setLinkCopied(false), 2000);
+    }
+
     // Calculate hours per person
     const horasPorPersona = personal.map(p => {
         const regs = registros.filter(r => r.personal_id === p.id);
@@ -1015,6 +1034,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     >
                         <Users className="w-4 h-4" />
                         Prestadores
+                        {pendingCount > 0 && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+                                {pendingCount} pendientes
+                            </span>
+                        )}
                     </Button>
                     <Button
                         variant="ghost"
@@ -1108,6 +1132,15 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 />
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={copyRegistroLink}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-white/5 border border-white/10 text-slate-300 rounded-xl hover:border-white/30 transition-all dark:bg-slate-800"
+                                    title="Copiar link para que el prestador complete sus datos"
+                                >
+                                    {linkCopied ? <Check className="w-4 h-4 text-green-400" /> : <Link2 className="w-4 h-4" />}
+                                    {linkCopied ? 'Copiado' : 'Link registro'}
+                                </button>
                                 <Button
                                     type="button"
                                     onClick={openCreateForm}
@@ -1599,26 +1632,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 </div>
                                             )}
 
-                                            {formData.modelo_pago === 'prestaciones' && (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                        <FileText className="w-4 h-4 inline mr-1 text-slate-400" />
-                                                        Porcentaje Honorarios (%)
-                                                    </label>
-                                                    <div className="relative">
-                                                        <Input
-                                                            type="number"
-                                                            min="0"
-                                                            max="100"
-                                                            value={formData.porcentaje_honorarios || 0}
-                                                            onChange={(e) => setFormData({ ...formData, porcentaje_honorarios: Number(e.target.value) })}
-                                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 pr-10"
-                                                            placeholder="Ej: 40"
-                                                        />
-                                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">%</span>
-                                                    </div>
-                                                </div>
-                                            )}
 
                                             <div className="md:col-span-2">
                                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -1834,7 +1847,47 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             {/* Prestadores Tab Content */}
             {
                 activeTab === 'prestadores' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        {/* Pendientes de activar */}
+                        {pendingCount > 0 && (
+                            <div className="mb-6">
+                                <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <Clock className="w-4 h-4" />
+                                    Pendientes de activar ({pendingCount})
+                                </h3>
+                                <div className="space-y-2">
+                                    {personal
+                                        .filter((p) => !p.activo && p.fuente_registro === 'autoregistro')
+                                        .map((p) => (
+                                            <div
+                                                key={p.id}
+                                                className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700 rounded-xl"
+                                            >
+                                                <div>
+                                                    <p className="font-medium text-sm text-slate-900 dark:text-white">
+                                                        {p.nombre} {p.apellido}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">
+                                                        {p.email}{p.documento ? ` · DNI ${p.documento}` : ''}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setActivatingPrestador(p);
+                                                        setActivationData({ area: p.area || '', modelo_pago: 'prestaciones' });
+                                                    }}
+                                                    className="px-3 py-1.5 text-xs font-semibold bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all"
+                                                >
+                                                    Activar
+                                                </button>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredPrestadores.length === 0 ? (
                             <div className="col-span-full p-12 text-center text-slate-400">
                                 <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -2014,6 +2067,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 </motion.div>
                             ))
                         )}
+                    </div>
                     </div>
                 )}
 
@@ -2307,6 +2361,97 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     />
                 )
             }
+
+            {/* Modal: activar prestador pendiente */}
+            {activatingPrestador && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setActivatingPrestador(null)}
+                    />
+                    <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 w-full max-w-sm m-4">
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1">
+                            Activar prestador
+                        </h3>
+                        <p className="text-sm text-slate-500 mb-4">
+                            {activatingPrestador.nombre} {activatingPrestador.apellido}
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">
+                                    Área *
+                                </label>
+                                <select
+                                    value={activationData.area}
+                                    onChange={(e) => setActivationData(d => ({ ...d, area: e.target.value }))}
+                                    className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                >
+                                    <option value="">Seleccionar área...</option>
+                                    {personalAreas.map((a) => (
+                                        <option key={a.id} value={a.nombre}>{a.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">
+                                    Modelo de pago
+                                </label>
+                                <div className="flex gap-2">
+                                    {(['horas', 'prestaciones', 'mensual'] as const).map((m) => (
+                                        <button
+                                            key={m}
+                                            type="button"
+                                            onClick={() => setActivationData(d => ({ ...d, modelo_pago: m }))}
+                                            className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium capitalize transition-all ${
+                                                activationData.modelo_pago === m
+                                                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                            }`}
+                                        >
+                                            {m}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                type="button"
+                                onClick={() => setActivatingPrestador(null)}
+                                className="flex-1 px-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={!activationData.area || activating}
+                                onClick={async () => {
+                                    if (!activatingPrestador) return;
+                                    setActivating(true);
+                                    const result = await activatePrestadorPendiente(
+                                        activatingPrestador.id,
+                                        activationData.area,
+                                        activationData.modelo_pago
+                                    );
+                                    setActivating(false);
+                                    if (result.error) {
+                                        toast.error(result.error);
+                                    } else {
+                                        toast.success(`${activatingPrestador.nombre} activado`);
+                                        setActivatingPrestador(null);
+                                        loadData();
+                                    }
+                                }}
+                                className="flex-1 px-4 py-2.5 text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-semibold disabled:opacity-40 transition-all"
+                            >
+                                {activating ? 'Activando...' : 'Activar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

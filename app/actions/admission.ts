@@ -155,6 +155,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 fecha_nacimiento: data.fecha_nacimiento || null,
                 observaciones_generales: clinicalNotes,
                 referencia_origen: data.referencia_origen,
+                como_nos_conocio: data.referencia_origen,
                 origen_registro: 'Admisión Directa',
                 fecha_alta: patientUUID ? undefined : new Date().toISOString(), // Only set on create
                 is_deleted: false,
@@ -176,9 +177,16 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 created.link_historia_clinica || undefined
             );
             console.log('Drive result:', JSON.stringify(driveResult));
-            if (driveResult.motherFolderId && driveResult.motherFolderUrl) {
-                driveLink = driveResult.motherFolderUrl;
-                triggers.drive = { ok: true, detail: 'Carpeta de paciente creada/validada' };
+            if (driveResult.motherFolderId) {
+                // If motherFolderUrl is missing, try to build a generic one or use the one from ensure
+                driveLink = driveResult.motherFolderUrl || `https://drive.google.com/drive/folders/${driveResult.motherFolderId}`;
+                
+                triggers.drive = { 
+                    ok: true, 
+                    detail: driveResult.motherFolderUrl 
+                        ? 'Carpeta de paciente creada/validada' 
+                        : 'Carpeta creada (URL generada manualmente)' 
+                };
 
                 console.log('Creating patient documents in folder:', driveResult.motherFolderId);
 
@@ -339,6 +347,7 @@ export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
                 whatsapp: data.whatsapp,
                 observaciones_generales: data.motivo_consulta,
                 referencia_origen: data.referencia_origen,
+                como_nos_conocio: data.referencia_origen,
                 cuit: data.cuit,
                 is_deleted: false,
                 fecha_alta: patientUUID ? undefined : new Date().toISOString(),

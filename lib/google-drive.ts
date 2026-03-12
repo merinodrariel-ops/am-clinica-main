@@ -419,9 +419,9 @@ export async function createWorkflowFolder(folderName: string, parentId?: string
 
         // Get the webViewLink
         const file = await drive.files.get({
-
             fileId: result.folderId!,
             fields: 'webViewLink',
+            supportsAllDrives: true,
         });
 
         return {
@@ -449,7 +449,7 @@ export async function ensureStandardPatientFolders(
         const drive = getDrive();
         const motherFolderName = getPatientFolderName(apellido, nombre);
 
-        let resolvedMotherFolderId = motherFolderId;
+        let resolvedMotherFolderId = extractFolderIdFromUrl(motherFolderId);
 
         if (resolvedMotherFolderId) {
             try {
@@ -459,7 +459,7 @@ export async function ensureStandardPatientFolders(
                     fields: 'id',
                 });
             } catch {
-                resolvedMotherFolderId = undefined;
+                resolvedMotherFolderId = null;
             }
         }
 
@@ -517,13 +517,13 @@ export async function ensurePatientContractFolder(
         const motherFolderName = getPatientFolderName(apellido, nombre);
         const contractFolderName = `[CONTRATO] ${motherFolderName}`;
 
-        let resolvedMotherFolderId = motherFolderId;
+        let resolvedMotherFolderId = extractFolderIdFromUrl(motherFolderId);
 
         if (resolvedMotherFolderId) {
             try {
-                await drive.files.get({ fileId: resolvedMotherFolderId, fields: 'id' });
+                await drive.files.get({ fileId: resolvedMotherFolderId, fields: 'id', supportsAllDrives: true });
             } catch {
-                resolvedMotherFolderId = undefined;
+                resolvedMotherFolderId = null;
             }
         }
 
@@ -575,7 +575,7 @@ export async function ensurePatientPresentationFolder(
         const motherFolderName = getPatientFolderName(apellido, nombre);
         const presentationFolderName = `[PRESENTACION] ${motherFolderName}`;
 
-        let resolvedMotherFolderId = motherFolderId;
+        let resolvedMotherFolderId = extractFolderIdFromUrl(motherFolderId);
 
         if (resolvedMotherFolderId) {
             try {
@@ -585,7 +585,7 @@ export async function ensurePatientPresentationFolder(
                     fields: 'id',
                 });
             } catch {
-                resolvedMotherFolderId = undefined;
+                resolvedMotherFolderId = null;
             }
         }
 
@@ -756,8 +756,8 @@ export async function deleteFromDrive(fileId: string): Promise<{ success: boolea
 }
 
 // Template IDs from environment (recommended) or fallback to name search
-const TEMPLATE_FICHA_ID = process.env.GOOGLE_SLIDES_TEMPLATE_FICHA || '';
-const TEMPLATE_PRESUPUESTO_ID = process.env.GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO || '';
+const getTemplateFichaId = () => process.env.GOOGLE_SLIDES_TEMPLATE_FICHA || '';
+const getTemplatePresupuestoId = () => process.env.GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO || '';
 
 /**
  * Copies templates and replaces placeholders for a new patient
@@ -791,6 +791,8 @@ export async function createPatientDocuments(
         const subfolders = await drive.files.list({
             q: `'${motherFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
             fields: 'files(id, name)',
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
         });
 
         const presentacionFolder = subfolders.data.files?.find(f => f.name?.includes('PRESENTACION'));
@@ -803,7 +805,7 @@ export async function createPatientDocuments(
         const results: { fichaUrl?: string; presupuestoUrl?: string } = {};
 
         // 2. Copy and populate "Ficha/Presentacion"
-        const fichaTemplateId = TEMPLATE_FICHA_ID || (await findFileByName(drive, 'Plantilla Ficha/Presentacion'))?.id;
+        const fichaTemplateId = getTemplateFichaId() || (await findFileByName(drive, 'Plantilla Ficha/Presentacion'))?.id;
         console.log('Ficha template lookup:', fichaTemplateId ? `Found ID: ${fichaTemplateId}` : 'NOT FOUND - create template and set GOOGLE_SLIDES_TEMPLATE_FICHA in .env.local');
         if (fichaTemplateId) {
             const newFichaName = `Ficha - ${patientData.apellido}, ${patientData.nombre}`;
@@ -823,7 +825,7 @@ export async function createPatientDocuments(
         }
 
         // 3. Copy and populate "Presupuesto"
-        const presupuestoTemplateId = TEMPLATE_PRESUPUESTO_ID || (await findFileByName(drive, 'Plantilla Presupuesto'))?.id;
+        const presupuestoTemplateId = getTemplatePresupuestoId() || (await findFileByName(drive, 'Plantilla Presupuesto'))?.id;
         console.log('Presupuesto template lookup:', presupuestoTemplateId ? `Found ID: ${presupuestoTemplateId}` : 'NOT FOUND - create template and set GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO in .env.local');
         if (presupuestoTemplateId) {
             const newPresuName = `Presupuesto - ${patientData.apellido}, ${patientData.nombre}`;

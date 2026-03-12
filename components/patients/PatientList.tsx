@@ -26,7 +26,12 @@ import { generatePatientUpdateToken } from '@/app/actions/patient-update';
 const ENRICHMENT_FIELDS: (keyof Paciente)[] = ['documento', 'fecha_nacimiento', 'email', 'whatsapp', 'como_nos_conocio'];
 
 function getMissingCount(patient: Paciente): number {
-    return ENRICHMENT_FIELDS.filter(f => {
+    return ENRICHMENT_FIELDS.filter((f) => {
+        if (f === 'como_nos_conocio') {
+            const referral = patient.como_nos_conocio || patient.referencia_origen;
+            return !referral || referral.trim() === '';
+        }
+
         const v = patient[f];
         return v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
     }).length;

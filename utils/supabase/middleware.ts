@@ -51,6 +51,8 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/admision/') ||
         path === '/actualizar-datos' ||
         path.startsWith('/actualizar-datos/') ||
+        path === '/registro-prestador' ||
+        path.startsWith('/registro-prestador/') ||
         path === '/mi-portal' ||
         path.startsWith('/mi-portal/') ||
         path.startsWith('/sonrisa/comparador') ||

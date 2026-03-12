@@ -821,3 +821,24 @@ export async function updateWorkerProfileAdmin(workerId: string, data: Partial<W
     revalidatePath('/portal/profile');
     revalidatePath('/portal/dashboard');
 }
+
+/** Activate a self-registered prestador — sets activo=true, assigns area and modelo_pago */
+export async function activatePrestadorPendiente(
+    id: string,
+    area: string,
+    modelo_pago: string
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autorizado' };
+
+    const adminSupabase = getAdminClient();
+    const { error } = await adminSupabase
+        .from('personal')
+        .update({ activo: true, area, modelo_pago })
+        .eq('id', id);
+
+    if (error) return { error: error.message };
+    revalidatePath('/caja-admin/personal');
+    return {};
+}

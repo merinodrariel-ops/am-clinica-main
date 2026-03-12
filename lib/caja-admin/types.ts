@@ -148,6 +148,7 @@ export interface Personal {
     monto_mensual?: number;
     moneda_mensual?: 'ARS' | 'USD';
     datos_bancarios?: string;
+    fuente_registro?: string | null;
     created_at?: string;
     updated_at?: string;
 }

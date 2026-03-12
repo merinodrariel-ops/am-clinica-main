@@ -55,7 +55,7 @@ function detectSearchType(input: string): SearchMethod {
     return 'dni';
 }
 
-const SELECT_FIELDS = 'id_paciente, nombre, apellido, documento, fecha_nacimiento, email, whatsapp, como_nos_conocio';
+const SELECT_FIELDS = 'id_paciente, nombre, apellido, documento, fecha_nacimiento, email, whatsapp, como_nos_conocio, referencia_origen';
 
 // ─── Unified smart lookup ──────────────────────────────────────────
 export async function lookupPatient(
@@ -159,8 +159,11 @@ function buildPatientResult(patient: Record<string, unknown>): PatientLookupResu
     const existingData: Partial<Record<UpdatableField, string | null>> = {};
 
     for (const field of UPDATABLE_FIELDS) {
-        const value = patient[field];
-        existingData[field] = (value as string | null) ?? null;
+        const value = field === 'como_nos_conocio'
+            ? (patient.como_nos_conocio as string | null) || (patient.referencia_origen as string | null) || null
+            : (patient[field] as string | null) || null;
+
+        existingData[field] = value;
         if (!value || (typeof value === 'string' && value.trim() === '')) {
             missingFields.push(field);
         }
@@ -260,6 +263,10 @@ export async function updatePatientData(
     const cleanUpdates: Record<string, string> = {};
     for (const [key, value] of Object.entries(updates)) {
         if (value && value.trim()) cleanUpdates[key] = value.trim();
+    }
+
+    if (cleanUpdates.como_nos_conocio && !cleanUpdates.referencia_origen) {
+        cleanUpdates.referencia_origen = cleanUpdates.como_nos_conocio;
     }
 
     if (Object.keys(cleanUpdates).length === 0) {

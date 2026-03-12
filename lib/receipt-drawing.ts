@@ -14,6 +14,8 @@ export interface ReceiptData {
     metodoPago: string;
     atendidoPor?: string;
     cuotaInfo?: string; // e.g. "Cuota 3/12"
+    // Optional: show USD equivalent as a small footnote (for ARS/USDT payments)
+    usdEquivalente?: number;
 }
 
 function getCurrencyCode(moneda: string): string {
@@ -132,6 +134,15 @@ export function drawReceiptOnCanvas(canvas: HTMLCanvasElement, data: ReceiptData
     ctx.fillStyle = '#000000';
     const montoStr = formatAmountWithCode(data.monto, currencyCode);
     ctx.fillText(montoStr, 50, y + 48);
+
+    // Optional USD equivalent footnote (small, for ARS/USDT payments)
+    if (data.usdEquivalente && currencyCode !== 'USD') {
+        const usdStr = formatAmountWithCode(data.usdEquivalente, 'USD');
+        ctx.font = '13px Arial';
+        ctx.fillStyle = '#888888';
+        ctx.textAlign = 'left';
+        ctx.fillText(`≈ ${usdStr} (equivalente según dólar BNA venta)`, 50, y + 68);
+    }
 
     y += 100;
 

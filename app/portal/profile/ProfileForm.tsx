@@ -249,10 +249,6 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
                                     <p className="text-white font-mono font-bold mt-1">${worker.valor_hora_ars?.toLocaleString() || '---'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">% Honorarios</p>
-                                    <p className="text-white font-mono font-bold mt-1">{worker.porcentaje_honorarios || 0}%</p>
-                                </div>
-                                <div>
                                     <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">Fecha Ingreso</p>
                                     <p className="text-white font-mono font-bold mt-1">
                                         {worker.fecha_ingreso ? new Date(worker.fecha_ingreso + 'T12:00:00').toLocaleDateString('es-AR') : '---'}

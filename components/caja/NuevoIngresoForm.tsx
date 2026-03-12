@@ -513,13 +513,31 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                         ? activeSplits.map(s => s.metodo_pago).join('/')
                         : formData.metodo_pago;
 
+                    // Determine receipt currency: use original payment currency, not USD conversion
+                    const allSplitsSameCurrency = useMultiplePayments
+                        ? new Set(activeSplits.map(s => s.moneda)).size === 1
+                        : true;
+                    const receiptMoneda = useMultiplePayments
+                        ? (allSplitsSameCurrency ? activeSplits[0].moneda : 'USD')
+                        : formData.moneda;
+                    const receiptMonto = useMultiplePayments
+                        ? (allSplitsSameCurrency
+                            ? activeSplits.reduce((s, sp) => s + sp.monto, 0)
+                            : totalUsdEquiv)
+                        : formData.monto;
+                    // Show USD equivalent as footnote only for non-USD payments
+                    const receiptUsdEquiv = receiptMoneda !== 'USD' && receiptMoneda !== 'USDT' && totalUsdEquiv > 0
+                        ? totalUsdEquiv
+                        : undefined;
+
                     const imageDataUrl = drawReceiptOnCanvas(canvas, {
                         numero: receiptNumber,
                         fecha: new Date(),
                         paciente: formData.paciente_nombre,
                         concepto: conceptoFinal,
-                        monto: totalUsdEquiv,
-                        moneda: 'USD',
+                        monto: receiptMonto,
+                        moneda: receiptMoneda,
+                        usdEquivalente: receiptUsdEquiv,
                         metodoPago: receiptMetodo,
                         atendidoPor: 'AM Clínica',
                         cuotaInfo,

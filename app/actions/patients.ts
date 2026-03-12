@@ -151,7 +151,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
                 const oldValue = existingData[key];
                 if (newValue !== undefined && newValue !== null && newValue !== '') {
                     if (newValue !== oldValue) {
-                        updates[key] = newValue;
+                        (updates as any)[key] = newValue;
                         hasChanges = true;
                     }
                 }

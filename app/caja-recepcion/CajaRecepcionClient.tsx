@@ -245,6 +245,7 @@ function CajaRecepcionContent() {
     const [transferDefaultType, setTransferDefaultType] = useState<'TRASPASO_INTERNO' | 'RETIRO_EFECTIVO'>('TRASPASO_INTERNO');
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
+    const [showHistorialMes, setShowHistorialMes] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
     const [efectivo, setEfectivo] = useState<{ usd: number; ars: number } | null>(null);
 
@@ -814,6 +815,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 concepto: mov.concepto_nombre,
                 monto: Math.abs(mov.monto),
                 moneda: mov.moneda,
+                usdEquivalente: mov.moneda !== 'USD' && mov.moneda !== 'USDT' && mov.usd_equivalente
+                    ? mov.usd_equivalente
+                    : undefined,
                 metodoPago: mov.metodo_pago,
                 atendidoPor: 'AM Clínica',
                 cuotaInfo,
@@ -1293,6 +1297,16 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     />
                                 </div>
 
+                                {/* Monthly audit history button */}
+                                <button
+                                    onClick={() => setShowHistorialMes(true)}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all shadow-sm bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                    title="Ver historial de ediciones del mes"
+                                >
+                                    <History size={16} />
+                                    <span className="hidden sm:inline">Auditoría</span>
+                                </button>
+
                                 {/* Sidebar Toggle */}
                                 <button
                                     onClick={() => setShowSidebar(!showSidebar)}
@@ -1526,13 +1540,6 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                     title="Editar movimiento (Monto, Fecha, Moneda)"
                                                                 >
                                                                     <Pencil size={16} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setHistorialMovId(mov.id)}
-                                                                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                                                    title="Ver historial de ediciones"
-                                                                >
-                                                                    <History size={16} />
                                                                 </button>
                                                                 {(role === 'admin' || role === 'owner' || role === 'developer') && (
                                                                     <button
@@ -2081,11 +2088,19 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             defaultTipo={transferDefaultType}
                         />
 
-                        {/* Historial Ediciones Modal */}
+                        {/* Historial Ediciones Modal — por movimiento individual */}
                         <HistorialEdicionesModal
                             isOpen={!!historialMovId}
                             onClose={() => setHistorialMovId(null)}
-                            registroId={historialMovId || ''}
+                            registroId={historialMovId || undefined}
+                            tabla="caja_recepcion_movimientos"
+                        />
+
+                        {/* Historial Ediciones Modal — auditoría mensual */}
+                        <HistorialEdicionesModal
+                            isOpen={showHistorialMes}
+                            onClose={() => setShowHistorialMes(false)}
+                            mes={mesActual}
                             tabla="caja_recepcion_movimientos"
                         />
 
@@ -2361,11 +2376,19 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </div>
                             </div>
                         )}
-                        {/* Historial Ediciones Modal */}
+                        {/* Historial Ediciones Modal — por movimiento individual */}
                         <HistorialEdicionesModal
                             isOpen={!!historialMovId}
                             onClose={() => setHistorialMovId(null)}
-                            registroId={historialMovId || ''}
+                            registroId={historialMovId || undefined}
+                            tabla="caja_recepcion_movimientos"
+                        />
+
+                        {/* Historial Ediciones Modal — auditoría mensual */}
+                        <HistorialEdicionesModal
+                            isOpen={showHistorialMes}
+                            onClose={() => setShowHistorialMes(false)}
+                            mes={mesActual}
                             tabla="caja_recepcion_movimientos"
                         />
                         {/* Modal de Confirmación de Eliminación */}
