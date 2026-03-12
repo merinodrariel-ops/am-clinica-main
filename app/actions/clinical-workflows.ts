@@ -196,6 +196,30 @@ function buildWhatsappLink(countryCode?: string | null, number?: string | null) 
     return `https://wa.me/${raw}`;
 }
 
+function extractGoogleFileIdFromUrl(url?: string | null) {
+    if (!url || typeof url !== 'string') return null;
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+
+    const patterns = [
+        /\/presentation\/d\/([a-zA-Z0-9_-]+)/,
+        /\/file\/d\/([a-zA-Z0-9_-]+)/,
+        /[?&]id=([a-zA-Z0-9_-]+)/,
+        /\/d\/([a-zA-Z0-9_-]+)/,
+    ];
+
+    for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match?.[1]) return match[1];
+    }
+
+    return null;
+}
+
+function buildGoogleDriveThumbnailUrl(fileId: string) {
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w256-h256`;
+}
+
 export async function getClinicalWorkflows(): Promise<ClinicalWorkflow[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -229,7 +253,7 @@ export async function getActiveTreatments(workflowId: string): Promise<PatientTr
         .from('patient_treatments')
         .select(`
             *,
-            patient:pacientes(id_paciente, nombre, apellido, documento),
+            patient:pacientes(id_paciente, nombre, apellido, documento, link_google_slides, link_historia_clinica),
             stage:clinical_workflow_stages(*),
             workflow:clinical_workflows(name)
         `)
@@ -244,11 +268,68 @@ export async function getActiveTreatments(workflowId: string): Promise<PatientTr
         return [];
     }
 
-    // Unify structure if workflow comes as array
-    return ((data || []) as TreatmentRow[]).map(t => ({
+    const baseTreatments = ((data || []) as TreatmentRow[]).map(t => ({
         ...t,
         workflow: Array.isArray(t.workflow) ? (t.workflow[0] || null) : t.workflow
     }));
+
+    const patientIds = Array.from(
+        new Set(
+            baseTreatments
+                .map(t => t.patient?.id_paciente)
+                .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        )
+    );
+
+    if (!patientIds.length) {
+        return baseTreatments;
+    }
+
+    const { data: patientPhotos, error: patientPhotosError } = await supabase
+        .from('patient_files')
+        .select('patient_id, file_url, thumbnail_url, created_at')
+        .in('patient_id', patientIds)
+        .eq('file_type', 'photo_before')
+        .order('created_at', { ascending: true });
+
+    if (patientPhotosError) {
+        console.error('Error fetching patient profile photos for workflow cards:', patientPhotosError);
+        return baseTreatments;
+    }
+
+    const profilePhotoByPatient = new Map<string, string>();
+    for (const file of patientPhotos || []) {
+        const patientId = typeof file.patient_id === 'string' ? file.patient_id : null;
+        if (!patientId || profilePhotoByPatient.has(patientId)) continue;
+
+        const photoUrl = typeof file.thumbnail_url === 'string' && file.thumbnail_url.trim().length > 0
+            ? file.thumbnail_url
+            : (typeof file.file_url === 'string' ? file.file_url : null);
+
+        if (photoUrl) {
+            profilePhotoByPatient.set(patientId, photoUrl);
+        }
+    }
+
+    return baseTreatments.map(treatment => {
+        const patientId = treatment.patient?.id_paciente;
+        let profilePhotoUrl = patientId ? profilePhotoByPatient.get(patientId) || null : null;
+
+        if (!profilePhotoUrl) {
+            const slidesFileId = extractGoogleFileIdFromUrl(treatment.patient?.link_google_slides);
+            if (slidesFileId) {
+                profilePhotoUrl = buildGoogleDriveThumbnailUrl(slidesFileId);
+            }
+        }
+
+        return {
+            ...treatment,
+            patient: {
+                ...treatment.patient,
+                profile_photo_url: profilePhotoUrl,
+            },
+        };
+    });
 }
 
 export async function createTreatment(data: {
@@ -441,7 +522,14 @@ export async function moveTreatmentStage(
         comments: comments || 'Cambio de etapa manual'
     });
 
-    // 2.1 Optional notifications on stage entry
+    // 2.1 Ensure Drive folder exists before any notification/automation that depends on links
+    try {
+        await ensurePatientDriveFolder(treatmentId);
+    } catch (e) {
+        console.error('Error in ensurePatientDriveFolder (move):', e);
+    }
+
+    // 2.2 Optional notifications on stage entry
     try {
         await sendStageEntryNotifications(treatmentId, newStageId);
     } catch (notificationError) {
@@ -449,7 +537,7 @@ export async function moveTreatmentStage(
         // Do not block business flow if notifications fail
     }
 
-    // 2.2 Auto-trigger laboratorio pipeline when "sena" stage is reached
+    // 2.3 Auto-trigger laboratorio pipeline when "sena" stage is reached
     try {
         await checkAndTriggerLaboratorioCase(treatmentId, newStageId);
     } catch (error) {
@@ -471,13 +559,6 @@ export async function moveTreatmentStage(
     } catch (error) {
         console.error('Error in recurrent cycle trigger:', error);
         // Do not fail the request, just log
-    }
-
-    // 5. Ensure Drive folder exists (handles move from non-ortho or historical cases)
-    try {
-        await ensurePatientDriveFolder(treatmentId);
-    } catch (e) {
-        console.error('Error in ensurePatientDriveFolder (move):', e);
     }
 
     revalidatePath('/workflows');
@@ -609,7 +690,7 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
             id,
             next_milestone_date,
             metadata,
-            patient:pacientes(nombre, apellido, documento, email),
+            patient:pacientes(id_paciente, nombre, apellido, documento, email),
             workflow:clinical_workflows(name)
         `)
         .eq('id', treatmentId)
@@ -621,6 +702,7 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
     const workflowName = Array.isArray(workflowData) ? workflowData[0]?.name : workflowData?.name;
 
     const patientData = treatmentData.patient as {
+        id_paciente?: string;
         nombre?: string | null;
         apellido?: string | null;
         documento?: string | null;
@@ -635,8 +717,14 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
         ? new Date(treatmentData.next_milestone_date).toLocaleDateString('es-AR')
         : 'No definido';
 
-    const driveFolderUrl = getMetadataString(treatmentData.metadata, 'drive_folder_url') || '';
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://amclinica.vercel.app';
+    const driveFolderId = getMetadataString(treatmentData.metadata, 'drive_folder_id');
+    const driveFolderUrl = driveFolderId
+        ? `https://drive.google.com/drive/folders/${driveFolderId}`
+        : (getMetadataString(treatmentData.metadata, 'drive_folder_url') || '');
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://amclinica.vercel.app').replace(/\/$/, '');
+    const patientFilesUrl = patientData?.id_paciente
+        ? `${appBaseUrl}/patients/${patientData.id_paciente}?tab=archivos`
+        : appBaseUrl;
 
     // Helper for variable replacement
     // isHtml=true → renders drive_url / app_url as clickable <a> tags (for email body)
@@ -646,8 +734,8 @@ async function sendStageEntryNotifications(treatmentId: string, stageId: string)
             ? `<a href="${driveFolderUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline">&#128193; Ver carpeta en Drive</a>`
             : driveFolderUrl;
         const appVal = isHtml
-            ? `<a href="${appBaseUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline">&#128279; Abrir app AM Cl&iacute;nica</a>`
-            : appBaseUrl;
+            ? `<a href="${patientFilesUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline">&#128279; Abrir archivos del paciente en AM Cl&iacute;nica</a>`
+            : patientFilesUrl;
         return text
             .replace(/{{paciente}}/g, patientFullName)
             .replace(/{{etapa}}/g, stageConfig.name)
@@ -972,8 +1060,13 @@ async function checkAndTriggerLaboratorioCase(treatmentId: string, stageId: stri
     const fechaEnvio = today.toISOString().slice(0, 10);
     const fechaEntregaEstimada = addDays(today, 10).toISOString().slice(0, 10);
     // Use patient-specific folder from treatment metadata; fall back to generic lab folder
-    const patientDriveFolderUrl = getMetadataString(treatmentData.metadata, 'drive_folder_url');
+    const patientDriveFolderId = getMetadataString(treatmentData.metadata, 'drive_folder_id');
+    const patientDriveFolderUrl = patientDriveFolderId
+        ? `https://drive.google.com/drive/folders/${patientDriveFolderId}`
+        : getMetadataString(treatmentData.metadata, 'drive_folder_url');
     const folderUrl = patientDriveFolderUrl || `https://drive.google.com/drive/folders/${LAB_CASE_FOLDER_ID}`;
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const patientFilesUrl = `${appBaseUrl}/patients/${patientData.id_paciente}?tab=archivos`;
     const notesParts = [
         'Caso generado automaticamente desde workflow.',
         `Workflow: ${workflowName}.`,
@@ -1033,6 +1126,7 @@ async function checkAndTriggerLaboratorioCase(treatmentId: string, stageId: stri
             </ul>
             <p style="margin-top: 10px;">Subir el caso clinico y los archivos a la carpeta del paciente.</p>
             <p style="margin-top: 10px;"><a href="${folderUrl}" style="background:#000;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">📁 ABRIR CARPETA EXOCAD DEL PACIENTE</a></p>
+            <p style="margin-top: 8px;"><a href="${patientFilesUrl}" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">🗂️ ABRIR ARCHIVOS DEL PACIENTE EN AM CLINICA</a></p>
             <p style="margin-top: 6px;"><a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/workflows?section=laboratorio"><strong>ABRIR TAB DE LABORATORIO EN WORKFLOWS</strong></a></p>
         </div>
     `;
@@ -1757,6 +1851,41 @@ export async function updateWorkflowStagesConfig(payload: {
             throw new Error('No puedes eliminar una columna que tiene tratamientos activos');
         }
 
+        // Archived treatments can still reference this stage and block FK deletion.
+        // We detach only archived rows to keep operational records intact.
+        const { error: detachArchivedError } = await supabase
+            .from('patient_treatments')
+            .update({ current_stage_id: null })
+            .eq('current_stage_id', stageId)
+            .eq('status', 'archived');
+
+        if (detachArchivedError) {
+            console.error('Error detaching archived treatments from stage:', detachArchivedError);
+            throw new Error('No se pudo preparar la columna para su eliminacion');
+        }
+
+        // Historical rows keep a FK to stage IDs.
+        // Nullify the reference so old history remains available without blocking deletion.
+        const { error: clearPrevHistoryError } = await supabase
+            .from('treatment_history')
+            .update({ previous_stage_id: null })
+            .eq('previous_stage_id', stageId);
+
+        if (clearPrevHistoryError) {
+            console.error('Error clearing previous_stage_id history reference:', clearPrevHistoryError);
+            throw new Error('No se pudo preparar el historial para eliminar la columna');
+        }
+
+        const { error: clearNewHistoryError } = await supabase
+            .from('treatment_history')
+            .update({ new_stage_id: null })
+            .eq('new_stage_id', stageId);
+
+        if (clearNewHistoryError) {
+            console.error('Error clearing new_stage_id history reference:', clearNewHistoryError);
+            throw new Error('No se pudo preparar el historial para eliminar la columna');
+        }
+
         const { error: deleteError } = await supabase
             .from('clinical_workflow_stages')
             .delete()
@@ -1765,6 +1894,9 @@ export async function updateWorkflowStagesConfig(payload: {
 
         if (deleteError) {
             console.error('Error deleting stage:', deleteError);
+            if (deleteError.code === '23503') {
+                throw new Error('No se pudo eliminar la columna porque todavia tiene referencias en tratamientos o historial');
+            }
             throw new Error('No se pudo eliminar la columna');
         }
     }
@@ -2046,28 +2178,101 @@ export async function sendTestWorkflowEmail(params: {
     subject: string;
     body: string;
     stageName: string;
+    stageId?: string;
     workflowName: string;
+    workflowId?: string;
     driveUrl?: string;
+    appUrl?: string;
 }): Promise<{ ok: boolean; error?: string }> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: 'No autenticado' };
 
-    const testDriveUrl = params.driveUrl?.trim() || 'https://drive.google.com/drive/folders/CARPETA-EJEMPLO';
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 
-    const filledSubject = params.subject
-        .replace(/\{\{paciente\}\}/g, 'Milena Prueba')
-        .replace(/\{\{etapa\}\}/g, params.stageName)
-        .replace(/\{\{workflow\}\}/g, params.workflowName)
-        .replace(/\{\{hito\}\}/g, '01/04/2026')
-        .replace(/\{\{drive_url\}\}/g, testDriveUrl);
+    type TestTreatmentRow = {
+        metadata?: unknown;
+        patient?: {
+            id_paciente?: string;
+            nombre?: string | null;
+            apellido?: string | null;
+        } | null;
+    };
 
-    const filledBody = params.body
-        .replace(/\{\{paciente\}\}/g, 'Milena Prueba')
-        .replace(/\{\{etapa\}\}/g, params.stageName)
-        .replace(/\{\{workflow\}\}/g, params.workflowName)
-        .replace(/\{\{hito\}\}/g, '01/04/2026')
-        .replace(/\{\{drive_url\}\}/g, testDriveUrl);
+    let autoDriveUrl: string | null = null;
+    let autoAppUrl: string | null = null;
+    let autoPatientName: string | null = null;
+
+    const workflowId = params.workflowId?.trim() || null;
+    if (workflowId) {
+        const baseQuery = supabase
+            .from('patient_treatments')
+            .select(`
+                metadata,
+                patient:pacientes(id_paciente, nombre, apellido)
+            `)
+            .eq('workflow_id', workflowId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        const stageScopedQuery = params.stageId
+            ? baseQuery.eq('current_stage_id', params.stageId)
+            : baseQuery;
+
+        const { data: recentTreatments } = await stageScopedQuery;
+
+        const candidates = (recentTreatments || []) as TestTreatmentRow[];
+        const withDrive = candidates.find((row) => {
+            const driveFolderId = getMetadataString(row.metadata, 'drive_folder_id');
+            const driveFolderUrl = getMetadataString(row.metadata, 'drive_folder_url');
+            return Boolean(driveFolderId || driveFolderUrl);
+        }) || candidates[0];
+
+        if (withDrive) {
+            const driveFolderId = getMetadataString(withDrive.metadata, 'drive_folder_id');
+            const driveFolderUrl = getMetadataString(withDrive.metadata, 'drive_folder_url');
+
+            autoDriveUrl = driveFolderId
+                ? `https://drive.google.com/drive/folders/${driveFolderId}`
+                : (driveFolderUrl || null);
+
+            if (withDrive.patient?.id_paciente) {
+                autoAppUrl = `${appBaseUrl}/patients/${withDrive.patient.id_paciente}?tab=archivos`;
+            }
+
+            const patientNameParts = [withDrive.patient?.nombre || '', withDrive.patient?.apellido || '']
+                .map((value) => value.trim())
+                .filter(Boolean);
+
+            if (patientNameParts.length > 0) {
+                autoPatientName = patientNameParts.join(' ');
+            }
+        }
+    }
+
+    const testDriveUrl = params.driveUrl?.trim() || autoDriveUrl || 'https://drive.google.com/drive/folders/CARPETA-EJEMPLO';
+    const testAppUrl = params.appUrl?.trim() || autoAppUrl || `${appBaseUrl}/patients/PACIENTE_ID?tab=archivos`;
+    const testPatientName = autoPatientName || 'Milena Prueba';
+
+    const fillTemplate = (template: string, withHtmlLinks: boolean) => {
+        const driveVal = withHtmlLinks
+            ? `<a href="${testDriveUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline">📁 Ver carpeta en Drive</a>`
+            : testDriveUrl;
+        const appVal = withHtmlLinks
+            ? `<a href="${testAppUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline">🗂️ Abrir archivos del paciente</a>`
+            : testAppUrl;
+
+        return template
+            .replace(/\{\{paciente\}\}/g, testPatientName)
+            .replace(/\{\{etapa\}\}/g, params.stageName)
+            .replace(/\{\{workflow\}\}/g, params.workflowName)
+            .replace(/\{\{hito\}\}/g, '01/04/2026')
+            .replace(/\{\{drive_url\}\}/g, driveVal)
+            .replace(/\{\{app_url\}\}/g, appVal);
+    };
+
+    const filledSubject = fillTemplate(params.subject, false);
+    const filledBody = fillTemplate(params.body, true).replace(/\n/g, '<br/>');
 
     try {
         await sendEmail({
@@ -2078,10 +2283,10 @@ export async function sendTestWorkflowEmail(params: {
 EMAIL DE PRUEBA — ${params.workflowName} / ${params.stageName}
 </div>
 <div style="border:1px solid #e5e7eb;border-top:none;padding:20px;border-radius:0 0 6px 6px">
-<p style="white-space:pre-wrap;margin:0">${filledBody}</p>
+<div style="white-space:pre-wrap;margin:0">${filledBody}</div>
 </div>
 <p style="font-size:11px;color:#9ca3af;margin-top:12px">
-Este es un email de prueba. Paciente de ejemplo: Milena Prueba.
+Este es un email de prueba. Paciente de ejemplo: ${testPatientName}.
 </p>
 </div>`,
         });

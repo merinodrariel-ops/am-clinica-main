@@ -1,7 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { createAdminClient } from '@/utils/supabase/admin';
 
-const supabase = createAdminClient();
+
+// This file should contain logic that can be reused on both client and server.
+// Functions that perform database operations should accept a supabase client as an argument.
+
 
 // =============================================
 // Types
@@ -215,7 +217,7 @@ export async function createPaciente(
     }
 
     // Log to audit
-    await logAudit({
+    await logAudit(supabase, {
         modulo: 'Pacientes',
         accion: 'CREATE',
         entidad_id: data.id_paciente,
@@ -223,16 +225,19 @@ export async function createPaciente(
         resumen_cambios: { created: paciente },
     });
 
+
     // Send Welcome Email if not already sent
     if (data.email && !data.welcome_email_sent) {
         import('@/app/actions/email').then(async ({ sendWelcomeEmailAction }) => {
             const result = await sendWelcomeEmailAction(data.nombre, data.email!);
             await logEmail(
+                supabase,
                 data.id_paciente,
                 'WELCOME',
                 result?.success ? 'SENT' : 'FAILED',
                 result?.error ? String(result.error) : undefined
             );
+
             // Update flag after attempt
             await supabase
                 .from('pacientes')
@@ -245,10 +250,12 @@ export async function createPaciente(
 }
 
 export async function updatePaciente(
+    supabase: SupabaseClient,
     id: string,
     updates: Partial<Paciente>,
     motivo?: string
 ): Promise<{ data: Paciente | null; error: Error | null }> {
+
     // Get current data for audit
     const { data: current } = await supabase
         .from('pacientes')
@@ -272,23 +279,27 @@ export async function updatePaciente(
     }
 
     // Log to audit
-    await logAudit({
+    await logAudit(supabase, {
         modulo: 'Pacientes',
         accion: 'UPDATE',
         entidad_id: id,
         entidad_tipo: 'paciente',
         resumen_cambios: { before: current, after: updates },
+
         motivo,
     });
+
 
     return { data, error: null };
 }
 
 export async function softDeletePaciente(
+    supabase: SupabaseClient,
     id: string,
     motivo: string,
     usuario?: string
 ): Promise<{ success: boolean; error?: string }> {
+
     const { error } = await supabase
         .from('pacientes')
         .update({
@@ -304,7 +315,7 @@ export async function softDeletePaciente(
     }
 
     // Log to audit
-    await logAudit({
+    await logAudit(supabase, {
         modulo: 'Pacientes',
         accion: 'DELETE_SOFT',
         entidad_id: id,
@@ -312,6 +323,7 @@ export async function softDeletePaciente(
         motivo,
         usuario,
     });
+
 
     return { success: true };
 }
@@ -339,7 +351,11 @@ export async function getHistoriaClinica(
     return data || [];
 }
 
-export async function createHistoriaEntry(entry: Partial<HistoriaClinica>): Promise<{ data: HistoriaClinica | null; error: Error | null }> {
+export async function createHistoriaEntry(
+    supabase: SupabaseClient,
+    entry: Partial<HistoriaClinica>
+): Promise<{ data: HistoriaClinica | null; error: Error | null }> {
+
     const { data, error } = await supabase
         .from('historia_clinica')
         .insert({
@@ -378,7 +394,11 @@ export async function getPlanesTratamiento(
     return data || [];
 }
 
-export async function createPlanTratamiento(plan: Partial<PlanTratamiento>): Promise<{ data: PlanTratamiento | null; error: Error | null }> {
+export async function createPlanTratamiento(
+    supabase: SupabaseClient,
+    plan: Partial<PlanTratamiento>
+): Promise<{ data: PlanTratamiento | null; error: Error | null }> {
+
     // Calculate senal and saldo
     const total = plan.total_usd || 0;
     const senal = plan.senal_usd || total * 0.5;
@@ -423,7 +443,11 @@ interface AuditEntry {
     motivo?: string;
 }
 
-export async function logAudit(entry: AuditEntry): Promise<void> {
+export async function logAudit(
+    supabase: SupabaseClient,
+    entry: AuditEntry
+): Promise<void> {
+
     try {
         await supabase
             .from('audit_log')
@@ -441,11 +465,13 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
 // =============================================
 
 export async function logEmail(
+    supabase: SupabaseClient,
     pacienteId: string,
     tipo: string,
     estado: string,
     error?: string
 ): Promise<void> {
+
     try {
         await supabase
             .from('email_log')

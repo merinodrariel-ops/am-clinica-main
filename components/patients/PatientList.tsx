@@ -18,7 +18,9 @@ import {
     Send,
 } from 'lucide-react';
 import Link from 'next/link';
-import { Paciente, formatWhatsAppLink, formatMailtoLink, softDeletePaciente } from '@/lib/patients';
+import { Paciente, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
+import { softDeletePatientAction as softDeletePaciente } from '@/app/actions/patients';
+
 import { generatePatientUpdateToken } from '@/app/actions/patient-update';
 
 const ENRICHMENT_FIELDS: (keyof Paciente)[] = ['documento', 'fecha_nacimiento', 'email', 'whatsapp', 'como_nos_conocio'];

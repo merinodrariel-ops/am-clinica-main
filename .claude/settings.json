@@ -11,11 +11,15 @@
       "Bash(node --max-old-space-size=4096 node_modules/.bin/next build)",
       "Read(//Users/am/.claude/**)",
       "Bash(cat app/mi-clinica/*/page.tsx)",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit)",
+      "Bash(node --max-old-space-size=4096 ./node_modules/.bin/tsc --noEmit --skipLibCheck)",
+      "Bash(gh run:*)",
+      "Bash(node --max-old-space-size=4096 ./node_modules/.bin/tsc --noEmit)"
     ],
     "additionalDirectories": [
       "/Users/am/Downloads/antigravity apps/am-clinica-main/app/inventario/productos/[id]",
-      "/Users/am/Downloads/antigravity apps/am-clinica-main/app/api/design-review/[patientId]"
+      "/Users/am/Downloads/antigravity apps/am-clinica-main/app/api/design-review/[patientId]",
+      "/Users/am/Downloads/antigravity apps/am-clinica-main/docs/plans"
     ]
   }
 }

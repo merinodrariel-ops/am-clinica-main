@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { Clock, AlertCircle, ChevronRight, User, ExternalLink, Loader2, HardDrive } from 'lucide-react';
 import { getPatientPortalUrl } from '@/app/actions/patient-portal';
+import { resolvePatientPresentationLinkAction } from '@/app/actions/presentaciones';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import type { PatientTreatment, PatientSummary } from './types';
@@ -20,6 +21,83 @@ interface TreatmentCardProps {
 
 export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPercent = 0, onClick, onPatientClick, onMoveToNext }: TreatmentCardProps) {
     const [isPortalLoading, setIsPortalLoading] = React.useState(false);
+    const [isResolvingPresentation, setIsResolvingPresentation] = React.useState(false);
+    const [resolvedPresentationUrl, setResolvedPresentationUrl] = React.useState<string | null>(null);
+    const profilePhotoUrl = typeof treatment.patient.profile_photo_url === 'string' && treatment.patient.profile_photo_url.trim().length > 0
+        ? treatment.patient.profile_photo_url
+        : null;
+    const patientPresentationUrl = typeof treatment.patient.link_google_slides === 'string' && treatment.patient.link_google_slides.trim().length > 0
+        ? treatment.patient.link_google_slides
+        : null;
+    const effectivePresentationUrl = patientPresentationUrl || resolvedPresentationUrl;
+    const patientFolderUrl = typeof treatment.patient.link_historia_clinica === 'string' && treatment.patient.link_historia_clinica.trim().length > 0
+        ? treatment.patient.link_historia_clinica
+        : null;
+    const canOpenPatient = Boolean(onPatientClick || patientPresentationUrl || patientFolderUrl);
+
+    const presentationThumbUrl = React.useMemo(() => {
+        const sourceUrl = effectivePresentationUrl;
+        if (!sourceUrl) return null;
+
+        const patterns = [
+            /\/presentation\/d\/([a-zA-Z0-9_-]+)/,
+            /\/file\/d\/([a-zA-Z0-9_-]+)/,
+            /[?&]id=([a-zA-Z0-9_-]+)/,
+            /\/d\/([a-zA-Z0-9_-]+)/,
+        ];
+
+        for (const pattern of patterns) {
+            const match = sourceUrl.match(pattern);
+            if (match?.[1]) {
+                return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w256-h256`;
+            }
+        }
+
+        return null;
+    }, [effectivePresentationUrl]);
+
+    const effectiveProfilePhotoUrl = profilePhotoUrl || presentationThumbUrl;
+
+    const handlePatientOpen = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (effectivePresentationUrl) {
+            window.open(effectivePresentationUrl, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        if (!isResolvingPresentation) {
+            setIsResolvingPresentation(true);
+            try {
+                const resolved = await resolvePatientPresentationLinkAction(treatment.patient.id_paciente);
+                if (resolved.success && resolved.url) {
+                    if (resolved.source !== 'folder') {
+                        setResolvedPresentationUrl(resolved.url);
+                    }
+                    window.open(resolved.url, '_blank', 'noopener,noreferrer');
+                    return;
+                }
+            } catch (error) {
+                console.error('Presentation resolve error:', error);
+            } finally {
+                setIsResolvingPresentation(false);
+            }
+        }
+
+        if (patientFolderUrl) {
+            window.open(patientFolderUrl, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        if (onPatientClick) {
+            onPatientClick(treatment.patient);
+        }
+    };
+
+    const patientOpenTitle = effectivePresentationUrl
+        ? 'Abrir presentación del paciente'
+        : patientFolderUrl
+            ? 'Abrir carpeta clínica del paciente'
+            : 'Abrir ficha del paciente';
 
     const handlePortalClick = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -137,23 +215,61 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
             )}
             onClick={onClick}
         >
-            <div className="flex justify-between items-start mb-2">
-                {onPatientClick ? (
-                    <button
-                        type="button"
-                        className="font-semibold text-gray-900 dark:text-white truncate pr-2 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline underline-offset-2 transition-colors cursor-pointer"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onPatientClick(treatment.patient);
-                        }}
-                    >
-                        {treatment.patient.apellido}, {treatment.patient.nombre}
-                    </button>
-                ) : (
-                    <h4 className="font-semibold text-gray-900 dark:text-white truncate pr-2">
-                        {treatment.patient.apellido}, {treatment.patient.nombre}
-                    </h4>
-                )}
+            <div className="flex justify-between items-start mb-2 gap-2">
+                <div className="flex items-start gap-2 min-w-0">
+                    {canOpenPatient ? (
+                        <button
+                            type="button"
+                            onClick={handlePatientOpen}
+                            className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shrink-0 flex items-center justify-center hover:ring-2 hover:ring-blue-400/60 transition"
+                            title={patientOpenTitle}
+                            aria-label={`${patientOpenTitle} ${treatment.patient.nombre} ${treatment.patient.apellido}`}
+                        >
+                            {effectiveProfilePhotoUrl ? (
+                                <img
+                                    src={effectiveProfilePhotoUrl}
+                                    alt={`Foto de ${treatment.patient.nombre} ${treatment.patient.apellido}`}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                />
+                            ) : isResolvingPresentation ? (
+                                <Loader2 size={14} className="text-gray-500 dark:text-gray-300 animate-spin" />
+                            ) : (
+                                <User size={14} className="text-gray-500 dark:text-gray-300" />
+                            )}
+                        </button>
+                    ) : (
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shrink-0 flex items-center justify-center">
+                            {effectiveProfilePhotoUrl ? (
+                                <img
+                                    src={effectiveProfilePhotoUrl}
+                                    alt={`Foto de ${treatment.patient.nombre} ${treatment.patient.apellido}`}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                />
+                            ) : isResolvingPresentation ? (
+                                <Loader2 size={14} className="text-gray-500 dark:text-gray-300 animate-spin" />
+                            ) : (
+                                <User size={14} className="text-gray-500 dark:text-gray-300" />
+                            )}
+                        </div>
+                    )}
+
+                    {canOpenPatient ? (
+                        <button
+                            type="button"
+                            className="font-semibold text-gray-900 dark:text-white truncate pr-2 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline underline-offset-2 transition-colors cursor-pointer"
+                            onClick={handlePatientOpen}
+                        >
+                            {treatment.patient.apellido}, {treatment.patient.nombre}
+                        </button>
+                    ) : (
+                        <h4 className="font-semibold text-gray-900 dark:text-white truncate pr-2">
+                            {treatment.patient.apellido}, {treatment.patient.nombre}
+                        </h4>
+                    )}
+                </div>
+
                 {metadataType && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300 font-medium">
                         {metadataType}

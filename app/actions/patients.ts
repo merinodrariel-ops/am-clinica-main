@@ -1,7 +1,8 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
-import { Paciente } from '@/lib/patients';
+import { Paciente, softDeletePaciente, updatePaciente } from '@/lib/patients';
+
 import { syncPatientToSheet } from '@/lib/google-sheets';
 import { sendWelcomeEmailAction } from '@/app/actions/email';
 
@@ -136,7 +137,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
         }
 
         if (existingId && existingData) {
-            const updates: any = {};
+            const updates: Partial<Paciente> & { updated_at?: string } = {};
             let hasChanges = false;
             const fields: (keyof Paciente)[] = [
                 'nombre', 'apellido', 'documento', 'fecha_nacimiento',
@@ -251,5 +252,25 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             success: false,
             error: error instanceof Error ? error.message : 'Error desconocido al procesar paciente.'
         };
+    }
+}
+
+export async function softDeletePatientAction(id: string, motivo: string, usuario?: string) {
+    try {
+        const supabase = await createClient();
+        return await softDeletePaciente(supabase, id, motivo, usuario);
+    } catch (error) {
+        console.error('Error in softDeletePatientAction:', error);
+        return { success: false, error: 'Error al eliminar el paciente' };
+    }
+}
+
+export async function updatePatientAction(id: string, updates: Partial<Paciente>, motivo?: string) {
+    try {
+        const supabase = await createClient();
+        return await updatePaciente(supabase, id, updates, motivo);
+    } catch (error) {
+        console.error('Error in updatePatientAction:', error);
+        return { data: null, error: error instanceof Error ? error : new Error('Error al actualizar el paciente') };
     }
 }

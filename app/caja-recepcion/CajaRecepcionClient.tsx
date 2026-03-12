@@ -99,6 +99,9 @@ interface Movimiento {
     comprobante_url?: string | null;
     origen?: string;
     tc_bna_venta?: number | null;
+    split_group_id?: string | null;
+    // Populated client-side when grouping multipago splits for display
+    _splitSiblings?: Movimiento[];
 }
 
 interface BnaRate {
@@ -885,6 +888,48 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
         return matchesSearch && matchesMetodo;
     });
 
+    // Group multipago splits (same split_group_id) into a single display row
+    const groupedMovimientos = useMemo(() => {
+        const groups = new Map<string, Movimiento[]>();
+        const singles: Movimiento[] = [];
+
+        for (const mov of filteredMovimientos) {
+            if (mov.split_group_id) {
+                const arr = groups.get(mov.split_group_id) ?? [];
+                arr.push(mov);
+                groups.set(mov.split_group_id, arr);
+            } else {
+                singles.push(mov);
+            }
+        }
+
+        const result: Movimiento[] = [...singles];
+
+        for (const splits of groups.values()) {
+            // Sort by fecha_hora so primary is always the first registered split
+            splits.sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
+            const primary = splits[0];
+            const totalUsd = splits.reduce((s, m) => s + (m.usd_equivalente ?? 0), 0);
+            const allArs = splits.every(m => m.moneda === 'ARS');
+            const totalArs = splits.filter(m => m.moneda === 'ARS').reduce((s, m) => s + m.monto, 0);
+            const allSameCurrency = new Set(splits.map(m => m.moneda)).size === 1;
+            const methods = [...new Set(splits.map(m => m.metodo_pago))].join(' + ');
+            // Strip "(Pago Mixto X/Y)" prefix that NuevoIngresoForm adds to secondary splits
+            const cleanConcept = primary.concepto_nombre.replace(/^\(Pago Mixto \d+\/\d+\)\s*/, '');
+
+            result.push({
+                ...primary,
+                concepto_nombre: cleanConcept,
+                metodo_pago: methods,
+                monto: allArs ? totalArs : (allSameCurrency ? splits.reduce((s, m) => s + m.monto, 0) : primary.monto),
+                usd_equivalente: totalUsd > 0 ? totalUsd : primary.usd_equivalente,
+                _splitSiblings: splits.slice(1),
+            });
+        }
+
+        return result.sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime());
+    }, [filteredMovimientos]);
+
     return (
         <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception']}>
             <div className="p-6 max-w-7xl mx-auto">
@@ -1300,7 +1345,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-white/[0.02]">
-                                                {filteredMovimientos.map((mov: Movimiento) => (
+                                                {groupedMovimientos.map((mov: Movimiento) => (
                                                     <tr
                                                         key={mov.id}
                                                         className="group hover:bg-white/[0.02] transition-all"
@@ -1370,9 +1415,16 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                                                {mov.metodo_pago}
-                                                            </span>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                                                    {mov.metodo_pago}
+                                                                </span>
+                                                                {mov._splitSiblings && mov._splitSiblings.length > 0 && (
+                                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-violet-500/10 text-violet-400 border border-violet-500/20 w-fit">
+                                                                        PAGO MIXTO
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             {(mov.moneda === 'USD' || mov.moneda === 'USDT') ? (

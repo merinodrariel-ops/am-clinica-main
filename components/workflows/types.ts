@@ -41,6 +41,9 @@ export interface PatientSummary {
     nombre: string;
     apellido: string;
     documento?: string | null;
+    profile_photo_url?: string | null;
+    link_google_slides?: string | null;
+    link_historia_clinica?: string | null;
 }
 
 export interface WorkflowSummary {

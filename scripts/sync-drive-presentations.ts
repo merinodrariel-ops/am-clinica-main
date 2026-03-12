@@ -40,9 +40,28 @@ const supabase = createClient(
 
 // ─── Google Auth ───────────────────────────────────────────────────────
 function getAuth() {
+    const authMode = (process.env.GOOGLE_DRIVE_AUTH_MODE || 'auto').toLowerCase();
     const oauthClientId = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID;
     const oauthClientSecret = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET;
     const oauthRefreshToken = process.env.GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN;
+
+    const preferredServiceEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const preferredServiceKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+    if (authMode === 'service_account') {
+        if (!preferredServiceEmail || !preferredServiceKey) {
+            throw new Error('GOOGLE_DRIVE_AUTH_MODE=service_account pero faltan GOOGLE_SERVICE_ACCOUNT_EMAIL/PRIVATE_KEY.');
+        }
+
+        return new google.auth.GoogleAuth({
+            credentials: { client_email: preferredServiceEmail, private_key: preferredServiceKey },
+            scopes: ['https://www.googleapis.com/auth/drive'],
+        });
+    }
+
+    if (authMode === 'oauth' && (!oauthClientId || !oauthClientSecret || !oauthRefreshToken)) {
+        throw new Error('GOOGLE_DRIVE_AUTH_MODE=oauth pero faltan GOOGLE_DRIVE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN.');
+    }
 
     if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
         const oauth2Client = new google.auth.OAuth2(oauthClientId, oauthClientSecret);

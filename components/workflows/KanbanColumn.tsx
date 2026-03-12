@@ -69,20 +69,28 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
         <div className="flex flex-col min-w-[280px] w-80 h-full max-h-full">
             {/* Header */}
             <div className={clsx(
-                "p-3 rounded-t-xl border-b-2 font-semibold flex justify-between items-center gap-2",
+                "p-3 rounded-t-xl border-b-2",
                 getStageColor(stage.color)
             )}>
-                {dragHandleProps && (
-                    <button
-                        {...dragHandleProps}
-                        className="p-0.5 rounded cursor-grab active:cursor-grabbing text-current opacity-40 hover:opacity-80 transition-opacity touch-none shrink-0"
-                        tabIndex={-1}
-                    >
-                        <GripVertical size={14} />
-                    </button>
-                )}
-                <span className="truncate">{stageLabel}</span>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-start gap-2">
+                    {dragHandleProps && (
+                        <button
+                            {...dragHandleProps}
+                            className="mt-0.5 p-0.5 rounded cursor-grab active:cursor-grabbing text-current opacity-40 hover:opacity-80 transition-opacity touch-none shrink-0"
+                            tabIndex={-1}
+                        >
+                            <GripVertical size={14} />
+                        </button>
+                    )}
+                    <h3 className="min-w-0 flex-1 text-sm font-semibold leading-tight whitespace-normal break-words">
+                        {stageLabel}
+                    </h3>
+                    <span className="bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded text-xs shrink-0">
+                        {treatments.length}
+                    </span>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-1">
                     {/* Urgency badges */}
                     {urgentCount > 0 && (
                         <span className="inline-flex items-center gap-0.5 bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold animate-pulse">
@@ -108,9 +116,6 @@ export function KanbanColumn({ stage, treatments, stagePosition, totalStages, on
                             Notif
                         </span>
                     ) : null}
-                    <span className="bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded text-xs">
-                        {treatments.length}
-                    </span>
                 </div>
             </div>
 

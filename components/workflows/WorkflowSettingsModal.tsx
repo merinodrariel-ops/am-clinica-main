@@ -263,6 +263,7 @@ export function WorkflowSettingsModal({ workflow }: WorkflowSettingsModalProps) 
                                             onRemove={() => handleRemoveStage(stage)}
                                             staffEmails={staffEmails}
                                             workflowName={workflow.name}
+                                            workflowId={workflow.id}
                                             isExpanded={expandedStageId === stage.id}
                                             onToggle={() => toggleStage(stage.id)}
                                         />
@@ -304,6 +305,7 @@ const VARIABLES = [
     { label: 'Workflow', value: '{{workflow}}' },
     { label: 'Hito', value: '{{hito}}' },
     { label: 'Carpeta Drive', value: '{{drive_url}}' },
+    { label: 'Archivos App', value: '{{app_url}}' },
 ];
 
 function VariableToolbar({ onSelect }: { onSelect: (val: string) => void }) {
@@ -439,6 +441,7 @@ function SortableStageCard({
     onRemove,
     staffEmails = [],
     workflowName = '',
+    workflowId,
     isExpanded = false,
     onToggle,
 }: {
@@ -447,12 +450,14 @@ function SortableStageCard({
     onRemove: () => void;
     staffEmails?: { name: string; email: string }[];
     workflowName?: string;
+    workflowId?: string;
     isExpanded?: boolean;
     onToggle?: () => void;
 }) {
     const [newEmail, setNewEmail] = useState('');
     const [testEmailTo, setTestEmailTo] = useState('');
     const [testDriveUrl, setTestDriveUrl] = useState('');
+    const [testAppUrl, setTestAppUrl] = useState('');
     const [testingTemplate, setTestingTemplate] = useState<string | null>(null);
 
     const handleAddEmail = () => {
@@ -503,7 +508,17 @@ function SortableStageCard({
         const body = bodies[templateKey] || '(sin cuerpo configurado)';
         setTestingTemplate(templateKey);
         try {
-            const result = await sendTestWorkflowEmail({ toEmail: to, subject, body, stageName: stage.name, workflowName, driveUrl: testDriveUrl || undefined });
+            const result = await sendTestWorkflowEmail({
+                toEmail: to,
+                subject,
+                body,
+                stageName: stage.name,
+                stageId: stage.persistedId,
+                workflowName,
+                workflowId,
+                driveUrl: testDriveUrl || undefined,
+                appUrl: testAppUrl || undefined,
+            });
             if (result.ok) {
                 toast.success(`Email de prueba enviado a ${to}`);
             } else {
@@ -679,7 +694,13 @@ function SortableStageCard({
                                 <input
                                     value={testDriveUrl}
                                     onChange={e => setTestDriveUrl(e.target.value)}
-                                    placeholder="Pegar link de carpeta Drive (opcional)"
+                                    placeholder="Link Drive (opcional, sino toma automático)"
+                                    className="rounded-lg border border-dashed border-amber-200 bg-amber-50/60 dark:bg-amber-900/10 px-2.5 py-1.5 text-[11px] outline-none w-56 focus:border-amber-400 text-gray-500"
+                                />
+                                <input
+                                    value={testAppUrl}
+                                    onChange={e => setTestAppUrl(e.target.value)}
+                                    placeholder="Link Archivos app (opcional, sino toma automático)"
                                     className="rounded-lg border border-dashed border-amber-200 bg-amber-50/60 dark:bg-amber-900/10 px-2.5 py-1.5 text-[11px] outline-none w-56 focus:border-amber-400 text-gray-500"
                                 />
                             </div>

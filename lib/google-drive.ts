@@ -63,13 +63,39 @@ const DRIVE_DEFAULT_SCOPES = [
     'https://www.googleapis.com/auth/drive',
     'https://www.googleapis.com/auth/presentations',
     'https://www.googleapis.com/auth/documents',
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.readonly',
 ];
 
 function getAuth(scopes: string[] = DRIVE_DEFAULT_SCOPES) {
+    const authMode = (process.env.GOOGLE_DRIVE_AUTH_MODE || 'auto').toLowerCase();
     const oauthClientId = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID;
     const oauthClientSecret = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET;
     const oauthRefreshToken = process.env.GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN;
     const oauthRedirectUri = process.env.GOOGLE_DRIVE_OAUTH_REDIRECT_URI || 'https://developers.google.com/oauthplayground';
+
+    const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+    if (authMode === 'service_account') {
+        if (!serviceAccountEmail || !serviceAccountKey) {
+            throw new Error('GOOGLE_DRIVE_AUTH_MODE=service_account pero faltan GOOGLE_SERVICE_ACCOUNT_EMAIL/PRIVATE_KEY');
+        }
+
+        return new google.auth.GoogleAuth({
+            credentials: {
+                client_email: serviceAccountEmail,
+                private_key: serviceAccountKey,
+            },
+            scopes,
+        });
+    }
+
+    if (authMode === 'oauth' && (!oauthClientId || !oauthClientSecret || !oauthRefreshToken)) {
+        throw new Error('GOOGLE_DRIVE_AUTH_MODE=oauth pero faltan GOOGLE_DRIVE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN');
+    }
 
     // Preferred mode for personal Google accounts (Google One): user OAuth refresh token.
     if (oauthClientId && oauthClientSecret && oauthRefreshToken) {

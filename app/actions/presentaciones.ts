@@ -50,8 +50,15 @@ interface PatientBase {
     id_paciente: string;
     nombre: string | null;
     apellido: string | null;
+    link_google_slides: string | null;
     link_historia_clinica: string | null;
 }
+
+const PRESENTATION_MIME_TYPES = [
+    'application/vnd.google-apps.presentation',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-powerpoint',
+];
 
 async function syncPatientPresentationsForPatient(patient: PatientBase): Promise<SyncPresentacionesResult> {
     const patientId = patient.id_paciente;
@@ -236,7 +243,7 @@ export async function syncPatientPresentationsAction(patientId: string): Promise
 
         const { data: patient, error: patientError } = await supabase
             .from('pacientes')
-            .select('id_paciente, nombre, apellido, link_historia_clinica')
+            .select('id_paciente, nombre, apellido, link_google_slides, link_historia_clinica')
             .eq('id_paciente', patientId)
             .single();
 
@@ -260,12 +267,73 @@ export async function syncPatientPresentationsAction(patientId: string): Promise
     }
 }
 
+export async function resolvePatientPresentationLinkAction(patientId: string): Promise<{
+    success: boolean;
+    url?: string;
+    source?: 'paciente' | 'sync' | 'folder';
+    error?: string;
+}> {
+    try {
+        if (!patientId) {
+            return { success: false, error: 'patientId requerido' };
+        }
+
+        const { data: patient, error: patientError } = await supabase
+            .from('pacientes')
+            .select('id_paciente, nombre, apellido, link_google_slides, link_historia_clinica')
+            .eq('id_paciente', patientId)
+            .single();
+
+        if (patientError || !patient) {
+            return { success: false, error: patientError?.message || 'Paciente no encontrado' };
+        }
+
+        const existingSlides = typeof patient.link_google_slides === 'string' ? patient.link_google_slides.trim() : '';
+        if (existingSlides) {
+            return { success: true, url: existingSlides, source: 'paciente' };
+        }
+
+        const syncResult = await syncPatientPresentationsForPatient(patient as PatientBase);
+
+        const { data: latestPresentation, error: latestError } = await supabase
+            .from('paciente_presentaciones')
+            .select('drive_web_view_link')
+            .eq('paciente_id', patientId)
+            .eq('is_deleted', false)
+            .in('drive_mime_type', PRESENTATION_MIME_TYPES)
+            .order('drive_created_time', { ascending: false, nullsFirst: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (!latestError && latestPresentation?.drive_web_view_link) {
+            const resolvedSlidesUrl = latestPresentation.drive_web_view_link;
+            await supabase
+                .from('pacientes')
+                .update({ link_google_slides: resolvedSlidesUrl })
+                .eq('id_paciente', patientId);
+
+            return { success: true, url: resolvedSlidesUrl, source: 'sync' };
+        }
+
+        if (syncResult.folderUrl) {
+            return { success: true, url: syncResult.folderUrl, source: 'folder' };
+        }
+
+        return {
+            success: false,
+            error: syncResult.error || latestError?.message || 'No se encontro presentacion para este paciente',
+        };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
 export async function syncAllPatientPresentationsAction(maxPatients: number = 100): Promise<SyncAllPresentacionesResult> {
     try {
         const capped = Math.min(300, Math.max(1, Math.floor(maxPatients || 100)));
         const { data: patients, error } = await supabase
             .from('pacientes')
-            .select('id_paciente, nombre, apellido, link_historia_clinica')
+            .select('id_paciente, nombre, apellido, link_google_slides, link_historia_clinica')
             .eq('is_deleted', false)
             .order('apellido', { ascending: true })
             .limit(capped);
