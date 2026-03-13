@@ -155,6 +155,27 @@ export default function ActualizarDatosClient() {
         });
     }, [tokenParam]);
 
+    // ID-based auto-lookup (for direct links from admin)
+    useEffect(() => {
+        const idParam = searchParams.get('id');
+        if (!idParam || tokenParam) return;
+        
+        setStep('loading');
+        lookupPatientById(idParam).then((result) => {
+            if (result.found) {
+                setPatient(result);
+                if (result.missingFields && result.missingFields.length > 0) {
+                    setStep('form');
+                } else {
+                    setStep('success');
+                }
+            } else {
+                setError('Paciente no encontrado');
+                setStep('search');
+            }
+        });
+    }, [searchParams, tokenParam]);
+
     const handleSearch = useCallback(async (value: string, method: SearchMethod) => {
         const trimmed = value.trim();
         if (trimmed.length < 3) {
