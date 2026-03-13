@@ -197,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Laboratorio / Technician
         if (categoria === 'laboratorio' || categoria === 'lab' || categoria === 'technician') {
-            return ['inventario', 'laboratorio', 'pacientes'].includes(module);
+            return ['inventario', 'laboratorio', 'pacientes', 'turnos'].includes(module);
         }
 
         // Asistente / Assistant
