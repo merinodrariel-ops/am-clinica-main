@@ -66,6 +66,7 @@ import {
 import ObservadosTab from './ObservadosTab';
 import PrestacionesTab from './PrestacionesTab';
 import HorariosTab from './HorariosTab';
+import PortfolioEditor from '@/components/caja-admin/PortfolioEditor';
 import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
 import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
@@ -147,6 +148,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     // Prestaciones list per professional (expand/edit/delete)
     const [expandedPrestaciones, setExpandedPrestaciones] = useState<Set<string>>(new Set());
     const [editingPrestacion, setEditingPrestacion] = useState<PrestacionRealizada | null>(null);
+    const [portfolioModal, setPortfolioModal] = useState<{ profesional: Personal; prestaciones: PrestacionRealizada[] } | null>(null);
     const [editPrestacionForm, setEditPrestacionForm] = useState({
         prestacion_nombre: '',
         fecha_realizacion: '',
@@ -2403,6 +2405,20 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             </div>
                                         )}
 
+                                        {/* Portfolio button */}
+                                        {isProfesional && prestacionesProfe.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setPortfolioModal({
+                                                    profesional: p,
+                                                    prestaciones: prestacionesProfe
+                                                })}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 rounded-lg transition-colors"
+                                            >
+                                                Portfolio
+                                            </button>
+                                        )}
+
                                         {/* Expandable prestaciones list */}
                                         {isProfesional && prestacionesProfe.length > 0 && (
                                             <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">
@@ -2752,6 +2768,15 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         </div>
                     </div>
                 </div>
+            )}
+            {/* Modal: Portfolio del profesional */}
+            {portfolioModal && (
+                <PortfolioEditor
+                    profesional={portfolioModal.profesional}
+                    prestaciones={portfolioModal.prestaciones}
+                    mes={mesActual}
+                    onClose={() => setPortfolioModal(null)}
+                />
             )}
         </div >
     );
