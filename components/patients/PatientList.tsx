@@ -37,6 +37,11 @@ function getMissingCount(patient: Paciente): number {
     }).length;
 }
 
+function isAdmissionLead(patient: Paciente): boolean {
+    const source = (patient.origen_registro || '').toLowerCase();
+    return source.includes('lead');
+}
+
 interface PatientListProps {
     patients: Paciente[];
     onRefresh?: () => void;
@@ -231,6 +236,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                             const whatsapp = getWhatsAppNumber(patient);
                             const email = patient.email;
                             const missingCount = getMissingCount(patient);
+                            const isLead = isAdmissionLead(patient);
 
                             return (
                                 <motion.tr
@@ -261,7 +267,15 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                             nuevo
                                                         </span>
                                                     )}
-                                                    {missingCount > 0 && (
+                                                    {missingCount > 0 && isLead && (
+                                                        <span
+                                                            className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                                                            title={`Lead de admisión parcial: faltan ${missingCount} dato${missingCount > 1 ? 's' : ''} por completar en ficha definitiva`}
+                                                        >
+                                                            Lead
+                                                        </span>
+                                                    )}
+                                                    {missingCount > 0 && !isLead && (
                                                         <span
                                                             className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                                             title={`${missingCount} dato${missingCount > 1 ? 's' : ''} faltante${missingCount > 1 ? 's' : ''}`}
@@ -366,7 +380,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-2">
-                                            {missingCount > 0 && (
+                                            {missingCount > 0 && !isLead && (
                                                 <button
                                                     onClick={() => handleSendEnrichmentLink(patient)}
                                                     disabled={sendingEnrichId === patient.id_paciente}

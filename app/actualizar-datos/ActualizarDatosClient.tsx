@@ -17,6 +17,7 @@ import {
     User,
     Hash,
     Loader2,
+    MapPin,
 } from 'lucide-react';
 import {
     lookupPatient,
@@ -83,6 +84,18 @@ const FIELD_CONFIG: Record<string, { label: string; placeholder: string; icon: R
         icon: <Phone size={18} />,
         type: 'tel',
         inputMode: 'tel',
+    },
+    ciudad: {
+        label: 'Ciudad',
+        placeholder: 'Ej: CABA',
+        icon: <MapPin size={18} />,
+        type: 'text',
+    },
+    zona_barrio: {
+        label: 'Zona / Barrio',
+        placeholder: 'Ej: Recoleta',
+        icon: <MapPin size={18} />,
+        type: 'text',
     },
 };
 
@@ -473,7 +486,9 @@ export default function ActualizarDatosClient() {
                                             Datos faltantes
                                         </p>
                                         <p className="text-[10px] text-zinc-600">
-                                            {filledCount} / {totalMissing}
+                                            {filledCount < totalMissing 
+                                                ? `Faltan ${totalMissing - filledCount} datos obligatorios` 
+                                                : '¡Todo listo!'}
                                         </p>
                                     </div>
 
@@ -560,7 +575,7 @@ export default function ActualizarDatosClient() {
                             {/* Submit */}
                             <button
                                 onClick={handleSubmit}
-                                disabled={saving || filledCount === 0}
+                                disabled={saving || filledCount < totalMissing}
                                 className="w-full py-4 rounded-full font-medium text-sm tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-[#D4AF37] to-[#EAAE10] text-black hover:shadow-[0_0_25px_rgba(212,175,55,0.3)]"
                             >
                                 {saving ? (

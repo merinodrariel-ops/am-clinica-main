@@ -69,6 +69,7 @@ import HorariosTab from './HorariosTab';
 import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
 import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
+import { eliminarPrestacion, updatePrestacionRealizada } from '@/app/actions/prestaciones';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
@@ -130,12 +131,34 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         prestacion_id: '',
         prestacion_nombre_manual: '',
         paciente_nombre: '',
+        fecha_realizacion: new Date().toISOString().split('T')[0],
+        slides_url: '',
         valor_cobrado: 0,
         moneda: 'ARS' as 'ARS' | 'USD',
         notas: '',
         guardar_en_tarifario: false,
         recalcular_liquidacion: true,
     });
+    // Patient autocomplete state
+    const [pacienteQuery, setPacienteQuery] = useState('');
+    const [pacienteOptions, setPacienteOptions] = useState<{ id: string; nombre: string; apellido: string; link_historia_clinica: string | null }[]>([]);
+    const [showPacienteDropdown, setShowPacienteDropdown] = useState(false);
+
+    // Prestaciones list per professional (expand/edit/delete)
+    const [expandedPrestaciones, setExpandedPrestaciones] = useState<Set<string>>(new Set());
+    const [editingPrestacion, setEditingPrestacion] = useState<PrestacionRealizada | null>(null);
+    const [editPrestacionForm, setEditPrestacionForm] = useState({
+        prestacion_nombre: '',
+        fecha_realizacion: '',
+        paciente_nombre: '',
+        valor_cobrado: 0,
+        monto_honorarios: 0,
+        moneda_cobro: 'ARS' as 'ARS' | 'USD',
+        slides_url: '',
+        notas: '',
+    });
+    const [confirmDeletePrestacionId, setConfirmDeletePrestacionId] = useState<string | null>(null);
+    const [savingPrestacion, setSavingPrestacion] = useState(false);
 
     // Form state for new/edit personal
     const [formData, setFormData] = useState<CreatePersonalInput>({
@@ -412,12 +435,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             paciente_nombre: '',
             prestacion_id: '',
             prestacion_nombre_manual: '',
+            fecha_realizacion: new Date().toISOString().split('T')[0],
+            slides_url: '',
             valor_cobrado: 0,
             moneda: 'ARS',
             notas: '',
             guardar_en_tarifario: prestacionesLista.length === 0,
             recalcular_liquidacion: true,
         });
+        setPacienteQuery('');
+        setPacienteOptions([]);
+        setShowPacienteDropdown(false);
         setShowPrestacionForm(true);
     }
 
@@ -515,18 +543,23 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const honorarios = prestacionForm.valor_cobrado;
         const finalPrestacionNombre = prestacion?.nombre || manualName;
 
+        // Parse fecha_realizacion as local date to avoid UTC offset shifting the day
+        const [fy, fm, fd] = prestacionForm.fecha_realizacion.split('-').map(Number);
+        const fechaLocal = new Date(fy, fm - 1, fd, 12, 0, 0).toISOString();
+
         const { error } = await registrarPrestacionRealizada({
             profesional_id: selectedProfesionalId,
             paciente_nombre: prestacionForm.paciente_nombre,
             prestacion_id: hasCatalogSelection ? prestacionForm.prestacion_id : undefined,
             prestacion_nombre: finalPrestacionNombre,
-            fecha_realizacion: new Date().toISOString(),
+            fecha_realizacion: fechaLocal,
             valor_cobrado: prestacionForm.valor_cobrado,
             moneda_cobro: prestacionForm.moneda,
             porcentaje_honorarios: 100,
             monto_honorarios: honorarios,
             estado_pago: 'pendiente',
             notas: prestacionForm.notas,
+            slides_url: prestacionForm.slides_url || null,
         });
 
         if (error) {
@@ -576,12 +609,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 paciente_nombre: '',
                 prestacion_id: '',
                 prestacion_nombre_manual: '',
+                fecha_realizacion: new Date().toISOString().split('T')[0],
+                slides_url: '',
                 valor_cobrado: 0,
                 moneda: 'ARS',
                 notas: '',
                 guardar_en_tarifario: false,
                 recalcular_liquidacion: true,
             });
+            setPacienteQuery('');
+            setPacienteOptions([]);
             loadData();
         }
         setSubmitting(false);
@@ -1697,15 +1734,94 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             </h3>
 
                             <div className="space-y-4">
-                                <div>
+                                {/* Paciente — autocomplete desde DB */}
+                                <div className="relative">
                                     <label className="block text-sm font-medium mb-1">Paciente</label>
                                     <Input
                                         type="text"
                                         className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
-                                        value={prestacionForm.paciente_nombre}
-                                        onChange={e => setPrestacionForm({ ...prestacionForm, paciente_nombre: e.target.value })}
-                                        placeholder="Nombre del Paciente"
+                                        value={pacienteQuery}
+                                        onChange={async (e) => {
+                                            const q = e.target.value;
+                                            setPacienteQuery(q);
+                                            setPrestacionForm(f => ({ ...f, paciente_nombre: q, slides_url: '' }));
+                                            if (q.length < 2) { setPacienteOptions([]); setShowPacienteDropdown(false); return; }
+                                            const supabase = (await import('@/utils/supabase/client')).createClient();
+                                            const { data } = await supabase
+                                                .from('pacientes')
+                                                .select('id_paciente, nombre, apellido, link_historia_clinica')
+                                                .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%`)
+                                                .limit(8);
+                                            setPacienteOptions((data || []).map((p: { id_paciente: string; nombre: string; apellido: string; link_historia_clinica: string | null }) => ({ id: p.id_paciente, nombre: p.nombre, apellido: p.apellido, link_historia_clinica: p.link_historia_clinica })));
+                                            setShowPacienteDropdown(true);
+                                        }}
+                                        onBlur={() => setTimeout(() => setShowPacienteDropdown(false), 150)}
+                                        placeholder="Buscar paciente por nombre o apellido..."
                                     />
+                                    {showPacienteDropdown && pacienteOptions.length > 0 && (
+                                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden">
+                                            {pacienteOptions.map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    type="button"
+                                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                                    onMouseDown={() => {
+                                                        const fullName = `${p.apellido}, ${p.nombre}`;
+                                                        setPacienteQuery(fullName);
+                                                        setPrestacionForm(f => ({
+                                                            ...f,
+                                                            paciente_nombre: fullName,
+                                                            slides_url: p.link_historia_clinica || '',
+                                                        }));
+                                                        setShowPacienteDropdown(false);
+                                                    }}
+                                                >
+                                                    <span className="font-medium">{p.apellido}</span>, {p.nombre}
+                                                    {p.link_historia_clinica && (
+                                                        <span className="ml-2 text-xs text-emerald-600">• con historia clínica</span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Fecha de realización */}
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Fecha de realización</label>
+                                    <Input
+                                        type="date"
+                                        className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
+                                        value={prestacionForm.fecha_realizacion}
+                                        onChange={e => setPrestacionForm(f => ({ ...f, fecha_realizacion: e.target.value }))}
+                                    />
+                                </div>
+
+                                {/* URL Historia Clínica */}
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Historia Clínica (URL)</label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="url"
+                                            className="flex-1 px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900 text-sm"
+                                            value={prestacionForm.slides_url}
+                                            onChange={e => setPrestacionForm(f => ({ ...f, slides_url: e.target.value }))}
+                                            placeholder="Se auto-completa al elegir paciente"
+                                        />
+                                        {prestacionForm.slides_url && (
+                                            <a
+                                                href={prestacionForm.slides_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-3 py-2 text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 rounded-xl hover:bg-emerald-100 transition-colors whitespace-nowrap"
+                                            >
+                                                Abrir ↗
+                                            </a>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        Se completa automáticamente al seleccionar el paciente desde la base de datos.
+                                    </p>
                                 </div>
 
                                 <div>
@@ -2286,6 +2402,104 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 )}
                                             </div>
                                         )}
+
+                                        {/* Expandable prestaciones list */}
+                                        {isProfesional && prestacionesProfe.length > 0 && (
+                                            <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpandedPrestaciones(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
+                                                        return next;
+                                                    })}
+                                                    className="w-full flex items-center justify-between text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                                                >
+                                                    <span>{expandedPrestaciones.has(p.id) ? 'Ocultar prestaciones' : `Ver ${prestacionesProfe.length} prestaciones del mes`}</span>
+                                                    <ChevronDown className={`w-4 h-4 transition-transform ${expandedPrestaciones.has(p.id) ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {expandedPrestaciones.has(p.id) && (
+                                                    <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
+                                                        {prestacionesProfe
+                                                            .slice()
+                                                            .sort((a, b) => new Date(b.fecha_realizacion).getTime() - new Date(a.fecha_realizacion).getTime())
+                                                            .map(pr => (
+                                                                <div key={pr.id} className={`rounded-lg px-3 py-2 text-xs ${pr.estado_pago === 'pendiente' ? 'bg-slate-50 dark:bg-slate-900' : 'bg-green-50 dark:bg-green-900/10'}`}>
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="font-medium text-slate-800 dark:text-slate-200 truncate">{pr.prestacion_nombre}</p>
+                                                                            <p className="text-slate-500 truncate">{pr.paciente_nombre || '—'} · {new Date(pr.fecha_realizacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</p>
+                                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                                                                    {pr.moneda_cobro} {new Intl.NumberFormat('es-AR').format(pr.valor_cobrado)}
+                                                                                </span>
+                                                                                {pr.slides_url && (
+                                                                                    <a href={pr.slides_url} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline flex items-center gap-0.5">
+                                                                                        <ExternalLink className="w-3 h-3" /> HC
+                                                                                    </a>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        {pr.estado_pago === 'pendiente' && (
+                                                                            <div className="flex gap-1 shrink-0">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    title="Editar"
+                                                                                    onClick={() => {
+                                                                                        setEditingPrestacion(pr);
+                                                                                        setEditPrestacionForm({
+                                                                                            prestacion_nombre: pr.prestacion_nombre,
+                                                                                            fecha_realizacion: pr.fecha_realizacion.slice(0, 10),
+                                                                                            paciente_nombre: pr.paciente_nombre || '',
+                                                                                            valor_cobrado: pr.valor_cobrado,
+                                                                                            monto_honorarios: pr.monto_honorarios,
+                                                                                            moneda_cobro: pr.moneda_cobro as 'ARS' | 'USD',
+                                                                                            slides_url: pr.slides_url || '',
+                                                                                            notas: pr.notas || '',
+                                                                                        });
+                                                                                    }}
+                                                                                    className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 transition-colors"
+                                                                                >
+                                                                                    <Pencil className="w-3 h-3" />
+                                                                                </button>
+                                                                                {confirmDeletePrestacionId === pr.id ? (
+                                                                                    <div className="flex gap-1">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={async () => {
+                                                                                                const res = await eliminarPrestacion(pr.id);
+                                                                                                if (res.success) { toast.success('Prestación eliminada'); loadData(); }
+                                                                                                else toast.error(res.error || 'Error al eliminar');
+                                                                                                setConfirmDeletePrestacionId(null);
+                                                                                            }}
+                                                                                            className="px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
+                                                                                        >Sí</button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => setConfirmDeletePrestacionId(null)}
+                                                                                            className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 text-[10px] font-bold"
+                                                                                        >No</button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        title="Eliminar"
+                                                                                        onClick={() => setConfirmDeletePrestacionId(pr.id)}
+                                                                                        className="p-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 transition-colors"
+                                                                                    >
+                                                                                        <Trash2 className="w-3 h-3" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -2361,6 +2575,93 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     />
                 )
             }
+
+            {/* Modal: editar prestación */}
+            {editingPrestacion && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingPrestacion(null)} />
+                    <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 w-full max-w-md m-4 space-y-4">
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                            <Pencil className="w-5 h-5 text-blue-500" />
+                            Editar Prestación
+                        </h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Paciente</label>
+                                <Input value={editPrestacionForm.paciente_nombre} onChange={e => setEditPrestacionForm(f => ({ ...f, paciente_nombre: e.target.value }))} className="w-full rounded-xl text-sm" />
+                            </div>
+                            <div>
+                                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Prestación</label>
+                                <Input value={editPrestacionForm.prestacion_nombre} onChange={e => setEditPrestacionForm(f => ({ ...f, prestacion_nombre: e.target.value }))} className="w-full rounded-xl text-sm" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Fecha</label>
+                                    <Input type="date" value={editPrestacionForm.fecha_realizacion} onChange={e => setEditPrestacionForm(f => ({ ...f, fecha_realizacion: e.target.value }))} className="w-full rounded-xl text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Moneda</label>
+                                    <select value={editPrestacionForm.moneda_cobro} onChange={e => setEditPrestacionForm(f => ({ ...f, moneda_cobro: e.target.value as 'ARS' | 'USD' }))} className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800">
+                                        <option value="ARS">ARS</option>
+                                        <option value="USD">USD</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Monto cobrado</label>
+                                    <MoneyInput value={editPrestacionForm.valor_cobrado} onChange={v => setEditPrestacionForm(f => ({ ...f, valor_cobrado: v, monto_honorarios: v }))} currency={editPrestacionForm.moneda_cobro} className="w-full" />
+                                </div>
+                                <div>
+                                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Monto honorarios</label>
+                                    <MoneyInput value={editPrestacionForm.monto_honorarios} onChange={v => setEditPrestacionForm(f => ({ ...f, monto_honorarios: v }))} currency={editPrestacionForm.moneda_cobro} className="w-full" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">URL Historia Clínica</label>
+                                <div className="flex gap-2">
+                                    <Input value={editPrestacionForm.slides_url} onChange={e => setEditPrestacionForm(f => ({ ...f, slides_url: e.target.value }))} className="flex-1 rounded-xl text-sm" placeholder="https://..." />
+                                    {editPrestacionForm.slides_url && (
+                                        <a href={editPrestacionForm.slides_url} target="_blank" rel="noopener noreferrer" className="px-3 py-2 text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 rounded-xl border border-emerald-200 dark:border-emerald-700">Abrir ↗</a>
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Notas</label>
+                                <Textarea value={editPrestacionForm.notas} onChange={e => setEditPrestacionForm(f => ({ ...f, notas: e.target.value }))} rows={2} className="w-full rounded-xl text-sm" />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button type="button" onClick={() => setEditingPrestacion(null)} className="flex-1 px-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">Cancelar</button>
+                            <button
+                                type="button"
+                                disabled={savingPrestacion}
+                                onClick={async () => {
+                                    setSavingPrestacion(true);
+                                    const [fy, fm, fd] = editPrestacionForm.fecha_realizacion.split('-').map(Number);
+                                    const fechaLocal = new Date(fy, fm - 1, fd, 12, 0, 0).toISOString();
+                                    const res = await updatePrestacionRealizada(editingPrestacion.id, {
+                                        prestacion_nombre: editPrestacionForm.prestacion_nombre,
+                                        fecha_realizacion: fechaLocal,
+                                        paciente_nombre: editPrestacionForm.paciente_nombre,
+                                        valor_cobrado: editPrestacionForm.valor_cobrado,
+                                        monto_honorarios: editPrestacionForm.monto_honorarios,
+                                        moneda_cobro: editPrestacionForm.moneda_cobro,
+                                        slides_url: editPrestacionForm.slides_url || null,
+                                        notas: editPrestacionForm.notas || undefined,
+                                    });
+                                    setSavingPrestacion(false);
+                                    if (res.success) { toast.success('Prestación actualizada'); setEditingPrestacion(null); loadData(); }
+                                    else toast.error(res.error || 'Error al guardar');
+                                }}
+                                className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-semibold disabled:opacity-40 hover:bg-blue-700 transition-all"
+                            >
+                                {savingPrestacion ? 'Guardando...' : 'Guardar cambios'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal: activar prestador pendiente */}
             {activatingPrestador && (

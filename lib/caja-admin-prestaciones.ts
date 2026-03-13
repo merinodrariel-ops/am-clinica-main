@@ -34,6 +34,7 @@ export interface PrestacionRealizada {
     estado_pago: 'pendiente' | 'liquidado' | 'pagado';
     liquidacion_id?: string;
     notas?: string;
+    slides_url?: string | null;
     profesional?: Personal;
 }
 

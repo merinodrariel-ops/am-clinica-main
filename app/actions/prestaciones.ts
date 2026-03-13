@@ -483,6 +483,34 @@ export async function eliminarPrestacion(
     if (error) return { success: false, error: error.message };
 
     revalidatePath('/portal/prestaciones');
+    revalidatePath('/caja-admin/personal');
+    return { success: true };
+}
+
+export async function updatePrestacionRealizada(
+    id: string,
+    updates: {
+        prestacion_nombre?: string;
+        fecha_realizacion?: string;
+        paciente_nombre?: string;
+        valor_cobrado?: number;
+        monto_honorarios?: number;
+        moneda_cobro?: string;
+        slides_url?: string | null;
+        notas?: string;
+    }
+): Promise<{ success: boolean; error?: string }> {
+    const admin = getAdminClient();
+    const { error } = await admin
+        .from('prestaciones_realizadas')
+        .update(updates)
+        .eq('id', id)
+        .eq('estado_pago', 'pendiente');
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath('/portal/prestaciones');
+    revalidatePath('/caja-admin/personal');
     return { success: true };
 }
 

@@ -18,6 +18,8 @@ const UPDATABLE_FIELDS = [
     'email',
     'whatsapp',
     'como_nos_conocio',
+    'ciudad',
+    'zona_barrio',
 ] as const;
 
 type UpdatableField = typeof UPDATABLE_FIELDS[number];
@@ -55,7 +57,7 @@ function detectSearchType(input: string): SearchMethod {
     return 'dni';
 }
 
-const SELECT_FIELDS = 'id_paciente, nombre, apellido, documento, fecha_nacimiento, email, whatsapp, como_nos_conocio, referencia_origen';
+const SELECT_FIELDS = 'id_paciente, nombre, apellido, documento, fecha_nacimiento, email, whatsapp, como_nos_conocio, referencia_origen, ciudad, zona_barrio';
 
 // ─── Unified smart lookup ──────────────────────────────────────────
 export async function lookupPatient(
