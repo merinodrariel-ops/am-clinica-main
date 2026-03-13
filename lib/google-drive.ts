@@ -259,7 +259,7 @@ export async function createDriveFolder(
 
     const inflight = (async (): Promise<{ folderId?: string; error?: string }> => {
         try {
-            const existingFolders = await listExactFoldersByName(drive, parentFolderId, folderName);
+            const existingFolders = await findFuzzyFoldersByName(drive, parentFolderId, folderName);
             const existingCanonical = pickCanonicalFolder(existingFolders);
             if (existingCanonical?.id) {
                 return { folderId: existingCanonical.id };
@@ -346,6 +346,47 @@ async function listExactFoldersByName(
     });
 
     return response.data.files || [];
+}
+
+/**
+ * Searches for a folder with some flexibility (swapped name/surname or missing brackets)
+ */
+async function findFuzzyFoldersByName(
+    drive: ReturnType<typeof google.drive>,
+    parentFolderId: string,
+    folderName: string
+) {
+    // 1. Try exact match
+    const exact = await listExactFoldersByName(drive, parentFolderId, folderName);
+    if (exact.length > 0) return exact;
+
+    // 2. Try swapped format if it contains a comma
+    if (folderName.includes(',')) {
+        const parts = folderName.split(',').map((p) => p.trim());
+        if (parts.length === 2) {
+            const swapped = `${parts[1].toUpperCase()}, ${parts[0]}`;
+            const swappedResults = await listExactFoldersByName(drive, parentFolderId, swapped);
+            if (swappedResults.length > 0) return swappedResults;
+        }
+    }
+
+    // 3. Try searching for matches containing both parts of the name
+    const terms = folderName.replace(/[\[\]]/g, '').split(/[\s,]+/).filter(t => t.length > 2);
+    if (terms.length >= 2) {
+        let query = `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+        for (const term of terms) {
+            query += ` and name contains '${escapeDriveQueryValue(term)}'`;
+        }
+        const res = await drive.files.list({
+            q: query,
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
+            fields: 'files(id, name, createdTime)',
+        });
+        if (res.data.files && res.data.files.length > 0) return res.data.files;
+    }
+
+    return [];
 }
 
 function pickCanonicalFolder(
@@ -795,8 +836,28 @@ export async function createPatientDocuments(
             includeItemsFromAllDrives: true,
         });
 
-        const presentacionFolder = subfolders.data.files?.find(f => f.name?.includes('PRESENTACION'));
-        const presupuestoFolder = subfolders.data.files?.find(f => f.name?.includes('PRESUPUESTO'));
+        let presentacionFolder = subfolders.data.files?.find(f => f.name?.includes('PRESENTACION'));
+        let presupuestoFolder = subfolders.data.files?.find(f => f.name?.includes('PRESUPUESTO'));
+
+        if (!presentacionFolder || !presupuestoFolder) {
+            // Try harder by looking for folders that might have different naming (e.g. without brackets if they were missing)
+            if (!presentacionFolder) {
+                 const res = await drive.files.list({
+                    q: `'${motherFolderId}' in parents and name contains 'PRESENTACION' and trashed=false`,
+                    fields: 'files(id, name)',
+                    supportsAllDrives: true,
+                });
+                presentacionFolder = res.data.files?.[0];
+            }
+            if (!presupuestoFolder) {
+                 const res = await drive.files.list({
+                    q: `'${motherFolderId}' in parents and name contains 'PRESUPUESTO' and trashed=false`,
+                    fields: 'files(id, name)',
+                    supportsAllDrives: true,
+                });
+                presupuestoFolder = res.data.files?.[0];
+            }
+        }
 
         if (!presentacionFolder || !presupuestoFolder) {
             return { error: 'Standard subfolders not found in mother folder' };

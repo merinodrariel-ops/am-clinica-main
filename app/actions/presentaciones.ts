@@ -97,6 +97,7 @@ async function syncPatientPresentationsForPatient(patient: PatientBase): Promise
         for (const item of motherContents.files || []) {
             const isFolder = item.mimeType === 'application/vnd.google-apps.folder';
             if (isFolder && item.id && item.id !== folderSetup.presentationFolderId) {
+                if (item.name?.toLowerCase().includes('presupuesto')) continue;
                 sourceFolderIds.add(item.id);
             }
         }
@@ -295,18 +296,18 @@ export async function resolvePatientPresentationLinkAction(patientId: string): P
 
         const syncResult = await syncPatientPresentationsForPatient(patient as PatientBase);
 
-        const { data: latestPresentation, error: latestError } = await supabase
+        const { data: latestPresentations, error: latestError } = await supabase
             .from('paciente_presentaciones')
-            .select('drive_web_view_link')
+            .select('drive_web_view_link, drive_name')
             .eq('paciente_id', patientId)
             .eq('is_deleted', false)
             .in('drive_mime_type', PRESENTATION_MIME_TYPES)
-            .order('drive_created_time', { ascending: false, nullsFirst: false })
-            .limit(1)
-            .maybeSingle();
+            .order('drive_created_time', { ascending: false, nullsFirst: false });
 
-        if (!latestError && latestPresentation?.drive_web_view_link) {
-            const resolvedSlidesUrl = latestPresentation.drive_web_view_link;
+        if (!latestError && latestPresentations && latestPresentations.length > 0) {
+            const targetPres = latestPresentations.find(p => !p.drive_name?.toLowerCase().includes('presupuesto')) || latestPresentations[0];
+            const resolvedSlidesUrl = targetPres.drive_web_view_link;
+            
             await supabase
                 .from('pacientes')
                 .update({ link_google_slides: resolvedSlidesUrl })
