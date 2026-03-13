@@ -124,6 +124,16 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         }
     }, [isOpen, initialData, initialDate]);
 
+    useEffect(() => {
+        if (!initialData?.id) return;
+        if (!doctorId || doctorSearch.trim().length > 0) return;
+
+        const selectedDoctor = doctors.find((doc) => doc.id === doctorId);
+        if (selectedDoctor) {
+            setDoctorSearch(selectedDoctor.full_name);
+        }
+    }, [initialData?.id, doctorId, doctorSearch, doctors]);
+
     // Search Patients Debounce
     useEffect(() => {
         const timeoutId = setTimeout(async () => {

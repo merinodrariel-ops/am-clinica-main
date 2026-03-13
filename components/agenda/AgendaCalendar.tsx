@@ -13,11 +13,11 @@ import type {
     EventInput,
     EventSourceFuncArg,
 } from '@fullcalendar/core';
-import { getAppointments, updateAppointment, getDoctors } from '@/app/actions/agenda';
+import { getAppointments, updateAppointment, deleteAppointment, getDoctors } from '@/app/actions/agenda';
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff } from 'lucide-react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2 } from 'lucide-react';
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -192,12 +192,15 @@ export default function AgendaCalendar() {
     const handleQuickStatusChange = async (appointmentId: string, newStatus: string) => {
         setUpdatingStatus(true);
         try {
-            await updateAppointment(appointmentId, { status: newStatus });
+            const result = await updateAppointment(appointmentId, { status: newStatus });
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo actualizar el estado');
+            }
             setQuickPopup(null);
             refreshCalendar();
             toast.success('Estado actualizado');
-        } catch {
-            toast.error('Error al actualizar');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Error al actualizar');
         } finally {
             setUpdatingStatus(false);
         }
@@ -660,14 +663,17 @@ export default function AgendaCalendar() {
                                 onClick={async () => {
                                     setIsNotifying(true);
                                     try {
-                                        await updateAppointment(dropConfirm.eventId, {
+                                        const result = await updateAppointment(dropConfirm.eventId, {
                                             start_time: dropConfirm.newStart.toISOString(),
                                             end_time: dropConfirm.newEnd.toISOString(),
                                         });
+                                        if (!result.success) {
+                                            throw new Error(result.error || 'No se pudo reprogramar el turno');
+                                        }
                                         toast.success('Turno reprogramado exitosamente');
                                         setDropConfirm(null);
                                     } catch (err) {
-                                        toast.error('Error al reprogramar');
+                                        toast.error(err instanceof Error ? err.message : 'Error al reprogramar');
                                         dropConfirm.arg.revert();
                                         setDropConfirm(null);
                                     } finally {
@@ -683,14 +689,17 @@ export default function AgendaCalendar() {
                                 onClick={async () => {
                                     setIsNotifying(true);
                                     try {
-                                        await updateAppointment(dropConfirm.eventId, {
+                                        const result = await updateAppointment(dropConfirm.eventId, {
                                             start_time: dropConfirm.newStart.toISOString(),
                                             end_time: dropConfirm.newEnd.toISOString(),
                                         });
+                                        if (!result.success) {
+                                            throw new Error(result.error || 'No se pudo reprogramar el turno');
+                                        }
                                         toast.success('Turno reprogramado. Se enviará WhatsApp al paciente.');
                                         setDropConfirm(null);
                                     } catch (err) {
-                                        toast.error('Error al reprogramar');
+                                        toast.error(err instanceof Error ? err.message : 'Error al reprogramar');
                                         dropConfirm.arg.revert();
                                         setDropConfirm(null);
                                     } finally {
@@ -778,14 +787,41 @@ export default function AgendaCalendar() {
                         </div>
 
                         {/* Rich Quick Actions */}
-                        <div className="px-3 pb-3 grid grid-cols-4 gap-2">
+                        <div className="px-3 pb-3 grid grid-cols-5 gap-2">
                             <button
+                                disabled={!canEdit}
                                 onClick={() => openFullModal(quickPopup.fullData)}
                                 title="Editar"
-                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 rounded-xl transition-colors"
+                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 rounded-xl transition-colors disabled:opacity-50"
                             >
                                 <Edit2 size={16} />
                                 Editar
+                            </button>
+
+                            <button
+                                disabled={!canEdit || updatingStatus}
+                                onClick={async () => {
+                                    if (!confirm('¿Eliminar este turno? Esta acción no se puede deshacer.')) return;
+                                    setUpdatingStatus(true);
+                                    try {
+                                        const result = await deleteAppointment(quickPopup.appointmentId);
+                                        if (!result.success) {
+                                            throw new Error(result.error || 'No se pudo eliminar el turno');
+                                        }
+                                        toast.success('Turno eliminado');
+                                        setQuickPopup(null);
+                                        refreshCalendar();
+                                    } catch (error) {
+                                        toast.error(error instanceof Error ? error.message : 'Error al eliminar turno');
+                                    } finally {
+                                        setUpdatingStatus(false);
+                                    }
+                                }}
+                                title="Eliminar turno"
+                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 rounded-xl transition-colors disabled:opacity-50"
+                            >
+                                <Trash2 size={16} />
+                                Borrar
                             </button>
 
                             <button
