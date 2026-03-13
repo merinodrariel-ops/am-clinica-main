@@ -129,7 +129,7 @@ export default function AgendaCalendar() {
     const [voiceOpen, setVoiceOpen] = useState(false);
     const [dropConfirm, setDropConfirm] = useState<DropConfirmData | null>(null);
     const [isNotifying, setIsNotifying] = useState(false);
-    const { categoria: role } = useAuth();
+    const { canEdit: canEditModule } = useAuth();
     const router = useRouter();
 
     // Load doctors for filter bar
@@ -374,7 +374,7 @@ export default function AgendaCalendar() {
         });
     };
 
-    const canEdit = ['owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo', 'recaptacion'].includes(role || '');
+    const canEdit = canEditModule('turnos');
 
     return (
         <div className="h-full bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
