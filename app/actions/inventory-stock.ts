@@ -24,6 +24,8 @@ export interface StockMovementRecord {
     motivo: string | null;
     usuario: string; // email in the new schema
     created_at: string;
+    paciente_id?: string | null;
+    paciente_nombre?: string | null;
     item: {
         id: string;
         nombre: string;
@@ -311,6 +313,8 @@ export async function registerInventoryEgress(input: {
     qty: number;
     note?: string;
     deviceInfo?: DeviceInfo;
+    pacienteId?: string;
+    pacienteNombre?: string;
 }) {
     const qty = Number(input.qty || 0);
     if (!input.productId || qty <= 0) {
@@ -346,6 +350,8 @@ export async function registerInventoryEgress(input: {
             cantidad: qty,
             motivo: (input.note || '').trim() || 'Salida manual',
             usuario: user.email,
+            paciente_id: input.pacienteId || null,
+            paciente_nombre: input.pacienteNombre || null,
         })
         .select('id')
         .single();
@@ -360,5 +366,45 @@ export async function registerInventoryEgress(input: {
     return {
         success: true,
         movementId: inserted.id,
+    };
+}
+
+export interface PatientMaterialRecord {
+    id: string;
+    created_at: string;
+    tipo_movimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE';
+    cantidad: number;
+    motivo: string | null;
+    usuario: string;
+    item: {
+        id: string;
+        nombre: string;
+        unidad_medida: string;
+        categoria: string;
+        area: string | null;
+        descripcion: string | null;
+    } | null;
+}
+
+export async function getPatientInventoryMaterials(
+    pacienteId: string
+): Promise<{ data: PatientMaterialRecord[]; error?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: [], error: 'No autenticado' };
+
+    const { data, error } = await supabase
+        .from('inventario_movimientos')
+        .select('id, created_at, tipo_movimiento, cantidad, motivo, usuario, item:inventario_items(id, nombre, unidad_medida, categoria, area, descripcion)')
+        .eq('paciente_id', pacienteId)
+        .order('created_at', { ascending: false });
+
+    if (error) return { data: [], error: error.message };
+    return {
+        data: (data || []).map((row: any) => ({
+            ...row,
+            item: Array.isArray(row.item) ? row.item[0] || null : row.item,
+            cantidad: Number(row.cantidad || 0),
+        })) as PatientMaterialRecord[],
     };
 }

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { X, ArrowUpCircle, ArrowDownCircle, Loader2, Save, MessageSquare } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, ArrowUpCircle, ArrowDownCircle, Loader2, Save, MessageSquare, Search, UserCheck } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import MoneyInput from '@/components/ui/MoneyInput';
+import { createClient } from '@/utils/supabase/client';
 import { registerInventoryIngress, registerInventoryEgress } from '@/app/actions/inventory-stock';
 
 interface Item {
@@ -12,6 +13,13 @@ interface Item {
     nombre: string;
     stock_actual: number;
     unidad_medida: string;
+}
+
+interface PatientResult {
+    id_paciente: string;
+    nombre: string;
+    apellido: string;
+    documento: string | null;
 }
 
 interface MovimientoStockFormProps {
@@ -27,7 +35,48 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
     const [saving, setSaving] = useState(false);
     const [cantidad, setCantidad] = useState(0);
     const [motivo, setMotivo] = useState('');
-    const [error, setError] = useState<string | null>(null); // Error state
+    const [error, setError] = useState<string | null>(null);
+
+    // Patient autocomplete (SALIDA only)
+    const [patientQuery, setPatientQuery] = useState('');
+    const [patientResults, setPatientResults] = useState<PatientResult[]>([]);
+    const [patientSearching, setPatientSearching] = useState(false);
+    const [selectedPatient, setSelectedPatient] = useState<PatientResult | null>(null);
+    const patientDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Debounced patient search
+    useEffect(() => {
+        if (tipo !== 'SALIDA' || selectedPatient || patientQuery.length < 2) {
+            setPatientResults([]);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setPatientSearching(true);
+            try {
+                const supabase = createClient();
+                const { data } = await supabase
+                    .from('pacientes')
+                    .select('id_paciente, nombre, apellido, documento')
+                    .eq('is_deleted', false)
+                    .or(`nombre.ilike.%${patientQuery}%,apellido.ilike.%${patientQuery}%,documento.ilike.%${patientQuery}%`)
+                    .order('apellido', { ascending: true })
+                    .limit(8);
+                setPatientResults(data || []);
+            } finally {
+                setPatientSearching(false);
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [patientQuery, selectedPatient, tipo]);
+
+    // Reset patient state when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setSelectedPatient(null);
+            setPatientQuery('');
+            setPatientResults([]);
+        }
+    }, [isOpen]);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -41,21 +90,30 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
         setSaving(true);
         setError(null);
         try {
-            const fn = tipo === 'ENTRADA' ? registerInventoryIngress : registerInventoryEgress;
-            const result = await fn({
-                productId: item.id,
-                qty: cantidad,
-                note: motivo || (tipo === 'ENTRADA' ? 'Carga de stock' : 'Consumo / Salida'),
-            });
-
-            if (!result.success) {
-                throw new Error(result.error);
+            if (tipo === 'ENTRADA') {
+                const result = await registerInventoryIngress({
+                    productId: item.id,
+                    qty: cantidad,
+                    note: motivo || 'Carga de stock',
+                });
+                if (!result.success) throw new Error(result.error);
+            } else {
+                const result = await registerInventoryEgress({
+                    productId: item.id,
+                    qty: cantidad,
+                    note: motivo || 'Consumo / Salida',
+                    pacienteId: selectedPatient?.id_paciente,
+                    pacienteNombre: selectedPatient ? `${selectedPatient.apellido}, ${selectedPatient.nombre}` : undefined,
+                });
+                if (!result.success) throw new Error(result.error);
             }
 
             onSuccess();
             onClose();
             setCantidad(0);
             setMotivo('');
+            setSelectedPatient(null);
+            setPatientQuery('');
         } catch (error: unknown) {
             console.error('Error saving movement:', error);
             const message = error instanceof Error ? error.message : 'Error al registrar el movimiento';
@@ -128,6 +186,70 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
                             )}
                         />
                     </div>
+
+                    {/* Patient association — SALIDA only */}
+                    {isSalida && (
+                        <div className="space-y-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                Paciente <span className="text-gray-400 font-normal text-xs">(opcional)</span>
+                            </label>
+                            <div className="relative" ref={patientDropdownRef}>
+                                {selectedPatient ? (
+                                    <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                                        <UserCheck size={18} className="text-red-500 shrink-0" />
+                                        <span className="flex-1 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            {selectedPatient.apellido}, {selectedPatient.nombre}
+                                            {selectedPatient.documento && (
+                                                <span className="ml-2 text-xs text-gray-500">DNI {selectedPatient.documento}</span>
+                                            )}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSelectedPatient(null); setPatientQuery(''); }}
+                                            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                                        >
+                                            <X size={14} className="text-red-400" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                        <input
+                                            type="text"
+                                            value={patientQuery}
+                                            onChange={(e) => setPatientQuery(e.target.value)}
+                                            placeholder="Buscar por nombre o DNI..."
+                                            className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all text-sm"
+                                        />
+                                        {patientSearching && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 p-3 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 flex justify-center z-20">
+                                                <Loader2 className="animate-spin text-red-500" size={18} />
+                                            </div>
+                                        )}
+                                        {patientResults.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-150">
+                                                {patientResults.map((p) => (
+                                                    <button
+                                                        key={p.id_paciente}
+                                                        type="button"
+                                                        onClick={() => { setSelectedPatient(p); setPatientQuery(''); setPatientResults([]); }}
+                                                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-50 dark:border-gray-700 last:border-0"
+                                                    >
+                                                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                                            {p.apellido}, {p.nombre}
+                                                        </p>
+                                                        {p.documento && (
+                                                            <p className="text-xs text-gray-500">DNI {p.documento}</p>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="space-y-2">
                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Motivo / Nota</label>

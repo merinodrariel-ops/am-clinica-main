@@ -26,6 +26,7 @@ import {
     Send,
     Loader2,
     FolderOpen,
+    Package,
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
@@ -44,6 +45,7 @@ import PatientCommandCenter from './PatientCommandCenter';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
+import { getPatientInventoryMaterials, type PatientMaterialRecord } from '@/app/actions/inventory-stock';
 import { calculateFinancingBreakdown, DEFAULT_MONTHLY_INTEREST_PCT } from '@/lib/financial-engine';
 
 interface Movement {
@@ -104,6 +106,7 @@ const TABS = [
     { id: 'smile_design', label: 'Smile Design ✨', icon: Sparkles },
     { id: 'diseno', label: 'Diseño Digital', icon: Sparkles },
     { id: 'portal', label: 'Portal 360', icon: Sparkles },
+    { id: 'materiales', label: 'Materiales', icon: Package },
 ];
 
 // Payment-related tabs hidden from restricted clinical/ops roles
@@ -126,6 +129,22 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const [activeTab, setActiveTab] = useState(
         hidePaymentTabs && PAYMENT_TABS.has(defaultTab) ? 'datos' : defaultTab
     );
+    // Materiales state
+    const [materiales, setMateriales] = useState<PatientMaterialRecord[]>([]);
+    const [materialesLoading, setMaterialesLoading] = useState(false);
+    const [materialesLoaded, setMaterialesLoaded] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'materiales' && !materialesLoaded) {
+            setMaterialesLoading(true);
+            getPatientInventoryMaterials(patient.id_paciente).then(({ data }) => {
+                setMateriales(data);
+                setMaterialesLoaded(true);
+                setMaterialesLoading(false);
+            });
+        }
+    }, [activeTab, materialesLoaded, patient.id_paciente]);
+
     // Portal magic link state
     const [sendingPortalLink, setSendingPortalLink] = useState(false);
     const [portalLinkSent, setPortalLinkSent] = useState(false);
@@ -1002,6 +1021,52 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 patientId={patient.id_paciente}
                                 patientName={`${patient.nombre} ${patient.apellido}`}
                             />
+                        )}
+
+                        {/* Tab: Materiales de Laboratorio */}
+                        {activeTab === 'materiales' && (
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
+                                <div className="flex items-center gap-3 mb-5">
+                                    <Package size={20} className="text-violet-500" />
+                                    <h3 className="font-bold text-gray-900 dark:text-white text-lg">Materiales utilizados</h3>
+                                </div>
+                                {materialesLoading ? (
+                                    <div className="flex justify-center py-10">
+                                        <Loader2 className="animate-spin text-violet-500" size={24} />
+                                    </div>
+                                ) : materiales.length === 0 ? (
+                                    <p className="text-center text-gray-400 py-10 text-sm">No hay materiales registrados para este paciente.</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {materiales.map((m) => {
+                                            const [y, mo, d] = m.created_at.split('T')[0].split('-').map(Number);
+                                            const fecha = new Date(y, mo - 1, d).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+                                            return (
+                                                <div key={m.id} className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                                    <div className="h-9 w-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                                                        <Package size={16} className="text-violet-600 dark:text-violet-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm truncate">
+                                                            {m.item?.nombre ?? 'Material'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-0.5">
+                                                            {m.cantidad} {m.item?.unidad_medida ?? 'u.'} — {fecha}
+                                                        </p>
+                                                        {m.motivo && (
+                                                            <p className="text-xs text-gray-400 mt-0.5 truncate">{m.motivo}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-xs font-medium text-gray-400">{m.item?.categoria}</span>
+                                                        <p className="text-xs text-gray-400 mt-0.5">{m.usuario?.split('@')[0]}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                     </motion.div>
