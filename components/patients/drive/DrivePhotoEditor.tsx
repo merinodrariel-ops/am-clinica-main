@@ -15,18 +15,18 @@ export default function DrivePhotoEditor({ file, onClose }: DrivePhotoEditorProp
     const imgRef = useRef<HTMLImageElement>(null);
     const objectUrlRef = useRef<string | null>(null);
     const [imageUrl, setImageUrl] = useState(`/api/drive/file/${file.id}`);
-
-    useEffect(() => {
-        return () => {
-            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-        };
-    }, []);
     const [rotation, setRotation] = useState(0);
     const [brightness, setBrightness] = useState(100);
     const [bgProcessing, setBgProcessing] = useState(false);
     const [bgDone, setBgDone] = useState(false);
     const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        };
+    }, []);
 
     async function handleRemoveBackground() {
         setBgProcessing(true);
