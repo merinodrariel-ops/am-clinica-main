@@ -432,11 +432,14 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                 : 'border-gray-200 dark:border-white/10'
                                 }`}
                         >
-                            {/* Folder header */}
-                            <button
-                                onClick={() => toggleFolder(folder.id)}
-                                disabled={isLoading}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors disabled:opacity-70"
+                            {/* Folder header — div instead of button to allow nested DriveUploadButton */}
+                            <div
+                                role="button"
+                                tabIndex={isLoading ? -1 : 0}
+                                aria-expanded={isOpen}
+                                onClick={() => !isLoading && toggleFolder(folder.id)}
+                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); !isLoading && toggleFolder(folder.id); } }}
+                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer select-none${isLoading ? ' opacity-70 pointer-events-none' : ''}`}
                             >
                                 {isLoading ? (
                                     <Loader2 size={16} className="text-blue-400 animate-spin" />
@@ -470,7 +473,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                         />
                                     </span>
                                 )}
-                            </button>
+                            </div>
 
                             {/* Folder contents */}
                             <AnimatePresence>
