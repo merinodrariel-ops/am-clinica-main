@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, ExternalLink } from 'lucide-react';
+import { X, Download, ExternalLink, Pencil } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 
@@ -13,6 +14,8 @@ const STLViewer = dynamic(() => import('@/components/portal-paciente/STLViewer')
         </div>
     ),
 });
+
+const DrivePhotoEditor = dynamic(() => import('./DrivePhotoEditor'), { ssr: false });
 
 interface DrivePreviewModalProps {
     file: DriveFile | null;
@@ -34,6 +37,12 @@ function get3DFormat(file: DriveFile): 'stl' | 'ply' {
 }
 
 export default function DrivePreviewModal({ file, onClose }: DrivePreviewModalProps) {
+    const [editMode, setEditMode] = useState(false);
+
+    useEffect(() => {
+        if (!file) setEditMode(false);
+    }, [file]);
+
     if (!file) return null;
 
     const previewType = getPreviewType(file);
@@ -63,6 +72,15 @@ export default function DrivePreviewModal({ file, onClose }: DrivePreviewModalPr
                             )}
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
+                            {previewType === 'image' && (
+                                <button
+                                    onClick={() => setEditMode(true)}
+                                    className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors flex items-center gap-1.5"
+                                >
+                                    <Pencil size={14} />
+                                    <span className="hidden sm:inline">Editar foto</span>
+                                </button>
+                            )}
                             <a
                                 href={file.webViewLink}
                                 target="_blank"
@@ -122,6 +140,12 @@ export default function DrivePreviewModal({ file, onClose }: DrivePreviewModalPr
                         )}
                     </div>
                 </motion.div>
+            )}
+            {editMode && file && (
+                <DrivePhotoEditor
+                    file={file}
+                    onClose={() => setEditMode(false)}
+                />
             )}
         </AnimatePresence>
     );
