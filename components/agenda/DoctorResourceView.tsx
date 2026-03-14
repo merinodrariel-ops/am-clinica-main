@@ -50,7 +50,7 @@ interface DoctorResourceViewProps {
 const START_HOUR  = 7.5;  // 07:30
 const END_HOUR    = 21;   // 21:00
 const SLOT_MINS   = 15;
-const SLOT_HEIGHT = 40;   // px per 15-min slot
+const SLOT_HEIGHT = 28;   // px per 15-min slot
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MINS;
 const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
 

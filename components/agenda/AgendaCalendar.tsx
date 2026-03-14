@@ -75,8 +75,6 @@ interface QuickPopup {
     doctorName: string;
     startTime: string;
     currentStatus: string;
-    x: number;
-    y: number;
     fullData: AppointmentModalData;
 }
 
@@ -172,11 +170,6 @@ export default function AgendaCalendar() {
             doctor: props.doctor
         };
 
-        // Calcular posición del popup cerca del evento
-        const rect = (arg.el as HTMLElement).getBoundingClientRect();
-        const x = Math.min(rect.left, window.innerWidth - 320);
-        const y = Math.min(rect.bottom + 8, window.innerHeight - 280);
-
         setQuickPopup({
             appointmentId: event.id,
             title: event.title,
@@ -184,7 +177,6 @@ export default function AgendaCalendar() {
             doctorName: props.doctor?.full_name || '',
             startTime: safeStart.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }),
             currentStatus: props.status || 'confirmed',
-            x, y,
             fullData,
         });
     };
@@ -383,7 +375,7 @@ export default function AgendaCalendar() {
                 .dark .fc { --fc-border-color: #1f2937; --fc-page-bg-color: #111827; }
                 .fc-col-header-cell-cushion { padding:12px 0!important; font-size:.85rem; font-weight:600; color:#4b5563; text-transform:uppercase; letter-spacing:.05em; }
                 .dark .fc-col-header-cell-cushion { color:#9ca3af; }
-                .fc-timegrid-slot { height:3rem!important; }
+                .fc-timegrid-slot { height:2rem!important; }
                 .fc-timegrid-slot-label-cushion { font-size:.72rem; color:#9ca3af; font-weight:500; }
                 .fc-event { border-radius:8px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:2px 6px; font-size:.82rem; font-weight:600; }
                 .premium-event { transition:all .2s ease; }
@@ -555,8 +547,8 @@ export default function AgendaCalendar() {
                         slotDuration="00:15:00"
                         slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                         eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-                        eventMinHeight={44}
-                        eventShortHeight={34}
+                        eventMinHeight={28}
+                        eventShortHeight={24}
                         expandRows
                         stickyHeaderDates
                         nowIndicator
@@ -721,13 +713,12 @@ export default function AgendaCalendar() {
                 <>
                     {/* Backdrop */}
                     <div
-                        className="fixed inset-0 z-40"
+                        className="fixed inset-0 z-40 bg-black/20 md:bg-transparent"
                         onClick={() => setQuickPopup(null)}
                     />
-                    {/* Popup */}
+                    {/* Side panel (desktop) / bottom sheet (mobile) */}
                     <div
-                        className="fixed z-50 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
-                        style={{ left: quickPopup.x, top: quickPopup.y }}
+                        className="fixed z-50 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col left-2 right-2 bottom-2 max-h-[calc(100vh-1rem)] md:w-80 md:left-auto md:right-4 md:top-24 md:bottom-auto md:max-h-[calc(100vh-7rem)]"
                     >
                         {/* Header */}
                         <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800">
@@ -749,6 +740,8 @@ export default function AgendaCalendar() {
                                 </button>
                             </div>
                         </div>
+
+                        <div className="flex-1 overflow-y-auto">
 
                         {/* Notes / Purpose */}
                         {quickPopup.fullData.notes && (
@@ -911,6 +904,7 @@ export default function AgendaCalendar() {
                                     </div>
                                 </div>
                             )}
+                        </div>
                         </div>
                     </div>
                 </>
