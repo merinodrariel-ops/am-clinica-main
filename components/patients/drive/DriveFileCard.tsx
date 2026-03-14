@@ -11,6 +11,7 @@ import {
     Play,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
+import Mini3DPreview from './Mini3DPreview';
 
 interface DriveFileCardProps {
     file: DriveFile;
@@ -95,7 +96,7 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
         >
             {/* Thumbnail or icon */}
             <div className="aspect-square rounded-lg overflow-hidden mb-2 flex items-center justify-center bg-gray-50 dark:bg-white/5 relative">
-                {category === 'image' && file.thumbnailLink ? (
+                {(category === 'image' || category === 'pdf' || category === 'google-doc') && file.thumbnailLink ? (
                     <img
                         src={file.thumbnailLink}
                         alt={file.name}
@@ -122,6 +123,11 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
                             </div>
                         </div>
                     </div>
+                ) : category === '3d' ? (
+                    <Mini3DPreview
+                        fileId={file.id}
+                        format={file.name.toLowerCase().endsWith('.ply') ? 'ply' : 'stl'}
+                    />
                 ) : (
                     <div className={`h-12 w-12 rounded-xl ${colorClass} flex items-center justify-center`}>
                         <Icon size={22} />
