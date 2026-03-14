@@ -1,0 +1,128 @@
+[dotenv@17.3.1] injecting env (41) from .env.local -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+--- DB DIAGNOSTIC ---
+Patients Found: [
+  {
+    "id_paciente": "b4cecd2b-9138-46e3-8525-84a608decf4b",
+    "id_sede": 1,
+    "nombre": "Analia",
+    "apellido": "Kobal",
+    "documento": null,
+    "fecha_nacimiento": null,
+    "email": "",
+    "whatsapp": "",
+    "fecha_alta": "2025-12-27T03:19:40.855+00:00",
+    "etiquetas": [
+      "Importado Google"
+    ],
+    "link_historia_clinica": "https://drive.google.com/drive/folders/17JwTp5dkAGaEW6E-AZlGa4hzz9uyBDSm",
+    "link_google_slides": null,
+    "presupuesto_total": 0,
+    "whatsapp_pais_code": "+54",
+    "whatsapp_numero": null,
+    "email_local": null,
+    "email_dominio": "gmail.com",
+    "ciudad": null,
+    "zona_barrio": null,
+    "direccion": null,
+    "observaciones_generales": null,
+    "estado_paciente": "Activo",
+    "origen_registro": "Recepción",
+    "consentimiento_comunicacion": true,
+    "created_by": null,
+    "updated_at": "2026-01-20T09:16:10.520415+00:00",
+    "updated_by": null,
+    "is_deleted": true,
+    "deleted_at": "2026-02-19T10:34:54.169+00:00",
+    "deleted_by": "Admin",
+    "delete_reason": "Solicitado por usuario (Test)",
+    "welcome_email_sent": false,
+    "financ_estado": "inactivo",
+    "financ_monto_total": 0,
+    "financ_cuotas_total": 0,
+    "referencia_origen": null,
+    "primera_consulta_fecha": null,
+    "full_name": "Analia Kobal",
+    "cuit": null,
+    "como_nos_conocio": null
+  },
+  {
+    "id_paciente": "3453ef3c-0f7b-405c-a025-70178404d91f",
+    "id_sede": 1,
+    "nombre": "Ana Lia",
+    "apellido": "Kobal",
+    "documento": "12126596",
+    "fecha_nacimiento": null,
+    "email": "analiakobal@gmail.com",
+    "whatsapp": "3455292572",
+    "fecha_alta": "2026-02-06T08:38:07.391729+00:00",
+    "etiquetas": [],
+    "link_historia_clinica": "https://drive.google.com/drive/folders/1Iq5jhb5P1990e_0vH5H8s3dZKSVeZ-Dm",
+    "link_google_slides": "https://docs.google.com/presentation/d/1VV6HcKdogj2NDFktQMXP9o-MRMgkdKuQGlZ4ME6ZVj8/edit?usp=drivesdk",
+    "presupuesto_total": 0,
+    "whatsapp_pais_code": "+54",
+    "whatsapp_numero": null,
+    "email_local": null,
+    "email_dominio": "gmail.com",
+    "ciudad": "--- OTRA ZONA / CIUDAD ---",
+    "zona_barrio": null,
+    "direccion": null,
+    "observaciones_generales": "Motivo: Cambio de coronas | Referencia: Recomendación de un amigo/familiar",
+    "estado_paciente": "Activo",
+    "origen_registro": "notion_sync",
+    "consentimiento_comunicacion": true,
+    "created_by": null,
+    "updated_at": "2026-02-06T08:38:07.391729+00:00",
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "delete_reason": null,
+    "welcome_email_sent": false,
+    "financ_estado": "inactivo",
+    "financ_monto_total": 0,
+    "financ_cuotas_total": 0,
+    "referencia_origen": "Recomendación de un amigo/familiar",
+    "primera_consulta_fecha": null,
+    "full_name": "Ana Lia Kobal",
+    "cuit": null,
+    "como_nos_conocio": null
+  }
+]
+Submissions error or not found - checking admission_leads
+Admission Leads Found: null
+
+--- DRIVE DIAGNOSTIC ---
+Listing files in folder: 17JwTp5dkAGaEW6E-AZlGa4hzz9uyBDSm
+Files in Drive Folder:
+[
+  {
+    "id": "1Cj7HqihicP7BDh1guTJBhFLL8HKyehIF",
+    "name": "[FOTO & VIDEO] KOBAL, Analia",
+    "mimeType": "application/vnd.google-apps.folder",
+    "version": "4",
+    "createdTime": "2026-02-27T10:20:18.994Z"
+  },
+  {
+    "id": "1NVEAys3KetZpQpeL1mn6YYbULnuqkc4K",
+    "name": "[PRESENTACION] KOBAL, Analia",
+    "mimeType": "application/vnd.google-apps.folder",
+    "version": "4",
+    "createdTime": "2026-02-27T10:20:20.013Z"
+  },
+  {
+    "id": "187-N7A9_Heq21N1y1N4l89YCo1rAixPG",
+    "name": "[PRESUPUESTO] KOBAL, Analia",
+    "mimeType": "application/vnd.google-apps.folder",
+    "version": "4",
+    "createdTime": "2026-02-27T10:20:21.038Z"
+  }
+]
+
+Contents of subfolder: [FOTO & VIDEO] KOBAL, Analia (1Cj7HqihicP7BDh1guTJBhFLL8HKyehIF)
+[]
+
+Contents of subfolder: [PRESENTACION] KOBAL, Analia (1NVEAys3KetZpQpeL1mn6YYbULnuqkc4K)
+[]
+
+Contents of subfolder: [PRESUPUESTO] KOBAL, Analia (187-N7A9_Heq21N1y1N4l89YCo1rAixPG)
+[]
