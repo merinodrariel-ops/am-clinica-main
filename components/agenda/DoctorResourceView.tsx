@@ -4,7 +4,7 @@
  * DoctorResourceView — Custom Multi-Doctor Column View
  *
  * Renders a day timeline where each doctor occupies a column.
- * Time slots on Y-axis (7:30 – 21:00, 15-min increments).
+ * Time slots on Y-axis (7:30 – 21:00, 60-min increments).
  * Events positioned absolutely within each column.
  * No FullCalendar Premium required.
  */
@@ -47,10 +47,10 @@ interface DoctorResourceViewProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const START_HOUR  = 7.5;  // 07:30
-const END_HOUR    = 21;   // 21:00
-const SLOT_MINS   = 15;
-const SLOT_HEIGHT = 28;   // px per 15-min slot
+const START_HOUR = 7.5; // 07:30
+const END_HOUR = 21; // 21:00
+const SLOT_MINS = 60;
+const SLOT_HEIGHT = 22; // px per 60-min slot
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MINS;
 const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
 
@@ -59,10 +59,10 @@ function minutesSinceMidnight(isoStr: string): number {
     return d.getHours() * 60 + d.getMinutes();
 }
 
-function topPercent(isoStr: string): number {
+function topOffsetPx(isoStr: string): number {
     const mins = minutesSinceMidnight(isoStr);
     const startMins = START_HOUR * 60;
-    return Math.max(0, mins - startMins);
+    return Math.max(0, ((mins - startMins) * SLOT_HEIGHT) / SLOT_MINS);
 }
 
 function durationMins(start: string, end: string): number {
@@ -145,7 +145,7 @@ function DoctorColumn({
     const nowRef = useRef<HTMLDivElement>(null);
     const isToday = new Date().toDateString() === date.toDateString();
     const nowMins = minutesSinceMidnight(new Date().toISOString());
-    const nowTop  = Math.max(0, (nowMins - START_HOUR * 60));
+    const nowTop = Math.max(0, ((nowMins - START_HOUR * 60) * SLOT_HEIGHT) / SLOT_MINS);
 
     // Handle click on empty slot
     const handleColumnClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -155,7 +155,7 @@ function DoctorColumn({
         const slotIndex = Math.floor(y / SLOT_HEIGHT);
         const startDate = slotToTime(slotIndex);
         startDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
-        const endDate = new Date(startDate.getTime() + 30 * 60000);
+        const endDate = new Date(startDate.getTime() + 60 * 60000);
         onSlotClick(startDate, endDate, doctor.id);
     };
 
@@ -165,15 +165,11 @@ function DoctorColumn({
             style={{ height: TOTAL_HEIGHT }}
             onClick={handleColumnClick}
         >
-            {/* Grid lines every 15 min */}
+            {/* Grid lines every 60 min */}
             {Array.from({ length: TOTAL_SLOTS }, (_, i) => (
                 <div
                     key={i}
-                    className={`absolute left-0 right-0 ${
-                        i % 4 === 0
-                            ? 'border-t border-gray-200 dark:border-gray-700'
-                            : 'border-t border-gray-100 dark:border-gray-800'
-                    }`}
+                    className="absolute left-0 right-0 border-t border-gray-200 dark:border-gray-700"
                     style={{ top: i * SLOT_HEIGHT }}
                 />
             ))}
@@ -192,9 +188,9 @@ function DoctorColumn({
 
             {/* Appointments */}
             {appointments.map(apt => {
-                const topPx     = topPercent(apt.start_time);
-                const heightPx  = Math.max(SLOT_HEIGHT, (durationMins(apt.start_time, apt.end_time) / SLOT_MINS) * SLOT_HEIGHT);
-                const isShort   = heightPx <= SLOT_HEIGHT;
+                const topPx = topOffsetPx(apt.start_time);
+                const heightPx = Math.max(SLOT_HEIGHT, (durationMins(apt.start_time, apt.end_time) / SLOT_MINS) * SLOT_HEIGHT);
+                const isShort = heightPx <= SLOT_HEIGHT;
 
                 return (
                     <div

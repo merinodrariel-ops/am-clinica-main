@@ -115,7 +115,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setTarifarioSearch('');
             const start = new Date(initialDate);
             const end = new Date(start);
-            end.setMinutes(end.getMinutes() + 30);
+            end.setMinutes(end.getMinutes() + 60);
             setStartTime(toDateTimeLocal(start));
             setEndTime(toDateTimeLocal(end));
             setStatus('confirmed');

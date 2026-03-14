@@ -375,7 +375,7 @@ export default function AgendaCalendar() {
                 .dark .fc { --fc-border-color: #1f2937; --fc-page-bg-color: #111827; }
                 .fc-col-header-cell-cushion { padding:12px 0!important; font-size:.85rem; font-weight:600; color:#4b5563; text-transform:uppercase; letter-spacing:.05em; }
                 .dark .fc-col-header-cell-cushion { color:#9ca3af; }
-                .fc-timegrid-slot { height:2rem!important; }
+                .fc-timegrid-slot { height:1.5rem!important; }
                 .fc-timegrid-slot-label-cushion { font-size:.72rem; color:#9ca3af; font-weight:500; }
                 .fc-event { border-radius:8px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:2px 6px; font-size:.82rem; font-weight:600; }
                 .premium-event { transition:all .2s ease; }
@@ -544,11 +544,13 @@ export default function AgendaCalendar() {
                         slotMaxTime="21:00:00"
                         scrollTime="12:00:00"
                         allDaySlot={false}
-                        slotDuration="00:15:00"
+                        slotDuration="01:00:00"
+                        slotLabelInterval="01:00:00"
+                        snapDuration="01:00:00"
                         slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                         eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-                        eventMinHeight={28}
-                        eventShortHeight={24}
+                        eventMinHeight={20}
+                        eventShortHeight={18}
                         expandRows
                         stickyHeaderDates
                         nowIndicator
