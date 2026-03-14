@@ -1,8 +1,9 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { X, Download, RotateCw, Sun, Wand2, Loader2, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 
 interface DrivePhotoEditorProps {
@@ -12,7 +13,14 @@ interface DrivePhotoEditorProps {
 
 export default function DrivePhotoEditor({ file, onClose }: DrivePhotoEditorProps) {
     const imgRef = useRef<HTMLImageElement>(null);
+    const objectUrlRef = useRef<string | null>(null);
     const [imageUrl, setImageUrl] = useState(`/api/drive/file/${file.id}`);
+
+    useEffect(() => {
+        return () => {
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        };
+    }, []);
     const [rotation, setRotation] = useState(0);
     const [brightness, setBrightness] = useState(100);
     const [bgProcessing, setBgProcessing] = useState(false);
@@ -28,10 +36,12 @@ export default function DrivePhotoEditor({ file, onClose }: DrivePhotoEditorProp
             const blob = await response.blob();
             const resultBlob = await removeBg(blob);
             const newUrl = URL.createObjectURL(resultBlob);
+            objectUrlRef.current = newUrl;
             setImageUrl(newUrl);
             setBgDone(true);
         } catch (err) {
             console.error('[bg-removal]', err);
+            toast.error('Error al remover fondo');
         } finally {
             setBgProcessing(false);
         }
@@ -78,6 +88,10 @@ export default function DrivePhotoEditor({ file, onClose }: DrivePhotoEditorProp
             return;
         }
 
+        // Note: completedCrop coords are in rendered (CSS) space. CSS rotation does not
+        // change img.width/img.height layout dimensions, so crops on rotated images may
+        // be slightly off if the rendered element is not square. handleRotate() resets
+        // completedCrop to prevent stale crop coordinates across rotations.
         const scaleX = outW / img.width;
         const scaleY = outH / img.height;
 
