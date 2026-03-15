@@ -493,21 +493,21 @@ export default function PhotoStudioModal({
                             </div>
                         )}
 
-                        {/* Bipupillar grid overlay — appears when rotating or manually toggled */}
-                        {(showGrid || rotation !== 0) && (
+                        {/* Bipupillar grid overlay — full grid when rotating/toggled; center crosshair also during pan */}
+                        {(showGrid || rotation !== 0 || isDragging || zoom > 1) && (
                             <svg
                                 className="absolute inset-0 w-full h-full pointer-events-none"
                                 xmlns="http://www.w3.org/2000/svg"
                             >
-                                {/* Rule-of-thirds verticals */}
-                                <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                                <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                                {/* Rule-of-thirds horizontals */}
-                                <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                                <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                                {/* Center horizontal — bipupillar reference line (gold, dashed) */}
+                                {/* Rule-of-thirds — only when grid is explicitly active */}
+                                {(showGrid || rotation !== 0) && (<>
+                                    <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                                    <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                                    <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                                    <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                                </>)}
+                                {/* Center crosshair — always visible when zoomed/panning or grid active */}
                                 <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(201,169,110,0.6)" strokeWidth="1" strokeDasharray="10 5" />
-                                {/* Center vertical */}
                                 <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(201,169,110,0.3)" strokeWidth="0.5" strokeDasharray="10 5" />
                             </svg>
                         )}
