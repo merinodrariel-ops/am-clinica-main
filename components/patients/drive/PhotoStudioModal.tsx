@@ -207,7 +207,9 @@ export default function PhotoStudioModal({
         if (e.touches.length === 2 && touchRef.current) {
             const newDist = getTouchDist(e.touches);
             const scale = newDist / touchRef.current.dist;
-            setZoom(Math.min(5, Math.max(1, touchRef.current.startZoom * scale)));
+            const next = Math.min(5, Math.max(1, touchRef.current.startZoom * scale));
+            if (next <= 1) { setPanX(0); setPanY(0); }
+            setZoom(next);
         }
     }
 
@@ -300,6 +302,8 @@ export default function PhotoStudioModal({
             a.download = `${baseName}_editada.${ext}`;
             a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        }).catch(() => {
+            toast.error('No se pudo generar el archivo para descargar');
         });
     }
 
@@ -484,7 +488,7 @@ export default function PhotoStudioModal({
 
                         {/* Zoom indicator badge */}
                         {zoom > 1 && (
-                            <div className="absolute bottom-3 right-3 px-2 py-1 rounded-md bg-black/50 text-white/70 text-xs font-mono pointer-events-none select-none">
+                            <div className="absolute bottom-3 right-3 z-10 px-2 py-1 rounded-md bg-black/50 text-white/70 text-xs font-mono pointer-events-none select-none">
                                 {Math.round(zoom * 100)}%
                             </div>
                         )}
