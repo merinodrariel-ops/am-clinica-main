@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
-    RotateCw, Save, ImageIcon,
+    RotateCw, Save, ImageIcon, Grid,
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -45,6 +45,7 @@ export default function PhotoStudioModal({
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
+    const [showGrid, setShowGrid] = useState(false);
 
     // Active file in the studio (may differ from initial file when user clicks thumbnails)
     const [activeFile, setActiveFile] = useState<DriveFile | null>(file);
@@ -90,6 +91,7 @@ export default function PhotoStudioModal({
         setZoom(1);
         setPanX(0);
         setPanY(0);
+        setShowGrid(false);
     }, []);
 
     // When initial file prop changes (shouldn't normally happen, but be safe)
@@ -486,6 +488,25 @@ export default function PhotoStudioModal({
                                 {Math.round(zoom * 100)}%
                             </div>
                         )}
+
+                        {/* Bipupillar grid overlay — appears when rotating or manually toggled */}
+                        {(showGrid || rotation !== 0) && (
+                            <svg
+                                className="absolute inset-0 w-full h-full pointer-events-none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                {/* Rule-of-thirds verticals */}
+                                <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                {/* Rule-of-thirds horizontals */}
+                                <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                {/* Center horizontal — bipupillar reference line (gold, dashed) */}
+                                <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(201,169,110,0.6)" strokeWidth="1" strokeDasharray="10 5" />
+                                {/* Center vertical */}
+                                <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(201,169,110,0.3)" strokeWidth="0.5" strokeDasharray="10 5" />
+                            </svg>
+                        )}
                     </div>
 
                     {/* Tools panel — right side on desktop */}
@@ -501,6 +522,8 @@ export default function PhotoStudioModal({
                                 resetEdits();
                                 setImageUrl(`/api/drive/file/${activeFile.id}`);
                             }}
+                            showGrid={showGrid}
+                            setShowGrid={setShowGrid}
                         />
                     </div>
                 </div>
@@ -638,6 +661,8 @@ interface ToolsPanelProps {
     bgColor: BgColor; setBgColor: (v: BgColor) => void;
     onRemoveBg: () => void;
     onReset: () => void;
+    showGrid: boolean;
+    setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 function ToolsPanel({
@@ -648,6 +673,7 @@ function ToolsPanel({
     bgColor, setBgColor,
     onRemoveBg,
     onReset,
+    showGrid, setShowGrid,
 }: ToolsPanelProps) {
     return (
         <>
@@ -678,6 +704,17 @@ function ToolsPanel({
                         Centrar
                     </button>
                 )}
+                <button
+                    onClick={() => setShowGrid(v => !v)}
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                        showGrid
+                            ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
+                            : 'bg-white/5 text-white/40 hover:text-white/60'
+                    }`}
+                >
+                    <Grid size={11} />
+                    Grilla
+                </button>
             </div>
 
             {/* Brightness */}
