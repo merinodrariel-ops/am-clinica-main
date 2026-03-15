@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X, ExternalLink, Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
@@ -64,8 +64,7 @@ export default function DrivePreviewModal({
 
     // Video / 3D → original minimal modal
     return (
-        <AnimatePresence>
-            <motion.div
+        <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -133,7 +132,6 @@ export default function DrivePreviewModal({
                         </div>
                     )}
                 </div>
-            </motion.div>
-        </AnimatePresence>
+        </motion.div>
     );
 }
