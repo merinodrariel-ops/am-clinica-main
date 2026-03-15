@@ -6,6 +6,8 @@ import {
     extractFolderIdFromUrl,
     ensureStandardPatientFolders,
     getFolderWebViewLink,
+    uploadFileToFolder,
+    deleteFromDrive,
 } from '@/lib/google-drive';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -183,6 +185,46 @@ export async function createPatientDriveFolderAction(
         }
 
         return { motherFolderUrl: motherFolderUrl || undefined };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+// ─── Photo Studio: save edited photo to Drive ───────────────────────────────
+
+/**
+ * Upload an edited photo blob (via FormData) to a specific Drive folder.
+ * The client sends a FormData with key "file" containing the Blob.
+ */
+export async function uploadEditedPhotoAction(
+    folderId: string,
+    fileName: string,
+    formData: FormData
+): Promise<{ fileId?: string; error?: string }> {
+    try {
+        const file = formData.get('file') as File | null;
+        if (!file) return { error: 'No file in FormData' };
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const result = await uploadFileToFolder(folderId, fileName, buffer, file.type || 'image/jpeg');
+
+        if (!result.success) return { error: result.error };
+        return { fileId: result.fileId };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Delete a file from Drive by ID (used for "replace original" in Photo Studio).
+ */
+export async function deleteDriveFileAction(
+    fileId: string
+): Promise<{ error?: string }> {
+    try {
+        const result = await deleteFromDrive(fileId);
+        if (!result.success) return { error: result.error };
+        return {};
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
     }
