@@ -21,6 +21,19 @@ import {
 import type { DriveFile, FolderWithFiles } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
 
+function toSlug(str: string): string {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+}
+
+function buildPatientPrefix(patientName: string, folderDisplayName: string): string {
+    return `${toSlug(patientName)}_am-clinica_${toSlug(folderDisplayName)}`;
+}
+
 function extractFolderIdFromUrl(url: string | null | undefined): string | null {
     if (!url) return null;
     const folderMatch = url.match(/folders\/([a-zA-Z0-9_-]{25,})/);
@@ -401,6 +414,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         successMessage={(count) => buildUploadSuccessMessage(effectiveUploadTargetFolderId, count)}
                         dropzoneTitle="Arrastrá archivos o hacé clic para subir"
                         dropzoneHint="Podés subir varios archivos a la vez"
+                        fileNamePrefix={
+                            effectiveUploadTargetFolderId === motherFolderId
+                                ? buildPatientPrefix(patientName, 'archivos')
+                                : buildPatientPrefix(patientName, folders.find(f => f.id === effectiveUploadTargetFolderId)?.displayName || 'archivos')
+                        }
                     />
                 </motion.div>
             )}
@@ -476,6 +494,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                             patientId={patientId}
                                             onUploaded={() => handleUploadedToFolder(folder.id)}
                                             successMessage={(count) => buildUploadSuccessMessage(folder.id, count)}
+                                            fileNamePrefix={buildPatientPrefix(patientName, folder.displayName)}
                                         />
                                     </span>
                                 )}
@@ -503,6 +522,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         dropzoneTitle={`Soltá archivos en ${folder.displayName}`}
                                                         dropzoneHint="Carga directa en esta carpeta"
                                                         dropzoneClassName="p-6"
+                                                        fileNamePrefix={buildPatientPrefix(patientName, folder.displayName)}
                                                     />
                                                 </div>
                                             )}
@@ -569,6 +589,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                             dropzoneTitle="Soltá archivos en cualquier parte"
                             dropzoneHint="También podés hacer clic para elegir archivos"
                             dropzoneClassName="p-10 border-blue-400/70 bg-blue-500/5"
+                            fileNamePrefix={
+                                effectiveGlobalDropFolderId === motherFolderId
+                                    ? buildPatientPrefix(patientName, 'archivos')
+                                    : buildPatientPrefix(patientName, folders.find(f => f.id === effectiveGlobalDropFolderId)?.displayName || 'archivos')
+                            }
                         />
                     </div>
                 </div>

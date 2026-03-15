@@ -5,6 +5,23 @@ import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/image-compression';
 
+function toSlug(str: string): string {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+}
+
+function buildSeoFileName(prefix: string, index: number, ext: string): string {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const seq = String(index).padStart(3, '0');
+    const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
+    return `${prefix}_${ym}_${seq}${cleanExt}`;
+}
+
 interface DriveUploadButtonProps {
     folderId: string;
     patientId: string;
@@ -14,6 +31,7 @@ interface DriveUploadButtonProps {
     dropzoneHint?: string;
     dropzoneClassName?: string;
     successMessage?: string | ((count: number) => string);
+    fileNamePrefix?: string;
 }
 
 export default function DriveUploadButton({
@@ -25,6 +43,7 @@ export default function DriveUploadButton({
     dropzoneHint = 'Subida directa a Google Drive',
     dropzoneClassName,
     successMessage,
+    fileNamePrefix,
 }: DriveUploadButtonProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
@@ -34,7 +53,9 @@ export default function DriveUploadButton({
         setUploading(true);
         let successCount = 0;
 
-        for (const file of Array.from(files)) {
+        const filesArray = Array.from(files);
+        for (let i = 0; i < filesArray.length; i++) {
+            const file = filesArray[i];
             try {
                 let fileToUpload: File | Blob = file;
 
@@ -49,8 +70,13 @@ export default function DriveUploadButton({
                     fileToUpload = compressed.blob;
                 }
 
+                const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
+                const uploadName = fileNamePrefix
+                    ? buildSeoFileName(fileNamePrefix, i + 1, ext)
+                    : file.name;
+
                 const formData = new FormData();
-                formData.append('file', fileToUpload, file.name);
+                formData.append('file', fileToUpload, uploadName);
                 formData.append('folderId', folderId);
                 formData.append('patientId', patientId);
 
