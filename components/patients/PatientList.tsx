@@ -248,7 +248,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                 >
                                     <td className="px-4 py-3">
                                         <Link
-                                            href={`/patients/${patient.id_paciente}`}
+                                            href={`/patients/${patient.id_paciente}?section=archivos`}
                                             className="flex items-center gap-3 group"
                                         >
                                             <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0 group-hover:bg-emerald-500/20 transition-colors border border-emerald-500/20">
@@ -395,7 +395,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                 </button>
                                             )}
                                             <Link
-                                                href={`/patients/${patient.id_paciente}`}
+                                                href={`/patients/${patient.id_paciente}?section=archivos`}
                                                 className="p-2 text-slate-500 hover:text-teal-400 hover:bg-teal-500/10 rounded-lg inline-flex transition-colors"
                                                 title="Ver ficha"
                                             >
