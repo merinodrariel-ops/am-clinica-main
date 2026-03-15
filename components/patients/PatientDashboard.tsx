@@ -42,7 +42,6 @@ import { createClient } from '@/utils/supabase/client';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import type { PlanFinanciacion } from '@/lib/financiacion';
-import PatientCommandCenter from './PatientCommandCenter';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
@@ -352,15 +351,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
 
             {/* Content */}
             <div className="max-w-5xl mx-auto p-6">
-                <PatientCommandCenter
-                    patient={patient}
-                    payments={payments}
-                    appointments={appointments.map(appointment => ({
-                        start_time: appointment.start_time,
-                        status: appointment.status,
-                    }))}
-                />
-
                 <div className="space-y-4">
 
                     {/* 1. Archivos — expanded by default */}

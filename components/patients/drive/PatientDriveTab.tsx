@@ -91,10 +91,21 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             return;
         }
 
-        setFolders(result.folders);
+        // Auto-expand the FOTO & VIDEO folder (or first folder with "foto"/"video" in name)
+        const fotoFolder = result.folders.find(f => /foto|video/i.test(f.displayName));
+        let foldersToSet = result.folders;
+        const autoOpenIds = new Set<string>();
+        if (fotoFolder) {
+            const filesResult = await loadFolderFiles(fotoFolder.id);
+            foldersToSet = result.folders.map(f =>
+                f.id === fotoFolder.id ? { ...f, files: filesResult.files, loaded: true } : f
+            );
+            autoOpenIds.add(fotoFolder.id);
+        }
+
+        setFolders(foldersToSet);
         setRootFiles(result.rootFiles);
-        // Don't auto-open — files are lazy loaded now
-        setOpenFolders(new Set());
+        setOpenFolders(autoOpenIds);
         setLoadingFolders(new Set());
         setStatus('loaded');
     }, []);
