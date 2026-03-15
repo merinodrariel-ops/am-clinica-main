@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', 'date-fns', 'framer-motion', '@nivo/core'],
   },
+  serverActions: {
+    bodySizeLimit: '20mb',
+  },
   async redirects() {
     return [
       {
