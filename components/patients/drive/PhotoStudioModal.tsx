@@ -111,11 +111,12 @@ export default function PhotoStudioModal({
         };
     }, []);
 
-    // Non-passive wheel handler for zoom (prevents page scroll)
+    // Non-passive wheel + touch handlers (prevents page scroll / browser pinch-zoom interference)
     useEffect(() => {
         const el = canvasContainerRef.current;
         if (!el) return;
-        const handler = (e: WheelEvent) => {
+
+        const wheelHandler = (e: WheelEvent) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.15 : 0.15;
             setZoom(prev => {
@@ -124,8 +125,24 @@ export default function PhotoStudioModal({
                 return next;
             });
         };
-        el.addEventListener('wheel', handler, { passive: false });
-        return () => el.removeEventListener('wheel', handler);
+
+        // Non-passive touch handlers prevent browser default pinch-zoom interference
+        const nativeTouchStart = (e: TouchEvent) => {
+            if (e.touches.length >= 2) e.preventDefault();
+        };
+        const nativeTouchMove = (e: TouchEvent) => {
+            if (e.touches.length >= 2) e.preventDefault();
+        };
+
+        el.addEventListener('wheel', wheelHandler, { passive: false });
+        el.addEventListener('touchstart', nativeTouchStart, { passive: false });
+        el.addEventListener('touchmove', nativeTouchMove, { passive: false });
+
+        return () => {
+            el.removeEventListener('wheel', wheelHandler);
+            el.removeEventListener('touchstart', nativeTouchStart);
+            el.removeEventListener('touchmove', nativeTouchMove);
+        };
     }, []);
 
     function handleSwitchFile(newFile: DriveFile) {
@@ -147,8 +164,19 @@ export default function PhotoStudioModal({
         if (!dragRef.current) return;
         const dx = (e.clientX - dragRef.current.startX) / zoom;
         const dy = (e.clientY - dragRef.current.startY) / zoom;
-        setPanX(dragRef.current.startPanX + dx);
-        setPanY(dragRef.current.startPanY + dy);
+        const newPanX = dragRef.current.startPanX + dx;
+        const newPanY = dragRef.current.startPanY + dy;
+        // Clamp so image can't be dragged fully off screen
+        const container = canvasContainerRef.current;
+        if (container) {
+            const maxX = (container.clientWidth  * (zoom - 1)) / (2 * zoom);
+            const maxY = (container.clientHeight * (zoom - 1)) / (2 * zoom);
+            setPanX(Math.max(-maxX, Math.min(maxX, newPanX)));
+            setPanY(Math.max(-maxY, Math.min(maxY, newPanY)));
+        } else {
+            setPanX(newPanX);
+            setPanY(newPanY);
+        }
     }
 
     function handleMouseUp() {
@@ -163,6 +191,11 @@ export default function PhotoStudioModal({
     }
 
     function handleTouchStart(e: React.TouchEvent) {
+        if (e.touches.length >= 1) {
+            // Cancel any active mouse drag when touch begins
+            dragRef.current = null;
+            setIsDragging(false);
+        }
         if (e.touches.length === 2) {
             touchRef.current = { dist: getTouchDist(e.touches), startZoom: zoom };
         }
@@ -420,7 +453,7 @@ export default function PhotoStudioModal({
                         onDoubleClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
                         style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                     >
-                        {/* zoom/pan wrapper */}
+                        {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
                         <div style={{ transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.05s ease-out' }}>
                             {cropActive ? (
                                 <ReactCrop
