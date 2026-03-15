@@ -20,6 +20,8 @@ import {
 } from '@/app/actions/patient-files-drive';
 import type { DriveFile, FolderWithFiles } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
+import DrivePreviewModal from './DrivePreviewModal';
+import DriveUploadButton from './DriveUploadButton';
 
 function toSlug(str: string): string {
     return str
@@ -31,7 +33,9 @@ function toSlug(str: string): string {
 }
 
 function buildPatientPrefix(patientName: string, folderDisplayName: string): string {
-    return `${toSlug(patientName)}_am-clinica_${toSlug(folderDisplayName)}`;
+    const patientSlug = toSlug(patientName) || 'paciente';
+    const folderSlug = toSlug(folderDisplayName) || 'archivo';
+    return `${patientSlug}_am-clinica_${folderSlug}`;
 }
 
 function extractFolderIdFromUrl(url: string | null | undefined): string | null {
@@ -43,8 +47,6 @@ function extractFolderIdFromUrl(url: string | null | undefined): string | null {
     if (/^[a-zA-Z0-9_-]{25,}$/.test(url)) return url;
     return null;
 }
-import DrivePreviewModal from './DrivePreviewModal';
-import DriveUploadButton from './DriveUploadButton';
 
 const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
 
