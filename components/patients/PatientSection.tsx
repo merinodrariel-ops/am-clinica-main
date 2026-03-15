@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 
@@ -9,18 +9,19 @@ interface PatientSectionProps {
     title: string;
     icon: LucideIcon;
     defaultOpen?: boolean;
-    children: React.ReactNode;
+    children: ReactNode;
 }
 
 export default function PatientSection({ id, title, icon: Icon, defaultOpen = false, children }: PatientSectionProps) {
     const [open, setOpen] = useState(defaultOpen);
     const [mounted, setMounted] = useState(defaultOpen);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const defaultOpenRef = useRef(defaultOpen);
 
     // Lazy-mount: render children only when section enters viewport for the first time.
     // Sections with defaultOpen=true skip this and mount immediately.
     useEffect(() => {
-        if (defaultOpen) return; // already mounted
+        if (defaultOpenRef.current) return;
         const el = wrapperRef.current;
         if (!el) return;
         const obs = new IntersectionObserver(
@@ -34,7 +35,6 @@ export default function PatientSection({ id, title, icon: Icon, defaultOpen = fa
         );
         obs.observe(el);
         return () => obs.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
@@ -42,6 +42,7 @@ export default function PatientSection({ id, title, icon: Icon, defaultOpen = fa
             {/* Header */}
             <button
                 onClick={() => setOpen(v => !v)}
+                aria-expanded={open}
                 className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-left"
             >
                 <div className="flex items-center gap-3">
