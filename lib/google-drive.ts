@@ -789,7 +789,7 @@ export async function movePresentationFilesToFolder(
 export async function deleteFromDrive(fileId: string): Promise<{ success: boolean; error?: string }> {
     try {
         const drive = getDrive();
-        await drive.files.delete({ fileId });
+        await drive.files.delete({ fileId, supportsAllDrives: true });
         return { success: true };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };

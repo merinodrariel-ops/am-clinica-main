@@ -133,19 +133,25 @@ export default function PhotoStudioModal({
         const outW = img.naturalWidth;
         const outH = img.naturalHeight;
 
+        // Compute bounding box that fits the rotated image without clipping
+        const sin = Math.abs(Math.sin(radians));
+        const cos = Math.abs(Math.cos(radians));
+        const canvasW = Math.ceil(outW * cos + outH * sin);
+        const canvasH = Math.ceil(outW * sin + outH * cos);
+
         const canvas = document.createElement('canvas');
-        canvas.width = outW;
-        canvas.height = outH;
+        canvas.width = canvasW;
+        canvas.height = canvasH;
         const ctx = canvas.getContext('2d')!;
 
         // Background fill (only when bg removed + non-transparent)
         if (bgDone && bgColor !== 'transparent') {
             ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#111111';
-            ctx.fillRect(0, 0, outW, outH);
+            ctx.fillRect(0, 0, canvasW, canvasH);
         }
 
         ctx.filter = `brightness(${brightness}%)`;
-        ctx.translate(outW / 2, outH / 2);
+        ctx.translate(canvasW / 2, canvasH / 2);
         ctx.rotate(radians);
         ctx.drawImage(img, -outW / 2, -outH / 2);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -157,8 +163,8 @@ export default function PhotoStudioModal({
             return new Promise(res => canvas.toBlob(b => res(b!), mime, 0.95));
         }
 
-        const scaleX = outW / img.width;
-        const scaleY = outH / img.height;
+        const scaleX = canvasW / img.width;
+        const scaleY = canvasH / img.height;
         const cropCanvas = document.createElement('canvas');
         cropCanvas.width = completedCrop.width * scaleX;
         cropCanvas.height = completedCrop.height * scaleY;
@@ -406,6 +412,27 @@ export default function PhotoStudioModal({
                             {bgProcessing ? <Loader2 size={13} className="animate-spin" /> : bgDone ? <Check size={13} /> : <Wand2 size={13} />}
                             {bgProcessing ? 'Procesando...' : bgDone ? 'Sin fondo' : 'Sin fondo'}
                         </button>
+                        {/* BG color selector — only when bg removed */}
+                        {bgDone && (
+                            <div className="flex items-center gap-1">
+                                {([
+                                    { value: 'transparent', label: '▥', title: 'Transparente' },
+                                    { value: 'white', label: '⬜', title: 'Blanco' },
+                                    { value: 'black', label: '⬛', title: 'Negro' },
+                                ] as const).map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setBgColor(opt.value)}
+                                        title={opt.title}
+                                        className={`px-2 py-1 rounded text-xs border transition-all ${
+                                            bgColor === opt.value ? 'border-[#C9A96E]' : 'border-white/10'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
