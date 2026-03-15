@@ -9,6 +9,7 @@ import {
     File,
     ExternalLink,
     Play,
+    Download,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import Mini3DPreview from './Mini3DPreview';
@@ -77,6 +78,8 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
     const Icon = ICON_MAP[category];
     const colorClass = COLOR_MAP[category];
     const canPreview = category === 'image' || category === 'video' || category === '3d';
+    // google-docs are served by Google directly; the proxy can't download them
+    const canDownload = category !== 'google-doc';
     const size = formatFileSize(file.size);
 
     const handleClick = () => {
@@ -138,6 +141,18 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
                     <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <ExternalLink size={14} className="text-gray-400" />
                     </div>
+                )}
+
+                {canDownload && (
+                    <a
+                        href={`/api/drive/file/${file.id}`}
+                        download={file.name}
+                        onClick={e => e.stopPropagation()}
+                        className="absolute bottom-1.5 right-1.5 p-1.5 rounded-lg bg-black/60 text-white/80 opacity-0 group-hover:opacity-100 sm:opacity-60 transition-all hover:bg-black/80 hover:text-white z-10"
+                        title="Descargar"
+                    >
+                        <Download size={13} />
+                    </a>
                 )}
             </div>
 
