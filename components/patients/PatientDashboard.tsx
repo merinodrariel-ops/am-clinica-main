@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import {
     FileText,
@@ -111,16 +112,22 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const [materialesLoaded, setMaterialesLoaded] = useState(false);
 
     function handleLoadMateriales() {
-        if (materialesLoaded) return;
+        if (materialesLoaded || materialesLoading) return;
         setMaterialesLoading(true);
-        getPatientInventoryMaterials(patient.id_paciente).then(({ data }) => {
+        getPatientInventoryMaterials(patient.id_paciente).then(({ data, error }) => {
+            if (error) {
+                toast.error('No se pudieron cargar los materiales');
+                setMaterialesLoading(false);
+                return;
+            }
             setMateriales(data);
             setMaterialesLoaded(true);
             setMaterialesLoading(false);
         });
     }
 
-    // Scroll to section from URL param (?section=archivos)
+    // Runs only on mount. searchParams is stable per-navigation in Next.js App Router,
+    // so this fires once per page load which is the correct behavior for initial scroll.
     useEffect(() => {
         const section = searchParams.get('section');
         if (!section) return;
