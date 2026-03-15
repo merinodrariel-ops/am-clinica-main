@@ -37,6 +37,14 @@ export default function PhotoStudioModal({
 }: PhotoStudioModalProps) {
     const imgRef = useRef<HTMLImageElement>(null);
     const objectUrlRef = useRef<string | null>(null);
+    const canvasContainerRef = useRef<HTMLDivElement>(null);
+    const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
+    const touchRef = useRef<{ dist: number; startZoom: number } | null>(null);
+
+    const [zoom, setZoom] = useState(1);
+    const [panX, setPanX] = useState(0);
+    const [panY, setPanY] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
 
     // Active file in the studio (may differ from initial file when user clicks thumbnails)
     const [activeFile, setActiveFile] = useState<DriveFile | null>(file);
@@ -79,6 +87,9 @@ export default function PhotoStudioModal({
         setCropActive(false);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
         setCompletedCrop(null);
+        setZoom(1);
+        setPanX(0);
+        setPanY(0);
     }, []);
 
     // When initial file prop changes (shouldn't normally happen, but be safe)
@@ -100,12 +111,73 @@ export default function PhotoStudioModal({
         };
     }, []);
 
+    // Non-passive wheel handler for zoom (prevents page scroll)
+    useEffect(() => {
+        const el = canvasContainerRef.current;
+        if (!el) return;
+        const handler = (e: WheelEvent) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.15 : 0.15;
+            setZoom(prev => {
+                const next = Math.min(5, Math.max(1, prev + delta));
+                if (next <= 1) { setPanX(0); setPanY(0); }
+                return next;
+            });
+        };
+        el.addEventListener('wheel', handler, { passive: false });
+        return () => el.removeEventListener('wheel', handler);
+    }, []);
+
     function handleSwitchFile(newFile: DriveFile) {
         if (newFile.id === activeFile?.id) return;
         if (isDirty && !confirm('Tenés cambios sin guardar. ¿Cambiar de foto de todas formas?')) return;
         resetEdits();
         setActiveFile(newFile);
         setImageUrl(`/api/drive/file/${newFile.id}`);
+    }
+
+    function handleMouseDown(e: React.MouseEvent) {
+        if (zoom <= 1) return;
+        e.preventDefault();
+        dragRef.current = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
+        setIsDragging(true);
+    }
+
+    function handleMouseMove(e: React.MouseEvent) {
+        if (!dragRef.current) return;
+        const dx = (e.clientX - dragRef.current.startX) / zoom;
+        const dy = (e.clientY - dragRef.current.startY) / zoom;
+        setPanX(dragRef.current.startPanX + dx);
+        setPanY(dragRef.current.startPanY + dy);
+    }
+
+    function handleMouseUp() {
+        dragRef.current = null;
+        setIsDragging(false);
+    }
+
+    function getTouchDist(touches: React.TouchList): number {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function handleTouchStart(e: React.TouchEvent) {
+        if (e.touches.length === 2) {
+            touchRef.current = { dist: getTouchDist(e.touches), startZoom: zoom };
+        }
+    }
+
+    function handleTouchMove(e: React.TouchEvent) {
+        if (e.touches.length === 2 && touchRef.current) {
+            const newDist = getTouchDist(e.touches);
+            const scale = newDist / touchRef.current.dist;
+            setZoom(Math.min(5, Math.max(1, touchRef.current.startZoom * scale)));
+        }
+    }
+
+    function handleTouchEnd() {
+        touchRef.current = null;
     }
 
     async function handleRemoveBackground() {
@@ -335,13 +407,36 @@ export default function PhotoStudioModal({
                     )}
 
                     {/* Canvas area */}
-                    <div className={`flex-1 flex items-center justify-center overflow-hidden p-4 ${canvasBg}`}>
-                        {cropActive ? (
-                            <ReactCrop
-                                crop={crop}
-                                onChange={c => setCrop(c)}
-                                onComplete={c => setCompletedCrop(c)}
-                            >
+                    <div
+                        ref={canvasContainerRef}
+                        className={`relative flex-1 flex items-center justify-center overflow-hidden p-4 ${canvasBg}`}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        onDoubleClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
+                        style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+                    >
+                        {/* zoom/pan wrapper */}
+                        <div style={{ transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.05s ease-out' }}>
+                            {cropActive ? (
+                                <ReactCrop
+                                    crop={crop}
+                                    onChange={c => setCrop(c)}
+                                    onComplete={c => setCompletedCrop(c)}
+                                >
+                                    <img
+                                        ref={imgRef}
+                                        src={imageUrl}
+                                        alt={activeFile.name}
+                                        crossOrigin="anonymous"
+                                        style={imageStyle}
+                                    />
+                                </ReactCrop>
+                            ) : (
                                 <img
                                     ref={imgRef}
                                     src={imageUrl}
@@ -349,15 +444,14 @@ export default function PhotoStudioModal({
                                     crossOrigin="anonymous"
                                     style={imageStyle}
                                 />
-                            </ReactCrop>
-                        ) : (
-                            <img
-                                ref={imgRef}
-                                src={imageUrl}
-                                alt={activeFile.name}
-                                crossOrigin="anonymous"
-                                style={imageStyle}
-                            />
+                            )}
+                        </div>
+
+                        {/* Zoom indicator badge */}
+                        {zoom > 1 && (
+                            <div className="absolute bottom-3 right-3 px-2 py-1 rounded-md bg-black/50 text-white/70 text-xs font-mono pointer-events-none select-none">
+                                {Math.round(zoom * 100)}%
+                            </div>
                         )}
                     </div>
 
