@@ -496,11 +496,11 @@ export default function PhotoStudioModal({
                                 xmlns="http://www.w3.org/2000/svg"
                             >
                                 {/* Rule-of-thirds verticals */}
-                                <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
-                                <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                                <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                 {/* Rule-of-thirds horizontals */}
-                                <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
-                                <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                                <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                 {/* Center horizontal — bipupillar reference line (gold, dashed) */}
                                 <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(201,169,110,0.6)" strokeWidth="1" strokeDasharray="10 5" />
                                 {/* Center vertical */}
@@ -524,6 +524,7 @@ export default function PhotoStudioModal({
                             }}
                             showGrid={showGrid}
                             setShowGrid={setShowGrid}
+                            isGridVisible={showGrid || rotation !== 0}
                         />
                     </div>
                 </div>
@@ -571,6 +572,15 @@ export default function PhotoStudioModal({
                         >
                             {bgProcessing ? <Loader2 size={13} className="animate-spin" /> : bgDone ? <Check size={13} /> : <Wand2 size={13} />}
                             {bgProcessing ? 'Procesando...' : bgDone ? 'Sin fondo' : 'Sin fondo'}
+                        </button>
+                        {/* Grid toggle */}
+                        <button
+                            onClick={() => setShowGrid(v => !v)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+                                (showGrid || rotation !== 0) ? 'bg-[#C9A96E]/30 text-[#C9A96E]' : 'bg-white/10 text-white/70'
+                            }`}
+                        >
+                            <Grid size={13} /> Grilla
                         </button>
                         {/* BG color selector — only when bg removed */}
                         {bgDone && (
@@ -663,6 +673,7 @@ interface ToolsPanelProps {
     onReset: () => void;
     showGrid: boolean;
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
+    isGridVisible: boolean;
 }
 
 function ToolsPanel({
@@ -674,6 +685,7 @@ function ToolsPanel({
     onRemoveBg,
     onReset,
     showGrid, setShowGrid,
+    isGridVisible,
 }: ToolsPanelProps) {
     return (
         <>
@@ -707,7 +719,7 @@ function ToolsPanel({
                 <button
                     onClick={() => setShowGrid(v => !v)}
                     className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
-                        showGrid
+                        isGridVisible
                             ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
                             : 'bg-white/5 text-white/40 hover:text-white/60'
                     }`}
