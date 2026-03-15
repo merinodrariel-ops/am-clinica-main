@@ -796,6 +796,44 @@ export async function deleteFromDrive(fileId: string): Promise<{ success: boolea
     }
 }
 
+/**
+ * Uploads a file buffer directly to a specific Drive folder by ID.
+ * Used for saving edited photos back to patient folders.
+ */
+export async function uploadFileToFolder(
+    folderId: string,
+    fileName: string,
+    buffer: Buffer,
+    mimeType: string
+): Promise<UploadResult> {
+    try {
+        const drive = getDriveClient();
+        const stream = Readable.from(buffer);
+        const response = await drive.files.create({
+            supportsAllDrives: true,
+            requestBody: {
+                name: fileName,
+                parents: [folderId],
+            },
+            media: {
+                mimeType,
+                body: stream,
+            },
+            fields: 'id, webViewLink',
+        });
+        return {
+            success: true,
+            fileId: response.data.id ?? undefined,
+            webViewLink: response.data.webViewLink ?? undefined,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
 // Template IDs from environment (recommended) or fallback to name search
 const getTemplateFichaId = () => process.env.GOOGLE_SLIDES_TEMPLATE_FICHA || '';
 const getTemplatePresupuestoId = () => process.env.GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO || '';
