@@ -91,11 +91,14 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
     };
 
     return (
-        <motion.button
+        <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleClick}
-            className="text-left rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-3 hover:border-blue-300 dark:hover:border-[#C9A96E]/30 hover:shadow-sm transition-all group w-full"
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleClick()}
+            className="text-left rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-3 hover:border-blue-300 dark:hover:border-[#C9A96E]/30 hover:shadow-sm transition-all group w-full cursor-pointer"
         >
             {/* Thumbnail or icon */}
             <div className="aspect-square rounded-lg overflow-hidden mb-2 flex items-center justify-center bg-gray-50 dark:bg-white/5 relative">
@@ -148,7 +151,7 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
                         href={`/api/drive/file/${file.id}`}
                         download={file.name}
                         onClick={e => e.stopPropagation()}
-                        className="absolute bottom-1.5 right-1.5 p-1.5 rounded-lg bg-black/60 text-white/80 opacity-0 group-hover:opacity-100 sm:opacity-60 transition-all hover:bg-black/80 hover:text-white z-10"
+                        className="absolute bottom-1.5 right-1.5 p-1.5 rounded-lg bg-black/60 text-white/80 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/80 hover:text-white z-10"
                         title="Descargar"
                     >
                         <Download size={13} />
@@ -168,6 +171,6 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
                     <span className="text-xs text-gray-400 dark:text-white/30">{size}</span>
                 )}
             </div>
-        </motion.button>
+        </motion.div>
     );
 }
