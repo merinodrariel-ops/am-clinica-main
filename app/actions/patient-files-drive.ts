@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/utils/supabase/server';
 import {
     listFolderFiles,
     extractFolderIdFromUrl,
@@ -200,16 +201,29 @@ export async function uploadEditedPhotoAction(
     folderId: string,
     fileName: string,
     formData: FormData
-): Promise<{ fileId?: string; error?: string }> {
+): Promise<{ fileId?: string; webViewLink?: string; error?: string }> {
     try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
         const file = formData.get('file') as File | null;
         if (!file) return { error: 'No file in FormData' };
+
+        const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!ALLOWED_MIME.includes(file.type)) {
+            return { error: 'Tipo de archivo no permitido' };
+        }
+
+        if (file.size > 20 * 1024 * 1024) {
+            return { error: 'El archivo supera el límite de 20 MB' };
+        }
 
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await uploadFileToFolder(folderId, fileName, buffer, file.type || 'image/jpeg');
 
         if (!result.success) return { error: result.error };
-        return { fileId: result.fileId };
+        return { fileId: result.fileId, webViewLink: result.webViewLink };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
     }
@@ -222,6 +236,14 @@ export async function deleteDriveFileAction(
     fileId: string
 ): Promise<{ error?: string }> {
     try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        if (!fileId || !/^[a-zA-Z0-9_-]{10,}$/.test(fileId)) {
+            return { error: 'ID de archivo inválido' };
+        }
+
         const result = await deleteFromDrive(fileId);
         if (!result.success) return { error: result.error };
         return {};
