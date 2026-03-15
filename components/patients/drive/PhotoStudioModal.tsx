@@ -16,6 +16,7 @@ interface PhotoStudioModalProps {
     file: DriveFile | null;
     folderId: string;
     allFolderFiles: DriveFile[];   // images in same folder — for thumbnail strip
+    canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
     onSaved: () => void;           // called after successful save → triggers folder refresh
 }
@@ -30,6 +31,7 @@ export default function PhotoStudioModal({
     file,
     folderId,
     allFolderFiles,
+    canSave,
     onClose,
     onSaved,
 }: PhotoStudioModalProps) {
@@ -128,7 +130,8 @@ export default function PhotoStudioModal({
     }
 
     async function exportToBlob(): Promise<Blob> {
-        const img = imgRef.current!;
+        const img = imgRef.current;
+        if (!img || img.naturalWidth === 0) throw new Error('Imagen no cargada todavía');
         const radians = (rotation * Math.PI) / 180;
         const outW = img.naturalWidth;
         const outH = img.naturalHeight;
@@ -160,11 +163,13 @@ export default function PhotoStudioModal({
         const mime = isPng ? 'image/png' : 'image/jpeg';
 
         if (!completedCrop || completedCrop.width === 0 || completedCrop.height === 0) {
-            return new Promise(res => canvas.toBlob(b => res(b!), mime, 0.95));
+            return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob returned null')), mime, 0.95));
         }
 
-        const scaleX = canvasW / img.width;
-        const scaleY = canvasH / img.height;
+        // Scale factors: ReactCrop pixels are relative to the displayed image size,
+        // so we need natural dimensions (not rotated canvas dimensions) as the scale base.
+        const scaleX = outW / img.width;
+        const scaleY = outH / img.height;
         const cropCanvas = document.createElement('canvas');
         cropCanvas.width = completedCrop.width * scaleX;
         cropCanvas.height = completedCrop.height * scaleY;
@@ -175,7 +180,7 @@ export default function PhotoStudioModal({
             cropCanvas.width, cropCanvas.height,
             0, 0, cropCanvas.width, cropCanvas.height
         );
-        return new Promise(res => cropCanvas.toBlob(b => res(b!), mime, 0.95));
+        return new Promise((res, rej) => cropCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob returned null')), mime, 0.95));
     }
 
     function handleDownload() {
@@ -268,13 +273,15 @@ export default function PhotoStudioModal({
                         {activeFile.name}
                     </p>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                            onClick={() => setSaveDialogOpen(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#b8924e] transition-colors"
-                        >
-                            <Save size={14} />
-                            <span className="hidden sm:inline">Guardar en Drive</span>
-                        </button>
+                        {canSave && (
+                            <button
+                                onClick={() => setSaveDialogOpen(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#b8924e] transition-colors"
+                            >
+                                <Save size={14} />
+                                <span className="hidden sm:inline">Guardar en Drive</span>
+                            </button>
+                        )}
                         <button
                             onClick={handleDownload}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
@@ -283,7 +290,10 @@ export default function PhotoStudioModal({
                             <span className="hidden sm:inline">Descargar</span>
                         </button>
                         <button
-                            onClick={onClose}
+                            onClick={() => {
+                                if (isDirty && !confirm('Tenés cambios sin guardar. ¿Salir de todas formas?')) return;
+                                onClose();
+                            }}
                             className="p-2 rounded-lg bg-white/10 text-white border border-white/10 hover:bg-white/15 transition-colors"
                         >
                             <X size={16} />

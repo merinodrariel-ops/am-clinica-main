@@ -578,6 +578,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             <DrivePreviewModal
                 file={previewFile}
                 folderId={previewFolderId}
+                canSave={canUpload}
                 allFolderFiles={
                     previewFolderId === motherFolderId
                         ? rootFiles.filter(f => f.mimeType.toLowerCase().startsWith('image/'))

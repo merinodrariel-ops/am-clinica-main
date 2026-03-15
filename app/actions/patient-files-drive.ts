@@ -197,6 +197,9 @@ export async function createPatientDriveFolderAction(
  * Upload an edited photo blob (via FormData) to a specific Drive folder.
  * The client sends a FormData with key "file" containing the Blob.
  */
+const DRIVE_WRITE_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
+const DRIVE_ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
+
 export async function uploadEditedPhotoAction(
     folderId: string,
     fileName: string,
@@ -206,6 +209,19 @@ export async function uploadEditedPhotoAction(
         const supabaseServer = await createServerClient();
         const { data: { user } } = await supabaseServer.auth.getUser();
         if (!user) return { error: 'No autenticado' };
+
+        const { data: profile } = await supabaseServer
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .single();
+        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
+            return { error: 'Sin permisos para guardar archivos en Drive' };
+        }
+
+        if (!folderId || !DRIVE_ID_RE.test(folderId)) return { error: 'Carpeta inválida' };
+
+        const safeName = fileName.replace(/[/\\]/g, '_');
 
         const file = formData.get('file') as File | null;
         if (!file) return { error: 'No file in FormData' };
@@ -220,7 +236,7 @@ export async function uploadEditedPhotoAction(
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
-        const result = await uploadFileToFolder(folderId, fileName, buffer, file.type || 'image/jpeg');
+        const result = await uploadFileToFolder(folderId, safeName, buffer, file.type || 'image/jpeg');
 
         if (!result.success) return { error: result.error };
         return { fileId: result.fileId, webViewLink: result.webViewLink };
@@ -240,7 +256,16 @@ export async function deleteDriveFileAction(
         const { data: { user } } = await supabaseServer.auth.getUser();
         if (!user) return { error: 'No autenticado' };
 
-        if (!fileId || !/^[a-zA-Z0-9_-]{10,}$/.test(fileId)) {
+        const { data: profile } = await supabaseServer
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .single();
+        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
+            return { error: 'Sin permisos para eliminar archivos de Drive' };
+        }
+
+        if (!fileId || !DRIVE_ID_RE.test(fileId)) {
             return { error: 'ID de archivo inválido' };
         }
 

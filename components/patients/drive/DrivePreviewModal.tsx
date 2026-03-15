@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
@@ -19,6 +19,7 @@ interface DrivePreviewModalProps {
     file: DriveFile | null;
     folderId: string;
     allFolderFiles: DriveFile[];
+    canSave: boolean;
     onClose: () => void;
     onSaved: () => void;
 }
@@ -40,6 +41,7 @@ export default function DrivePreviewModal({
     file,
     folderId,
     allFolderFiles,
+    canSave,
     onClose,
     onSaved,
 }: DrivePreviewModalProps) {
@@ -54,6 +56,7 @@ export default function DrivePreviewModal({
                 file={file}
                 folderId={folderId}
                 allFolderFiles={allFolderFiles}
+                canSave={canSave}
                 onClose={onClose}
                 onSaved={onSaved}
             />
@@ -64,6 +67,7 @@ export default function DrivePreviewModal({
 
     // Video / 3D → original minimal modal
     return (
+        <AnimatePresence>
         <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -133,5 +137,6 @@ export default function DrivePreviewModal({
                     )}
                 </div>
         </motion.div>
+        </AnimatePresence>
     );
 }
