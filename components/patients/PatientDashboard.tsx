@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import {
     FileText,
@@ -30,6 +29,7 @@ import {
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
+import PatientSection from './PatientSection';
 import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
 const PatientDriveTab = dynamic(() => import('@/components/patients/drive/PatientDriveTab'), { ssr: false });
@@ -97,21 +97,6 @@ interface PatientDashboardProps {
     designReview?: DesignReview | null;
 }
 
-const TABS = [
-    { id: 'datos', label: 'Datos Personales', icon: User },
-    { id: 'historia', label: 'Historia Clínica', icon: FileText },
-    { id: 'finanzas', label: 'Finanzas', icon: TrendingUp },
-    { id: 'recalls', label: 'Recalls (Seguimiento)', icon: Bell },
-    { id: 'archivos', label: 'Archivos', icon: FolderOpen },
-    { id: 'smile_design', label: 'Smile Design ✨', icon: Sparkles },
-    { id: 'diseno', label: 'Diseño Digital', icon: Sparkles },
-    { id: 'portal', label: 'Portal 360', icon: Sparkles },
-    { id: 'materiales', label: 'Materiales', icon: Package },
-];
-
-// Payment-related tabs hidden from restricted clinical/ops roles
-const PAYMENT_TABS = new Set(['finanzas']);
-
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null, designReview = null }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -119,31 +104,30 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const isOdontologo = role === 'odontologo';
     const isRecaptacion = role === 'recaptacion';
     const hidePaymentTabs = isOdontologo || isRecaptacion;
-    const visibleTabs = hidePaymentTabs ? TABS.filter(t => !PAYMENT_TABS.has(t.id)) : TABS;
-    const requestedTab = searchParams.get('tab') || 'datos';
-    const defaultTabRaw = ['financiamiento', 'pagos', 'planes'].includes(requestedTab)
-        ? 'finanzas'
-        : requestedTab;
-    const tabIds = new Set(TABS.map((tab) => tab.id));
-    const defaultTab = tabIds.has(defaultTabRaw) ? defaultTabRaw : 'datos';
-    const [activeTab, setActiveTab] = useState(
-        hidePaymentTabs && PAYMENT_TABS.has(defaultTab) ? 'datos' : defaultTab
-    );
+
     // Materiales state
     const [materiales, setMateriales] = useState<PatientMaterialRecord[]>([]);
     const [materialesLoading, setMaterialesLoading] = useState(false);
     const [materialesLoaded, setMaterialesLoaded] = useState(false);
 
+    function handleLoadMateriales() {
+        if (materialesLoaded) return;
+        setMaterialesLoading(true);
+        getPatientInventoryMaterials(patient.id_paciente).then(({ data }) => {
+            setMateriales(data);
+            setMaterialesLoaded(true);
+            setMaterialesLoading(false);
+        });
+    }
+
+    // Scroll to section from URL param (?section=archivos)
     useEffect(() => {
-        if (activeTab === 'materiales' && !materialesLoaded) {
-            setMaterialesLoading(true);
-            getPatientInventoryMaterials(patient.id_paciente).then(({ data }) => {
-                setMateriales(data);
-                setMaterialesLoaded(true);
-                setMaterialesLoading(false);
-            });
-        }
-    }, [activeTab, materialesLoaded, patient.id_paciente]);
+        const section = searchParams.get('section');
+        if (!section) return;
+        requestAnimationFrame(() => {
+            document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Portal magic link state
     const [sendingPortalLink, setSendingPortalLink] = useState(false);
@@ -356,29 +340,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             )}
                         </div>
                     </div>
-
-                    {/* Tabs */}
-                    <div className="flex mt-4 -mb-px">
-                        {visibleTabs.map((tab) => {
-                            const Icon = tab.icon;
-                            const isActive = activeTab === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                                        isActive
-                                            ? "border-blue-500 text-blue-600"
-                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                    )}
-                                >
-                                    <Icon size={16} />
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
-                    </div>
                 </div>
             </div>
 
@@ -392,168 +353,167 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                         status: appointment.status,
                     }))}
                 />
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeTab}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.15 }}
-                    >
-                        {/* Tab 1: Datos Personales */}
-                        {activeTab === 'datos' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-lg font-semibold">Datos Personales</h2>
-                                    <Link
-                                        href={`/actualizar-datos?patientId=${patient.id_paciente}`}
-                                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200"
-                                    >
-                                        <Edit2 size={16} />
-                                        Editar
-                                    </Link>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <InfoCard
-                                        icon={<User size={18} />}
-                                        label="Nombre Completo"
-                                        value={`${patient.nombre} ${patient.apellido}`}
-                                    />
-                                    <InfoCard
-                                        icon={<FileIcon size={18} />}
-                                        label="Documento"
-                                        value={patient.documento || 'No registrado'}
-                                    />
-                                    <InfoCard
-                                        icon={<Calendar size={18} />}
-                                        label="Fecha de Nacimiento"
-                                        value={patient.fecha_nacimiento ? new Date(patient.fecha_nacimiento).toLocaleDateString('es-AR') : 'No registrada'}
-                                    />
-                                    <InfoCard
-                                        icon={<Calendar size={18} />}
-                                        label="Edad"
-                                        value={age ? `${age} años` : 'No calculable'}
-                                    />
-                                    <InfoCard
-                                        icon={<Phone size={18} />}
-                                        label="WhatsApp"
-                                        value={whatsappNumber || 'No registrado'}
-                                    />
-                                    <InfoCard
-                                        icon={<Mail size={18} />}
-                                        label="Email"
-                                        value={patient.email || 'No registrado'}
-                                    />
-                                    <InfoCard
-                                        icon={<MapPin size={18} />}
-                                        label="Ciudad"
-                                        value={patient.ciudad || 'No registrada'}
-                                    />
-                                    <InfoCard
-                                        icon={<MapPin size={18} />}
-                                        label="Zona/Barrio"
-                                        value={patient.zona_barrio || 'No registrado'}
-                                    />
-                                </div>
+                <div className="space-y-4">
 
-                                {patient.observaciones_generales && (
-                                    <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                        <label className="text-xs text-gray-500 uppercase tracking-wider">Observaciones</label>
-                                        <p className="mt-1 text-gray-900 dark:text-gray-100">{patient.observaciones_generales}</p>
-                                    </div>
-                                )}
+                    {/* 1. Archivos — expanded by default */}
+                    <PatientSection id="archivos" title="Archivos" icon={FolderOpen} defaultOpen>
+                        <PatientDriveTab
+                            patientId={patient.id_paciente}
+                            patientName={`${patient.apellido}, ${patient.nombre}`}
+                            motherFolderUrl={patient.link_historia_clinica}
+                        />
+                    </PatientSection>
 
-                                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                    <div>
-                                        <span className="text-gray-500">Fecha Alta:</span>
-                                        <p className="font-medium">{patient.fecha_alta ? new Date(patient.fecha_alta).toLocaleDateString('es-AR') : '-'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-500">Origen:</span>
-                                        <p className="font-medium">{patient.origen_registro || '-'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-500">Consentimiento:</span>
-                                        <p className="font-medium">{patient.consentimiento_comunicacion ? '✓ Sí' : '✗ No'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-500">ID:</span>
-                                        <p className="font-mono text-xs">{patient.id_paciente.slice(0, 8)}...</p>
-                                    </div>
-                                </div>
+                    {/* 2. Datos Personales — expanded by default */}
+                    <PatientSection id="datos" title="Datos Personales" icon={User} defaultOpen>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-lg font-semibold">Datos Personales</h2>
+                            <Link
+                                href={`/actualizar-datos?patientId=${patient.id_paciente}`}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200"
+                            >
+                                <Edit2 size={16} />
+                                Editar
+                            </Link>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <InfoCard
+                                icon={<User size={18} />}
+                                label="Nombre Completo"
+                                value={`${patient.nombre} ${patient.apellido}`}
+                            />
+                            <InfoCard
+                                icon={<FileIcon size={18} />}
+                                label="Documento"
+                                value={patient.documento || 'No registrado'}
+                            />
+                            <InfoCard
+                                icon={<Calendar size={18} />}
+                                label="Fecha de Nacimiento"
+                                value={patient.fecha_nacimiento ? new Date(patient.fecha_nacimiento).toLocaleDateString('es-AR') : 'No registrada'}
+                            />
+                            <InfoCard
+                                icon={<Calendar size={18} />}
+                                label="Edad"
+                                value={age ? `${age} años` : 'No calculable'}
+                            />
+                            <InfoCard
+                                icon={<Phone size={18} />}
+                                label="WhatsApp"
+                                value={whatsappNumber || 'No registrado'}
+                            />
+                            <InfoCard
+                                icon={<Mail size={18} />}
+                                label="Email"
+                                value={patient.email || 'No registrado'}
+                            />
+                            <InfoCard
+                                icon={<MapPin size={18} />}
+                                label="Ciudad"
+                                value={patient.ciudad || 'No registrada'}
+                            />
+                            <InfoCard
+                                icon={<MapPin size={18} />}
+                                label="Zona/Barrio"
+                                value={patient.zona_barrio || 'No registrado'}
+                            />
+                        </div>
+
+                        {patient.observaciones_generales && (
+                            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <label className="text-xs text-gray-500 uppercase tracking-wider">Observaciones</label>
+                                <p className="mt-1 text-gray-900 dark:text-gray-100">{patient.observaciones_generales}</p>
                             </div>
                         )}
 
-                        {/* Tab 2: Historia Clínica */}
-                        {activeTab === 'historia' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-                                <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                                    <h2 className="text-lg font-semibold">Historia Clínica</h2>
-                                    <Link
-                                        href={`/worker-portal?patientId=${patient.id_paciente}`}
-                                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
-                                    >
-                                        <Plus size={16} />
-                                        Nueva Entrada
-                                    </Link>
-                                </div>
+                        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <span className="text-gray-500">Fecha Alta:</span>
+                                <p className="font-medium">{patient.fecha_alta ? new Date(patient.fecha_alta).toLocaleDateString('es-AR') : '-'}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">Origen:</span>
+                                <p className="font-medium">{patient.origen_registro || '-'}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">Consentimiento:</span>
+                                <p className="font-medium">{patient.consentimiento_comunicacion ? '✓ Sí' : '✗ No'}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">ID:</span>
+                                <p className="font-mono text-xs">{patient.id_paciente.slice(0, 8)}...</p>
+                            </div>
+                        </div>
+                    </PatientSection>
 
-                                {historiaClinica.length === 0 ? (
-                                    <div className="p-10 text-center text-gray-500">
-                                        <FileText size={48} className="mx-auto mb-4 text-gray-300" />
-                                        <p>No hay registros en la historia clínica.</p>
-                                    </div>
-                                ) : (
-                                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        {historiaClinica.map((entry) => (
-                                            <div key={entry.id} className="p-6">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div>
-                                                        <p className="font-medium">{entry.profesional}</p>
-                                                        <p className="text-sm text-gray-500">
-                                                            {new Date(entry.fecha).toLocaleDateString('es-AR', {
-                                                                day: 'numeric',
-                                                                month: 'long',
-                                                                year: 'numeric'
-                                                            })}
-                                                        </p>
-                                                    </div>
-                                                    {entry.proximo_control && (
-                                                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
-                                                            Próx: {new Date(entry.proximo_control).toLocaleDateString('es-AR')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {entry.motivo_consulta && (
-                                                    <div className="mb-2">
-                                                        <span className="text-xs text-gray-500">Motivo:</span>
-                                                        <p className="text-sm">{entry.motivo_consulta}</p>
-                                                    </div>
-                                                )}
-                                                {entry.diagnostico && (
-                                                    <div className="mb-2">
-                                                        <span className="text-xs text-gray-500">Diagnóstico:</span>
-                                                        <p className="text-sm">{entry.diagnostico}</p>
-                                                    </div>
-                                                )}
-                                                {entry.tratamiento_realizado && (
-                                                    <div>
-                                                        <span className="text-xs text-gray-500">Tratamiento:</span>
-                                                        <p className="text-sm">{entry.tratamiento_realizado}</p>
-                                                    </div>
-                                                )}
+                    {/* 3. Historia Clínica + Prestaciones + Materiales — expanded by default */}
+                    <PatientSection id="historia" title="Historia Clínica" icon={FileText} defaultOpen>
+                        <div className="border-b border-gray-100 dark:border-gray-800 flex justify-between items-center pb-4 mb-4">
+                            <h2 className="text-lg font-semibold">Historia Clínica</h2>
+                            <Link
+                                href={`/worker-portal?patientId=${patient.id_paciente}`}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                            >
+                                <Plus size={16} />
+                                Nueva Entrada
+                            </Link>
+                        </div>
+
+                        {historiaClinica.length === 0 ? (
+                            <div className="p-10 text-center text-gray-500">
+                                <FileText size={48} className="mx-auto mb-4 text-gray-300" />
+                                <p>No hay registros en la historia clínica.</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {historiaClinica.map((entry) => (
+                                    <div key={entry.id} className="py-6">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <p className="font-medium">{entry.profesional}</p>
+                                                <p className="text-sm text-gray-500">
+                                                    {new Date(entry.fecha).toLocaleDateString('es-AR', {
+                                                        day: 'numeric',
+                                                        month: 'long',
+                                                        year: 'numeric'
+                                                    })}
+                                                </p>
                                             </div>
-                                        ))}
+                                            {entry.proximo_control && (
+                                                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
+                                                    Próx: {new Date(entry.proximo_control).toLocaleDateString('es-AR')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {entry.motivo_consulta && (
+                                            <div className="mb-2">
+                                                <span className="text-xs text-gray-500">Motivo:</span>
+                                                <p className="text-sm">{entry.motivo_consulta}</p>
+                                            </div>
+                                        )}
+                                        {entry.diagnostico && (
+                                            <div className="mb-2">
+                                                <span className="text-xs text-gray-500">Diagnóstico:</span>
+                                                <p className="text-sm">{entry.diagnostico}</p>
+                                            </div>
+                                        )}
+                                        {entry.tratamiento_realizado && (
+                                            <div>
+                                                <span className="text-xs text-gray-500">Tratamiento:</span>
+                                                <p className="text-sm">{entry.tratamiento_realizado}</p>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                ))}
                             </div>
                         )}
 
-                        {/* Prestaciones Realizadas — HC desde la app */}
-                        {activeTab === 'historia' && prestaciones.length > 0 && (
-                            <div className="mt-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-                                <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                        {/* Prestaciones Realizadas */}
+                        {prestaciones.length > 0 && (
+                            <div className="mt-6 border-t border-gray-100 dark:border-gray-800 pt-4">
+                                <div className="flex items-center justify-between mb-3">
                                     <div>
                                         <h2 className="text-base font-semibold">Prestaciones Realizadas</h2>
                                         <p className="text-xs text-gray-400 mt-0.5">{prestaciones.length} registros · cargados desde el portal</p>
@@ -575,7 +535,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         const fecha = new Date(p.fecha_realizacion + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
                                         const isUsd = p.moneda_cobro === 'USD';
                                         return (
-                                            <div key={p.id} className="px-5 py-4 flex flex-col md:flex-row md:items-center gap-3">
+                                            <div key={p.id} className="px-0 py-4 flex flex-col md:flex-row md:items-center gap-3">
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-medium text-sm text-gray-800 dark:text-gray-200">{p.prestacion_nombre}</p>
                                                     <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -617,10 +577,62 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             </div>
                         )}
 
-                        {/* Tab: Finanzas (Historial + Plan + Presupuestos) */}
-                        {activeTab === 'finanzas' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-                                <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                        {/* Materiales sub-section */}
+                        <div className="mt-6 border-t border-gray-100 dark:border-gray-800 pt-4">
+                            <button
+                                onClick={handleLoadMateriales}
+                                className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-white/50 hover:text-violet-500 transition-colors mb-3"
+                            >
+                                <Package size={15} />
+                                Materiales utilizados
+                            </button>
+                            {materialesLoading ? (
+                                <div className="flex justify-center py-6">
+                                    <Loader2 className="animate-spin text-violet-500" size={20} />
+                                </div>
+                            ) : materialesLoaded ? (
+                                materiales.length === 0 ? (
+                                    <p className="text-center text-gray-400 py-6 text-sm">No hay materiales registrados.</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {materiales.map((m) => {
+                                            const [y, mo, d] = m.created_at.split('T')[0].split('-').map(Number);
+                                            const fecha = new Date(y, mo - 1, d).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+                                            return (
+                                                <div key={m.id} className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                                    <div className="h-9 w-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                                                        <Package size={16} className="text-violet-600 dark:text-violet-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm truncate">
+                                                            {m.item?.nombre ?? 'Material'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-0.5">
+                                                            {m.cantidad} {m.item?.unidad_medida ?? 'u.'} — {fecha}
+                                                        </p>
+                                                        {m.motivo && (
+                                                            <p className="text-xs text-gray-400 mt-0.5 truncate">{m.motivo}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-xs font-medium text-gray-400">{m.item?.categoria}</span>
+                                                        <p className="text-xs text-gray-400 mt-0.5">{m.usuario?.split('@')[0]}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )
+                            ) : null}
+                        </div>
+                    </PatientSection>
+
+                    {/* 4. Finanzas — collapsed, hidden for odontologo/recaptacion */}
+                    {!hidePaymentTabs && (
+                        <PatientSection id="finanzas" title="Finanzas" icon={TrendingUp}>
+                            {/* Historial de Pagos */}
+                            <div className="border-b border-gray-100 dark:border-gray-800 pb-6 mb-6">
+                                <div className="flex justify-between items-center mb-4">
                                     <div>
                                         <h2 className="text-lg font-semibold">Historial de Pagos</h2>
                                         <p className="text-sm text-gray-500">Solo lectura - Los pagos se registran desde Caja Recepción</p>
@@ -631,26 +643,22 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     </div>
                                 </div>
 
-                                <div className="p-6">
-                                    <PatientPaymentHistory payments={payments} variant="internal" />
+                                <PatientPaymentHistory payments={payments} variant="internal" />
 
-                                    {payments.length === 0 && (
-                                        <Link
-                                            href="/caja-recepcion"
-                                            className="inline-flex items-center gap-2 mt-4 text-blue-500 hover:underline"
-                                        >
-                                            <ExternalLink size={16} />
-                                            Ir a Caja Recepción
-                                        </Link>
-                                    )}
-                                </div>
+                                {payments.length === 0 && (
+                                    <Link
+                                        href="/caja-recepcion"
+                                        className="inline-flex items-center gap-2 mt-4 text-blue-500 hover:underline"
+                                    >
+                                        <ExternalLink size={16} />
+                                        Ir a Caja Recepción
+                                    </Link>
+                                )}
                             </div>
-                        )}
 
-                        {/* Sección: Planes de Tratamiento */}
-                        {activeTab === 'finanzas' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-                                <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                            {/* Planes de Tratamiento */}
+                            <div className="border-b border-gray-100 dark:border-gray-800 pb-6 mb-6">
+                                <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-lg font-semibold">Planes de Tratamiento</h2>
                                     <Link
                                         href={`/caja-recepcion?tab=contratos&patientId=${patient.id_paciente}`}
@@ -673,7 +681,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             const progreso = plan.total_usd > 0 ? (pagadoPlan / plan.total_usd) * 100 : 0;
 
                                             return (
-                                                <div key={plan.id} className="p-6">
+                                                <div key={plan.id} className="py-6">
                                                     <div className="flex justify-between items-start mb-4">
                                                         <div>
                                                             <p className="font-medium">{plan.descripcion || 'Plan sin nombre'}</p>
@@ -733,13 +741,10 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 )}
                             </div>
 
-                        )}
-
-                        {/* Sección: Financiación */}
-                        {activeTab === 'finanzas' && (
+                            {/* Financiación */}
                             <div className="space-y-6">
                                 {/* Header / Config Card */}
-                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -970,107 +975,43 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             </tbody>
                                         </table>
                                     )}
-
                                 </div>}
                             </div>
-                        )}
+                        </PatientSection>
+                    )}
 
-                        {/* Tab: Recalls */}
-                        {activeTab === 'recalls' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
-                                <PatientCadence patientId={patient.id_paciente} />
-                            </div>
-                        )}
+                    {/* 5. Recalls — collapsed */}
+                    <PatientSection id="recalls" title="Recalls (Seguimiento)" icon={Bell}>
+                        <PatientCadence patientId={patient.id_paciente} />
+                    </PatientSection>
 
-                        {/* Tab: Smile Design ✨ */}
-                        {activeTab === 'smile_design' && (
-                            <div className="py-2">
-                                <SmileDesign
-                                    patientId={patient.id_paciente}
-                                    patientName={`${patient.nombre} ${patient.apellido}`}
-                                    onSaved={() => setActiveTab('portal')}
-                                />
-                            </div>
-                        )}
+                    {/* 6. Smile Design — collapsed */}
+                    <PatientSection id="smile_design" title="Smile Design ✨" icon={Sparkles}>
+                        <SmileDesign
+                            patientId={patient.id_paciente}
+                            patientName={`${patient.nombre} ${patient.apellido}`}
+                            onSaved={() => document.getElementById('portal')?.scrollIntoView({ behavior: 'smooth' })}
+                        />
+                    </PatientSection>
 
-                        {/* Tab: Archivos (Google Drive) */}
-                        {activeTab === 'archivos' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
-                                <PatientDriveTab
-                                    patientId={patient.id_paciente}
-                                    patientName={`${patient.apellido}, ${patient.nombre}`}
-                                    motherFolderUrl={patient.link_historia_clinica}
-                                />
-                            </div>
-                        )}
+                    {/* 7. Diseño Digital — collapsed */}
+                    <PatientSection id="diseno" title="Diseño Digital" icon={Sparkles}>
+                        <DesignReviewTab
+                            patientId={patient.id_paciente}
+                            motherFolderUrl={patient.link_historia_clinica ?? null}
+                            initialReview={designReview}
+                        />
+                    </PatientSection>
 
-                        {/* Tab: Diseño Digital */}
-                        {activeTab === 'diseno' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
-                                <DesignReviewTab
-                                    patientId={patient.id_paciente}
-                                    motherFolderUrl={patient.link_historia_clinica ?? null}
-                                    initialReview={designReview}
-                                />
-                            </div>
-                        )}
+                    {/* 8. Portal 360 — collapsed */}
+                    <PatientSection id="portal" title="Portal 360" icon={Sparkles}>
+                        <PatientPortalPanel
+                            patientId={patient.id_paciente}
+                            patientName={`${patient.nombre} ${patient.apellido}`}
+                        />
+                    </PatientSection>
 
-                        {/* Tab: Portal 360 */}
-                        {activeTab === 'portal' && (
-                            <PatientPortalPanel
-                                patientId={patient.id_paciente}
-                                patientName={`${patient.nombre} ${patient.apellido}`}
-                            />
-                        )}
-
-                        {/* Tab: Materiales de Laboratorio */}
-                        {activeTab === 'materiales' && (
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6">
-                                <div className="flex items-center gap-3 mb-5">
-                                    <Package size={20} className="text-violet-500" />
-                                    <h3 className="font-bold text-gray-900 dark:text-white text-lg">Materiales utilizados</h3>
-                                </div>
-                                {materialesLoading ? (
-                                    <div className="flex justify-center py-10">
-                                        <Loader2 className="animate-spin text-violet-500" size={24} />
-                                    </div>
-                                ) : materiales.length === 0 ? (
-                                    <p className="text-center text-gray-400 py-10 text-sm">No hay materiales registrados para este paciente.</p>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {materiales.map((m) => {
-                                            const [y, mo, d] = m.created_at.split('T')[0].split('-').map(Number);
-                                            const fecha = new Date(y, mo - 1, d).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-                                            return (
-                                                <div key={m.id} className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                                    <div className="h-9 w-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
-                                                        <Package size={16} className="text-violet-600 dark:text-violet-400" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm truncate">
-                                                            {m.item?.nombre ?? 'Material'}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 mt-0.5">
-                                                            {m.cantidad} {m.item?.unidad_medida ?? 'u.'} — {fecha}
-                                                        </p>
-                                                        {m.motivo && (
-                                                            <p className="text-xs text-gray-400 mt-0.5 truncate">{m.motivo}</p>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-right shrink-0">
-                                                        <span className="text-xs font-medium text-gray-400">{m.item?.categoria}</span>
-                                                        <p className="text-xs text-gray-400 mt-0.5">{m.usuario?.split('@')[0]}</p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                    </motion.div>
-                </AnimatePresence>
+                </div>
             </div>
 
             {/* Modal: Crear Plan de Financiación */}
@@ -1259,7 +1200,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                     </div>
                 </div>
             )}
-        </div >
+        </div>
     );
 }
 
