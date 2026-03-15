@@ -584,10 +584,12 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         : (folders.find(f => f.id === previewFolderId)?.files ?? [])
                             .filter(f => f.mimeType.toLowerCase().startsWith('image/'))
                 }
-                onClose={() => setPreviewFile(null)}
+                onClose={() => { setPreviewFile(null); setPreviewFolderId(''); }}
                 onSaved={() => {
+                    const targetFolder = previewFolderId;
                     setPreviewFile(null);
-                    handleUploadedToFolder(previewFolderId);
+                    setPreviewFolderId('');
+                    handleUploadedToFolder(targetFolder);
                 }}
             />
         </div>
