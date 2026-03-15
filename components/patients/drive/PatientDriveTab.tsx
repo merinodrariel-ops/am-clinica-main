@@ -51,6 +51,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [errorMsg, setErrorMsg] = useState('');
     const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
+    const [previewFolderId, setPreviewFolderId] = useState<string>('');
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
     const [creating, setCreating] = useState(false);
     const [uploadTargetFolderId, setUploadTargetFolderId] = useState(() => extractFolderIdFromUrl(motherFolderUrl) || '');
@@ -90,6 +91,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             });
         }
     }, [currentFolderUrl, status, fetchFolders]);
+
+    function openPreview(file: DriveFile, folderId: string) {
+        setPreviewFile(file);
+        setPreviewFolderId(folderId);
+    }
 
     const handleRefresh = () => {
         if (currentFolderUrl) {
@@ -406,7 +412,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {rootFiles.map(file => (
-                            <DriveFileCard key={file.id} file={file} onPreview={setPreviewFile} />
+                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} />
                         ))}
                     </div>
                 </div>
@@ -511,7 +517,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         <DriveFileCard
                                                             key={file.id}
                                                             file={file}
-                                                            onPreview={setPreviewFile}
+                                                            onPreview={f => openPreview(f, folder.id)}
                                                         />
                                                     ))}
                                                 </div>
@@ -569,7 +575,21 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             )}
 
             {/* Preview modal */}
-            <DrivePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
+            <DrivePreviewModal
+                file={previewFile}
+                folderId={previewFolderId}
+                allFolderFiles={
+                    previewFolderId === motherFolderId
+                        ? rootFiles.filter(f => f.mimeType.toLowerCase().startsWith('image/'))
+                        : (folders.find(f => f.id === previewFolderId)?.files ?? [])
+                            .filter(f => f.mimeType.toLowerCase().startsWith('image/'))
+                }
+                onClose={() => setPreviewFile(null)}
+                onSaved={() => {
+                    setPreviewFile(null);
+                    handleUploadedToFolder(previewFolderId);
+                }}
+            />
         </div>
     );
 }
