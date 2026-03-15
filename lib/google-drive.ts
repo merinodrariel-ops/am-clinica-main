@@ -807,7 +807,7 @@ export async function uploadFileToFolder(
     mimeType: string
 ): Promise<UploadResult> {
     try {
-        const drive = getDriveClient();
+        const drive = getDrive();
         const stream = Readable.from(buffer);
         const response = await drive.files.create({
             supportsAllDrives: true,
@@ -823,10 +823,11 @@ export async function uploadFileToFolder(
         });
         return {
             success: true,
-            fileId: response.data.id ?? undefined,
-            webViewLink: response.data.webViewLink ?? undefined,
+            fileId: response.data.id || undefined,
+            webViewLink: response.data.webViewLink || undefined,
         };
     } catch (error) {
+        console.error('Error uploading file to Drive folder:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : String(error),
