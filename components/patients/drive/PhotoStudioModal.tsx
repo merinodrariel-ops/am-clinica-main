@@ -544,7 +544,6 @@ export default function PhotoStudioModal({
         const displayScale = rect.width > 0 ? W / rect.width : 1;
         // MAX_R in natural pixels ≈ 1.8 display pixels (middle ground, tapers at ends)
         const MAX_R = 1.8 * displayScale;
-        const TAPER_FRAC = 0.14; // fraction of open path that tapers in/out
         const STEPS = 18; // samples per segment for smooth dot sampling
 
         const allShapes: DrawShape[] = [...drawShapes];
@@ -560,53 +559,72 @@ export default function PhotoStudioModal({
             const segCount = shape.closed ? n : n - 1;
 
             ctx.save();
-            ctx.fillStyle = getDrawColorHex(shape.color);
             ctx.shadowColor = 'rgba(0,0,0,0.55)';
             ctx.shadowBlur = 3 * displayScale;
 
-            // ── Main stroke: dot-sampled path with taper at ends (open) ──────
-            if (segCount > 0) {
-                ctx.beginPath();
-                for (let i = 0; i < segCount; i++) {
-                    const p0 = pts[(i - 1 + n) % n];
-                    const p1 = pts[i];
-                    const p2 = pts[(i + 1) % n];
-                    const p3 = pts[(i + 2) % n];
-                    const x1 = p1.x * W, y1 = p1.y * H;
-                    const x2 = p2.x * W, y2 = p2.y * H;
-                    const startStep = i === 0 ? 0 : 1;
-                    for (let s = startStep; s <= STEPS; s++) {
-                        const u = s / STEPS;
-                        const globalT = (i + u) / segCount;
-                        let sx: number, sy: number;
+            if (shape.id === '__current__') {
+                // ── In-progress: clean bezier stroke, no reshaping/taper ────────
+                ctx.strokeStyle = getDrawColorHex(shape.color);
+                ctx.lineWidth = MAX_R * 2;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                if (segCount > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(pts[0].x * W, pts[0].y * H);
+                    for (let i = 0; i < segCount; i++) {
+                        const p0 = pts[(i - 1 + n) % n];
+                        const p1 = pts[i];
+                        const p2 = pts[(i + 1) % n];
+                        const p3 = pts[(i + 2) % n];
+                        const x1 = p1.x * W, y1 = p1.y * H;
+                        const x2 = p2.x * W, y2 = p2.y * H;
                         if (p1.smooth && p2.smooth && n >= 3) {
                             const [cp1x, cp1y, cp2x, cp2y] = catmullRomToBezier(
                                 p0.x * W, p0.y * H, x1, y1, x2, y2, p3.x * W, p3.y * H
                             );
-                            sx = cubicBezierVal(x1, cp1x, cp2x, x2, u);
-                            sy = cubicBezierVal(y1, cp1y, cp2y, y2, u);
+                            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
                         } else {
-                            sx = x1 + (x2 - x1) * u;
-                            sy = y1 + (y2 - y1) * u;
+                            ctx.lineTo(x2, y2);
                         }
-                        let r: number;
-                        if (shape.closed) {
-                            r = MAX_R;
-                        } else {
-                            // Bell taper: 0 at ends, max in middle
-                            const taper = Math.min(globalT / TAPER_FRAC, 1, (1 - globalT) / TAPER_FRAC);
-                            r = MAX_R * taper;
-                        }
-                        if (r < 0.2) continue;
-                        ctx.moveTo(sx + r, sy);
-                        ctx.arc(sx, sy, r, 0, Math.PI * 2);
                     }
+                    ctx.stroke();
                 }
-                ctx.fill();
-            } else if (n === 1) {
-                ctx.beginPath();
-                ctx.arc(pts[0].x * W, pts[0].y * H, MAX_R, 0, Math.PI * 2);
-                ctx.fill();
+            } else {
+                // ── Finished shape: dot-sampled for organic sketch look ───────
+                ctx.fillStyle = getDrawColorHex(shape.color);
+                if (segCount > 0) {
+                    ctx.beginPath();
+                    for (let i = 0; i < segCount; i++) {
+                        const p0 = pts[(i - 1 + n) % n];
+                        const p1 = pts[i];
+                        const p2 = pts[(i + 1) % n];
+                        const p3 = pts[(i + 2) % n];
+                        const x1 = p1.x * W, y1 = p1.y * H;
+                        const x2 = p2.x * W, y2 = p2.y * H;
+                        const startStep = i === 0 ? 0 : 1;
+                        for (let s = startStep; s <= STEPS; s++) {
+                            const u = s / STEPS;
+                            let sx: number, sy: number;
+                            if (p1.smooth && p2.smooth && n >= 3) {
+                                const [cp1x, cp1y, cp2x, cp2y] = catmullRomToBezier(
+                                    p0.x * W, p0.y * H, x1, y1, x2, y2, p3.x * W, p3.y * H
+                                );
+                                sx = cubicBezierVal(x1, cp1x, cp2x, x2, u);
+                                sy = cubicBezierVal(y1, cp1y, cp2y, y2, u);
+                            } else {
+                                sx = x1 + (x2 - x1) * u;
+                                sy = y1 + (y2 - y1) * u;
+                            }
+                            ctx.moveTo(sx + MAX_R, sy);
+                            ctx.arc(sx, sy, MAX_R, 0, Math.PI * 2);
+                        }
+                    }
+                    ctx.fill();
+                } else if (n === 1) {
+                    ctx.beginPath();
+                    ctx.arc(pts[0].x * W, pts[0].y * H, MAX_R, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
 
             // ── Rubber-band dashed line for in-progress shape ────────────────
