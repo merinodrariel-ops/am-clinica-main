@@ -360,7 +360,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                 <div className="space-y-4">
 
                     {/* 1. Archivos — expanded by default */}
-                    <PatientSection id="archivos" title="Archivos" icon={FolderOpen} defaultOpen>
+                    <PatientSection id="archivos" title="Documentación" icon={FolderOpen} defaultOpen>
                         <PatientDriveTab
                             patientId={patient.id_paciente}
                             patientName={`${patient.apellido}, ${patient.nombre}`}
