@@ -197,6 +197,50 @@ export async function createPatientDriveFolderAction(
     }
 }
 
+// ─── Fotos order persistence ────────────────────────────────────────────────
+
+/** Returns the saved photo order for a patient: { [folderId]: [fileId, ...] } */
+export async function getPatientFotosOrder(patientId: string): Promise<Record<string, string[]>> {
+    const { data } = await supabase
+        .from('pacientes')
+        .select('fotos_order')
+        .eq('id_paciente', patientId)
+        .single();
+    return (data?.fotos_order as Record<string, string[]>) ?? {};
+}
+
+/** Persists the display order of files in a folder for a patient. */
+export async function saveFotosOrderAction(
+    patientId: string,
+    folderId: string,
+    orderedIds: string[]
+): Promise<{ error?: string }> {
+    try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        // Read current value then merge — avoids overwriting other folders' orders
+        const { data: current } = await supabase
+            .from('pacientes')
+            .select('fotos_order')
+            .eq('id_paciente', patientId)
+            .single();
+
+        const merged = { ...(current?.fotos_order as Record<string, string[]> ?? {}), [folderId]: orderedIds };
+
+        const { error } = await supabase
+            .from('pacientes')
+            .update({ fotos_order: merged })
+            .eq('id_paciente', patientId);
+
+        if (error) return { error: error.message };
+        return {};
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+    }
+}
+
 // ─── Photo Studio: save edited photo to Drive ───────────────────────────────
 
 /**

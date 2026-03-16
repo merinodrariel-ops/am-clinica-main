@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, type DragEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type DragEvent, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FolderOpen,
@@ -10,18 +10,63 @@ import {
     AlertCircle,
     FolderPlus,
     ExternalLink,
+    GripVertical,
 } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
     getPatientDriveFolders,
     createPatientDriveFolderAction,
     loadFolderFiles,
+    getPatientFotosOrder,
+    saveFotosOrderAction,
 } from '@/app/actions/patient-files-drive';
 import type { DriveFile, FolderWithFiles } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
 import DrivePreviewModal from './DrivePreviewModal';
 import DriveUploadButton from './DriveUploadButton';
+
+// ─── Sortable photo card ─────────────────────────────────────────────────────
+
+function SortableFileCard({
+    file,
+    isPortada,
+    onPreview,
+}: {
+    file: DriveFile;
+    isPortada: boolean;
+    onPreview: (f: DriveFile) => void;
+}) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
+    const style: CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.45 : 1,
+        zIndex: isDragging ? 20 : undefined,
+        position: 'relative',
+    };
+    return (
+        <div ref={setNodeRef} style={style} className="group">
+            {isPortada && (
+                <div className="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-[#C9A96E] text-black text-[10px] font-bold leading-tight pointer-events-none select-none">
+                    Portada
+                </div>
+            )}
+            <div
+                {...attributes}
+                {...listeners}
+                className="absolute top-1 right-1 z-10 p-1 rounded cursor-grab active:cursor-grabbing bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+                title="Arrastrá para reordenar"
+            >
+                <GripVertical size={12} className="text-white" />
+            </div>
+            <DriveFileCard file={file} onPreview={onPreview} />
+        </div>
+    );
+}
 
 function toSlug(str: string): string {
     return str
@@ -73,6 +118,32 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [isGlobalDragging, setIsGlobalDragging] = useState(false);
     const [globalDropFolderId, setGlobalDropFolderId] = useState('');
     const globalDragDepthRef = useRef(0);
+    const [fotosOrder, setFotosOrder] = useState<Record<string, string[]>>({});
+
+    // dnd-kit sensors — require 8px move before drag activates (avoids accidental drags on click)
+    const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+    function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] {
+        if (!savedOrder.length) return files;
+        const pos = new Map(savedOrder.map((id, i) => [id, i]));
+        return [...files].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
+    }
+
+    function handleDragEnd(event: DragEndEvent, folderId: string) {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        setFolders(prev => prev.map(folder => {
+            if (folder.id !== folderId) return folder;
+            const oldIdx = folder.files.findIndex(f => f.id === String(active.id));
+            const newIdx = folder.files.findIndex(f => f.id === String(over.id));
+            if (oldIdx === -1 || newIdx === -1) return folder;
+            const reordered = arrayMove(folder.files, oldIdx, newIdx);
+            const ids = reordered.map(f => f.id);
+            setFotosOrder(prev => ({ ...prev, [folderId]: ids }));
+            void saveFotosOrderAction(patientId, folderId, ids);
+            return { ...folder, files: reordered };
+        }));
+    }
 
     const fetchFolders = useCallback(async (url: string) => {
         const folderId = extractFolderIdFromUrl(url);
@@ -91,14 +162,19 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             return;
         }
 
+        // Load saved photo order for all folders
+        const orderData = await getPatientFotosOrder(patientId);
+        setFotosOrder(orderData);
+
         // Auto-expand the FOTO & VIDEO folder (or first folder with "foto"/"video" in name)
         const fotoFolder = result.folders.find(f => /foto|video/i.test(f.displayName));
         let foldersToSet = result.folders;
         const autoOpenIds = new Set<string>();
         if (fotoFolder) {
             const filesResult = await loadFolderFiles(fotoFolder.id);
+            const sortedFiles = applySavedOrder(filesResult.files, orderData[fotoFolder.id] ?? []);
             foldersToSet = result.folders.map(f =>
-                f.id === fotoFolder.id ? { ...f, files: filesResult.files, loaded: true } : f
+                f.id === fotoFolder.id ? { ...f, files: sortedFiles, loaded: true } : f
             );
             autoOpenIds.add(fotoFolder.id);
         }
@@ -108,7 +184,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         setOpenFolders(autoOpenIds);
         setLoadingFolders(new Set());
         setStatus('loaded');
-    }, []);
+    }, [patientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (currentFolderUrl && status === 'idle') {
@@ -173,10 +249,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             setLoadingFolders(prev => new Set(prev).add(folderId));
 
             const result = await loadFolderFiles(folderId);
+            const sortedFiles = applySavedOrder(result.files, fotosOrder[folderId] ?? []);
 
             setFolders(prev => prev.map(f =>
                 f.id === folderId
-                    ? { ...f, files: result.files, loaded: true }
+                    ? { ...f, files: sortedFiles, loaded: true }
                     : f
             ));
             setLoadingFolders(prev => {
@@ -478,15 +555,27 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                     Carpeta vacía
                                                 </p>
                                             ) : (
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                                    {folder.files.map(file => (
-                                                        <DriveFileCard
-                                                            key={file.id}
-                                                            file={file}
-                                                            onPreview={f => openPreview(f, folder.id)}
-                                                        />
-                                                    ))}
-                                                </div>
+                                                <DndContext
+                                                    sensors={dndSensors}
+                                                    collisionDetection={closestCenter}
+                                                    onDragEnd={e => handleDragEnd(e, folder.id)}
+                                                >
+                                                    <SortableContext
+                                                        items={folder.files.map(f => f.id)}
+                                                        strategy={rectSortingStrategy}
+                                                    >
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                                            {folder.files.map((file, idx) => (
+                                                                <SortableFileCard
+                                                                    key={file.id}
+                                                                    file={file}
+                                                                    isPortada={idx === 0 && file.mimeType.startsWith('image/')}
+                                                                    onPreview={f => openPreview(f, folder.id)}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </SortableContext>
+                                                </DndContext>
                                             )}
                                         </div>
                                     </motion.div>
