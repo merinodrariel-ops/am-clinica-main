@@ -76,6 +76,16 @@ function isImageFile(file: DriveFile): boolean {
     return file.mimeType.toLowerCase().startsWith('image/');
 }
 
+// Custom rotation cursor — circular arrow SVG, hotspot at center (10,10)
+const ROTATION_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">' +
+    '<path d="M10 3 A7 7 0 1 1 3 10" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>' +
+    '<polygon points="0,8 3,15 6,8" fill="white"/>' +
+    '<path d="M10 3 A7 7 0 1 1 3 10" stroke="black" stroke-width="0.7" fill="none" stroke-linecap="round"/>' +
+    '<polygon points="0,8 3,15 6,8" fill="none" stroke="black" stroke-width="0.5"/>' +
+    '</svg>'
+)}") 10 10, crosshair`;
+
 export default function PhotoStudioModal({
     file,
     folderId,
@@ -1141,7 +1151,7 @@ export default function PhotoStudioModal({
                 const ci = hitTestCorner(shape, nx, ny, canvas);
                 const isRotate = e.metaKey || e.ctrlKey;
                 if (ci >= 0) {
-                    canvas.style.cursor = isRotate ? 'grab' : (ci === 0 || ci === 2 ? 'nwse-resize' : 'nesw-resize');
+                    canvas.style.cursor = isRotate ? ROTATION_CURSOR : (ci === 0 || ci === 2 ? 'nwse-resize' : 'nesw-resize');
                 } else if (hitTestShapeBody(shape, nx, ny, canvas)) {
                     canvas.style.cursor = 'move';
                 } else {
