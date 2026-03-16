@@ -125,7 +125,9 @@ export default function PhotoStudioModal({
         rotation !== 0 ||
         brightness !== 100 ||
         bgDone ||
-        imageUrl.startsWith('blob:');
+        imageUrl.startsWith('blob:') ||
+        drawShapes.length > 0 ||
+        currentPoints.length > 0;
 
     // Reset edits without changing the active file
     const resetEdits = useCallback(() => {
@@ -653,6 +655,7 @@ export default function PhotoStudioModal({
         ctx.rotate(radians);
         ctx.drawImage(img, -outW / 2, -outH / 2);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.filter = 'none'; // reset filter so annotation layer is not brightness-affected
 
         // Flatten draw annotation layer when visible
         if (drawVisible && drawCanvasRef.current && drawCanvasRef.current.width > 0) {
@@ -663,6 +666,7 @@ export default function PhotoStudioModal({
     }
 
     async function handleEnterCropMode() {
+        setDrawActive(false);
         if (preCropImageRef.current) {
             // Already have a full pre-crop reference → restore it so user crops from full image
             prevCroppedUrlRef.current = imageUrl; // save current (may be cropped) for cancel
@@ -1183,7 +1187,10 @@ export default function PhotoStudioModal({
                             onUndoBg={handleUndoBgRemoval}
                             onCancelBg={handleCancelBgProcessing}
                             brushMode={brushMode}
-                            onSetBrushMode={setBrushMode}
+                            onSetBrushMode={(mode) => {
+                                setBrushMode(mode);
+                                if (mode !== null) setDrawActive(false);
+                            }}
                             brushSize={brushSize}
                             onSetBrushSize={setBrushSize}
                             onReset={() => {
@@ -1788,7 +1795,7 @@ function ToolsPanel({
                 {drawActive && (
                     <div className="flex items-center gap-1.5">
                         {(['white', 'yellow', 'cyan', 'red'] as DrawColor[]).map(c => {
-                            const hex = { white: '#ffffff', yellow: '#FFE566', cyan: '#66E5FF', red: '#FF5566' }[c];
+                            const hex = getDrawColorHex(c);
                             return (
                                 <button
                                     key={c}
