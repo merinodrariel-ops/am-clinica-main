@@ -37,7 +37,7 @@ export async function GET(request: Request) {
             return NextResponse.json({
                 success: true,
                 message: `Email enviado exitosamente a ${to}`,
-                messageId: result.messageId
+                messageId: (result as any).id
             });
         } else {
             return NextResponse.json({

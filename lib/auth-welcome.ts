@@ -62,8 +62,6 @@ function normalizeCategoria(rawCategoria: unknown) {
     return allowed.has(categoria) ? categoria : 'google_user';
 }
 
-import { generatePremiumWelcomeEmail } from '@/lib/email-templates';
-
 function buildWelcomeHtml(name: string) {
     // Legacy function, now using template from email-templates.ts
     return generatePremiumWelcomeEmail(name, `${process.env.NEXT_PUBLIC_APP_URL || ''}/portal`);

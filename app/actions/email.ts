@@ -7,7 +7,7 @@ export async function sendWelcomeEmailAction(toName: string, toEmail: string) {
         const response = await EmailService.sendWelcome(toName, toEmail);
 
         if (response.success) {
-            console.log('Welcome Email Sent (Action)!', response.messageId);
+            console.log('Welcome Email Sent (Action)!', (response as any).id);
             return { success: true };
         } else {
             console.error('Failed to send email (Action):', response.error);
