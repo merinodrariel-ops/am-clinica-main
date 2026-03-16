@@ -1059,10 +1059,10 @@ export default function PhotoStudioModal({
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `${f.name.replace(/\.[^.]+$/, '')}_web.jpg`;
+                        a.download = `${f.name.replace(/\.[^.]+$/, '')}_web.webp`;
                         a.click();
                         setTimeout(() => { URL.revokeObjectURL(url); res(); }, 500);
-                    }, 'image/jpeg', 0.85);
+                    }, 'image/webp', 0.85);
                 });
                 if (i < files.length - 1) await new Promise(r => setTimeout(r, 350));
             }
