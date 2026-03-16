@@ -10,6 +10,7 @@ import {
     ExternalLink,
     Play,
     Download,
+    Trash2,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import Mini3DPreview from './Mini3DPreview';
@@ -17,6 +18,7 @@ import Mini3DPreview from './Mini3DPreview';
 interface DriveFileCardProps {
     file: DriveFile;
     onPreview: (file: DriveFile) => void;
+    onDelete?: (file: DriveFile) => void;
 }
 
 function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'other' {
@@ -73,7 +75,7 @@ const COLOR_MAP = {
     other: 'text-gray-400 bg-gray-400/10',
 };
 
-export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
+export default function DriveFileCard({ file, onPreview, onDelete }: DriveFileCardProps) {
     const category = getFileCategory(file);
     const Icon = ICON_MAP[category];
     const colorClass = COLOR_MAP[category];
@@ -156,6 +158,15 @@ export default function DriveFileCard({ file, onPreview }: DriveFileCardProps) {
                     >
                         <Download size={13} />
                     </a>
+                )}
+                {onDelete && (
+                    <button
+                        onClick={e => { e.stopPropagation(); onDelete(file); }}
+                        className="absolute bottom-1.5 left-1.5 p-1.5 rounded-lg bg-black/60 text-white/60 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-red-600 hover:text-white z-10"
+                        title="Eliminar"
+                    >
+                        <Trash2 size={13} />
+                    </button>
                 )}
             </div>
 

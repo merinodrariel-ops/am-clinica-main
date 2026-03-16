@@ -668,7 +668,7 @@ export async function listFolderFiles(folderId: string): Promise<{ files?: { id:
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
             fields: 'files(id, name, webViewLink, mimeType, createdTime, thumbnailLink, size)',
-            orderBy: 'createdTime desc',
+            orderBy: 'createdTime asc',
         });
 
         return {
@@ -834,6 +834,31 @@ export async function uploadFileToFolder(
             success: false,
             error: error instanceof Error ? error.message : String(error),
         };
+    }
+}
+
+/**
+ * Updates the content of an existing Drive file in-place (preserves file ID, no duplicate).
+ * Requires writer access on the file — works for service account as folder writer.
+ */
+export async function updateFileContentInDrive(
+    fileId: string,
+    buffer: Buffer,
+    mimeType: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const drive = getDrive();
+        const stream = Readable.from(buffer);
+        await drive.files.update({
+            fileId,
+            supportsAllDrives: true,
+            media: { mimeType, body: stream },
+            fields: 'id',
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('[Drive] Error updating file content:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
 

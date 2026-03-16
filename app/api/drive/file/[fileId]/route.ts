@@ -40,8 +40,9 @@ export async function GET(
         const headers = new Headers();
         headers.set('Content-Type', fileMetadata.data.mimeType || 'application/octet-stream');
         headers.set('Content-Disposition', `inline; filename="${fileMetadata.data.name}"`);
-        // Add cache headers if desired
-        headers.set('Cache-Control', 'private, max-age=3600');
+        headers.set('Cache-Control', 'no-cache');
+        // Allow canvas drawImage() without tainting (needed for PhotoStudio export)
+        headers.set('Access-Control-Allow-Origin', '*');
 
         return new Response(stream, { headers });
     } catch (error) {

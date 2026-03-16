@@ -9,6 +9,7 @@ import {
     getFolderWebViewLink,
     uploadFileToFolder,
     deleteFromDrive,
+    updateFileContentInDrive,
 } from '@/lib/google-drive';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -290,6 +291,46 @@ export async function uploadEditedPhotoAction(
 
         if (!result.success) return { error: result.error };
         return { fileId: result.fileId, webViewLink: result.webViewLink };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Replaces an existing Drive file's content in-place (preserves file ID, no duplicate created).
+ * Uses files.update with media body — requires writer access, NOT ownership.
+ */
+export async function replaceEditedPhotoAction(
+    fileId: string,
+    formData: FormData
+): Promise<{ error?: string }> {
+    try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        const { data: profile } = await supabaseServer
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .single();
+        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
+            return { error: 'Sin permisos para guardar archivos en Drive' };
+        }
+
+        if (!fileId || !DRIVE_ID_RE.test(fileId)) return { error: 'ID de archivo inválido' };
+
+        const file = formData.get('file') as File | null;
+        if (!file) return { error: 'No file in FormData' };
+
+        const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!ALLOWED_MIME.includes(file.type)) return { error: 'Tipo de archivo no permitido' };
+        if (file.size > 20 * 1024 * 1024) return { error: 'El archivo supera el límite de 20 MB' };
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const result = await updateFileContentInDrive(fileId, buffer, file.type || 'image/jpeg');
+        if (!result.success) return { error: result.error };
+        return {};
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
     }

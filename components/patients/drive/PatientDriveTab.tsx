@@ -23,6 +23,7 @@ import {
     loadFolderFiles,
     getPatientFotosOrder,
     saveFotosOrderAction,
+    deleteDriveFileAction,
 } from '@/app/actions/patient-files-drive';
 import type { DriveFile, FolderWithFiles } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
@@ -35,10 +36,12 @@ function SortableFileCard({
     file,
     isPortada,
     onPreview,
+    onDelete,
 }: {
     file: DriveFile;
     isPortada: boolean;
     onPreview: (f: DriveFile) => void;
+    onDelete?: (f: DriveFile) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
     const style: CSSProperties = {
@@ -63,7 +66,7 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} />
+            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} />
         </div>
     );
 }
@@ -132,17 +135,29 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     function handleDragEnd(event: DragEndEvent, folderId: string) {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
-        setFolders(prev => prev.map(folder => {
-            if (folder.id !== folderId) return folder;
-            const oldIdx = folder.files.findIndex(f => f.id === String(active.id));
-            const newIdx = folder.files.findIndex(f => f.id === String(over.id));
-            if (oldIdx === -1 || newIdx === -1) return folder;
-            const reordered = arrayMove(folder.files, oldIdx, newIdx);
-            const ids = reordered.map(f => f.id);
-            setFotosOrder(prev => ({ ...prev, [folderId]: ids }));
-            void saveFotosOrderAction(patientId, folderId, ids);
-            return { ...folder, files: reordered };
-        }));
+        const folder = folders.find(f => f.id === folderId);
+        if (!folder) return;
+        const oldIdx = folder.files.findIndex(f => f.id === String(active.id));
+        const newIdx = folder.files.findIndex(f => f.id === String(over.id));
+        if (oldIdx === -1 || newIdx === -1) return;
+        const reordered = arrayMove(folder.files, oldIdx, newIdx);
+        const ids = reordered.map(f => f.id);
+        setFolders(prev => prev.map(f => f.id === folderId ? { ...f, files: reordered } : f));
+        setFotosOrder(prev => ({ ...prev, [folderId]: ids }));
+        void saveFotosOrderAction(patientId, folderId, ids);
+    }
+
+    async function handleDeleteFile(file: DriveFile) {
+        if (!confirm(`¿Eliminar "${file.name}"? Esta acción no se puede deshacer.`)) return;
+        const result = await deleteDriveFileAction(file.id);
+        if (result.error) {
+            toast.error(`Error al eliminar: ${result.error}`);
+            return;
+        }
+        toast.success(`"${file.name}" eliminado`);
+        // Remove from local state immediately
+        setFolders(prev => prev.map(f => ({ ...f, files: f.files.filter(fi => fi.id !== file.id) })));
+        setRootFiles(prev => prev.filter(fi => fi.id !== file.id));
     }
 
     const fetchFolders = useCallback(async (url: string) => {
@@ -469,7 +484,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {rootFiles.map(file => (
-                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} />
+                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} onDelete={canUpload ? handleDeleteFile : undefined} />
                         ))}
                     </div>
                 </div>
@@ -571,6 +586,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                                     file={file}
                                                                     isPortada={idx === 0 && file.mimeType.startsWith('image/')}
                                                                     onPreview={f => openPreview(f, folder.id)}
+                                                                    onDelete={canUpload ? handleDeleteFile : undefined}
                                                                 />
                                                             ))}
                                                         </div>
