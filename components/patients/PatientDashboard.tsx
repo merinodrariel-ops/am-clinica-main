@@ -44,6 +44,7 @@ import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import type { PlanFinanciacion } from '@/lib/financiacion';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
+import NuevaPresentacionModal from './NuevaPresentacionModal';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
 import { getPatientInventoryMaterials, type PatientMaterialRecord } from '@/app/actions/inventory-stock';
 import { calculateFinancingBreakdown, DEFAULT_MONTHLY_INTEREST_PCT } from '@/lib/financial-engine';
@@ -100,10 +101,14 @@ interface PatientDashboardProps {
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null, designReview = null }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { categoria: role } = useAuth();
+    const { categoria: role, profile } = useAuth();
     const isOdontologo = role === 'odontologo';
     const isRecaptacion = role === 'recaptacion';
     const hidePaymentTabs = isOdontologo || isRecaptacion;
+
+    // Historia Clínica local state (allows optimistic add without page reload)
+    const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
+    const [showPresentacionModal, setShowPresentacionModal] = useState(false);
 
     // Materiales state
     const [materiales, setMateriales] = useState<PatientMaterialRecord[]>([]);
@@ -268,6 +273,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
         .reduce((sum, p) => sum + (p.usd_equivalente || 0), 0);
 
     return (
+        <>
         <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100">
             {/* Header */}
             <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
@@ -449,23 +455,23 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                     <PatientSection id="historia" title="Historia Clínica" icon={FileText} defaultOpen>
                         <div className="border-b border-gray-100 dark:border-gray-800 flex justify-between items-center pb-4 mb-4">
                             <h2 className="text-lg font-semibold">Historia Clínica</h2>
-                            <Link
-                                href={`/worker-portal?patientId=${patient.id_paciente}`}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                            <button
+                                onClick={() => setShowPresentacionModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
                             >
                                 <Plus size={16} />
-                                Nueva Entrada
-                            </Link>
+                                Nueva Presentación
+                            </button>
                         </div>
 
-                        {historiaClinica.length === 0 ? (
+                        {localHistoria.length === 0 ? (
                             <div className="p-10 text-center text-gray-500">
                                 <FileText size={48} className="mx-auto mb-4 text-gray-300" />
                                 <p>No hay registros en la historia clínica.</p>
                             </div>
                         ) : (
                             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                                {historiaClinica.map((entry) => (
+                                {localHistoria.map((entry) => (
                                     <div key={entry.id} className="py-6">
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
@@ -1198,6 +1204,20 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                 </div>
             )}
         </div>
+
+        {/* Nueva Presentación modal */}
+        {showPresentacionModal && (
+            <NuevaPresentacionModal
+                patientId={patient.id_paciente}
+                profesional={profile?.full_name || role || 'Profesional'}
+                onSaved={(entry) => {
+                    setLocalHistoria(prev => [entry as HistoriaClinica, ...prev]);
+                    setShowPresentacionModal(false);
+                }}
+                onClose={() => setShowPresentacionModal(false)}
+            />
+        )}
+        </>
     );
 }
 

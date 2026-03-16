@@ -58,10 +58,10 @@ function SortableFileCard({
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute top-1 right-1 z-10 p-1 rounded cursor-grab active:cursor-grabbing bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+                className="absolute top-1.5 right-1.5 z-10 px-2 py-1.5 rounded-md cursor-grab active:cursor-grabbing bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
                 title="Arrastrá para reordenar"
             >
-                <GripVertical size={12} className="text-white" />
+                <GripVertical size={15} className="text-white" />
             </div>
             <DriveFileCard file={file} onPreview={onPreview} />
         </div>

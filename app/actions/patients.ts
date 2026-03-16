@@ -274,3 +274,36 @@ export async function updatePatientAction(id: string, updates: Partial<Paciente>
         return { data: null, error: error instanceof Error ? error : new Error('Error al actualizar el paciente') };
     }
 }
+
+export async function createHistoriaClinicaEntry(entry: {
+    paciente_id: string;
+    fecha: string;
+    profesional: string;
+    tratamiento_realizado: string;
+    motivo_consulta?: string;
+    observaciones_clinicas?: string;
+}): Promise<{ data?: { id: string; fecha: string; profesional: string; tratamiento_realizado: string }; error?: string }> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        const { data, error } = await supabase
+            .from('historia_clinica')
+            .insert({
+                paciente_id: entry.paciente_id,
+                fecha: entry.fecha,
+                profesional: entry.profesional,
+                tratamiento_realizado: entry.tratamiento_realizado,
+                ...(entry.motivo_consulta ? { motivo_consulta: entry.motivo_consulta } : {}),
+                ...(entry.observaciones_clinicas ? { observaciones_clinicas: entry.observaciones_clinicas } : {}),
+            })
+            .select('id, fecha, profesional, tratamiento_realizado')
+            .single();
+
+        if (error) return { error: error.message };
+        return { data: data as { id: string; fecha: string; profesional: string; tratamiento_realizado: string } };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+    }
+}
