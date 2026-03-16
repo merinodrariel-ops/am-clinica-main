@@ -507,8 +507,8 @@ export default function PhotoStudioModal({
                                     <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                 </>)}
                                 {/* Center crosshair — always visible when zoomed/panning or grid active */}
-                                <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(201,169,110,0.6)" strokeWidth="1" strokeDasharray="10 5" />
-                                <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(201,169,110,0.3)" strokeWidth="0.5" strokeDasharray="10 5" />
+                                <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(255,255,255,0.75)" strokeWidth="1.5" strokeDasharray="8 4" />
+                                <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(255,255,255,0.45)" strokeWidth="1" strokeDasharray="8 4" />
                             </svg>
                         )}
                     </div>

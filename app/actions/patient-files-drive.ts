@@ -122,8 +122,14 @@ export async function getPatientDriveFolders(
             loaded: false,
         }));
 
-        // Sort alphabetically
-        folderResults.sort((a, b) => a.displayName.localeCompare(b.displayName));
+        // Sort: FOTO/VIDEO folder first, then alphabetically
+        folderResults.sort((a, b) => {
+            const aIsFoto = /foto|video/i.test(a.displayName);
+            const bIsFoto = /foto|video/i.test(b.displayName);
+            if (aIsFoto && !bIsFoto) return -1;
+            if (!aIsFoto && bIsFoto) return 1;
+            return a.displayName.localeCompare(b.displayName);
+        });
 
         return {
             folders: folderResults,

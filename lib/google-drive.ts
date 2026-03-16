@@ -789,7 +789,9 @@ export async function movePresentationFilesToFolder(
 export async function deleteFromDrive(fileId: string): Promise<{ success: boolean; error?: string }> {
     try {
         const drive = getDrive();
-        await drive.files.delete({ fileId, supportsAllDrives: true });
+        // Use trash instead of delete: trash only requires write access (not ownership),
+        // so the service account can trash files it didn't create.
+        await drive.files.update({ fileId, supportsAllDrives: true, requestBody: { trashed: true } });
         return { success: true };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
