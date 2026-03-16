@@ -1090,13 +1090,25 @@ export default function PhotoStudioModal({
                                     />
                                 </ReactCrop>
                             ) : (
-                                <img
-                                    ref={imgRef}
-                                    src={imageUrl}
-                                    alt={activeFile.name}
-                                    crossOrigin="anonymous"
-                                    style={imageStyle}
-                                />
+                                <div className="relative inline-block">
+                                    <img
+                                        ref={imgRef}
+                                        src={imageUrl}
+                                        alt={activeFile.name}
+                                        crossOrigin="anonymous"
+                                        style={imageStyle}
+                                    />
+                                    <canvas
+                                        ref={drawCanvasRef}
+                                        className="absolute inset-0 w-full h-full"
+                                        style={{
+                                            cursor: drawActive ? 'crosshair' : 'default',
+                                            pointerEvents: drawActive ? 'auto' : 'none',
+                                        }}
+                                        onClick={handleDrawClick}
+                                        onDoubleClick={handleDrawDblClick}
+                                    />
+                                </div>
                             )}
                         </div>
 
