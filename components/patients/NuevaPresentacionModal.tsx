@@ -126,7 +126,7 @@ export default function NuevaPresentacionModal({ patientId, profesional, onSaved
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Nueva Presentación</h3>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Nueva Prestación</h3>
                         <button
                             onClick={onClose}
                             className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
