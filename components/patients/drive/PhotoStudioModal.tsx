@@ -27,8 +27,15 @@ type BgColor = 'transparent' | 'white' | 'black';
 
 type DrawColor = 'white' | 'yellow' | 'cyan' | 'red';
 
+interface DrawPoint {
+    x: number;       // normalized 0–1
+    y: number;       // normalized 0–1
+    smooth: boolean; // true = Catmull-Rom tangent, false = sharp corner
+}
+
 interface DrawShape {
-    points: [number, number][]; // normalized 0–1 relative to image natural size
+    id: string;
+    points: DrawPoint[];
     closed: boolean;
     color: DrawColor;
 }
@@ -40,6 +47,23 @@ function getDrawColorHex(color: DrawColor): string {
         case 'cyan':   return '#66E5FF';
         case 'red':    return '#FF5566';
     }
+}
+
+// Convert Catmull-Rom control points to cubic bezier control points.
+// Returns [cp1x, cp1y, cp2x, cp2y] for the segment from P1 to P2.
+function catmullRomToBezier(
+    p0x: number, p0y: number,
+    p1x: number, p1y: number,
+    p2x: number, p2y: number,
+    p3x: number, p3y: number,
+): [number, number, number, number] {
+    const t = 0.5;
+    return [
+        p1x + (p2x - p0x) * t / 3,
+        p1y + (p2y - p0y) * t / 3,
+        p2x - (p3x - p1x) * t / 3,
+        p2y - (p3y - p1y) * t / 3,
+    ];
 }
 
 function isImageFile(file: DriveFile): boolean {
@@ -68,12 +92,17 @@ export default function PhotoStudioModal({
     const brushCanvasRef = useRef<HTMLCanvasElement>(null);
     const brushDrawingRef = useRef(false);
     const drawCanvasRef = useRef<HTMLCanvasElement>(null);
+    const dragStateRef = useRef<{ shapeId: string; pointIdx: number } | null>(null);
 
-    const [drawActive, setDrawActive] = useState(false);
+    type DrawMode = 'idle' | 'drawing' | 'editing';
+    const [drawMode, setDrawMode] = useState<DrawMode>('idle');
     const [drawVisible, setDrawVisible] = useState(true);
     const [drawColor, setDrawColor] = useState<DrawColor>('white');
     const [drawShapes, setDrawShapes] = useState<DrawShape[]>([]);
-    const [currentPoints, setCurrentPoints] = useState<[number, number][]>([]);
+    const [currentPoints, setCurrentPoints] = useState<DrawPoint[]>([]);
+    const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+    const [mousePos, setMousePos] = useState<[number, number] | null>(null);
+    const [drawClipboard, setDrawClipboard] = useState<DrawShape | null>(null);
 
     const [zoom, setZoom] = useState(1);
     const [panX, setPanX] = useState(0);
@@ -153,9 +182,11 @@ export default function PhotoStudioModal({
         preCropImageRef.current = null;
         prevCroppedUrlRef.current = null;
         setHistory([]);
-        setDrawActive(false);
+        setDrawMode('idle');
         setDrawShapes([]);
         setCurrentPoints([]);
+        setSelectedShapeId(null);
+        setMousePos(null);
     }, []);
 
     // When initial file prop changes (shouldn't normally happen, but be safe)
@@ -239,6 +270,35 @@ export default function PhotoStudioModal({
         return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [history]);
+
+    // Keyboard shortcut: Cmd+C / Cmd+V for draw shape copy/paste
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (!e.metaKey && !e.ctrlKey) return;
+            if (e.key === 'c' && selectedShapeId) {
+                const shape = drawShapes.find(s => s.id === selectedShapeId);
+                if (shape) setDrawClipboard(shape);
+            }
+            if (e.key === 'v' && drawClipboard) {
+                const OFFSET = 0.02;
+                const newShape: DrawShape = {
+                    ...drawClipboard,
+                    id: `shape-${Date.now()}`,
+                    points: drawClipboard.points.map(p => ({
+                        ...p,
+                        x: Math.min(1, p.x + OFFSET),
+                        y: Math.min(1, p.y + OFFSET),
+                    })),
+                };
+                setDrawShapes(prev => [...prev, newShape]);
+                setSelectedShapeId(newShape.id);
+                setDrawMode('editing');
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedShapeId, drawShapes, drawClipboard]);
 
     function handleSwitchFile(newFile: DriveFile) {
         if (newFile.id === activeFile?.id) return;
@@ -463,52 +523,97 @@ export default function PhotoStudioModal({
         const canvas = drawCanvasRef.current;
         const img = imgRef.current;
         if (!canvas || !img) return;
-
         const W = img.naturalWidth || img.width;
         const H = img.naturalHeight || img.height;
         if (W === 0 || H === 0) return;
         canvas.width = W;
         canvas.height = H;
-
         const ctx = canvas.getContext('2d')!;
         ctx.clearRect(0, 0, W, H);
-
         if (!drawVisible) return;
 
-        const allShapes = [...drawShapes];
+        const allShapes: DrawShape[] = [...drawShapes];
         if (currentPoints.length > 0) {
-            allShapes.push({ points: currentPoints, closed: false, color: drawColor });
+            allShapes.push({ id: '__current__', points: currentPoints, closed: false, color: drawColor });
         }
 
         for (const shape of allShapes) {
             if (shape.points.length < 1) continue;
+            const pts = shape.points;
+            const n = pts.length;
+            const isSelected = shape.id === selectedShapeId;
+
             ctx.save();
             ctx.strokeStyle = getDrawColorHex(shape.color);
-            ctx.lineWidth = Math.max(2, W / 400);
+            ctx.lineWidth = 1.5;
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
-            ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            ctx.shadowBlur = Math.max(3, W / 300);
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 2;
 
             ctx.beginPath();
-            const [fx, fy] = shape.points[0];
-            ctx.moveTo(fx * W, fy * H);
-            for (let i = 1; i < shape.points.length; i++) {
-                const [px, py] = shape.points[i];
-                ctx.lineTo(px * W, py * H);
+            ctx.moveTo(pts[0].x * W, pts[0].y * H);
+
+            for (let i = 0; i < (shape.closed ? n : n - 1); i++) {
+                const p0 = pts[(i - 1 + n) % n];
+                const p1 = pts[i];
+                const p2 = pts[(i + 1) % n];
+                const p3 = pts[(i + 2) % n];
+
+                const x1 = p1.x * W, y1 = p1.y * H;
+                const x2 = p2.x * W, y2 = p2.y * H;
+
+                if (p1.smooth && p2.smooth && n >= 3) {
+                    const [cp1x, cp1y, cp2x, cp2y] = catmullRomToBezier(
+                        p0.x * W, p0.y * H, x1, y1, x2, y2, p3.x * W, p3.y * H
+                    );
+                    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+                } else {
+                    ctx.lineTo(x2, y2);
+                }
             }
             if (shape.closed) ctx.closePath();
             ctx.stroke();
 
-            ctx.fillStyle = getDrawColorHex(shape.color);
-            for (const [px, py] of shape.points) {
+            // Rubber-band line for in-progress shape
+            if (shape.id === '__current__' && mousePos && n >= 1) {
+                const last = pts[n - 1];
+                ctx.save();
+                ctx.strokeStyle = getDrawColorHex(shape.color);
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.globalAlpha = 0.5;
+                ctx.shadowBlur = 0;
                 ctx.beginPath();
-                ctx.arc(px * W, py * H, Math.max(3, W / 250), 0, Math.PI * 2);
-                ctx.fill();
+                ctx.moveTo(last.x * W, last.y * H);
+                ctx.lineTo(mousePos[0] * W, mousePos[1] * H);
+                ctx.stroke();
+                ctx.restore();
             }
+
+            // Handles in edit mode
+            if ((drawMode === 'editing' || drawMode === 'drawing') && shape.id !== '__current__' && isSelected) {
+                for (const pt of pts) {
+                    ctx.save();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = getDrawColorHex(shape.color);
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowBlur = 0;
+                    if (pt.smooth) {
+                        ctx.beginPath();
+                        ctx.arc(pt.x * W, pt.y * H, 5, 0, Math.PI * 2);
+                        ctx.fill(); ctx.stroke();
+                    } else {
+                        ctx.fillRect(pt.x * W - 4, pt.y * H - 4, 8, 8);
+                        ctx.strokeRect(pt.x * W - 4, pt.y * H - 4, 8, 8);
+                    }
+                    ctx.restore();
+                }
+            }
+
             ctx.restore();
         }
-    }, [drawShapes, currentPoints, drawVisible, drawColor]);
+    }, [drawShapes, currentPoints, drawVisible, drawColor, drawMode, selectedShapeId, mousePos, imageUrl]);
 
     function getCanvasXY(e: React.PointerEvent<HTMLCanvasElement>) {
         const canvas = e.currentTarget;
@@ -576,43 +681,152 @@ export default function PhotoStudioModal({
         }, 'image/png');
     }
 
-    function getDrawCanvasXY(e: React.MouseEvent<HTMLCanvasElement>): [number, number] {
-        const canvas = e.currentTarget;
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width;
-        const y = (e.clientY - rect.top) / rect.height;
-        return [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))];
+    // ── Draw tool helpers ─────────────────────────────────────────────────────
+
+    function getDrawNormXY(e: React.MouseEvent<HTMLCanvasElement>): [number, number] {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        return [x, y];
+    }
+
+    function getPointerNormXY(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        return [x, y];
+    }
+
+    function hitTestPoint(shape: DrawShape, nx: number, ny: number, canvas: HTMLCanvasElement): number {
+        const W = canvas.width, H = canvas.height;
+        const RADIUS_PX = 10;
+        const rx = RADIUS_PX / W, ry = RADIUS_PX / H;
+        for (let i = 0; i < shape.points.length; i++) {
+            const p = shape.points[i];
+            if (Math.abs(p.x - nx) < rx && Math.abs(p.y - ny) < ry) return i;
+        }
+        return -1;
+    }
+
+    function hitTestShape(shapes: DrawShape[], nx: number, ny: number, canvas: HTMLCanvasElement): DrawShape | null {
+        for (const shape of [...shapes].reverse()) {
+            if (hitTestPoint(shape, nx, ny, canvas) >= 0) return shape;
+        }
+        return null;
+    }
+
+    function handleDrawMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+        if (drawMode !== 'drawing') return;
+        const [x, y] = getDrawNormXY(e);
+        setMousePos([x, y]);
     }
 
     function handleDrawClick(e: React.MouseEvent<HTMLCanvasElement>) {
-        if (!drawActive) return;
-        e.stopPropagation();
-        const pt = getDrawCanvasXY(e);
-        setCurrentPoints(prev => [...prev, pt]);
+        if (drawMode === 'idle') {
+            const canvas = drawCanvasRef.current!;
+            const [nx, ny] = getDrawNormXY(e);
+            const hit = hitTestShape(drawShapes, nx, ny, canvas);
+            if (hit) {
+                setSelectedShapeId(hit.id);
+                setDrawMode('editing');
+            }
+            return;
+        }
+        if (drawMode === 'drawing') {
+            e.stopPropagation();
+            const [x, y] = getDrawNormXY(e);
+            setCurrentPoints(prev => [...prev, { x, y, smooth: true }]);
+            return;
+        }
+        if (drawMode === 'editing') {
+            const canvas = drawCanvasRef.current!;
+            const [nx, ny] = getDrawNormXY(e);
+            const hit = hitTestShape(drawShapes, nx, ny, canvas);
+            if (!hit) {
+                setSelectedShapeId(null);
+                setDrawMode('idle');
+            } else if (hit.id !== selectedShapeId) {
+                setSelectedShapeId(hit.id);
+            }
+        }
     }
 
     function handleDrawDblClick(e: React.MouseEvent<HTMLCanvasElement>) {
-        if (!drawActive) return;
-        e.stopPropagation();
-        setCurrentPoints(prev => {
-            const pts = prev.slice(0, -1);
-            if (pts.length >= 2) {
-                setDrawShapes(shapes => [...shapes, { points: pts, closed: true, color: drawColor }]);
+        if (drawMode === 'drawing') {
+            e.stopPropagation();
+            setCurrentPoints(prev => {
+                const pts = prev.slice(0, -1);
+                if (pts.length >= 2) {
+                    const newId = `shape-${Date.now()}`;
+                    setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: true, color: drawColor }]);
+                    setSelectedShapeId(newId);
+                    setDrawMode('editing');
+                }
+                return [];
+            });
+            setMousePos(null);
+            return;
+        }
+        if (drawMode === 'editing' && selectedShapeId) {
+            const canvas = drawCanvasRef.current!;
+            const [nx, ny] = getDrawNormXY(e);
+            const shape = drawShapes.find(s => s.id === selectedShapeId);
+            if (!shape) return;
+            const idx = hitTestPoint(shape, nx, ny, canvas);
+            if (idx >= 0) {
+                e.stopPropagation();
+                setDrawShapes(shapes => shapes.map(s =>
+                    s.id === selectedShapeId
+                        ? { ...s, points: s.points.map((p, i) => i === idx ? { ...p, smooth: !p.smooth } : p) }
+                        : s
+                ));
             }
-            return [];
-        });
+        }
+    }
+
+    function handleDrawPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (drawMode !== 'editing' || !selectedShapeId) return;
+        const canvas = drawCanvasRef.current!;
+        const [nx, ny] = getPointerNormXY(e);
+        const shape = drawShapes.find(s => s.id === selectedShapeId);
+        if (!shape) return;
+        const idx = hitTestPoint(shape, nx, ny, canvas);
+        if (idx >= 0) {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            dragStateRef.current = { shapeId: selectedShapeId, pointIdx: idx };
+        }
+    }
+
+    function handleDrawPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (!dragStateRef.current) return;
+        const [nx, ny] = getPointerNormXY(e);
+        const { shapeId, pointIdx } = dragStateRef.current;
+        setDrawShapes(shapes => shapes.map(s =>
+            s.id === shapeId
+                ? { ...s, points: s.points.map((p, i) => i === pointIdx ? { ...p, x: nx, y: ny } : p) }
+                : s
+        ));
+    }
+
+    function handleDrawPointerUp() {
+        dragStateRef.current = null;
     }
 
     function handleClearDraw() {
         setDrawShapes([]);
         setCurrentPoints([]);
+        setSelectedShapeId(null);
+        setDrawMode('idle');
+        setMousePos(null);
     }
 
     function handleUndoLastDrawPoint() {
-        if (currentPoints.length > 0) {
+        if (drawMode === 'drawing' && currentPoints.length > 0) {
             setCurrentPoints(prev => prev.slice(0, -1));
         } else if (drawShapes.length > 0) {
             setDrawShapes(prev => prev.slice(0, -1));
+            setSelectedShapeId(null);
+            setDrawMode('idle');
         }
     }
 
@@ -666,7 +880,8 @@ export default function PhotoStudioModal({
     }
 
     async function handleEnterCropMode() {
-        setDrawActive(false);
+        setDrawMode('idle');
+        setMousePos(null);
         if (preCropImageRef.current) {
             // Already have a full pre-crop reference → restore it so user crops from full image
             prevCroppedUrlRef.current = imageUrl; // save current (may be cropped) for cancel
@@ -1111,11 +1326,18 @@ export default function PhotoStudioModal({
                                         ref={drawCanvasRef}
                                         className="absolute inset-0 w-full h-full"
                                         style={{
-                                            cursor: drawActive ? 'crosshair' : 'default',
-                                            pointerEvents: drawActive ? 'auto' : 'none',
+                                            cursor: drawMode === 'drawing' ? 'crosshair'
+                                                  : drawMode === 'editing' ? 'pointer'
+                                                  : 'default',
+                                            pointerEvents: drawMode !== 'idle' ? 'auto' : 'none',
                                         }}
                                         onClick={handleDrawClick}
                                         onDoubleClick={handleDrawDblClick}
+                                        onMouseMove={handleDrawMouseMove}
+                                        onMouseLeave={() => setMousePos(null)}
+                                        onPointerDown={handleDrawPointerDown}
+                                        onPointerMove={handleDrawPointerMove}
+                                        onPointerUp={handleDrawPointerUp}
                                     />
                                 </div>
                             )}
@@ -1189,7 +1411,7 @@ export default function PhotoStudioModal({
                             brushMode={brushMode}
                             onSetBrushMode={(mode) => {
                                 setBrushMode(mode);
-                                if (mode !== null) setDrawActive(false);
+                                if (mode !== null) { setDrawMode('idle'); setMousePos(null); }
                             }}
                             brushSize={brushSize}
                             onSetBrushSize={setBrushSize}
@@ -1203,10 +1425,10 @@ export default function PhotoStudioModal({
                             setShowGrid={setShowGrid}
                             isGridVisible={showGrid || rotation !== 0}
                             onConfirmBg={handleConfirmBg}
-                            drawActive={drawActive}
-                            onSetDrawActive={(v) => {
-                                setDrawActive(v);
-                                if (v) {
+                            drawMode={drawMode}
+                            onSetDrawMode={(mode) => {
+                                setDrawMode(mode);
+                                if (mode !== 'idle') {
                                     setCropActive(false);
                                     setBrushMode(null);
                                 }
@@ -1507,8 +1729,8 @@ interface ToolsPanelProps {
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
     isGridVisible: boolean;
     onConfirmBg: () => void;
-    drawActive: boolean;
-    onSetDrawActive: (v: boolean) => void;
+    drawMode: 'idle' | 'drawing' | 'editing';
+    onSetDrawMode: (mode: 'idle' | 'drawing' | 'editing') => void;
     drawVisible: boolean;
     onToggleDrawVisible: () => void;
     drawColor: DrawColor;
@@ -1542,7 +1764,7 @@ function ToolsPanel({
     showGrid, setShowGrid,
     isGridVisible,
     onConfirmBg,
-    drawActive, onSetDrawActive,
+    drawMode, onSetDrawMode,
     drawVisible, onToggleDrawVisible,
     drawColor, onSetDrawColor,
     drawShapeCount, currentPointCount,
@@ -1781,18 +2003,20 @@ function ToolsPanel({
                 </div>
 
                 <button
-                    onClick={() => onSetDrawActive(!drawActive)}
+                    onClick={() => onSetDrawMode(drawMode === 'idle' ? 'drawing' : 'idle')}
                     className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        drawActive
+                        drawMode !== 'idle'
                             ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/30'
                             : 'bg-white/5 text-white/50 hover:text-white/80 border border-white/10'
                     }`}
                 >
                     <PenLine size={12} />
-                    {drawActive ? 'Dibujando — doble clic para cerrar' : 'Activar trazo'}
+                    {drawMode === 'drawing' ? 'Dibujando — doble clic para cerrar'
+                     : drawMode === 'editing' ? 'Editando forma'
+                     : 'Activar trazo'}
                 </button>
 
-                {drawActive && (
+                {drawMode !== 'idle' && (
                     <div className="flex items-center gap-1.5">
                         {(['white', 'yellow', 'cyan', 'red'] as DrawColor[]).map(c => {
                             const hex = getDrawColorHex(c);
@@ -1828,9 +2052,14 @@ function ToolsPanel({
                     </div>
                 )}
 
-                {drawActive && currentPointCount > 0 && (
+                {drawMode === 'drawing' && currentPointCount > 0 && (
                     <p className="text-white/25 text-[10px]">
                         {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic para cerrar forma
+                    </p>
+                )}
+                {drawMode === 'editing' && (
+                    <p className="text-white/25 text-[10px]">
+                        Arrastrá puntos · doble clic para curva/esquina · Cmd+C/V para copiar
                     </p>
                 )}
             </div>
