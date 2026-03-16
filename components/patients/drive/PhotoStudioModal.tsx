@@ -654,6 +654,11 @@ export default function PhotoStudioModal({
         ctx.drawImage(img, -outW / 2, -outH / 2);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
 
+        // Flatten draw annotation layer when visible
+        if (drawVisible && drawCanvasRef.current && drawCanvasRef.current.width > 0) {
+            ctx.drawImage(drawCanvasRef.current, 0, 0, canvasW, canvasH);
+        }
+
         return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob returned null')), mime, 0.95));
     }
 
