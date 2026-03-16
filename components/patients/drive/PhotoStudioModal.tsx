@@ -33,6 +33,15 @@ interface DrawShape {
     color: DrawColor;
 }
 
+function getDrawColorHex(color: DrawColor): string {
+    switch (color) {
+        case 'white':  return '#ffffff';
+        case 'yellow': return '#FFE566';
+        case 'cyan':   return '#66E5FF';
+        case 'red':    return '#FF5566';
+    }
+}
+
 function isImageFile(file: DriveFile): boolean {
     return file.mimeType.toLowerCase().startsWith('image/');
 }
@@ -446,6 +455,58 @@ export default function PhotoStudioModal({
         };
         sync();
     }, [brushMode]);
+
+    // Redraw annotation layer whenever shapes or visibility change
+    useEffect(() => {
+        const canvas = drawCanvasRef.current;
+        const img = imgRef.current;
+        if (!canvas || !img) return;
+
+        const W = img.naturalWidth || img.width;
+        const H = img.naturalHeight || img.height;
+        if (W === 0 || H === 0) return;
+        canvas.width = W;
+        canvas.height = H;
+
+        const ctx = canvas.getContext('2d')!;
+        ctx.clearRect(0, 0, W, H);
+
+        if (!drawVisible) return;
+
+        const allShapes = [...drawShapes];
+        if (currentPoints.length > 0) {
+            allShapes.push({ points: currentPoints, closed: false, color: drawColor });
+        }
+
+        for (const shape of allShapes) {
+            if (shape.points.length < 1) continue;
+            ctx.save();
+            ctx.strokeStyle = getDrawColorHex(shape.color);
+            ctx.lineWidth = Math.max(2, W / 400);
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = Math.max(3, W / 300);
+
+            ctx.beginPath();
+            const [fx, fy] = shape.points[0];
+            ctx.moveTo(fx * W, fy * H);
+            for (let i = 1; i < shape.points.length; i++) {
+                const [px, py] = shape.points[i];
+                ctx.lineTo(px * W, py * H);
+            }
+            if (shape.closed) ctx.closePath();
+            ctx.stroke();
+
+            ctx.fillStyle = getDrawColorHex(shape.color);
+            for (const [px, py] of shape.points) {
+                ctx.beginPath();
+                ctx.arc(px * W, py * H, Math.max(3, W / 250), 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    }, [drawShapes, currentPoints, drawVisible, drawColor]);
 
     function getCanvasXY(e: React.PointerEvent<HTMLCanvasElement>) {
         const canvas = e.currentTarget;
