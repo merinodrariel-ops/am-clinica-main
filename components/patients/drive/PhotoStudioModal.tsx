@@ -1191,6 +1191,22 @@ export default function PhotoStudioModal({
                             setShowGrid={setShowGrid}
                             isGridVisible={showGrid || rotation !== 0}
                             onConfirmBg={handleConfirmBg}
+                            drawActive={drawActive}
+                            onSetDrawActive={(v) => {
+                                setDrawActive(v);
+                                if (v) {
+                                    setCropActive(false);
+                                    setBrushMode(null);
+                                }
+                            }}
+                            drawVisible={drawVisible}
+                            onToggleDrawVisible={() => setDrawVisible(v => !v)}
+                            drawColor={drawColor}
+                            onSetDrawColor={setDrawColor}
+                            drawShapeCount={drawShapes.length}
+                            currentPointCount={currentPoints.length}
+                            onUndoLastDrawPoint={handleUndoLastDrawPoint}
+                            onClearDraw={handleClearDraw}
                         />
                         </div>
                     </div>
@@ -1479,6 +1495,16 @@ interface ToolsPanelProps {
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
     isGridVisible: boolean;
     onConfirmBg: () => void;
+    drawActive: boolean;
+    onSetDrawActive: (v: boolean) => void;
+    drawVisible: boolean;
+    onToggleDrawVisible: () => void;
+    drawColor: DrawColor;
+    onSetDrawColor: (c: DrawColor) => void;
+    drawShapeCount: number;
+    currentPointCount: number;
+    onUndoLastDrawPoint: () => void;
+    onClearDraw: () => void;
 }
 
 function ToolsPanel({
@@ -1504,6 +1530,12 @@ function ToolsPanel({
     showGrid, setShowGrid,
     isGridVisible,
     onConfirmBg,
+    drawActive, onSetDrawActive,
+    drawVisible, onToggleDrawVisible,
+    drawColor, onSetDrawColor,
+    drawShapeCount, currentPointCount,
+    onUndoLastDrawPoint,
+    onClearDraw,
 }: ToolsPanelProps) {
     return (
         <>
@@ -1717,6 +1749,77 @@ function ToolsPanel({
                             <Check size={14} /> Confirmar
                         </button>
                     </div>
+                )}
+            </div>
+
+            {/* ── Trazo (Smile Design) ── */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
+                        <PenLine size={13} />
+                        Trazo
+                    </div>
+                    <button
+                        onClick={onToggleDrawVisible}
+                        title={drawVisible ? 'Ocultar trazo' : 'Mostrar trazo'}
+                        className="p-1 rounded text-white/40 hover:text-white/70 transition-colors"
+                    >
+                        {drawVisible ? <Eye size={13} /> : <EyeOff size={13} />}
+                    </button>
+                </div>
+
+                <button
+                    onClick={() => onSetDrawActive(!drawActive)}
+                    className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        drawActive
+                            ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/30'
+                            : 'bg-white/5 text-white/50 hover:text-white/80 border border-white/10'
+                    }`}
+                >
+                    <PenLine size={12} />
+                    {drawActive ? 'Dibujando — doble clic para cerrar' : 'Activar trazo'}
+                </button>
+
+                {drawActive && (
+                    <div className="flex items-center gap-1.5">
+                        {(['white', 'yellow', 'cyan', 'red'] as DrawColor[]).map(c => {
+                            const hex = { white: '#ffffff', yellow: '#FFE566', cyan: '#66E5FF', red: '#FF5566' }[c];
+                            return (
+                                <button
+                                    key={c}
+                                    onClick={() => onSetDrawColor(c)}
+                                    title={c}
+                                    className={`w-6 h-6 rounded-full border-2 transition-all ${
+                                        drawColor === c ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'
+                                    }`}
+                                    style={{ backgroundColor: hex }}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+
+                {(drawShapeCount > 0 || currentPointCount > 0) && (
+                    <div className="flex gap-1.5">
+                        <button
+                            onClick={onUndoLastDrawPoint}
+                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs bg-white/5 text-white/50 hover:text-white/80 transition-colors border border-white/10"
+                        >
+                            <Undo2 size={11} /> Deshacer
+                        </button>
+                        <button
+                            onClick={onClearDraw}
+                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs bg-white/5 text-white/50 hover:text-red-400 transition-colors border border-white/10"
+                        >
+                            <X size={11} /> Borrar todo
+                        </button>
+                    </div>
+                )}
+
+                {drawActive && currentPointCount > 0 && (
+                    <p className="text-white/25 text-[10px]">
+                        {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic para cerrar forma
+                    </p>
                 )}
             </div>
 
