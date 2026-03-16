@@ -1391,8 +1391,9 @@ export default function PhotoStudioModal({
                                         style={{
                                             cursor: drawMode === 'drawing' ? 'crosshair'
                                                   : drawMode === 'editing' ? 'pointer'
+                                                  : drawShapes.length > 0 ? 'pointer'
                                                   : 'default',
-                                            pointerEvents: drawMode !== 'idle' ? 'auto' : 'none',
+                                            pointerEvents: (drawMode !== 'idle' || drawShapes.length > 0) ? 'auto' : 'none',
                                         }}
                                         onClick={handleDrawClick}
                                         onDoubleClick={handleDrawDblClick}
