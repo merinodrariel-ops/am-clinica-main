@@ -574,6 +574,46 @@ export default function PhotoStudioModal({
         }, 'image/png');
     }
 
+    function getDrawCanvasXY(e: React.MouseEvent<HTMLCanvasElement>): [number, number] {
+        const canvas = e.currentTarget;
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        const y = (e.clientY - rect.top) / rect.height;
+        return [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))];
+    }
+
+    function handleDrawClick(e: React.MouseEvent<HTMLCanvasElement>) {
+        if (!drawActive) return;
+        e.stopPropagation();
+        const pt = getDrawCanvasXY(e);
+        setCurrentPoints(prev => [...prev, pt]);
+    }
+
+    function handleDrawDblClick(e: React.MouseEvent<HTMLCanvasElement>) {
+        if (!drawActive) return;
+        e.stopPropagation();
+        setCurrentPoints(prev => {
+            const pts = prev.slice(0, -1);
+            if (pts.length >= 2) {
+                setDrawShapes(shapes => [...shapes, { points: pts, closed: true, color: drawColor }]);
+            }
+            return [];
+        });
+    }
+
+    function handleClearDraw() {
+        setDrawShapes([]);
+        setCurrentPoints([]);
+    }
+
+    function handleUndoLastDrawPoint() {
+        if (currentPoints.length > 0) {
+            setCurrentPoints(prev => prev.slice(0, -1));
+        } else if (drawShapes.length > 0) {
+            setDrawShapes(prev => prev.slice(0, -1));
+        }
+    }
+
     async function exportToBlob(): Promise<Blob> {
         // Crop is already baked into imageUrl (done at confirm time).
         // This function only needs to apply remaining rotation + brightness.
