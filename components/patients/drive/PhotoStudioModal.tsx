@@ -562,6 +562,13 @@ export default function PhotoStudioModal({
             ctx.shadowColor = 'rgba(0,0,0,0.55)';
             ctx.shadowBlur = 3 * displayScale;
 
+            // For open paths: clamp phantom control points at both ends
+            // instead of wrapping (wrapping causes a "hook" artifact)
+            const getP0 = (i: number) =>
+                !shape.closed && i === 0 ? pts[0] : pts[(i - 1 + n) % n];
+            const getP3 = (i: number) =>
+                !shape.closed && i === segCount - 1 ? pts[n - 1] : pts[(i + 2) % n];
+
             if (shape.id === '__current__') {
                 // ── In-progress: clean bezier stroke, no reshaping/taper ────────
                 ctx.strokeStyle = getDrawColorHex(shape.color);
@@ -572,10 +579,10 @@ export default function PhotoStudioModal({
                     ctx.beginPath();
                     ctx.moveTo(pts[0].x * W, pts[0].y * H);
                     for (let i = 0; i < segCount; i++) {
-                        const p0 = pts[(i - 1 + n) % n];
+                        const p0 = getP0(i);
                         const p1 = pts[i];
                         const p2 = pts[(i + 1) % n];
-                        const p3 = pts[(i + 2) % n];
+                        const p3 = getP3(i);
                         const x1 = p1.x * W, y1 = p1.y * H;
                         const x2 = p2.x * W, y2 = p2.y * H;
                         if (p1.smooth && p2.smooth && n >= 3) {
@@ -595,10 +602,10 @@ export default function PhotoStudioModal({
                 if (segCount > 0) {
                     ctx.beginPath();
                     for (let i = 0; i < segCount; i++) {
-                        const p0 = pts[(i - 1 + n) % n];
+                        const p0 = getP0(i);
                         const p1 = pts[i];
                         const p2 = pts[(i + 1) % n];
-                        const p3 = pts[(i + 2) % n];
+                        const p3 = getP3(i);
                         const x1 = p1.x * W, y1 = p1.y * H;
                         const x2 = p2.x * W, y2 = p2.y * H;
                         const startStep = i === 0 ? 0 : 1;
