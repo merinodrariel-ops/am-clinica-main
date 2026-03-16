@@ -66,6 +66,12 @@ function catmullRomToBezier(
     ];
 }
 
+// Evaluate a cubic bezier at parameter t (0–1)
+function cubicBezierVal(p0: number, cp1: number, cp2: number, p3: number, t: number): number {
+    const mt = 1 - t;
+    return mt*mt*mt*p0 + 3*mt*mt*t*cp1 + 3*mt*t*t*cp2 + t*t*t*p3;
+}
+
 function isImageFile(file: DriveFile): boolean {
     return file.mimeType.toLowerCase().startsWith('image/');
 }
@@ -532,6 +538,14 @@ export default function PhotoStudioModal({
         ctx.clearRect(0, 0, W, H);
         if (!drawVisible) return;
 
+        // Scale radius from display pixels → natural image pixels
+        const rect = canvas.getBoundingClientRect();
+        const displayScale = rect.width > 0 ? W / rect.width : 1;
+        // MAX_R in natural pixels ≈ 1.8 display pixels (middle ground, tapers at ends)
+        const MAX_R = 1.8 * displayScale;
+        const TAPER_FRAC = 0.14; // fraction of open path that tapers in/out
+        const STEPS = 18; // samples per segment for smooth dot sampling
+
         const allShapes: DrawShape[] = [...drawShapes];
         if (currentPoints.length > 0) {
             allShapes.push({ id: '__current__', points: currentPoints, closed: false, color: drawColor });
@@ -542,46 +556,65 @@ export default function PhotoStudioModal({
             const pts = shape.points;
             const n = pts.length;
             const isSelected = shape.id === selectedShapeId;
+            const segCount = shape.closed ? n : n - 1;
 
             ctx.save();
-            ctx.strokeStyle = getDrawColorHex(shape.color);
-            ctx.lineWidth = 1.5;
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
-            ctx.shadowColor = 'rgba(0,0,0,0.5)';
-            ctx.shadowBlur = 2;
+            ctx.fillStyle = getDrawColorHex(shape.color);
+            ctx.shadowColor = 'rgba(0,0,0,0.55)';
+            ctx.shadowBlur = 3 * displayScale;
 
-            ctx.beginPath();
-            ctx.moveTo(pts[0].x * W, pts[0].y * H);
-
-            for (let i = 0; i < (shape.closed ? n : n - 1); i++) {
-                const p0 = pts[(i - 1 + n) % n];
-                const p1 = pts[i];
-                const p2 = pts[(i + 1) % n];
-                const p3 = pts[(i + 2) % n];
-
-                const x1 = p1.x * W, y1 = p1.y * H;
-                const x2 = p2.x * W, y2 = p2.y * H;
-
-                if (p1.smooth && p2.smooth && n >= 3) {
-                    const [cp1x, cp1y, cp2x, cp2y] = catmullRomToBezier(
-                        p0.x * W, p0.y * H, x1, y1, x2, y2, p3.x * W, p3.y * H
-                    );
-                    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
-                } else {
-                    ctx.lineTo(x2, y2);
+            // ── Main stroke: dot-sampled path with taper at ends (open) ──────
+            if (segCount > 0) {
+                ctx.beginPath();
+                for (let i = 0; i < segCount; i++) {
+                    const p0 = pts[(i - 1 + n) % n];
+                    const p1 = pts[i];
+                    const p2 = pts[(i + 1) % n];
+                    const p3 = pts[(i + 2) % n];
+                    const x1 = p1.x * W, y1 = p1.y * H;
+                    const x2 = p2.x * W, y2 = p2.y * H;
+                    const startStep = i === 0 ? 0 : 1;
+                    for (let s = startStep; s <= STEPS; s++) {
+                        const u = s / STEPS;
+                        const globalT = (i + u) / segCount;
+                        let sx: number, sy: number;
+                        if (p1.smooth && p2.smooth && n >= 3) {
+                            const [cp1x, cp1y, cp2x, cp2y] = catmullRomToBezier(
+                                p0.x * W, p0.y * H, x1, y1, x2, y2, p3.x * W, p3.y * H
+                            );
+                            sx = cubicBezierVal(x1, cp1x, cp2x, x2, u);
+                            sy = cubicBezierVal(y1, cp1y, cp2y, y2, u);
+                        } else {
+                            sx = x1 + (x2 - x1) * u;
+                            sy = y1 + (y2 - y1) * u;
+                        }
+                        let r: number;
+                        if (shape.closed) {
+                            r = MAX_R;
+                        } else {
+                            // Bell taper: 0 at ends, max in middle
+                            const taper = Math.min(globalT / TAPER_FRAC, 1, (1 - globalT) / TAPER_FRAC);
+                            r = MAX_R * taper;
+                        }
+                        if (r < 0.2) continue;
+                        ctx.moveTo(sx + r, sy);
+                        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+                    }
                 }
+                ctx.fill();
+            } else if (n === 1) {
+                ctx.beginPath();
+                ctx.arc(pts[0].x * W, pts[0].y * H, MAX_R, 0, Math.PI * 2);
+                ctx.fill();
             }
-            if (shape.closed) ctx.closePath();
-            ctx.stroke();
 
-            // Rubber-band line for in-progress shape
+            // ── Rubber-band dashed line for in-progress shape ────────────────
             if (shape.id === '__current__' && mousePos && n >= 1) {
                 const last = pts[n - 1];
                 ctx.save();
                 ctx.strokeStyle = getDrawColorHex(shape.color);
-                ctx.lineWidth = 1;
-                ctx.setLineDash([4, 4]);
+                ctx.lineWidth = displayScale;
+                ctx.setLineDash([4 * displayScale, 4 * displayScale]);
                 ctx.globalAlpha = 0.5;
                 ctx.shadowBlur = 0;
                 ctx.beginPath();
@@ -591,21 +624,22 @@ export default function PhotoStudioModal({
                 ctx.restore();
             }
 
-            // Handles in edit mode
+            // ── Handles in edit mode ─────────────────────────────────────────
             if ((drawMode === 'editing' || drawMode === 'drawing') && shape.id !== '__current__' && isSelected) {
+                const HR = 5 * displayScale; // handle radius in natural pixels
                 for (const pt of pts) {
                     ctx.save();
                     ctx.fillStyle = '#ffffff';
                     ctx.strokeStyle = getDrawColorHex(shape.color);
-                    ctx.lineWidth = 1.5;
+                    ctx.lineWidth = 1.5 * displayScale;
                     ctx.shadowBlur = 0;
                     if (pt.smooth) {
                         ctx.beginPath();
-                        ctx.arc(pt.x * W, pt.y * H, 5, 0, Math.PI * 2);
+                        ctx.arc(pt.x * W, pt.y * H, HR, 0, Math.PI * 2);
                         ctx.fill(); ctx.stroke();
                     } else {
-                        ctx.fillRect(pt.x * W - 4, pt.y * H - 4, 8, 8);
-                        ctx.strokeRect(pt.x * W - 4, pt.y * H - 4, 8, 8);
+                        ctx.fillRect(pt.x * W - HR, pt.y * H - HR, HR * 2, HR * 2);
+                        ctx.strokeRect(pt.x * W - HR, pt.y * H - HR, HR * 2, HR * 2);
                     }
                     ctx.restore();
                 }
@@ -698,9 +732,11 @@ export default function PhotoStudioModal({
     }
 
     function hitTestPoint(shape: DrawShape, nx: number, ny: number, canvas: HTMLCanvasElement): number {
-        const W = canvas.width, H = canvas.height;
-        const RADIUS_PX = 10;
-        const rx = RADIUS_PX / W, ry = RADIUS_PX / H;
+        // Use display (CSS) pixels for hit radius so it works on any resolution photo
+        const rect = canvas.getBoundingClientRect();
+        const RADIUS_CSS_PX = 14;
+        const rx = RADIUS_CSS_PX / (rect.width || 1);
+        const ry = RADIUS_CSS_PX / (rect.height || 1);
         for (let i = 0; i < shape.points.length; i++) {
             const p = shape.points[i];
             if (Math.abs(p.x - nx) < rx && Math.abs(p.y - ny) < ry) return i;
@@ -792,6 +828,8 @@ export default function PhotoStudioModal({
         if (!shape) return;
         const idx = hitTestPoint(shape, nx, ny, canvas);
         if (idx >= 0) {
+            e.stopPropagation(); // prevent parent container from starting a pan
+            e.preventDefault();
             e.currentTarget.setPointerCapture(e.pointerId);
             dragStateRef.current = { shapeId: selectedShapeId, pointIdx: idx };
         }
