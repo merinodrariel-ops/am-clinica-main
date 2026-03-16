@@ -6,7 +6,7 @@ import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
-    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight,
+    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type,
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -37,6 +37,14 @@ interface DrawShape {
     id: string;
     points: DrawPoint[];
     closed: boolean;
+    color: DrawColor;
+}
+
+interface TextAnnotation {
+    id: string;
+    x: number;   // normalized 0–1
+    y: number;   // normalized 0–1
+    text: string;
     color: DrawColor;
 }
 
@@ -134,6 +142,14 @@ export default function PhotoStudioModal({
     const [mousePos, setMousePos] = useState<[number, number] | null>(null);
     const [drawClipboard, setDrawClipboard] = useState<DrawShape | null>(null);
 
+    // Text annotation state
+    const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>([]);
+    const [editingTextId, setEditingTextId] = useState<string | null>(null);
+    const [textToolActive, setTextToolActive] = useState(false);
+    const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+    const textDragRef = useRef<{ id: string; lastNx: number; lastNy: number } | null>(null);
+    const textMetricsRef = useRef<Map<string, { wNorm: number; hNorm: number }>>(new Map());
+
     const [zoom, setZoom] = useState(1);
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
@@ -186,7 +202,8 @@ export default function PhotoStudioModal({
         bgDone ||
         imageUrl.startsWith('blob:') ||
         drawShapes.length > 0 ||
-        currentPoints.length > 0;
+        currentPoints.length > 0 ||
+        textAnnotations.length > 0;
 
     // Reset edits without changing the active file
     const resetEdits = useCallback(() => {
@@ -217,6 +234,11 @@ export default function PhotoStudioModal({
         setCurrentPoints([]);
         setSelectedShapeId(null);
         setMousePos(null);
+        setTextAnnotations([]);
+        setEditingTextId(null);
+        setTextToolActive(false);
+        setSelectedTextId(null);
+        textMetricsRef.current.clear();
     }, []);
 
     // When initial file prop changes (shouldn't normally happen, but be safe)
@@ -758,7 +780,41 @@ export default function PhotoStudioModal({
 
             ctx.restore();
         }
-    }, [drawShapes, currentPoints, drawVisible, drawColor, drawMode, selectedShapeId, mousePos, imageUrl]);
+        // ── Text annotations ─────────────────────────────────────────────────
+        if (drawVisible) {
+            const fontSize = 24 * displayScale;
+            ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+            ctx.textBaseline = 'top';
+            textMetricsRef.current.clear();
+            for (const ta of textAnnotations) {
+                const skip = ta.id === editingTextId;
+                const tx = ta.x * W;
+                const ty = ta.y * H;
+                const measured = ctx.measureText(ta.text || ' ');
+                textMetricsRef.current.set(ta.id, {
+                    wNorm: measured.width / W,
+                    hNorm: fontSize / H,
+                });
+                if (skip) continue; // HTML input handles display while editing
+                ctx.save();
+                ctx.shadowColor = 'rgba(0,0,0,0.7)';
+                ctx.shadowBlur = 5 * displayScale;
+                ctx.fillStyle = getDrawColorHex(ta.color);
+                ctx.fillText(ta.text, tx, ty);
+                if (ta.id === selectedTextId && textToolActive) {
+                    ctx.shadowBlur = 0;
+                    ctx.setLineDash([3 * displayScale, 2 * displayScale]);
+                    ctx.strokeStyle = getDrawColorHex(ta.color);
+                    ctx.lineWidth = displayScale;
+                    ctx.globalAlpha = 0.6;
+                    ctx.strokeRect(tx - 2 * displayScale, ty - 2 * displayScale,
+                        measured.width + 4 * displayScale, fontSize + 4 * displayScale);
+                }
+                ctx.restore();
+            }
+        }
+    }, [drawShapes, currentPoints, drawVisible, drawColor, drawMode, selectedShapeId, mousePos, imageUrl,
+        textAnnotations, editingTextId, selectedTextId, textToolActive]);
 
     function getCanvasXY(e: React.PointerEvent<HTMLCanvasElement>) {
         const canvas = e.currentTarget;
@@ -873,6 +929,20 @@ export default function PhotoStudioModal({
         return null;
     }
 
+    function hitTestTextAnnotation(annotations: TextAnnotation[], nx: number, ny: number): TextAnnotation | null {
+        for (const ta of [...annotations].reverse()) {
+            const m = textMetricsRef.current.get(ta.id);
+            if (!m) continue;
+            if (nx >= ta.x && nx <= ta.x + m.wNorm && ny >= ta.y && ny <= ta.y + m.hNorm) return ta;
+        }
+        return null;
+    }
+
+    function finishTextEditing(id: string) {
+        setTextAnnotations(prev => prev.filter(t => t.id !== id || t.text.trim() !== ''));
+        setEditingTextId(null);
+    }
+
     // Returns which corner (0=TL, 1=TR, 2=BR, 3=BL) of the selection bbox is hit, or -1
     function hitTestCorner(shape: DrawShape, nx: number, ny: number, canvas: HTMLCanvasElement): -1 | 0 | 1 | 2 | 3 {
         if (shape.points.length === 0) return -1;
@@ -900,6 +970,24 @@ export default function PhotoStudioModal({
     function handleDrawClick(e: React.MouseEvent<HTMLCanvasElement>) {
         // Suppress click if we were dragging
         if (didDragRef.current) { didDragRef.current = false; return; }
+
+        // Text tool: click to create or edit
+        if (textToolActive) {
+            e.stopPropagation();
+            const [nx, ny] = getDrawNormXY(e);
+            const hit = hitTestTextAnnotation(textAnnotations, nx, ny);
+            if (hit) {
+                setSelectedTextId(hit.id);
+                setEditingTextId(hit.id);
+            } else {
+                const newId = `text-${Date.now()}`;
+                const newTA: TextAnnotation = { id: newId, x: nx, y: ny, text: '', color: drawColor };
+                setTextAnnotations(prev => [...prev, newTA]);
+                setSelectedTextId(newId);
+                setEditingTextId(newId);
+            }
+            return;
+        }
 
         if (drawMode === 'drawing') {
             e.stopPropagation();
@@ -985,6 +1073,19 @@ export default function PhotoStudioModal({
         const canvas = drawCanvasRef.current!;
         const [nx, ny] = getPointerNormXY(e);
 
+        // Text tool: drag to move an existing annotation
+        if (textToolActive) {
+            const hit = hitTestTextAnnotation(textAnnotations, nx, ny);
+            if (hit) {
+                e.stopPropagation();
+                e.preventDefault();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setSelectedTextId(hit.id);
+                textDragRef.current = { id: hit.id, lastNx: nx, lastNy: ny };
+            }
+            return;
+        }
+
         if (drawMode === 'editing' && selectedShapeId) {
             // Try to grab a point handle
             const shape = drawShapes.find(s => s.id === selectedShapeId);
@@ -1058,6 +1159,21 @@ export default function PhotoStudioModal({
     }
 
     function handleDrawPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        // Text drag
+        if (textDragRef.current) {
+            const [nx, ny] = getPointerNormXY(e);
+            const dx = nx - textDragRef.current.lastNx;
+            const dy = ny - textDragRef.current.lastNy;
+            if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) didDragRef.current = true;
+            const { id } = textDragRef.current;
+            setTextAnnotations(prev => prev.map(t => t.id === id
+                ? { ...t, x: Math.max(0, Math.min(0.98, t.x + dx)), y: Math.max(0, Math.min(0.98, t.y + dy)) }
+                : t
+            ));
+            textDragRef.current.lastNx = nx;
+            textDragRef.current.lastNy = ny;
+            return;
+        }
         // Rubber-band preview while drawing
         if (drawMode === 'drawing') {
             const [x, y] = getPointerNormXY(e);
@@ -1166,6 +1282,7 @@ export default function PhotoStudioModal({
         shapeDragRef.current = null;
         cornerDragRef.current = null;
         rotationDragRef.current = null;
+        textDragRef.current = null;
     }
 
     function handleClearDraw() {
@@ -1174,6 +1291,10 @@ export default function PhotoStudioModal({
         setSelectedShapeId(null);
         setDrawMode('idle');
         setMousePos(null);
+        setTextAnnotations([]);
+        setEditingTextId(null);
+        setSelectedTextId(null);
+        textMetricsRef.current.clear();
     }
 
     function handleFlipHorizontal() {
@@ -1240,6 +1361,21 @@ export default function PhotoStudioModal({
         // Flatten draw annotation layer when visible
         if (drawVisible && drawCanvasRef.current && drawCanvasRef.current.width > 0) {
             ctx.drawImage(drawCanvasRef.current, 0, 0, canvasW, canvasH);
+        }
+        // Bake text annotations (including any currently being edited)
+        if (drawVisible && textAnnotations.length > 0) {
+            const fontSize = 24 * (canvasW / (drawCanvasRef.current?.getBoundingClientRect().width || canvasW));
+            ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+            ctx.textBaseline = 'top';
+            for (const ta of textAnnotations) {
+                if (!ta.text.trim()) continue;
+                ctx.save();
+                ctx.shadowColor = 'rgba(0,0,0,0.7)';
+                ctx.shadowBlur = 5 * (canvasW / (drawCanvasRef.current?.getBoundingClientRect().width || canvasW));
+                ctx.fillStyle = getDrawColorHex(ta.color);
+                ctx.fillText(ta.text, ta.x * canvasW, ta.y * canvasH);
+                ctx.restore();
+            }
         }
 
         return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob returned null')), mime, 0.95));
@@ -1692,20 +1828,63 @@ export default function PhotoStudioModal({
                                         ref={drawCanvasRef}
                                         className="absolute inset-0 w-full h-full"
                                         style={{
-                                            cursor: drawMode === 'drawing' ? 'crosshair'
+                                            cursor: textToolActive ? 'text'
+                                                  : drawMode === 'drawing' ? 'crosshair'
                                                   : drawMode === 'editing' ? 'crosshair'
                                                   : drawMode === 'selected' ? 'move'
                                                   : drawShapes.length > 0 ? 'pointer'
                                                   : 'default',
-                                            pointerEvents: (drawMode !== 'idle' || drawShapes.length > 0) ? 'auto' : 'none',
+                                            pointerEvents: (drawMode !== 'idle' || drawShapes.length > 0 || textToolActive || textAnnotations.length > 0) ? 'auto' : 'none',
                                         }}
                                         onClick={handleDrawClick}
                                         onDoubleClick={handleDrawDblClick}
                                         onPointerDown={handleDrawPointerDown}
                                         onPointerMove={handleDrawPointerMove}
                                         onPointerUp={handleDrawPointerUp}
-                                        onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; cornerDragRef.current = null; rotationDragRef.current = null; }}
+                                        onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; cornerDragRef.current = null; rotationDragRef.current = null; textDragRef.current = null; }}
                                     />
+                                    {/* Text annotation editing overlay */}
+                                    {textAnnotations.map(ta => {
+                                        if (ta.id !== editingTextId) return null;
+                                        return (
+                                            <div
+                                                key={ta.id}
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: `${ta.x * 100}%`,
+                                                    top: `${ta.y * 100}%`,
+                                                    zIndex: 20,
+                                                    pointerEvents: 'auto',
+                                                }}
+                                            >
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    value={ta.text}
+                                                    placeholder="Texto..."
+                                                    onChange={e => setTextAnnotations(prev => prev.map(t => t.id === ta.id ? { ...t, text: e.target.value } : t))}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter' || e.key === 'Escape') {
+                                                            e.preventDefault();
+                                                            finishTextEditing(ta.id);
+                                                        }
+                                                    }}
+                                                    onBlur={() => finishTextEditing(ta.id)}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        outline: 'none',
+                                                        font: '600 24px Inter, sans-serif',
+                                                        color: getDrawColorHex(ta.color),
+                                                        caretColor: getDrawColorHex(ta.color),
+                                                        textShadow: '0 0 4px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.9)',
+                                                        minWidth: '8ch',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -1798,6 +1977,8 @@ export default function PhotoStudioModal({
                                 if (mode !== 'idle') {
                                     setCropActive(false);
                                     setBrushMode(null);
+                                    setTextToolActive(false);
+                                    setEditingTextId(null);
                                 }
                             }}
                             drawVisible={drawVisible}
@@ -1809,6 +1990,18 @@ export default function PhotoStudioModal({
                             onUndoLastDrawPoint={handleUndoLastDrawPoint}
                             onClearDraw={handleClearDraw}
                             onFlipHorizontal={handleFlipHorizontal}
+                            textToolActive={textToolActive}
+                            onToggleTextTool={() => {
+                                setTextToolActive(v => !v);
+                                if (!textToolActive) {
+                                    setDrawMode('idle');
+                                    setCurrentPoints([]);
+                                    setBrushMode(null);
+                                }
+                                setEditingTextId(null);
+                                setSelectedTextId(null);
+                            }}
+                            textAnnotationCount={textAnnotations.length}
                         />
                         </div>
                     </div>
@@ -2108,6 +2301,9 @@ interface ToolsPanelProps {
     onUndoLastDrawPoint: () => void;
     onClearDraw: () => void;
     onFlipHorizontal: () => void;
+    textToolActive: boolean;
+    onToggleTextTool: () => void;
+    textAnnotationCount: number;
 }
 
 function ToolsPanel({
@@ -2140,6 +2336,8 @@ function ToolsPanel({
     onUndoLastDrawPoint,
     onClearDraw,
     onFlipHorizontal,
+    textToolActive, onToggleTextTool,
+    textAnnotationCount,
 }: ToolsPanelProps) {
     return (
         <>
@@ -2444,6 +2642,35 @@ function ToolsPanel({
                 {drawMode === 'editing' && (
                     <p className="text-white/25 text-[10px]">
                         Arrastrá puntos · doble clic en punto para curva/esquina · doble clic afuera para salir
+                    </p>
+                )}
+            </div>
+
+            {/* ── Texto ── */}
+            <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
+                    <Type size={13} />
+                    Texto
+                </div>
+                <button
+                    onClick={onToggleTextTool}
+                    className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        textToolActive
+                            ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/30'
+                            : 'bg-white/5 text-white/50 hover:text-white/80 border border-white/10'
+                    }`}
+                >
+                    <Type size={12} />
+                    {textToolActive ? 'Texto activo — clic para escribir' : 'Agregar texto'}
+                </button>
+                {textToolActive && (
+                    <p className="text-white/25 text-[10px]">
+                        Clic = crear · clic en texto = editar · mantener+arrastrar = mover · Enter o Esc = confirmar
+                    </p>
+                )}
+                {textAnnotationCount > 0 && (
+                    <p className="text-white/30 text-[10px]">
+                        {textAnnotationCount} texto{textAnnotationCount !== 1 ? 's' : ''}
                     </p>
                 )}
             </div>
