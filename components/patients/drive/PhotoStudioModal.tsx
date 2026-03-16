@@ -106,6 +106,12 @@ export default function PhotoStudioModal({
         origCornerNx: number; origCornerNy: number;
         origPoints: DrawPoint[];
     } | null>(null);
+    const rotationDragRef = useRef<{
+        shapeId: string;
+        centerNx: number; centerNy: number;
+        startAngle: number;
+        origPoints: DrawPoint[];
+    } | null>(null);
     const didDragRef = useRef(false);
 
     type DrawMode = 'idle' | 'drawing' | 'selected' | 'editing';
@@ -658,6 +664,33 @@ export default function PhotoStudioModal({
                 ctx.restore();
             }
 
+            // ── First-point close indicator while drawing (≥3 pts) ──────────
+            if (shape.id === '__current__' && n >= 3 && drawMode === 'drawing') {
+                const first = pts[0];
+                const nearFirst = mousePos &&
+                    Math.abs(mousePos[0] - first.x) < 14 / (rect.width || 1) &&
+                    Math.abs(mousePos[1] - first.y) < 14 / (rect.height || 1);
+                ctx.save();
+                ctx.shadowBlur = 0;
+                ctx.setLineDash([]);
+                ctx.strokeStyle = getDrawColorHex(shape.color);
+                ctx.lineWidth = 1.5 * displayScale;
+                if (nearFirst) {
+                    ctx.fillStyle = getDrawColorHex(shape.color);
+                    ctx.globalAlpha = 0.9;
+                    ctx.beginPath();
+                    ctx.arc(first.x * W, first.y * H, 5 * displayScale, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else {
+                    ctx.globalAlpha = 0.55;
+                    ctx.beginPath();
+                    ctx.arc(first.x * W, first.y * H, 5 * displayScale, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
             // ── Selection bounding box + corner resize handles ────────────────
             if (drawMode === 'selected' && shape.id !== '__current__' && isSelected) {
                 const xs = pts.map(p => p.x * W);
@@ -861,6 +894,22 @@ export default function PhotoStudioModal({
         if (drawMode === 'drawing') {
             e.stopPropagation();
             const [x, y] = getDrawNormXY(e);
+            // If clicking near the first point (≥3 pts already) → close the shape
+            if (currentPoints.length >= 3) {
+                const canvas = drawCanvasRef.current!;
+                const rect = canvas.getBoundingClientRect();
+                const first = currentPoints[0];
+                if (Math.abs(x - first.x) < 14 / (rect.width || 1) &&
+                    Math.abs(y - first.y) < 14 / (rect.height || 1)) {
+                    const newId = `shape-${Date.now()}`;
+                    setDrawShapes(shapes => [...shapes, { id: newId, points: currentPoints, closed: true, color: drawColor }]);
+                    setCurrentPoints([]);
+                    setMousePos(null);
+                    setSelectedShapeId(newId);
+                    setDrawMode('selected');
+                    return;
+                }
+            }
             setCurrentPoints(prev => [...prev, { x, y, smooth: true }]);
             return;
         }
@@ -881,12 +930,14 @@ export default function PhotoStudioModal({
     function handleDrawDblClick(e: React.MouseEvent<HTMLCanvasElement>) {
         if (drawMode === 'drawing') {
             e.stopPropagation();
-            const pts = currentPoints.slice(0, -1);
+            const pts = currentPoints.slice(0, -1); // remove phantom point from last click
             if (pts.length >= 2) {
                 const newId = `shape-${Date.now()}`;
-                setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: true, color: drawColor }]);
+                // Double-click = open path (no line back to first point)
+                // To close: click on the first point while drawing
+                setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: false, color: drawColor }]);
                 setSelectedShapeId(newId);
-                setDrawMode('selected'); // closed → selected; double-click again to edit
+                setDrawMode('selected');
             }
             setCurrentPoints([]);
             setMousePos(null);
@@ -940,7 +991,7 @@ export default function PhotoStudioModal({
         }
 
         if (drawMode === 'selected' && selectedShapeId) {
-            // Check corner resize handles first
+            // Check corner handles — Cmd/Ctrl = rotate, plain = resize
             const shape = drawShapes.find(s => s.id === selectedShapeId);
             if (shape) {
                 const ci = hitTestCorner(shape, nx, ny, canvas);
@@ -952,18 +1003,31 @@ export default function PhotoStudioModal({
                     const ys = shape.points.map(p => p.y);
                     const minX = Math.min(...xs), maxX = Math.max(...xs);
                     const minY = Math.min(...ys), maxY = Math.max(...ys);
-                    const origCorners: [number, number][] = [
-                        [minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY],
-                    ];
-                    const anchorIdx = (ci + 2) % 4;
-                    cornerDragRef.current = {
-                        corner: ci as 0 | 1 | 2 | 3,
-                        anchorNx: origCorners[anchorIdx][0],
-                        anchorNy: origCorners[anchorIdx][1],
-                        origCornerNx: origCorners[ci][0],
-                        origCornerNy: origCorners[ci][1],
-                        origPoints: shape.points.map(p => ({ ...p })),
-                    };
+                    if (e.metaKey || e.ctrlKey) {
+                        // Rotation drag
+                        const centerNx = (minX + maxX) / 2;
+                        const centerNy = (minY + maxY) / 2;
+                        rotationDragRef.current = {
+                            shapeId: selectedShapeId,
+                            centerNx, centerNy,
+                            startAngle: Math.atan2(ny - centerNy, nx - centerNx),
+                            origPoints: shape.points.map(p => ({ ...p })),
+                        };
+                    } else {
+                        // Resize drag
+                        const origCorners: [number, number][] = [
+                            [minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY],
+                        ];
+                        const anchorIdx = (ci + 2) % 4;
+                        cornerDragRef.current = {
+                            corner: ci as 0 | 1 | 2 | 3,
+                            anchorNx: origCorners[anchorIdx][0],
+                            anchorNy: origCorners[anchorIdx][1],
+                            origCornerNx: origCorners[ci][0],
+                            origCornerNy: origCorners[ci][1],
+                            origPoints: shape.points.map(p => ({ ...p })),
+                        };
+                    }
                     return;
                 }
             }
@@ -997,6 +1061,30 @@ export default function PhotoStudioModal({
             setDrawShapes(shapes => shapes.map(s =>
                 s.id === shapeId
                     ? { ...s, points: s.points.map((p, i) => i === pointIdx ? { ...p, x: nx, y: ny } : p) }
+                    : s
+            ));
+            return;
+        }
+        // Rotation drag (Cmd+corner)
+        if (rotationDragRef.current) {
+            didDragRef.current = true;
+            const [nx, ny] = getPointerNormXY(e);
+            const { shapeId, centerNx, centerNy, startAngle, origPoints } = rotationDragRef.current;
+            const delta = Math.atan2(ny - centerNy, nx - centerNx) - startAngle;
+            const cos = Math.cos(delta), sin = Math.sin(delta);
+            setDrawShapes(shapes => shapes.map(s =>
+                s.id === shapeId
+                    ? {
+                        ...s,
+                        points: origPoints.map(p => {
+                            const dx = p.x - centerNx, dy = p.y - centerNy;
+                            return {
+                                ...p,
+                                x: Math.max(0, Math.min(1, centerNx + dx * cos - dy * sin)),
+                                y: Math.max(0, Math.min(1, centerNy + dx * sin + dy * cos)),
+                            };
+                        }),
+                    }
                     : s
             ));
             return;
@@ -1051,10 +1139,9 @@ export default function PhotoStudioModal({
             if (shape) {
                 const [nx, ny] = getPointerNormXY(e);
                 const ci = hitTestCorner(shape, nx, ny, canvas);
-                if (ci === 0 || ci === 2) {
-                    canvas.style.cursor = 'nwse-resize';
-                } else if (ci === 1 || ci === 3) {
-                    canvas.style.cursor = 'nesw-resize';
+                const isRotate = e.metaKey || e.ctrlKey;
+                if (ci >= 0) {
+                    canvas.style.cursor = isRotate ? 'grab' : (ci === 0 || ci === 2 ? 'nwse-resize' : 'nesw-resize');
                 } else if (hitTestShapeBody(shape, nx, ny, canvas)) {
                     canvas.style.cursor = 'move';
                 } else {
@@ -1068,6 +1155,7 @@ export default function PhotoStudioModal({
         dragStateRef.current = null;
         shapeDragRef.current = null;
         cornerDragRef.current = null;
+        rotationDragRef.current = null;
     }
 
     function handleClearDraw() {
@@ -1606,7 +1694,7 @@ export default function PhotoStudioModal({
                                         onPointerDown={handleDrawPointerDown}
                                         onPointerMove={handleDrawPointerMove}
                                         onPointerUp={handleDrawPointerUp}
-                                        onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; cornerDragRef.current = null; }}
+                                        onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; cornerDragRef.current = null; rotationDragRef.current = null; }}
                                     />
                                 </div>
                             )}
@@ -2327,7 +2415,7 @@ function ToolsPanel({
 
                 {drawMode === 'drawing' && currentPointCount > 0 && (
                     <p className="text-white/25 text-[10px]">
-                        {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic para cerrar forma
+                        {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic para terminar abierto · clic en el primer punto para cerrar
                     </p>
                 )}
                 {(drawMode === 'selected' || drawMode === 'editing') && (
@@ -2340,7 +2428,7 @@ function ToolsPanel({
                 )}
                 {drawMode === 'selected' && (
                     <p className="text-white/25 text-[10px]">
-                        Arrastrá esquinas para escalar · mover · doble clic para editar puntos · Cmd+C/V para copiar
+                        Esquinas: arrastrar=escalar · Cmd+arrastrar=rotar · mover · doble clic=editar · Cmd+C/V=copiar
                     </p>
                 )}
                 {drawMode === 'editing' && (
