@@ -42,10 +42,33 @@ interface DrawShape {
 
 interface TextAnnotation {
     id: string;
-    x: number;   // normalized 0–1
-    y: number;   // normalized 0–1
+    x: number;    // normalized 0–1
+    y: number;    // normalized 0–1
     text: string;
     color: DrawColor;
+    width: number; // normalized 0–1 — controls the wrap box width
+}
+
+const TEXT_LINE_HEIGHT = 1.35; // em — must match CSS in the textarea overlay
+
+function wrapTextCanvas(ctx: CanvasRenderingContext2D, text: string, maxWidthPx: number): string[] {
+    const result: string[] = [];
+    for (const paragraph of text.split('\n')) {
+        if (!paragraph) { result.push(''); continue; }
+        const words = paragraph.split(' ');
+        let line = '';
+        for (const word of words) {
+            const test = line ? `${line} ${word}` : word;
+            if (line && ctx.measureText(test).width > maxWidthPx) {
+                result.push(line);
+                line = word;
+            } else {
+                line = test;
+            }
+        }
+        result.push(line);
+    }
+    return result.length ? result : [''];
 }
 
 function getDrawColorHex(color: DrawColor): string {
@@ -148,7 +171,8 @@ export default function PhotoStudioModal({
     const [textToolActive, setTextToolActive] = useState(false);
     const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
     const textDragRef = useRef<{ id: string; lastNx: number; lastNy: number } | null>(null);
-    const textMetricsRef = useRef<Map<string, { wNorm: number; hNorm: number }>>(new Map());
+    const textResizeDragRef = useRef<{ id: string; startNx: number; startWidth: number } | null>(null);
+    const textMetricsRef = useRef<Map<string, { hNorm: number }>>(new Map());
     const justFinishedEditRef = useRef<string | null>(null); // guards against blur-then-click creating new text
 
     const [zoom, setZoom] = useState(1);
@@ -784,6 +808,7 @@ export default function PhotoStudioModal({
         // ── Text annotations ─────────────────────────────────────────────────
         if (drawVisible) {
             const fontSize = 24 * displayScale;
+            const lineH = fontSize * TEXT_LINE_HEIGHT;
             ctx.font = `600 ${fontSize}px Inter, sans-serif`;
             ctx.textBaseline = 'top';
             textMetricsRef.current.clear();
@@ -791,25 +816,38 @@ export default function PhotoStudioModal({
                 const skip = ta.id === editingTextId;
                 const tx = ta.x * W;
                 const ty = ta.y * H;
-                const measured = ctx.measureText(ta.text || ' ');
-                textMetricsRef.current.set(ta.id, {
-                    wNorm: measured.width / W,
-                    hNorm: fontSize / H,
-                });
-                if (skip) continue; // HTML input handles display while editing
+                const maxWidthPx = ta.width * W;
+                const lines = wrapTextCanvas(ctx, ta.text || '', maxWidthPx);
+                const totalH = lines.length * lineH;
+                textMetricsRef.current.set(ta.id, { hNorm: totalH / H });
+                if (skip) continue; // HTML textarea handles display while editing
                 ctx.save();
                 ctx.shadowColor = 'rgba(0,0,0,0.7)';
                 ctx.shadowBlur = 5 * displayScale;
                 ctx.fillStyle = getDrawColorHex(ta.color);
-                ctx.fillText(ta.text, tx, ty);
-                if (ta.id === selectedTextId && textToolActive) {
+                for (let i = 0; i < lines.length; i++) {
+                    ctx.fillText(lines[i], tx, ty + i * lineH);
+                }
+                const isSelected = ta.id === selectedTextId && textToolActive;
+                if (isSelected) {
+                    const ds = displayScale;
                     ctx.shadowBlur = 0;
-                    ctx.setLineDash([3 * displayScale, 2 * displayScale]);
+                    ctx.setLineDash([3 * ds, 2 * ds]);
                     ctx.strokeStyle = getDrawColorHex(ta.color);
-                    ctx.lineWidth = displayScale;
+                    ctx.lineWidth = ds;
                     ctx.globalAlpha = 0.6;
-                    ctx.strokeRect(tx - 2 * displayScale, ty - 2 * displayScale,
-                        measured.width + 4 * displayScale, fontSize + 4 * displayScale);
+                    ctx.strokeRect(tx - 2 * ds, ty - 2 * ds, maxWidthPx + 4 * ds, totalH + 4 * ds);
+                    // Resize handle — right edge, vertically centered
+                    const hx = tx + maxWidthPx;
+                    const hy = ty + totalH / 2;
+                    ctx.setLineDash([]);
+                    ctx.globalAlpha = 1;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = getDrawColorHex(ta.color);
+                    ctx.lineWidth = 1.5 * ds;
+                    const HR = 5 * ds;
+                    ctx.fillRect(hx - HR, hy - HR, HR * 2, HR * 2);
+                    ctx.strokeRect(hx - HR, hy - HR, HR * 2, HR * 2);
                 }
                 ctx.restore();
             }
@@ -931,15 +969,20 @@ export default function PhotoStudioModal({
     }
 
     function hitTestTextAnnotation(annotations: TextAnnotation[], nx: number, ny: number): TextAnnotation | null {
-        const PAD = 0.015; // generous padding so text is easy to grab
+        const PAD = 0.015;
         for (const ta of [...annotations].reverse()) {
             const m = textMetricsRef.current.get(ta.id);
-            // Fallback when metrics not yet computed: use a reasonable hit zone
-            const w = m ? m.wNorm + PAD * 2 : 0.2;
             const h = m ? m.hNorm + PAD * 2 : 0.06;
-            if (nx >= ta.x - PAD && nx <= ta.x + w && ny >= ta.y - PAD && ny <= ta.y + h) return ta;
+            if (nx >= ta.x - PAD && nx <= ta.x + ta.width + PAD && ny >= ta.y - PAD && ny <= ta.y + h) return ta;
         }
         return null;
+    }
+
+    function hitTestTextResizeHandle(ta: TextAnnotation, nx: number, ny: number): boolean {
+        const m = textMetricsRef.current.get(ta.id);
+        const hx = ta.x + ta.width;
+        const hy = ta.y + (m ? m.hNorm / 2 : 0.03);
+        return Math.abs(nx - hx) < 0.025 && Math.abs(ny - hy) < 0.025;
     }
 
     function finishTextEditing(id: string) {
@@ -995,7 +1038,7 @@ export default function PhotoStudioModal({
             } else {
                 setSelectedTextId(null);
                 const newId = `text-${Date.now()}`;
-                const newTA: TextAnnotation = { id: newId, x: nx, y: ny, text: '', color: drawColor };
+                const newTA: TextAnnotation = { id: newId, x: nx, y: ny, text: '', color: drawColor, width: 0.35 };
                 setTextAnnotations(prev => [...prev, newTA]);
                 setSelectedTextId(newId);
                 setEditingTextId(newId);
@@ -1087,8 +1130,20 @@ export default function PhotoStudioModal({
         const canvas = drawCanvasRef.current!;
         const [nx, ny] = getPointerNormXY(e);
 
-        // Text drag: always available (text tool doesn't need to be active to move existing text)
+        // Text interactions: always available regardless of text tool state
         if (textAnnotations.length > 0) {
+            // Check resize handle first (only on selected text)
+            if (selectedTextId) {
+                const selText = textAnnotations.find(t => t.id === selectedTextId);
+                if (selText && hitTestTextResizeHandle(selText, nx, ny)) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    textResizeDragRef.current = { id: selText.id, startNx: nx, startWidth: selText.width };
+                    return;
+                }
+            }
+            // Then check body drag
             const textHit = hitTestTextAnnotation(textAnnotations, nx, ny);
             if (textHit) {
                 e.stopPropagation();
@@ -1175,6 +1230,15 @@ export default function PhotoStudioModal({
     }
 
     function handleDrawPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        // Text resize (right-edge handle drag)
+        if (textResizeDragRef.current) {
+            const [nx] = getPointerNormXY(e);
+            didDragRef.current = true;
+            const { id, startNx, startWidth } = textResizeDragRef.current;
+            const newWidth = Math.max(0.05, Math.min(0.95, startWidth + (nx - startNx)));
+            setTextAnnotations(prev => prev.map(t => t.id === id ? { ...t, width: newWidth } : t));
+            return;
+        }
         // Text drag
         if (textDragRef.current) {
             const [nx, ny] = getPointerNormXY(e);
@@ -1278,6 +1342,14 @@ export default function PhotoStudioModal({
         if (textAnnotations.length > 0 || textToolActive) {
             const canvas = e.currentTarget;
             const [nx, ny] = getPointerNormXY(e);
+            // Resize handle on selected text
+            if (selectedTextId) {
+                const selText = textAnnotations.find(t => t.id === selectedTextId);
+                if (selText && hitTestTextResizeHandle(selText, nx, ny)) {
+                    canvas.style.cursor = 'ew-resize';
+                    return;
+                }
+            }
             if (hitTestTextAnnotation(textAnnotations, nx, ny)) {
                 canvas.style.cursor = 'move';
                 return;
@@ -1309,6 +1381,7 @@ export default function PhotoStudioModal({
         cornerDragRef.current = null;
         rotationDragRef.current = null;
         textDragRef.current = null;
+        textResizeDragRef.current = null;
     }
 
     function handleClearDraw() {
@@ -1388,18 +1461,26 @@ export default function PhotoStudioModal({
         if (drawVisible && drawCanvasRef.current && drawCanvasRef.current.width > 0) {
             ctx.drawImage(drawCanvasRef.current, 0, 0, canvasW, canvasH);
         }
-        // Bake text annotations (including any currently being edited)
+        // Bake text annotations with word-wrap (including any currently being edited)
         if (drawVisible && textAnnotations.length > 0) {
-            const fontSize = 24 * (canvasW / (drawCanvasRef.current?.getBoundingClientRect().width || canvasW));
+            const displayW = drawCanvasRef.current?.getBoundingClientRect().width || canvasW;
+            const fontSize = 24 * (canvasW / displayW);
+            const lineH = fontSize * TEXT_LINE_HEIGHT;
             ctx.font = `600 ${fontSize}px Inter, sans-serif`;
             ctx.textBaseline = 'top';
             for (const ta of textAnnotations) {
                 if (!ta.text.trim()) continue;
+                const tx = ta.x * canvasW;
+                const ty = ta.y * canvasH;
+                const maxWidthPx = ta.width * canvasW;
+                const lines = wrapTextCanvas(ctx, ta.text, maxWidthPx);
                 ctx.save();
                 ctx.shadowColor = 'rgba(0,0,0,0.7)';
-                ctx.shadowBlur = 5 * (canvasW / (drawCanvasRef.current?.getBoundingClientRect().width || canvasW));
+                ctx.shadowBlur = 5 * (canvasW / displayW);
                 ctx.fillStyle = getDrawColorHex(ta.color);
-                ctx.fillText(ta.text, ta.x * canvasW, ta.y * canvasH);
+                for (let i = 0; i < lines.length; i++) {
+                    ctx.fillText(lines[i], tx, ty + i * lineH);
+                }
                 ctx.restore();
             }
         }
@@ -1866,7 +1947,7 @@ export default function PhotoStudioModal({
                                         onPointerDown={handleDrawPointerDown}
                                         onPointerMove={handleDrawPointerMove}
                                         onPointerUp={handleDrawPointerUp}
-                                        onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; cornerDragRef.current = null; rotationDragRef.current = null; textDragRef.current = null; }}
+                                        onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; cornerDragRef.current = null; rotationDragRef.current = null; textDragRef.current = null; textResizeDragRef.current = null; }}
                                     />
                                     {/* Text annotation editing overlay */}
                                     {textAnnotations.map(ta => {
@@ -1882,29 +1963,40 @@ export default function PhotoStudioModal({
                                                     pointerEvents: 'auto',
                                                 }}
                                             >
-                                                <input
+                                                <textarea
                                                     autoFocus
-                                                    type="text"
                                                     value={ta.text}
                                                     placeholder="Texto..."
-                                                    onChange={e => setTextAnnotations(prev => prev.map(t => t.id === ta.id ? { ...t, text: e.target.value } : t))}
+                                                    rows={1}
+                                                    onChange={e => {
+                                                        setTextAnnotations(prev => prev.map(t => t.id === ta.id ? { ...t, text: e.target.value } : t));
+                                                        // auto-grow height
+                                                        e.target.style.height = 'auto';
+                                                        e.target.style.height = `${e.target.scrollHeight}px`;
+                                                    }}
                                                     onKeyDown={e => {
-                                                        if (e.key === 'Enter' || e.key === 'Escape') {
+                                                        if (e.key === 'Escape') {
                                                             e.preventDefault();
                                                             finishTextEditing(ta.id);
                                                         }
+                                                        // Enter inserts newline (textarea default)
                                                     }}
                                                     onBlur={() => finishTextEditing(ta.id)}
                                                     style={{
+                                                        width: `${ta.width * 100}%`,
                                                         background: 'transparent',
                                                         border: 'none',
                                                         outline: 'none',
-                                                        font: '600 24px Inter, sans-serif',
+                                                        resize: 'none',
+                                                        overflow: 'hidden',
+                                                        padding: 0,
+                                                        display: 'block',
+                                                        font: `600 24px Inter, sans-serif`,
+                                                        lineHeight: TEXT_LINE_HEIGHT,
                                                         color: getDrawColorHex(ta.color),
                                                         caretColor: getDrawColorHex(ta.color),
-                                                        textShadow: '0 0 4px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.9)',
-                                                        minWidth: '8ch',
-                                                        whiteSpace: 'nowrap',
+                                                        textShadow: '0 0 4px rgba(0,0,0,0.8)',
+                                                        minHeight: '30px',
                                                     }}
                                                 />
                                             </div>
