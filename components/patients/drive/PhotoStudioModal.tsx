@@ -99,8 +99,10 @@ export default function PhotoStudioModal({
     const brushDrawingRef = useRef(false);
     const drawCanvasRef = useRef<HTMLCanvasElement>(null);
     const dragStateRef = useRef<{ shapeId: string; pointIdx: number } | null>(null);
+    const shapeDragRef = useRef<{ shapeId: string; lastNx: number; lastNy: number } | null>(null);
+    const didDragRef = useRef(false);
 
-    type DrawMode = 'idle' | 'drawing' | 'editing';
+    type DrawMode = 'idle' | 'drawing' | 'selected' | 'editing';
     const [drawMode, setDrawMode] = useState<DrawMode>('idle');
     const [drawVisible, setDrawVisible] = useState(true);
     const [drawColor, setDrawColor] = useState<DrawColor>('white');
@@ -542,8 +544,8 @@ export default function PhotoStudioModal({
         // Scale radius from display pixels → natural image pixels
         const rect = canvas.getBoundingClientRect();
         const displayScale = rect.width > 0 ? W / rect.width : 1;
-        // MAX_R in natural pixels ≈ 1.8 display pixels (middle ground, tapers at ends)
-        const MAX_R = 1.8 * displayScale;
+        // MAX_R in natural pixels ≈ 1.3 display pixels (slightly thin, sketch feel)
+        const MAX_R = 1.3 * displayScale;
         const STEPS = 18; // samples per segment for smooth dot sampling
 
         const allShapes: DrawShape[] = [...drawShapes];
@@ -650,9 +652,27 @@ export default function PhotoStudioModal({
                 ctx.restore();
             }
 
+            // ── Selection bounding box (selected mode, no handles yet) ────────
+            if (drawMode === 'selected' && shape.id !== '__current__' && isSelected) {
+                const xs = pts.map(p => p.x * W);
+                const ys = pts.map(p => p.y * H);
+                const pad = 8 * displayScale;
+                const bx = Math.min(...xs) - pad, by = Math.min(...ys) - pad;
+                const bw = Math.max(...xs) - Math.min(...xs) + pad * 2;
+                const bh = Math.max(...ys) - Math.min(...ys) + pad * 2;
+                ctx.save();
+                ctx.strokeStyle = getDrawColorHex(shape.color);
+                ctx.lineWidth = displayScale;
+                ctx.setLineDash([5 * displayScale, 4 * displayScale]);
+                ctx.globalAlpha = 0.7;
+                ctx.shadowBlur = 0;
+                ctx.strokeRect(bx, by, bw, bh);
+                ctx.restore();
+            }
+
             // ── Handles in edit mode ─────────────────────────────────────────
-            if ((drawMode === 'editing' || drawMode === 'drawing') && shape.id !== '__current__' && isSelected) {
-                const HR = 5 * displayScale; // handle radius in natural pixels
+            if (drawMode === 'editing' && shape.id !== '__current__' && isSelected) {
+                const HR = 5 * displayScale;
                 for (const pt of pts) {
                     ctx.save();
                     ctx.fillStyle = '#ffffff';
@@ -770,45 +790,44 @@ export default function PhotoStudioModal({
         return -1;
     }
 
-    function hitTestShape(shapes: DrawShape[], nx: number, ny: number, canvas: HTMLCanvasElement): DrawShape | null {
+    // Returns which shape's bounding box contains the click (for select/drag)
+    function hitTestShapeBody(shape: DrawShape, nx: number, ny: number, canvas: HTMLCanvasElement): boolean {
+        if (shape.points.length === 0) return false;
+        const rect = canvas.getBoundingClientRect();
+        const PAD = 14 / (rect.width || 1);
+        const xs = shape.points.map(p => p.x);
+        const ys = shape.points.map(p => p.y);
+        return nx >= Math.min(...xs) - PAD && nx <= Math.max(...xs) + PAD
+            && ny >= Math.min(...ys) - PAD && ny <= Math.max(...ys) + PAD;
+    }
+
+    function hitTestAnyShape(shapes: DrawShape[], nx: number, ny: number, canvas: HTMLCanvasElement): DrawShape | null {
         for (const shape of [...shapes].reverse()) {
-            if (hitTestPoint(shape, nx, ny, canvas) >= 0) return shape;
+            if (hitTestShapeBody(shape, nx, ny, canvas)) return shape;
         }
         return null;
     }
 
-    function handleDrawMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
-        if (drawMode !== 'drawing') return;
-        const [x, y] = getDrawNormXY(e);
-        setMousePos([x, y]);
-    }
-
     function handleDrawClick(e: React.MouseEvent<HTMLCanvasElement>) {
-        if (drawMode === 'idle') {
-            const canvas = drawCanvasRef.current!;
-            const [nx, ny] = getDrawNormXY(e);
-            const hit = hitTestShape(drawShapes, nx, ny, canvas);
-            if (hit) {
-                setSelectedShapeId(hit.id);
-                setDrawMode('editing');
-            }
-            return;
-        }
+        // Suppress click if we were dragging
+        if (didDragRef.current) { didDragRef.current = false; return; }
+
         if (drawMode === 'drawing') {
             e.stopPropagation();
             const [x, y] = getDrawNormXY(e);
             setCurrentPoints(prev => [...prev, { x, y, smooth: true }]);
             return;
         }
-        if (drawMode === 'editing') {
+        if (drawMode === 'idle' || drawMode === 'selected' || drawMode === 'editing') {
             const canvas = drawCanvasRef.current!;
             const [nx, ny] = getDrawNormXY(e);
-            const hit = hitTestShape(drawShapes, nx, ny, canvas);
-            if (!hit) {
+            const hit = hitTestAnyShape(drawShapes, nx, ny, canvas);
+            if (hit) {
+                setSelectedShapeId(hit.id);
+                setDrawMode('selected');
+            } else {
                 setSelectedShapeId(null);
                 setDrawMode('idle');
-            } else if (hit.id !== selectedShapeId) {
-                setSelectedShapeId(hit.id);
             }
         }
     }
@@ -816,19 +835,25 @@ export default function PhotoStudioModal({
     function handleDrawDblClick(e: React.MouseEvent<HTMLCanvasElement>) {
         if (drawMode === 'drawing') {
             e.stopPropagation();
-            // Use currentPoints directly — don't nest setState calls inside an updater
-            const pts = currentPoints.slice(0, -1); // remove duplicate from 2nd click
+            const pts = currentPoints.slice(0, -1);
             if (pts.length >= 2) {
                 const newId = `shape-${Date.now()}`;
                 setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: true, color: drawColor }]);
                 setSelectedShapeId(newId);
-                setDrawMode('editing');
+                setDrawMode('selected'); // closed → selected; double-click again to edit
             }
             setCurrentPoints([]);
             setMousePos(null);
             return;
         }
+        if (drawMode === 'selected' && selectedShapeId) {
+            // Double-click on selected shape → enter edit mode (show handles)
+            e.stopPropagation();
+            setDrawMode('editing');
+            return;
+        }
         if (drawMode === 'editing' && selectedShapeId) {
+            // Double-click on a handle → toggle smooth/sharp
             const canvas = drawCanvasRef.current!;
             const [nx, ny] = getDrawNormXY(e);
             const shape = drawShapes.find(s => s.id === selectedShapeId);
@@ -841,38 +866,88 @@ export default function PhotoStudioModal({
                         ? { ...s, points: s.points.map((p, i) => i === idx ? { ...p, smooth: !p.smooth } : p) }
                         : s
                 ));
+            } else {
+                // Double-click outside handles → back to selected
+                setDrawMode('selected');
             }
         }
     }
 
     function handleDrawPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
-        if (drawMode !== 'editing' || !selectedShapeId) return;
+        didDragRef.current = false;
         const canvas = drawCanvasRef.current!;
         const [nx, ny] = getPointerNormXY(e);
-        const shape = drawShapes.find(s => s.id === selectedShapeId);
-        if (!shape) return;
-        const idx = hitTestPoint(shape, nx, ny, canvas);
-        if (idx >= 0) {
-            e.stopPropagation(); // prevent parent container from starting a pan
-            e.preventDefault();
-            e.currentTarget.setPointerCapture(e.pointerId);
-            dragStateRef.current = { shapeId: selectedShapeId, pointIdx: idx };
+
+        if (drawMode === 'editing' && selectedShapeId) {
+            // Try to grab a point handle
+            const shape = drawShapes.find(s => s.id === selectedShapeId);
+            if (shape) {
+                const idx = hitTestPoint(shape, nx, ny, canvas);
+                if (idx >= 0) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    dragStateRef.current = { shapeId: selectedShapeId, pointIdx: idx };
+                    return;
+                }
+            }
+        }
+
+        if (drawMode === 'selected' || drawMode === 'idle') {
+            // Try to grab a shape for whole-shape drag
+            const hit = hitTestAnyShape(drawShapes, nx, ny, canvas);
+            if (hit) {
+                e.stopPropagation();
+                e.preventDefault();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setSelectedShapeId(hit.id);
+                setDrawMode('selected');
+                shapeDragRef.current = { shapeId: hit.id, lastNx: nx, lastNy: ny };
+            }
         }
     }
 
     function handleDrawPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
-        if (!dragStateRef.current) return;
-        const [nx, ny] = getPointerNormXY(e);
-        const { shapeId, pointIdx } = dragStateRef.current;
-        setDrawShapes(shapes => shapes.map(s =>
-            s.id === shapeId
-                ? { ...s, points: s.points.map((p, i) => i === pointIdx ? { ...p, x: nx, y: ny } : p) }
-                : s
-        ));
+        // Rubber-band preview while drawing
+        if (drawMode === 'drawing') {
+            const [x, y] = getPointerNormXY(e);
+            setMousePos([x, y]);
+        }
+        // Point drag (editing mode)
+        if (dragStateRef.current) {
+            didDragRef.current = true;
+            const [nx, ny] = getPointerNormXY(e);
+            const { shapeId, pointIdx } = dragStateRef.current;
+            setDrawShapes(shapes => shapes.map(s =>
+                s.id === shapeId
+                    ? { ...s, points: s.points.map((p, i) => i === pointIdx ? { ...p, x: nx, y: ny } : p) }
+                    : s
+            ));
+        }
+        // Whole-shape drag (selected mode)
+        if (shapeDragRef.current) {
+            const [nx, ny] = getPointerNormXY(e);
+            const dx = nx - shapeDragRef.current.lastNx;
+            const dy = ny - shapeDragRef.current.lastNy;
+            if (Math.abs(dx) > 0.0005 || Math.abs(dy) > 0.0005) didDragRef.current = true;
+            const { shapeId } = shapeDragRef.current;
+            setDrawShapes(shapes => shapes.map(s =>
+                s.id === shapeId
+                    ? { ...s, points: s.points.map(p => ({
+                        ...p,
+                        x: Math.max(0, Math.min(1, p.x + dx)),
+                        y: Math.max(0, Math.min(1, p.y + dy)),
+                    }))}
+                    : s
+            ));
+            shapeDragRef.current.lastNx = nx;
+            shapeDragRef.current.lastNy = ny;
+        }
     }
 
     function handleDrawPointerUp() {
         dragStateRef.current = null;
+        shapeDragRef.current = null;
     }
 
     function handleClearDraw() {
@@ -1390,18 +1465,18 @@ export default function PhotoStudioModal({
                                         className="absolute inset-0 w-full h-full"
                                         style={{
                                             cursor: drawMode === 'drawing' ? 'crosshair'
-                                                  : drawMode === 'editing' ? 'pointer'
+                                                  : drawMode === 'editing' ? 'crosshair'
+                                                  : drawMode === 'selected' ? 'move'
                                                   : drawShapes.length > 0 ? 'pointer'
                                                   : 'default',
                                             pointerEvents: (drawMode !== 'idle' || drawShapes.length > 0) ? 'auto' : 'none',
                                         }}
                                         onClick={handleDrawClick}
                                         onDoubleClick={handleDrawDblClick}
-                                        onMouseMove={handleDrawMouseMove}
-                                        onMouseLeave={() => setMousePos(null)}
                                         onPointerDown={handleDrawPointerDown}
                                         onPointerMove={handleDrawPointerMove}
                                         onPointerUp={handleDrawPointerUp}
+                                        onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; }}
                                     />
                                 </div>
                             )}
@@ -1793,8 +1868,8 @@ interface ToolsPanelProps {
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
     isGridVisible: boolean;
     onConfirmBg: () => void;
-    drawMode: 'idle' | 'drawing' | 'editing';
-    onSetDrawMode: (mode: 'idle' | 'drawing' | 'editing') => void;
+    drawMode: 'idle' | 'drawing' | 'selected' | 'editing';
+    onSetDrawMode: (mode: 'idle' | 'drawing' | 'selected' | 'editing') => void;
     drawVisible: boolean;
     onToggleDrawVisible: () => void;
     drawColor: DrawColor;
@@ -2076,7 +2151,8 @@ function ToolsPanel({
                 >
                     <PenLine size={12} />
                     {drawMode === 'drawing' ? 'Dibujando — doble clic para cerrar'
-                     : drawMode === 'editing' ? 'Editando forma'
+                     : drawMode === 'selected' ? 'Forma seleccionada'
+                     : drawMode === 'editing' ? 'Editando puntos'
                      : 'Activar trazo'}
                 </button>
 
@@ -2121,9 +2197,14 @@ function ToolsPanel({
                         {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic para cerrar forma
                     </p>
                 )}
+                {drawMode === 'selected' && (
+                    <p className="text-white/25 text-[10px]">
+                        Arrastrá para mover · doble clic para editar puntos · Cmd+C/V para copiar
+                    </p>
+                )}
                 {drawMode === 'editing' && (
                     <p className="text-white/25 text-[10px]">
-                        Arrastrá puntos · doble clic para curva/esquina · Cmd+C/V para copiar
+                        Arrastrá puntos · doble clic en punto para curva/esquina · doble clic afuera para salir
                     </p>
                 )}
             </div>
