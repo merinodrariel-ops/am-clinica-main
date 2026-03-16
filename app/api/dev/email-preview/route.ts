@@ -18,7 +18,7 @@ import {
     generatePatientMagicLinkEmail,
     generateInvitationMessage,
 } from '@/lib/email-templates';
-import { sendEmail } from '@/lib/nodemailer';
+import { EmailService } from '@/lib/email-service';
 
 // Solo disponible en desarrollo
 const isDev = process.env.NODE_ENV !== 'production';
@@ -150,7 +150,7 @@ export async function GET(request: Request) {
             'invitation': '[PREVIEW] Invitación al equipo',
         };
 
-        await sendEmail({
+        await EmailService.send({
             to,
             subject: subjectMap[template] || `[PREVIEW] Template: ${template}`,
             html,

@@ -2,16 +2,15 @@
 // https://www.emailjs.com/
 
 // EmailJS configuration is no longer used directly;
-// the app now uses Nodemailer via lib/nodemailer.ts
+// the app now uses Resend via lib/email-service.ts
+
+import { EmailService } from '@/lib/email-service';
+import { generatePremiumWelcomeEmail, generateInvitationMessage } from '@/lib/email-templates';
 
 interface EmailData {
   to_email: string;
   to_name: string;
-  message: string;
-  website_link?: string;
-  whatsapp_link?: string;
-  maps_link?: string;
-  action_link?: string;
+  message?: string;
 }
 
 interface InvitationData {
@@ -20,28 +19,14 @@ interface InvitationData {
   action_link: string;
 }
 
-import { sendEmail } from '@/lib/nodemailer';
-
 export async function sendWelcomeEmail(data: EmailData): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await sendEmail({
-      to: data.to_email,
-      subject: `Bienvenido a AM Clínica - ${data.to_name}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <body>
-            <p>Este es un correo enviado via Gmail/Nodemailer.</p>
-            <p>${data.message}</p>
-        </body>
-        </html>
-      ` // We should ideally use a proper template generator
-    });
+    const response = await EmailService.sendWelcome(data.to_name, data.to_email);
 
     if (response.success) {
       return { success: true };
     } else {
-      return { success: false, error: response.error ?? 'Error desconocido al enviar email' };
+      return { success: false, error: (response as any).error ?? 'Error desconocido al enviar email' };
     }
   } catch (error) {
     return {
@@ -51,22 +36,21 @@ export async function sendWelcomeEmail(data: EmailData): Promise<{ success: bool
   }
 }
 
-import { generatePremiumWelcomeEmail, generateInvitationMessage } from '@/lib/email-templates';
-
-export { generatePremiumWelcomeEmail, generateInvitationMessage }; // Re-export for compatibility if needed, but better to import directly.
-
 export async function sendInvitationEmail(data: InvitationData): Promise<{ success: boolean; error?: string }> {
-  const htmlMessage = generateInvitationMessage(data.to_name, data.action_link);
+  try {
+    const response = await EmailService.sendInvitation(data.to_name, data.to_email, data.action_link);
 
-  const response = await sendEmail({
-    to: data.to_email,
-    subject: `Invitación a AM Clínica - ${data.to_name}`,
-    html: htmlMessage
-  });
-
-  if (response.success) {
-    return { success: true };
-  } else {
-    return { success: false, error: response.error ?? 'Error desconocido al enviar email' };
+    if (response.success) {
+      return { success: true };
+    } else {
+      return { success: false, error: (response as any).error ?? 'Error desconocido al enviar email' };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }
+
+export { generatePremiumWelcomeEmail, generateInvitationMessage };

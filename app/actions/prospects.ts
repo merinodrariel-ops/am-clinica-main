@@ -19,7 +19,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { sendEmail } from '@/lib/nodemailer';
+import { EmailService } from '@/lib/email-service';
 import {
     PROSPECT_EMAIL_BY_STAGE,
     PROSPECT_WHATSAPP_SEQUENCE,
@@ -252,7 +252,7 @@ export async function enrollProspect(input: EnrollProspectInput) {
 
     const teamEmails = TEAM_ALERT_RECIPIENTS.split(',').map(e => e.trim()).filter(Boolean);
     await Promise.all(teamEmails.map(async email => {
-        const resp = await sendEmail({
+        const resp = await EmailService.send({
             to: email,
             subject: `🔔 Nuevo prospecto: ${patient.nombre} ${patient.apellido} (${input.main_interest || 'interés no definido'})`,
             html: alertHtml,
@@ -289,7 +289,7 @@ export async function enrollProspect(input: EnrollProspectInput) {
 </div>`;
 
         await Promise.all(teamEmails.map(async email => {
-            const resp = await sendEmail({
+            const resp = await EmailService.send({
                 to: email,
                 subject: `💬 WA para enviar hoy: ${patient.nombre} ${patient.apellido}`,
                 html: staffWaHtml,
@@ -465,7 +465,7 @@ export async function advanceProspectStage(
 
         const subject = subjectMap[stageOrder] || `Novedad de AM Estética Dental para ${patient.nombre}`;
 
-        const resp = await sendEmail({ to: patient.email, subject, html });
+        const resp = await EmailService.send({ to: patient.email, subject, html });
         await logProspectEvent({
             treatmentId,
             stageId: newStageId,
@@ -517,7 +517,7 @@ export async function advanceProspectStage(
 </div>`;
 
         await Promise.all(teamEmails.map(email =>
-            sendEmail({
+            EmailService.send({
                 to: email,
                 subject: `💬 WA para ${patient?.nombre}: T+${stageNames[newStageId]}`,
                 html: staffWaHtml,
@@ -751,7 +751,7 @@ export async function runProspectReengagementReminders(): Promise<{
 
             const subject = subjectMap[stageOrder] || `AM Estética Dental — pensando en tu caso`;
 
-            const resp = await sendEmail({ to: patient.email, subject, html });
+            const resp = await EmailService.send({ to: patient.email, subject, html });
 
             await logProspectEvent({
                 treatmentId: prospect.id,
@@ -780,7 +780,7 @@ export async function runProspectReengagementReminders(): Promise<{
 </div>`;
 
             await Promise.all(teamEmails.map(async email => {
-                const resp = await sendEmail({
+                const resp = await EmailService.send({
                     to: email,
                     subject: `⚠️ Prospecto SLA: ${patient?.nombre || 'Paciente'} — contacto manual requerido`,
                     html: staffHtml,

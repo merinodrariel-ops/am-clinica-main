@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
-import { Resend } from 'resend';
+import { EmailService } from '@/lib/email-service';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const APP_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || '';
 
 type Action = 'viewed' | 'approved' | 'revision';
@@ -135,8 +134,7 @@ async function sendNotifications(
 
     for (const profile of profiles) {
         if (!profile.email) continue;
-        await resend.emails.send({
-            from: 'AM Clínica <notificaciones@am-clinica.ar>',
+        await EmailService.send({
             to: profile.email,
             subject,
             html: bodyHtml,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/nodemailer';
+import { EmailService } from '@/lib/email-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
                     if (existing) continue;
 
-                    const response = await sendEmail({ to: email, subject: staffSubject, html: staffHtml });
+                    const response = await EmailService.send({ to: email, subject: staffSubject, html: staffHtml });
 
                     await supabase.from('workflow_notifications_log').insert({
                         workflow_id: treatment.workflow_id,
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
                     .maybeSingle();
 
                 if (!existing) {
-                    const response = await sendEmail({ to: patient.email, subject: patientSubject, html: patientHtml });
+                    const response = await EmailService.send({ to: patient.email, subject: patientSubject, html: patientHtml });
 
                     await supabase.from('workflow_notifications_log').insert({
                         workflow_id: treatment.workflow_id,

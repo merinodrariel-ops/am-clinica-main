@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/api-auth';
-import { sendEmail } from '@/lib/nodemailer';
+import { EmailService } from '@/lib/email-service';
 
 export async function GET(request: Request) {
     const auth = await authorizeRequest(request);
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const to = searchParams.get('to') || process.env.NEXT_PUBLIC_OWNER_EMAIL || '';
 
     try {
-        const result = await sendEmail({
+        const result = await EmailService.send({
             to,
             subject: '🧪 Prueba de Email - AM Clínica',
             html: `
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
                     <div style="padding: 30px; background: #fff; border: 1px solid #eee;">
                         <h2 style="color: #333;">¡El sistema de emails funciona! 🎉</h2>
                         <p style="color: #555; line-height: 1.6;">
-                            Este es un correo de prueba enviado desde AM Clínica usando Gmail + Nodemailer.
+                            Este es un correo de prueba enviado desde AM Clínica usando <strong>Resend</strong>.
                         </p>
                         <p style="color: #999; font-size: 14px; margin-top: 30px;">
                             Fecha: ${new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}

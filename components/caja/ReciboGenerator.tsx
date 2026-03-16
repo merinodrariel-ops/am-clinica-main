@@ -333,7 +333,7 @@ export function ReciboGenerator({
                     </div>
 
                     <div className="grid gap-2">
-                        <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">Email destino (Gmail)</label>
+                        <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">Email destino</label>
                         <Input
                             type="email"
                             value={emailTarget}
@@ -368,7 +368,7 @@ export function ReciboGenerator({
                             disabled={sendingEmail}
                             className="flex-1 px-5 py-3 bg-red-500 hover:bg-red-600 text-white font-bold h-auto border-none disabled:opacity-70"
                         >
-                            {sendingEmail ? '⏳ Enviando email...' : '✉️ Enviar por Gmail'}
+                            {sendingEmail ? '⏳ Enviando email...' : '✉️ Enviar por Email'}
                         </Button>
 
                         <Button

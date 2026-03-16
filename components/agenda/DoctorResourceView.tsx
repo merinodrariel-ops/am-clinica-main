@@ -4,7 +4,7 @@
  * DoctorResourceView — Custom Multi-Doctor Column View
  *
  * Renders a day timeline where each doctor occupies a column.
- * Time slots on Y-axis (7:30 – 21:00, 60-min increments).
+ * Time slots on Y-axis (12:00 – 21:00, 60-min increments).
  * Events positioned absolutely within each column.
  * No FullCalendar Premium required.
  */
@@ -47,26 +47,34 @@ interface DoctorResourceViewProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const START_HOUR = 7.5; // 07:30
+const START_HOUR = 12; // 12:00
 const END_HOUR = 21; // 21:00
 const SLOT_MINS = 60;
 const SLOT_HEIGHT = 22; // px per 60-min slot
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MINS;
 const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
+const AFTERNOON_FOCUS_MINS = 12 * 60;
 
 function minutesSinceMidnight(isoStr: string): number {
     const d = new Date(isoStr);
     return d.getHours() * 60 + d.getMinutes();
 }
 
-function topOffsetPx(isoStr: string): number {
-    const mins = minutesSinceMidnight(isoStr);
-    const startMins = START_HOUR * 60;
-    return Math.max(0, ((mins - startMins) * SLOT_HEIGHT) / SLOT_MINS);
+function pxFromMinutes(mins: number): number {
+    return ((mins - START_HOUR * 60) * SLOT_HEIGHT) / SLOT_MINS;
 }
 
-function durationMins(start: string, end: string): number {
-    return (new Date(end).getTime() - new Date(start).getTime()) / 60000;
+function getVisibleWindow(startIso: string, endIso: string) {
+    const startMins = minutesSinceMidnight(startIso);
+    const endMins = minutesSinceMidnight(endIso);
+    const visibleStart = Math.max(startMins, START_HOUR * 60);
+    const visibleEnd = Math.min(endMins, END_HOUR * 60);
+
+    return {
+        visibleStart,
+        visibleEnd,
+        isVisible: visibleEnd > visibleStart,
+    };
 }
 
 function slotToTime(slotIndex: number): Date {
@@ -188,8 +196,12 @@ function DoctorColumn({
 
             {/* Appointments */}
             {appointments.map(apt => {
-                const topPx = topOffsetPx(apt.start_time);
-                const heightPx = Math.max(SLOT_HEIGHT, (durationMins(apt.start_time, apt.end_time) / SLOT_MINS) * SLOT_HEIGHT);
+                const window = getVisibleWindow(apt.start_time, apt.end_time);
+                if (!window.isVisible) return null;
+
+                const visibleDurationMins = window.visibleEnd - window.visibleStart;
+                const topPx = pxFromMinutes(window.visibleStart);
+                const heightPx = Math.max(SLOT_HEIGHT, (visibleDurationMins / SLOT_MINS) * SLOT_HEIGHT);
                 const isShort = heightPx <= SLOT_HEIGHT;
 
                 return (
@@ -265,13 +277,12 @@ export default function DoctorResourceView({
         load();
     }, [date]);
 
-    // Scroll to current hour on mount
+    // Focus afternoon by default while keeping morning reachable via scroll-up.
     useEffect(() => {
-        if (!containerRef.current) return;
-        const nowMins = minutesSinceMidnight(new Date().toISOString());
-        const scrollTop = Math.max(0, (nowMins - START_HOUR * 60) * SLOT_HEIGHT / SLOT_MINS - 200);
+        if (!containerRef.current || loading) return;
+        const scrollTop = Math.max(0, ((AFTERNOON_FOCUS_MINS - START_HOUR * 60) * SLOT_HEIGHT) / SLOT_MINS - 40);
         containerRef.current.scrollTop = scrollTop;
-    }, []);
+    }, [date, loading]);
 
     if (loading) {
         return (
@@ -296,9 +307,9 @@ export default function DoctorResourceView({
             {/* Doctor Headers */}
             <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 flex-shrink-0">
                 <div className="w-14 flex-shrink-0" />
-                {visibleDoctors.map((doc, idx) => {
+                {visibleDoctors.map((doc) => {
                     const color = doctorColors[doctors.indexOf(doc) % doctorColors.length];
-                    const dayApts = appointments.filter(a => a.doctor_id === doc.id);
+                    const dayApts = appointments.filter((a) => a.doctor_id === doc.id && getVisibleWindow(a.start_time, a.end_time).isVisible);
                     return (
                         <div
                             key={doc.id}
@@ -332,9 +343,9 @@ export default function DoctorResourceView({
             >
                 <div className="flex" style={{ minHeight: TOTAL_HEIGHT }}>
                     <TimeColumn />
-                    {visibleDoctors.map((doc, idx) => {
+                    {visibleDoctors.map((doc) => {
                         const color   = doctorColors[doctors.indexOf(doc) % doctorColors.length];
-                        const docApts = appointments.filter(a => a.doctor_id === doc.id);
+                        const docApts = appointments.filter((a) => a.doctor_id === doc.id);
                         return (
                             <DoctorColumn
                                 key={doc.id}

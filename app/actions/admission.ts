@@ -3,8 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { ensureStandardPatientFolders, createPatientDocuments } from '@/lib/google-drive';
 import { syncPatientToSheet } from '@/lib/google-sheets';
-import { sendEmail } from '@/lib/nodemailer';
-import { generatePremiumWelcomeEmail } from '@/lib/email-templates';
+import { EmailService } from '@/lib/email-service';
 import { admissionSubmissionSchema, type AdmissionSubmission } from '@/lib/admission-schema';
 import type { Paciente } from '@/lib/patients';
 
@@ -293,20 +292,13 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         }
 
         try {
-            const isMerino = data.profesional?.includes('Merino') ?? false;
-            // The premium welcome email can include the portal URL or specific links
-            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://clinica.arielmerino.com';
-            const portalUrl = `${siteUrl}/portal`;
-
-            const html = generatePremiumWelcomeEmail(data.nombre, portalUrl);
-
-            await sendEmail({
-                to: data.email,
-                subject: "Bienvenido a AM Estética Dental — Excelencia y Minimalismo",
-                html: html
-            });
+            // Send premium welcome email
+            await EmailService.sendWelcome(data.nombre, data.email);
+            
+            // Send form submission confirmation (admission form)
+            await EmailService.sendFormConfirmation(data.nombre, data.email, 'Formulario de Admisión');
         } catch (emailErr) {
-            console.error('Error sending welcome email:', emailErr);
+            console.error('Error sending admission emails:', emailErr);
         }
 
         return {

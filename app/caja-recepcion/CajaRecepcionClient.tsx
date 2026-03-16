@@ -1212,12 +1212,12 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     {/* Main Content Grid */}
                     <div className={clsx(
                         "grid grid-cols-1 gap-6 transition-all duration-300",
-                        showSidebar ? "lg:grid-cols-3" : "grid-cols-1"
+                        showSidebar ? "md:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
                     )}>
                         {/* Movements Table */}
                         <div className={clsx(
-                            "bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-300",
-                            showSidebar ? "lg:col-span-2" : "col-span-1"
+                            "bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-300 min-w-0",
+                            showSidebar ? "lg:col-span-2 xl:col-span-3" : "col-span-1"
                         )}>
                             <div className="px-5 py-3 border-b border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-900/20">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
@@ -1307,25 +1307,25 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     <span className="hidden sm:inline">Auditoría</span>
                                 </button>
 
-                                {/* Sidebar Toggle */}
+                                {/* Links Toggle */}
                                 <button
                                     onClick={() => setShowSidebar(!showSidebar)}
                                     className={clsx(
                                         "flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all shadow-sm",
                                         showSidebar
-                                            ? "bg-blue-50 text-blue-600 border-blue-200"
+                                            ? "bg-blue-600 text-white border-blue-600 shadow-blue-200/50"
                                             : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                     )}
-                                    title={showSidebar ? "Expandir lista de ingresos" : "Contraer lista de ingresos"}
+                                    title={showSidebar ? "Ocultar links" : "Links Importantes"}
                                 >
                                     <div className="relative">
-                                        <Layout size={18} />
+                                        <Share2 size={18} />
                                         {!showSidebar && (
                                             <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                                         )}
                                     </div>
                                     <span className="hidden sm:inline">
-                                        {showSidebar ? 'Expandir' : 'Contraer'}
+                                        {showSidebar ? 'Ocultar Links' : 'Links Importantes'}
                                     </span>
                                 </button>
                             </div>
@@ -1333,7 +1333,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             {/* Movements Table */}
                             <div className={clsx(
                                 "glass-card rounded-3xl overflow-hidden transition-all duration-300",
-                                showSidebar ? "lg:col-span-2" : "col-span-1"
+                                showSidebar ? "md:col-span-2" : "col-span-1"
                             )}>
                                 {movimientos.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center p-20 text-slate-500">
@@ -1477,7 +1477,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                 <span className="text-slate-700 text-xs">—</span>
                                                             )}
                                                         </td>
-                                                        <td className="px-6 py-4 text-center">
+                                                        <td className="px-6 py-4 text-center min-w-[200px]">
                                                             <div className="flex items-center justify-center gap-2">
                                                                 {mov.registro_editado && (
                                                                     <span title="Este registro ha sido editado">
@@ -1563,20 +1563,21 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     </div>
                                 )}
                             </div>
+                        </div>
 
-                            {/* Payment Data Panel */}
+                        {/* Payment Data Panel */}
                             <AnimatePresence>
                                 {showSidebar && (
                                     <motion.div
                                         initial={{ opacity: 0, x: 20, width: 0 }}
                                         animate={{ opacity: 1, x: 0, width: 'auto' }}
                                         exit={{ opacity: 0, x: 20, width: 0 }}
-                                        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 h-fit sticky top-6 overflow-hidden"
+                                        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 h-fit sticky top-6 overflow-hidden min-w-0 md:min-w-[340px]"
                                     >
                                         <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                                             <div>
-                                                <h3 className="font-semibold text-gray-900 dark:text-white">Datos para Cobro</h3>
-                                                <p className="text-xs text-gray-500 mt-1">Click para copiar</p>
+                                                <h3 className="font-semibold text-gray-900 dark:text-white">Links & Datos de Cobro</h3>
+                                                <p className="text-xs text-gray-500 mt-1">Click para copiar y compartir</p>
                                             </div>
                                             <button
                                                 onClick={() => setShowSidebar(false)}
@@ -1669,7 +1670,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                                     return (
                                                                         <div
                                                                             key={key}
-                                                                            className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all ml-3"
+                                                                            className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
                                                                         >
                                                                             <div
                                                                                 className="flex-1 cursor-pointer"
@@ -1888,9 +1889,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                             <div key={item.id} className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
                                                                 <div className="flex-1 cursor-pointer" onClick={() => copyToClipboard(item.id, item.val)}>
                                                                     <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{item.label}</p>
-                                                                    <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{item.val}</p>
+                                                                    <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[140px]">{item.val}</p>
                                                                 </div>
-                                                                <div className="flex items-center gap-1">
+                                                                <div className="flex items-center gap-1 shrink-0">
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
@@ -1981,9 +1982,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                         <div className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
                                                             <div className="flex-1 cursor-pointer" onClick={() => copyToClipboard('opinion', HELP_LINKS.google_opinion)}>
                                                                 <p className="font-medium text-sm text-gray-900 dark:text-gray-100">Dejanos tu opinión</p>
-                                                                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{HELP_LINKS.google_opinion}</p>
+                                                                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[140px]">{HELP_LINKS.google_opinion}</p>
                                                             </div>
-                                                            <div className="flex items-center gap-1">
+                                                            <div className="flex items-center gap-1 flex-shrink-0">
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -2024,9 +2025,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                                         <div className="group flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
                                                             <div className="flex-1 cursor-pointer" onClick={() => copyToClipboard('wa_link', HELP_LINKS.whatsapp)}>
                                                                 <p className="font-medium text-sm text-gray-900 dark:text-gray-100">Link WhatsApp</p>
-                                                                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">{HELP_LINKS.whatsapp}</p>
+                                                                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[140px]">{HELP_LINKS.whatsapp}</p>
                                                             </div>
-                                                            <div className="flex items-center gap-1">
+                                                            <div className="flex items-center gap-1 flex-shrink-0">
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -2376,21 +2377,6 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </div>
                             </div>
                         )}
-                        {/* Historial Ediciones Modal — por movimiento individual */}
-                        <HistorialEdicionesModal
-                            isOpen={!!historialMovId}
-                            onClose={() => setHistorialMovId(null)}
-                            registroId={historialMovId || undefined}
-                            tabla="caja_recepcion_movimientos"
-                        />
-
-                        {/* Historial Ediciones Modal — auditoría mensual */}
-                        <HistorialEdicionesModal
-                            isOpen={showHistorialMes}
-                            onClose={() => setShowHistorialMes(false)}
-                            mes={mesActual}
-                            tabla="caja_recepcion_movimientos"
-                        />
                         {/* Modal de Confirmación de Eliminación */}
                         {deletingMovId && (
                             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -2489,8 +2475,8 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </motion.div>
                             </div>
                         )}
-                    </div>
-                </>)}
+                    </>
+                )}
             </div>
         </CategoriaGuard>
     );

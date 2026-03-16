@@ -540,7 +540,7 @@ export default function AgendaCalendar() {
                         select={handleDateSelect}
                         eventClick={handleEventClick}
                         eventDrop={handleEventDrop}
-                        slotMinTime="07:30:00"
+                        slotMinTime="12:00:00"
                         slotMaxTime="21:00:00"
                         scrollTime="12:00:00"
                         allDaySlot={false}
@@ -551,7 +551,6 @@ export default function AgendaCalendar() {
                         eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                         eventMinHeight={20}
                         eventShortHeight={18}
-                        expandRows
                         stickyHeaderDates
                         nowIndicator
                         datesSet={(arg) => {

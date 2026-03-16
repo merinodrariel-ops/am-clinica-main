@@ -1,17 +1,10 @@
 'use server';
 
-import { sendEmail } from '@/lib/nodemailer';
-import { generateInvitationMessage } from '@/lib/email-templates';
+import { EmailService } from '@/lib/email-service';
 
 export async function sendWelcomeEmailAction(toName: string, toEmail: string) {
     try {
-        const html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px"><h2>Bienvenido/a, ${toName}</h2><p>Tu cuenta en AM Clínica fue creada exitosamente.</p></div>`;
-
-        const response = await sendEmail({
-            to: toEmail,
-            subject: 'Bienvenido a AM Clínica',
-            html
-        });
+        const response = await EmailService.sendWelcome(toName, toEmail);
 
         if (response.success) {
             console.log('Welcome Email Sent (Action)!', response.messageId);
@@ -28,13 +21,7 @@ export async function sendWelcomeEmailAction(toName: string, toEmail: string) {
 
 export async function sendInvitationEmailAction(toName: string, toEmail: string, link: string) {
     try {
-        const html = generateInvitationMessage(toName, link);
-
-        const response = await sendEmail({
-            to: toEmail,
-            subject: `Invitación a AM Clínica - ${toName}`,
-            html
-        });
+        const response = await EmailService.sendInvitation(toName, toEmail, link);
 
         if (response.success) {
             return { success: true };
@@ -43,6 +30,33 @@ export async function sendInvitationEmailAction(toName: string, toEmail: string,
         }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+export async function sendMagicLinkEmailAction(toName: string, toEmail: string, link: string) {
+    try {
+        const response = await EmailService.sendMagicLink(toName, toEmail, link);
+        return response;
+    } catch (error) {
+        return { success: false, error: String(error) };
+    }
+}
+
+export async function sendBudgetEmailAction(toName: string, toEmail: string, budgetUrl: string, amount?: string) {
+    try {
+        const response = await EmailService.sendBudget(toName, toEmail, budgetUrl, amount);
+        return response;
+    } catch (error) {
+        return { success: false, error: String(error) };
+    }
+}
+
+export async function sendFormConfirmationEmailAction(toName: string, toEmail: string, formName?: string) {
+    try {
+        const response = await EmailService.sendFormConfirmation(toName, toEmail, formName);
+        return response;
+    } catch (error) {
+        return { success: false, error: String(error) };
     }
 }
 export async function sendSecurityAlertAction(details: {
@@ -108,7 +122,7 @@ export async function sendSecurityAlertAction(details: {
             </div>
         `;
 
-        const response = await sendEmail({
+        const response = await EmailService.send({
             to: adminEmail,
             subject: `⚠️ ALERTA: Modificación en Caja - ${details.userName}`,
             html
@@ -165,7 +179,7 @@ export async function sendReciboEmailAction(payload: {
             </div>
         `;
 
-        const response = await sendEmail({
+        const response = await EmailService.send({
             to: email,
             subject: `Comprobante de Pago - Recibo ${payload.reciboNumero}`,
             html,
@@ -173,7 +187,6 @@ export async function sendReciboEmailAction(payload: {
                 {
                     filename: `recibo-${payload.reciboNumero}.jpg`,
                     content: base64Image,
-                    encoding: 'base64',
                     contentType: 'image/jpeg',
                 },
             ],

@@ -524,7 +524,146 @@ export function generateInvitationMessage(nombre: string, link: string): string 
 </html>`;
 }
 
+export function generateBudgetEmail(nombre: string, budgetUrl: string, amount?: string): string {
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuesto — AM Clínica</title>
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000;padding:60px 20px;">
+        <tr>
+            <td align="center">
+                <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background-color:#050505;border:1px solid rgba(201,169,110,0.15);">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding:45px 0 30px;">
+                            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM Clínica" height="35" style="display:block;height:35px;filter:brightness(0) invert(1);">
+                        </td>
+                    </tr>
 
+                    <!-- Visual -->
+                    <tr>
+                        <td align="center" style="padding:0 40px 40px;">
+                            <div style="width:70px;height:70px;background-color:rgba(201,169,110,0.05);border-radius:50%;border:1px solid rgba(201,169,110,0.2);display:inline-block;padding:15px;box-shadow: 0 0 15px rgba(201,169,110,0.1);">
+                                <img src="https://cdn-icons-png.flaticon.com/512/2666/2666505.png" width="40" style="filter:invert(84%) sepia(21%) saturate(798%) hue-rotate(345deg) brightness(88%) contrast(85%);" alt="Budget">
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td align="center" style="padding:0 50px 50px;">
+                            <p style="margin:0 0 14px;color:#C9A96E;font-size:9px;letter-spacing:5px;text-transform:uppercase;font-weight:700;">Propuesta Clínica</p>
+                            <h1 style="margin:0 0 28px;font-size:30px;font-weight:300;letter-spacing:-0.5px;line-height:1.2;color:#ffffff;font-family:'Times New Roman',serif;">
+                                Tu Plan de <br><span style="color:#C9A96E;font-weight:700;">Tratamiento.</span>
+                            </h1>
+                            <p style="margin:0 0 35px;color:rgba(255,255,255,0.6);font-size:15px;line-height:1.7;">
+                                Hola <strong>${nombre}</strong>, hemos preparado una propuesta detallada para tu transformación dental. <br>
+                                Diseñamos cada paso pensando en la excelencia y resultados duraderos.
+                            </p>
+
+                            <!-- Budget Box -->
+                            <div style="background-color:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:30px;border-radius:2px;margin-bottom:40px;">
+                                <p style="margin:0 0 5px;color:rgba(255,255,255,0.3);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Acceso al presupuesto</p>
+                                <a href="${budgetUrl}" style="display:inline-block;padding:15px 35px;background-color:#C9A96E;color:#000000;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:2px;border-radius:2px;margin-top:20px;">
+                                    VER PRESUPUESTO ONLINE
+                                </a>
+                                ${amount ? `<p style="margin:20px 0 0;color:#C9A96E;font-size:18px;font-weight:600;">Inversión estimada: ${amount}</p>` : ''}
+                            </div>
+                            
+                            <p style="margin:0;color:rgba(255,255,255,0.3);font-size:12px;line-height:1.6;">
+                                Quedamos a tu entera disposición para coordinar el inicio de tu tratamiento.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding:40px;background-color:#0a0a0a;border-top:1px solid rgba(255,255,255,0.05);">
+                            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:9px;letter-spacing:2px;text-transform:uppercase;">
+                                AM Clínica Dental · Puerto Madero · Buenos Aires
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
+
+export function generateFormSubmissionConfirmationEmail(nombre: string, formName?: string): string {
+    const title = formName ? `Formulario Recibido: ${formName}` : 'Formulario Recibido';
+    const displayFormName = formName || 'tu formulario';
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title} — AM Clínica</title>
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000;padding:60px 20px;">
+        <tr>
+            <td align="center">
+                <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background-color:#050505;border:1px solid rgba(201,169,110,0.15);">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding:45px 0 30px;">
+                            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM Clínica" height="35" style="display:block;height:35px;filter:brightness(0) invert(1);">
+                        </td>
+                    </tr>
+
+                    <!-- Visual -->
+                    <tr>
+                        <td align="center" style="padding:0 40px 40px;">
+                            <div style="width:70px;height:70px;background-color:rgba(201,169,110,0.05);border-radius:50%;border:1px solid rgba(201,169,110,0.2);display:inline-block;padding:15px;box-shadow: 0 0 15px rgba(201,169,110,0.1);">
+                                <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" width="40" style="filter:invert(84%) sepia(21%) saturate(798%) hue-rotate(345deg) brightness(88%) contrast(85%);" alt="Confirmed">
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td align="center" style="padding:0 50px 50px;">
+                            <p style="margin:0 0 14px;color:#C9A96E;font-size:9px;letter-spacing:5px;text-transform:uppercase;font-weight:700;">Recepción Exitosa</p>
+                            <h1 style="margin:0 0 28px;font-size:30px;font-weight:300;letter-spacing:-0.5px;line-height:1.2;color:#ffffff;font-family:'Times New Roman',serif;">
+                                Formulario <br><span style="color:#C9A96E;font-weight:700;">Recibido.</span>
+                            </h1>
+                            <p style="margin:0 0 35px;color:rgba(255,255,255,0.6);font-size:15px;line-height:1.7;">
+                                Hola <strong>${nombre}</strong>, hemos recibido los datos de <strong>${displayFormName}</strong> correctamente. <br>
+                                Nuestro equipo administrativo revisará la información y se pondrá en contacto contigo a la brevedad.
+                            </p>
+
+                            <div style="background-color:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:25px;border-radius:2px;">
+                                <p style="margin:0;color:rgba(255,255,255,0.4);font-size:13px;line-height:1.5;">
+                                    Si necesitas asistencia inmediata, puedes escribirnos directamente por WhatsApp.
+                                </p>
+                                <a href="https://wa.link/zolb52" style="display:inline-block;margin-top:15px;color:#C9A96E;text-decoration:none;font-size:14px;font-weight:700;">HABLAR CON RECEPCIÓN &rarr;</a>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding:40px;background-color:#0a0a0a;border-top:1px solid rgba(255,255,255,0.05);">
+                            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:9px;letter-spacing:2px;text-transform:uppercase;">
+                                AM Clínica Dental · Puerto Madero · Buenos Aires
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
 
 export function generatePaymentConfirmationEmail(nombre: string, amountUsd: number, description?: string): string {
     return `<!DOCTYPE html>

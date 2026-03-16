@@ -4,11 +4,9 @@
  * Called by /api/agenda/remind (cron) or triggered on status change.
  */
 
-import { Resend } from 'resend';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { EmailService } from '@/lib/email-service';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = process.env.RESEND_FROM ?? 'agenda@am-clinica.ar';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://am-clinica.ar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -250,15 +248,14 @@ async function sendEmail(ctx: AppointmentNotificationContext): Promise<{ success
   const { subject, html } = renderTemplate(ctx.templateKey, ctx);
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+    const response = await EmailService.send({
       to: ctx.patientEmail,
       subject,
       html,
     });
 
-    if (error) return { success: false, error: error.message };
-    return { success: true, id: data?.id };
+    if (!response.success) return { success: false, error: (response as any).error?.message || 'Error sending email' };
+    return { success: true, id: (response as any).id };
   } catch (err) {
     return { success: false, error: String(err) };
   }

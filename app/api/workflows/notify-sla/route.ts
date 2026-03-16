@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/nodemailer';
+import { EmailService } from '@/lib/email-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
                     ? replaceVars(stage.sla_staff_subject)
                     : `SLA por vencer: ${workflowName || 'Workflow'} / ${stage.name || 'Etapa'}`;
 
-                const response = await sendEmail({ to: email, subject: subjectValue, html: htmlValue });
+                const response = await EmailService.send({ to: email, subject: subjectValue, html: htmlValue });
 
                 await supabase.from('workflow_notifications_log').insert({
                     workflow_id: treatment.workflow_id,

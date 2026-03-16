@@ -2,7 +2,8 @@ import 'server-only';
 
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
-import { sendResendEmail } from '@/lib/resend-email';
+import { EmailService } from '@/lib/email-service';
+import { generatePremiumWelcomeEmail } from '@/lib/email-templates';
 
 type ProfileSyncResult = {
     success: boolean;
@@ -116,14 +117,10 @@ export async function syncUserProfileAndSendFirstWelcome(user: User): Promise<Pr
 
     const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/portal`;
 
-    const send = await sendResendEmail({
-        to: user.email!,
-        subject: 'Bienvenido a AM Clínica Dental',
-        html: generatePremiumWelcomeEmail(fullName, portalUrl),
-    });
+    const send = await EmailService.sendWelcome(fullName, user.email!);
 
     if (!send.success) {
-        return { success: false, error: send.error || 'No se pudo enviar welcome email' };
+        return { success: false, error: (send as any).error || 'No se pudo enviar welcome email' };
     }
 
     await admin

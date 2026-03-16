@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
-import { sendInvitationEmail } from '@/lib/emailjs';
+import { EmailService } from '@/lib/email-service';
 import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
 
 // Initialize Admin Client securely
@@ -166,12 +166,12 @@ export async function inviteUser(formData: FormData) {
         if (linkError) throw linkError;
         if (!linkData.user) throw new Error('No user created');
 
-        // 2. Send Custom Email via EmailJS
-        const emailResult = await sendInvitationEmail({
-            to_email: email,
-            to_name: fullName,
-            action_link: linkData.properties.action_link
-        });
+        // 2. Send Custom Email via EmailService (Resend)
+        const emailResult = await EmailService.sendInvitation(
+            fullName,
+            email,
+            linkData.properties.action_link
+        );
 
         if (!emailResult.success) {
             console.error('Email sending failed:', emailResult.error);
@@ -505,11 +505,11 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
 
         if (linkError) throw linkError;
 
-        const emailRes = await sendInvitationEmail({
-            to_email: targetUser.email!,
-            to_name: targetUser.user_metadata?.full_name || 'Usuario',
-            action_link: linkData.properties.action_link
-        });
+        const emailRes = await EmailService.sendInvitation(
+            targetUser.user_metadata?.full_name || 'Usuario',
+            targetUser.email!,
+            linkData.properties.action_link
+        );
 
         if (!emailRes.success) throw new Error(`Email failed: ${emailRes.error}`);
 

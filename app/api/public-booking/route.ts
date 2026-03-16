@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { sendNotification } from '@/lib/am-scheduler/notification-service';
-import { sendResendEmail } from '@/lib/resend-email';
-import { sendEmail } from '@/lib/nodemailer';
+import { EmailService } from '@/lib/email-service';
 import {
     buildAvailableSlots,
     getDoctorAppointmentsForDate,
@@ -270,22 +269,14 @@ export async function POST(request: NextRequest) {
                 </div>
             `;
 
-            const resendResult = await sendResendEmail({
+            const emailResult = await EmailService.send({
                 to: notifyEmail,
                 subject: clinicSubject,
                 html: clinicHtml,
             });
-
-            if (!resendResult.success) {
-                const gmailResult = await sendEmail({
-                    to: notifyEmail,
-                    subject: clinicSubject,
-                    html: clinicHtml,
-                });
-
-                if (!gmailResult.success) {
-                    warnings.push('No se pudo enviar el email interno de aviso al contacto de la clínica.');
-                }
+            
+            if (!emailResult.success) {
+                warnings.push('No se pudo enviar el email interno de aviso al contacto de la clínica.');
             }
         } else {
             warnings.push('No hay email interno configurado para recibir avisos de agenda pública.');

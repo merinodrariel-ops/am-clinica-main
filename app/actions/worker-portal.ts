@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { WorkerProfile, WorkLog, Achievement, WorkerAchievement, ProviderGoal, GoalProgress, Liquidation, EmpresaPrestadora } from '@/types/worker-portal';
 import { revalidatePath } from 'next/cache';
-import { sendInvitationEmail } from '@/lib/emailjs';
+import { EmailService } from '@/lib/email-service';
 
 // Service-role client for admin operations that bypass RLS
 function getAdminClient() {
@@ -521,11 +521,11 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
 
     // 2. Send invitation email (non-blocking — worker is created even if email fails)
     if (actionLink) {
-        const emailResult = await sendInvitationEmail({
-            to_name: `${data.nombre} ${data.apellido || ''}`.trim(),
-            to_email: data.email,
-            action_link: actionLink,
-        });
+        const emailResult = await EmailService.sendInvitation(
+            `${data.nombre} ${data.apellido || ''}`.trim(),
+            data.email,
+            actionLink
+        );
         if (!emailResult.success) {
             console.error('Invitation email failed:', emailResult.error);
             // Don't throw — auth user + personal record are created; admin can resend later
@@ -657,11 +657,11 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
 
     const actionLink = linkData.properties?.action_link;
     if (actionLink) {
-        const emailResult = await sendInvitationEmail({
-            to_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
-            to_email: worker.email,
-            action_link: actionLink,
-        });
+        const emailResult = await EmailService.sendInvitation(
+            `${worker.nombre} ${worker.apellido || ''}`.trim(),
+            worker.email,
+            actionLink
+        );
         if (!emailResult.success) {
             // Surface the real Resend error so admin can see it
             throw new Error(`Invitación creada pero el email falló: ${emailResult.error}`);

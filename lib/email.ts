@@ -1,51 +1,35 @@
-import { sendEmail } from '@/lib/nodemailer';
-import { generatePremiumWelcomeEmail, generatePaymentConfirmationEmail } from '@/lib/email-templates';
+import { EmailService } from './email-service';
 
 export async function sendWelcomeEmail(toName: string, toEmail: string, whatsapp?: string) {
     try {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://clinica.arielmerino.com';
-        const portalUrl = `${siteUrl}/portal`;
-
-        const html = generatePremiumWelcomeEmail(toName, portalUrl);
-
-        const response = await sendEmail({
-            to: toEmail,
-            subject: 'Bienvenido a AM Estética Dental — Excelencia y Minimalismo',
-            html
-        });
+        const response = await EmailService.sendWelcome(toName, toEmail);
 
         if (response.success) {
-            console.log('Welcome Email Sent!', response.messageId);
+            console.log('Welcome Email Sent!', (response as any).id);
             return { success: true };
         } else {
-            console.error('Failed to send email:', response.error);
-            return { success: false, error: String(response.error) };
+            console.error('Failed to send email:', (response as any).error);
+            return { success: false, error: String((response as any).error) };
         }
     } catch (error) {
         console.error('Failed to send email:', error);
-        return { success: false, error };
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
 
 export async function sendPaymentEmail(toName: string, toEmail: string, amountUsd: number, description?: string) {
     try {
-        const html = generatePaymentConfirmationEmail(toName, amountUsd, description);
-
-        const response = await sendEmail({
-            to: toEmail,
-            subject: 'Comprobante de Pago Confirmado — AM Clínica',
-            html
-        });
+        const response = await EmailService.sendPaymentConfirmation(toName, toEmail, amountUsd, description);
 
         if (response.success) {
-            console.log('Payment Email Sent!', response.messageId);
+            console.log('Payment Email Sent!', (response as any).id);
             return { success: true };
         } else {
-            console.error('Failed to send payment email:', response.error);
-            return { success: false, error: String(response.error) };
+            console.error('Failed to send payment email:', (response as any).error);
+            return { success: false, error: String((response as any).error) };
         }
     } catch (error) {
         console.error('Failed to send payment email:', error);
-        return { success: false, error };
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 }

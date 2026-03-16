@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
-import { sendEmail } from '@/lib/nodemailer';
-import { generatePatientMagicLinkEmail } from '@/lib/email-templates';
+import { EmailService } from '@/lib/email-service';
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -67,11 +66,7 @@ export async function POST(req: NextRequest) {
 
         // 5. Send email
         console.log(`[MagicLink] Attempting to send magic link to: ${patient.email}`);
-        const emailResult = await sendEmail({
-            to: patient.email,
-            subject: `Tu acceso seguro a AM Clínica – ${nombre}`,
-            html: generatePatientMagicLinkEmail(nombre, portalUrl),
-        });
+        const emailResult = await EmailService.sendMagicLink(nombre, patient.email, portalUrl);
         console.log(`[MagicLink] Email result for ${patient.email}:`, emailResult);
 
         if (!emailResult.success) {

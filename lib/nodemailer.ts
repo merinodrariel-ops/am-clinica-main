@@ -1,17 +1,10 @@
 import 'server-only';
-import nodemailer from 'nodemailer';
+import { EmailService } from './email-service';
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-    },
-});
-
-const FROM = process.env.GMAIL_USER
-    ? `AM Clínica <${process.env.GMAIL_USER}>`
-    : 'AM Clínica <noreply@amclinica.com.ar>';
+/**
+ * DEPRECATED: Use EmailService from @/lib/email-service instead.
+ * This file now acts as a proxy to Resend to ensure no emails are sent via Gmail.
+ */
 
 interface EmailAttachment {
     filename: string;
@@ -31,25 +24,27 @@ export async function sendEmail({
     html: string;
     attachments?: EmailAttachment[];
 }) {
+    console.warn('DEPRECATED: sendEmail from nodemailer.ts is deprecated. Using Resend instead.');
+    
     try {
-        const info = await transporter.sendMail({
-            from: FROM,
+        const response = await EmailService.send({
             to,
             subject,
             html,
-            attachments: attachments?.map((a) => ({
+            attachments: attachments?.map(a => ({
                 filename: a.filename,
                 content: a.content,
-                encoding: a.encoding,
-                contentType: a.contentType,
-            })),
+                contentType: a.contentType
+            }))
         });
 
-        console.log('Email sent via Gmail:', info.messageId);
-        return { success: true, messageId: info.messageId };
+        if (response.success) {
+            return { success: true, messageId: (response as any).id };
+        } else {
+            return { success: false, error: (response as any).error };
+        }
     } catch (error) {
-        console.error('Error sending email via Gmail:', error);
-        const msg = error instanceof Error ? error.message : JSON.stringify(error);
-        return { success: false, error: msg };
+        console.error('Error in nodemailer proxy:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
