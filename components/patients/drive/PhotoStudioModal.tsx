@@ -316,6 +316,7 @@ export default function PhotoStudioModal({
 
     function handleMouseDown(e: React.MouseEvent) {
         if (zoom <= 1) return;
+        if (drawMode !== 'idle') return; // draw tool active — don't pan
         e.preventDefault();
         dragRef.current = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
         setIsDragging(true);
@@ -790,16 +791,15 @@ export default function PhotoStudioModal({
     function handleDrawDblClick(e: React.MouseEvent<HTMLCanvasElement>) {
         if (drawMode === 'drawing') {
             e.stopPropagation();
-            setCurrentPoints(prev => {
-                const pts = prev.slice(0, -1);
-                if (pts.length >= 2) {
-                    const newId = `shape-${Date.now()}`;
-                    setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: true, color: drawColor }]);
-                    setSelectedShapeId(newId);
-                    setDrawMode('editing');
-                }
-                return [];
-            });
+            // Use currentPoints directly — don't nest setState calls inside an updater
+            const pts = currentPoints.slice(0, -1); // remove duplicate from 2nd click
+            if (pts.length >= 2) {
+                const newId = `shape-${Date.now()}`;
+                setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: true, color: drawColor }]);
+                setSelectedShapeId(newId);
+                setDrawMode('editing');
+            }
+            setCurrentPoints([]);
             setMousePos(null);
             return;
         }
