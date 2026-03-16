@@ -149,6 +149,7 @@ export default function PhotoStudioModal({
     const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
     const textDragRef = useRef<{ id: string; lastNx: number; lastNy: number } | null>(null);
     const textMetricsRef = useRef<Map<string, { wNorm: number; hNorm: number }>>(new Map());
+    const justFinishedEditRef = useRef<string | null>(null); // guards against blur-then-click creating new text
 
     const [zoom, setZoom] = useState(1);
     const [panX, setPanX] = useState(0);
@@ -930,10 +931,13 @@ export default function PhotoStudioModal({
     }
 
     function hitTestTextAnnotation(annotations: TextAnnotation[], nx: number, ny: number): TextAnnotation | null {
+        const PAD = 0.015; // generous padding so text is easy to grab
         for (const ta of [...annotations].reverse()) {
             const m = textMetricsRef.current.get(ta.id);
-            if (!m) continue;
-            if (nx >= ta.x && nx <= ta.x + m.wNorm && ny >= ta.y && ny <= ta.y + m.hNorm) return ta;
+            // Fallback when metrics not yet computed: use a reasonable hit zone
+            const w = m ? m.wNorm + PAD * 2 : 0.2;
+            const h = m ? m.hNorm + PAD * 2 : 0.06;
+            if (nx >= ta.x - PAD && nx <= ta.x + w && ny >= ta.y - PAD && ny <= ta.y + h) return ta;
         }
         return null;
     }
@@ -941,6 +945,9 @@ export default function PhotoStudioModal({
     function finishTextEditing(id: string) {
         setTextAnnotations(prev => prev.filter(t => t.id !== id || t.text.trim() !== ''));
         setEditingTextId(null);
+        setSelectedTextId(id); // keep visually selected so user can see + drag it
+        justFinishedEditRef.current = id;
+        setTimeout(() => { justFinishedEditRef.current = null; }, 350);
     }
 
     // Returns which corner (0=TL, 1=TR, 2=BR, 3=BL) of the selection bbox is hit, or -1
@@ -974,12 +981,19 @@ export default function PhotoStudioModal({
         // Text tool: click to create or edit
         if (textToolActive) {
             e.stopPropagation();
+            // Guard: blur fires before click when clicking away from an active input;
+            // finishTextEditing sets this ref so we don't create a new annotation accidentally.
+            if (justFinishedEditRef.current) {
+                justFinishedEditRef.current = null;
+                return;
+            }
             const [nx, ny] = getDrawNormXY(e);
             const hit = hitTestTextAnnotation(textAnnotations, nx, ny);
             if (hit) {
                 setSelectedTextId(hit.id);
                 setEditingTextId(hit.id);
             } else {
+                setSelectedTextId(null);
                 const newId = `text-${Date.now()}`;
                 const newTA: TextAnnotation = { id: newId, x: nx, y: ny, text: '', color: drawColor };
                 setTextAnnotations(prev => [...prev, newTA]);
@@ -1073,18 +1087,20 @@ export default function PhotoStudioModal({
         const canvas = drawCanvasRef.current!;
         const [nx, ny] = getPointerNormXY(e);
 
-        // Text tool: drag to move an existing annotation
-        if (textToolActive) {
-            const hit = hitTestTextAnnotation(textAnnotations, nx, ny);
-            if (hit) {
+        // Text drag: always available (text tool doesn't need to be active to move existing text)
+        if (textAnnotations.length > 0) {
+            const textHit = hitTestTextAnnotation(textAnnotations, nx, ny);
+            if (textHit) {
                 e.stopPropagation();
                 e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
-                setSelectedTextId(hit.id);
-                textDragRef.current = { id: hit.id, lastNx: nx, lastNy: ny };
+                setSelectedTextId(textHit.id);
+                textDragRef.current = { id: textHit.id, lastNx: nx, lastNy: ny };
+                return;
             }
-            return;
         }
+        // If text tool is active but clicked on empty area: let click handler create text, skip shape logic
+        if (textToolActive) return;
 
         if (drawMode === 'editing' && selectedShapeId) {
             // Try to grab a point handle
@@ -1257,6 +1273,16 @@ export default function PhotoStudioModal({
             shapeDragRef.current.lastNx = nx;
             shapeDragRef.current.lastNy = ny;
             return;
+        }
+        // Dynamic cursor for text annotations
+        if (textAnnotations.length > 0 || textToolActive) {
+            const canvas = e.currentTarget;
+            const [nx, ny] = getPointerNormXY(e);
+            if (hitTestTextAnnotation(textAnnotations, nx, ny)) {
+                canvas.style.cursor = 'move';
+                return;
+            }
+            if (textToolActive) { canvas.style.cursor = 'text'; return; }
         }
         // Dynamic cursor in selected mode: resize cursor over corners, move over body
         if (drawMode === 'selected' && selectedShapeId) {
@@ -1828,8 +1854,7 @@ export default function PhotoStudioModal({
                                         ref={drawCanvasRef}
                                         className="absolute inset-0 w-full h-full"
                                         style={{
-                                            cursor: textToolActive ? 'text'
-                                                  : drawMode === 'drawing' ? 'crosshair'
+                                            cursor: drawMode === 'drawing' ? 'crosshair'
                                                   : drawMode === 'editing' ? 'crosshair'
                                                   : drawMode === 'selected' ? 'move'
                                                   : drawShapes.length > 0 ? 'pointer'
