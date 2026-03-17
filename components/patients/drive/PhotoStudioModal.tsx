@@ -344,11 +344,6 @@ export default function PhotoStudioModal({
 
         const wheelHandler = (e: WheelEvent) => {
             e.preventDefault();
-            if (zoomRef.current <= 1) {
-                // Navigate between photos when not zoomed in
-                switchToAdjacentRef.current(e.deltaY > 0 ? 1 : -1);
-                return;
-            }
             const delta = e.deltaY > 0 ? -0.15 : 0.15;
             setZoom(prev => {
                 const next = Math.min(5, Math.max(1, prev + delta));
