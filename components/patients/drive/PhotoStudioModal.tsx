@@ -675,8 +675,8 @@ export default function PhotoStudioModal({
         // Scale radius from display pixels → natural image pixels
         const rect = canvas.getBoundingClientRect();
         const displayScale = rect.width > 0 ? W / rect.width : 1;
-        // MAX_R in natural pixels ≈ 1.3 display pixels (slightly thin, sketch feel)
-        const MAX_R = 1.3 * displayScale;
+        // MAX_R in natural pixels ≈ 0.8 display pixels (fine precision line)
+        const MAX_R = 0.8 * displayScale;
         const STEPS = 18; // samples per segment for smooth dot sampling
 
         const allShapes: DrawShape[] = [...drawShapes];
