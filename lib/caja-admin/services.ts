@@ -2051,13 +2051,13 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
         });
     }
 
-    // ── GIRO ACTIVO: cumulative all-time balance (using usd_equivalente_total) ──
+    // ── GIRO ACTIVO: cumulative balance with non-negative floor ──
     // Everything normalized to USD to avoid currency mismatch between debt and payment.
-    // Debt: GIRO_ACTIVO tipo movements (acumula deuda, no impacta efectivo)
-    // Payment: EGRESO con subtipo containing 'giro' (paga la deuda con efectivo físico)
+    // Debt: GIRO_ACTIVO (acumula deuda, no impacta efectivo)
+    // Payment: EGRESO de giro (reduce deuda, but can never make debt negative)
     const { data: allGiroDeuda, error: giroDeudaError } = await getSupabase()
         .from('caja_admin_movimientos')
-        .select('usd_equivalente_total')
+        .select('usd_equivalente_total, fecha_hora')
         .eq('sucursal_id', sucursalId)
         .eq('tipo_movimiento', 'GIRO_ACTIVO')
         .neq('estado', 'Anulado')
@@ -2067,10 +2067,10 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
         console.error('[getCurrentBalanceAdmin] Error fetching giro deuda:', giroDeudaError);
     }
 
-    // EGRESO con subtipo que contiene 'giro' = pago de la deuda (sale efectivo físico USD)
+    // EGRESO de giro = pago de la deuda (sale efectivo físico USD)
     const { data: allGiroPagos, error: giroPagosError } = await getSupabase()
         .from('caja_admin_movimientos')
-        .select('usd_equivalente_total')
+        .select('usd_equivalente_total, fecha_hora')
         .eq('sucursal_id', sucursalId)
         .eq('tipo_movimiento', 'EGRESO')
         .ilike('subtipo', '%giro%')
@@ -2081,16 +2081,37 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
         console.error('[getCurrentBalanceAdmin] Error fetching giro pagos:', giroPagosError);
     }
 
-    let giroUsdTotal = 0;
+    type GiroFlowRow = { usd_equivalente_total: number | null; fecha_hora: string | null; tipo: 'DEUDA' | 'PAGO' };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    allGiroDeuda?.forEach((m: any) => {
-        giroUsdTotal += Number(m.usd_equivalente_total || 0);
+    const giroFlow: GiroFlowRow[] = [
+        ...((allGiroDeuda || []).map((m: { usd_equivalente_total: number | null; fecha_hora: string | null }) => ({
+            usd_equivalente_total: m.usd_equivalente_total,
+            fecha_hora: m.fecha_hora,
+            tipo: 'DEUDA' as const,
+        }))),
+        ...((allGiroPagos || []).map((m: { usd_equivalente_total: number | null; fecha_hora: string | null }) => ({
+            usd_equivalente_total: m.usd_equivalente_total,
+            fecha_hora: m.fecha_hora,
+            tipo: 'PAGO' as const,
+        }))),
+    ];
+
+    giroFlow.sort((a, b) => {
+        const aTs = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
+        const bTs = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
+        return aTs - bTs;
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    allGiroPagos?.forEach((m: any) => {
-        giroUsdTotal -= Number(m.usd_equivalente_total || 0);
+    let giroUsdTotal = 0;
+    giroFlow.forEach((row) => {
+        const amount = Math.abs(Number(row.usd_equivalente_total || 0));
+        if (row.tipo === 'DEUDA') {
+            giroUsdTotal += amount;
+            return;
+        }
+
+        giroUsdTotal -= amount;
+        if (giroUsdTotal < 0) giroUsdTotal = 0;
     });
 
     // Calculate breakdown metrics for reporting
@@ -2125,7 +2146,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
         saldoUsd: totalUsd,
         gastosTotalesUsd,
         giroArs: 0,
-        giroUsd: Math.max(0, giroUsdTotal),
+        giroUsd: giroUsdTotal,
         saldosPorCuenta,
         metrics,
         lastClosure: ultimo
