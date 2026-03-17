@@ -38,6 +38,8 @@ interface DrawShape {
     points: DrawPoint[];
     closed: boolean;
     color: DrawColor;
+    strokeStyle?: string;    // persisted per-shape so styles can coexist
+    children?: DrawShape[];  // set only on group shapes
 }
 
 interface TextAnnotation {
@@ -103,6 +105,188 @@ function cubicBezierVal(p0: number, cp1: number, cp2: number, p3: number, t: num
     return mt*mt*mt*p0 + 3*mt*mt*t*cp1 + 3*mt*t*t*cp2 + t*t*t*p3;
 }
 
+/**
+ * Snaps (toX, toY) to the nearest 45° angle from (fromX, fromY).
+ * Used for Shift-constrained drawing (0°, 45°, 90°, 135°, 180°, …).
+ */
+function snapTo45(fromX: number, fromY: number, toX: number, toY: number): [number, number] {
+    const dx = toX - fromX, dy = toY - fromY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1e-6) return [toX, toY];
+    const angle = Math.atan2(dy, dx);
+    const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+    return [fromX + dist * Math.cos(snapped), fromY + dist * Math.sin(snapped)];
+}
+
+/**
+ * Fills a variable-width stroke as a smooth polygon strip.
+ * Each dot has its own radius; perpendiculars are computed per point.
+ * Works for both open and closed paths.
+ */
+function fillStrokePolygon(
+    ctx: CanvasRenderingContext2D,
+    dots: { sx: number; sy: number }[],
+    radii: number[],
+    closed: boolean,
+    offsetX = 0,
+    offsetY = 0,
+) {
+    const D = dots.length;
+    if (D < 2) return;
+    // Compute perpendicular unit vector at each point
+    const px: number[] = new Array(D);
+    const py: number[] = new Array(D);
+    for (let i = 0; i < D; i++) {
+        const ai = closed ? (i - 1 + D) % D : Math.max(0, i - 1);
+        const bi = closed ? (i + 1) % D : Math.min(D - 1, i + 1);
+        const dx = dots[bi].sx - dots[ai].sx;
+        const dy = dots[bi].sy - dots[ai].sy;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        px[i] = -dy / len;
+        py[i] = dx / len;
+    }
+    ctx.beginPath();
+    // Right side forward
+    ctx.moveTo(dots[0].sx + px[0] * radii[0] + offsetX, dots[0].sy + py[0] * radii[0] + offsetY);
+    for (let i = 1; i < D; i++) {
+        ctx.lineTo(dots[i].sx + px[i] * radii[i] + offsetX, dots[i].sy + py[i] * radii[i] + offsetY);
+    }
+    // Left side backward
+    for (let i = D - 1; i >= 0; i--) {
+        ctx.lineTo(dots[i].sx - px[i] * radii[i] + offsetX, dots[i].sy - py[i] * radii[i] + offsetY);
+    }
+    ctx.closePath();
+    ctx.fill();
+}
+
+/**
+ * Renders the fill geometry of a finished (non-current) DrawShape.
+ * Caller is responsible for ctx.save/restore and shadow settings.
+ */
+function renderFinishedShapeGeometry(
+    ctx: CanvasRenderingContext2D,
+    shape: DrawShape,
+    W: number,
+    H: number,
+    displayScale: number,
+) {
+    const pts = shape.points;
+    const n = pts.length;
+    if (n < 1) return;
+    const MAX_R = 1.0 * displayScale;
+    const MIN_R = 0.1 * displayScale;
+    const RAMP  = 0.18;
+    const STEPS = 18;
+    const segCount = shape.closed ? n : n - 1;
+    const getP0 = (i: number) => !shape.closed && i === 0 ? pts[0] : pts[(i - 1 + n) % n];
+    const getP3 = (i: number) => !shape.closed && i === segCount - 1 ? pts[n - 1] : pts[(i + 2) % n];
+
+    const shapeStyle = shape.strokeStyle || 'taper';
+    const color = getDrawColorHex(shape.color);
+
+    if (segCount > 0) {
+        const dots: { sx: number; sy: number }[] = [];
+        for (let i = 0; i < segCount; i++) {
+            const p0 = getP0(i), p1 = pts[i];
+            const p2 = pts[(i + 1) % n], p3 = getP3(i);
+            const x1 = p1.x * W, y1 = p1.y * H;
+            const x2 = p2.x * W, y2 = p2.y * H;
+            const startStep = i === 0 ? 0 : 1;
+            for (let s = startStep; s <= STEPS; s++) {
+                const u = s / STEPS;
+                let sx: number, sy: number;
+                if (p1.smooth && p2.smooth && n >= 3) {
+                    const [cp1x, cp1y, cp2x, cp2y] = catmullRomToBezier(
+                        p0.x * W, p0.y * H, x1, y1, x2, y2, p3.x * W, p3.y * H
+                    );
+                    sx = cubicBezierVal(x1, cp1x, cp2x, x2, u);
+                    sy = cubicBezierVal(y1, cp1y, cp2y, y2, u);
+                } else {
+                    sx = x1 + (x2 - x1) * u;
+                    sy = y1 + (y2 - y1) * u;
+                }
+                dots.push({ sx, sy });
+            }
+        }
+        const D = dots.length;
+        if (D < 2) return;
+
+        if (shapeStyle === 'taper') {
+            const radii = new Array(D).fill(MAX_R);
+            if (!shape.closed) {
+                for (let di = 0; di < D; di++) {
+                    const t = di / (D - 1);
+                    const raw = Math.min(t / RAMP, (1 - t) / RAMP, 1);
+                    radii[di] = MIN_R + (MAX_R - MIN_R) * (raw * raw * (3 - 2 * raw));
+                }
+            }
+            ctx.fillStyle = color; ctx.globalAlpha = 1;
+            fillStrokePolygon(ctx, dots, radii, shape.closed);
+
+        } else if (shapeStyle === 'velocity') {
+            const spd = dots.map((_, di) => {
+                const a = dots[Math.max(0, di - 1)], b = dots[Math.min(D - 1, di + 1)];
+                const dx = b.sx - a.sx, dy = b.sy - a.sy;
+                return Math.sqrt(dx * dx + dy * dy);
+            });
+            const ss = spd.map((_, di) => {
+                let sum = 0;
+                for (let k = -2; k <= 2; k++) sum += spd[Math.max(0, Math.min(D - 1, di + k))];
+                return sum / 5;
+            });
+            const sMin = Math.min(...ss), sMax = Math.max(...ss);
+            const sRange = Math.max(sMax - sMin, sMax * 0.6) || 1;
+            const radii = ss.map(s => MAX_R * 2 * (1 - Math.min((s - sMin) / sRange, 1) * 0.9));
+            ctx.fillStyle = color; ctx.globalAlpha = 1;
+            fillStrokePolygon(ctx, dots, radii, shape.closed);
+
+        } else if (shapeStyle === 'nib') {
+            const NIB_ANGLE = Math.PI / 4;
+            const radii = dots.map((_, di) => {
+                const a = dots[Math.max(0, di - 1)], b = dots[Math.min(D - 1, di + 1)];
+                const angle = Math.atan2(b.sy - a.sy, b.sx - a.sx);
+                return MIN_R + (MAX_R * 2.5 - MIN_R) * Math.abs(Math.sin(angle - NIB_ANGLE));
+            });
+            ctx.fillStyle = color; ctx.globalAlpha = 1;
+            fillStrokePolygon(ctx, dots, radii, shape.closed);
+
+        } else if (shapeStyle === 'brush') {
+            const baseRadii = dots.map((_, di) => {
+                if (!shape.closed) {
+                    const t = di / (D - 1);
+                    const raw = Math.min(t / RAMP, (1 - t) / RAMP, 1);
+                    return MIN_R + (MAX_R - MIN_R) * (raw * raw * (3 - 2 * raw));
+                }
+                return MAX_R;
+            });
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.12; fillStrokePolygon(ctx, dots, baseRadii.map(r => r * 3.0), shape.closed);
+            ctx.globalAlpha = 0.28; fillStrokePolygon(ctx, dots, baseRadii.map(r => r * 1.8), shape.closed);
+            ctx.globalAlpha = 0.90; fillStrokePolygon(ctx, dots, baseRadii, shape.closed);
+            ctx.globalAlpha = 1;
+
+        } else {
+            // pencil: 3 thin offset passes, graphite feel
+            const thinR = dots.map(() => MAX_R * 0.35);
+            ctx.fillStyle = color;
+            for (const [ox, oy, alpha] of [
+                [-1.2 * displayScale, -0.4 * displayScale, 0.55],
+                [0, 0, 0.75],
+                [1.0 * displayScale,  0.5 * displayScale, 0.45],
+            ] as [number, number, number][]) {
+                ctx.globalAlpha = alpha;
+                fillStrokePolygon(ctx, dots, thinR, shape.closed, ox, oy);
+            }
+            ctx.globalAlpha = 1;
+        }
+    } else if (n === 1) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(pts[0].x * W, pts[0].y * H, MAX_R, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
 function isImageFile(file: DriveFile): boolean {
     return file.mimeType.toLowerCase().startsWith('image/');
 }
@@ -154,6 +338,15 @@ export default function PhotoStudioModal({
         origPoints: DrawPoint[];
     } | null>(null);
     const didDragRef = useRef(false);
+    // Per-file state cache — persists draws/rotation/brightness across photo navigation
+    type FileEditState = {
+        rotation: number; brightness: number;
+        drawShapes: DrawShape[]; textAnnotations: TextAnnotation[];
+    };
+    const fileStatesRef = useRef<Map<string, FileEditState>>(new Map());
+    // Stable refs for arrow-key handler (avoids stale closure)
+    const drawModeRef = useRef<DrawMode>('idle');
+    const selectedShapeIdRef = useRef<string | null>(null);
 
     type DrawMode = 'idle' | 'drawing' | 'selected' | 'editing';
     const [drawMode, setDrawMode] = useState<DrawMode>('idle');
@@ -162,8 +355,15 @@ export default function PhotoStudioModal({
     const [drawShapes, setDrawShapes] = useState<DrawShape[]>([]);
     const [currentPoints, setCurrentPoints] = useState<DrawPoint[]>([]);
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+    const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [mousePos, setMousePos] = useState<[number, number] | null>(null);
     const [drawClipboard, setDrawClipboard] = useState<DrawShape | null>(null);
+    const [studioMode, setStudioMode] = useState<'editor' | 'canvas'>('editor');
+
+    // Stroke style
+    type StrokeStyle = 'taper' | 'velocity' | 'nib' | 'brush' | 'pencil';
+    const [strokeStyle, setStrokeStyle] = useState<StrokeStyle>('brush');
 
     // Text annotation state
     const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>([]);
@@ -178,6 +378,8 @@ export default function PhotoStudioModal({
     const [zoom, setZoom] = useState(1);
     const zoomRef = useRef(1); // mirrors zoom for non-reactive wheel handler
     useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+    useEffect(() => { drawModeRef.current = drawMode; }, [drawMode]);
+    useEffect(() => { selectedShapeIdRef.current = selectedShapeId; }, [selectedShapeId]);
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -321,15 +523,36 @@ export default function PhotoStudioModal({
     useEffect(() => {
         if (presentationMode) return; // presentation mode has its own handler
         const handler = (e: KeyboardEvent) => {
-            // Skip when typing in an input / textarea or editing a text annotation
             if (editingTextId) return;
             const tag = (e.target as HTMLElement)?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            const isArrow = ['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key);
+            if (!isArrow) return;
+            e.preventDefault();
+
+            // If a shape is selected → nudge it instead of navigating
+            const shapeId = selectedShapeIdRef.current;
+            if (drawModeRef.current === 'selected' && shapeId) {
+                const NUDGE = 0.002;
+                const dx = e.key === 'ArrowRight' ? NUDGE : e.key === 'ArrowLeft' ? -NUDGE : 0;
+                const dy = e.key === 'ArrowDown'  ? NUDGE : e.key === 'ArrowUp'   ? -NUDGE : 0;
+                const mv = (pts: DrawPoint[]) => pts.map(p => ({
+                    ...p,
+                    x: Math.max(0, Math.min(1, p.x + dx)),
+                    y: Math.max(0, Math.min(1, p.y + dy)),
+                }));
+                setDrawShapes(shapes => shapes.map(s => {
+                    if (s.id !== shapeId) return s;
+                    if (s.children) return { ...s, children: s.children.map(c => ({ ...c, points: mv(c.points) })) };
+                    return { ...s, points: mv(s.points) };
+                }));
+                return;
+            }
+
+            // Otherwise navigate photos
             if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                e.preventDefault();
                 switchToAdjacentRef.current(1);
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                e.preventDefault();
+            } else {
                 switchToAdjacentRef.current(-1);
             }
         };
@@ -441,8 +664,21 @@ export default function PhotoStudioModal({
 
     function handleSwitchFile(newFile: DriveFile) {
         if (newFile.id === activeFile?.id) return;
-        if (isDirty && !confirm('Tenés cambios sin guardar. ¿Cambiar de foto de todas formas?')) return;
+        // Save current photo's editable state before switching
+        if (activeFile) {
+            fileStatesRef.current.set(activeFile.id, {
+                rotation, brightness, drawShapes, textAnnotations,
+            });
+        }
+        // Reset and restore saved state for the new file (if any)
         resetEdits();
+        const saved = fileStatesRef.current.get(newFile.id);
+        if (saved) {
+            setRotation(saved.rotation);
+            setBrightness(saved.brightness);
+            setDrawShapes(saved.drawShapes);
+            setTextAnnotations(saved.textAnnotations);
+        }
         setActiveFile(newFile);
         setImageUrl(`/api/drive/file/${newFile.id}`);
     }
@@ -592,8 +828,13 @@ export default function PhotoStudioModal({
     }
 
     async function handleConfirmBg() {
-        // Bake bg-removed image + chosen color into a new blob → fixes it in the editor
-        pushHistory();
+        // Push history pointing to the PRE-bg-removal URL so Undo cleanly
+        // restores the original image (the bg-removed blob gets revoked below).
+        pushHistory({
+            imageUrl: preBgUrlRef.current ?? imageUrl,
+            rotation, brightness,
+            bgDone: false, bgColor: 'transparent',
+        });
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
             const el = new Image();
             el.crossOrigin = 'anonymous';
@@ -675,35 +916,65 @@ export default function PhotoStudioModal({
         // Scale radius from display pixels → natural image pixels
         const rect = canvas.getBoundingClientRect();
         const displayScale = rect.width > 0 ? W / rect.width : 1;
-        // MAX_R in natural pixels ≈ 0.8 display pixels (fine precision line)
-        const MAX_R = 0.8 * displayScale;
+        // Stroke radius constants (natural pixels)
+        const MAX_R = 1.0 * displayScale; // widest point
+        const MIN_R = 0.1 * displayScale; // tip radius for taper
+        const RAMP = 0.18; // fraction of path length for taper ramp
         const STEPS = 18; // samples per segment for smooth dot sampling
 
         const allShapes: DrawShape[] = [...drawShapes];
         if (currentPoints.length > 0) {
-            allShapes.push({ id: '__current__', points: currentPoints, closed: false, color: drawColor });
+            allShapes.push({ id: '__current__', points: currentPoints, closed: false, color: drawColor, strokeStyle });
         }
 
         for (const shape of allShapes) {
-            if (shape.points.length < 1) continue;
-            const pts = shape.points;
-            const n = pts.length;
             const isSelected = shape.id === selectedShapeId;
-            const segCount = shape.closed ? n : n - 1;
 
             ctx.save();
             ctx.shadowColor = 'rgba(0,0,0,0.55)';
             ctx.shadowBlur = 3 * displayScale;
 
-            // For open paths: clamp phantom control points at both ends
-            // instead of wrapping (wrapping causes a "hook" artifact)
+            // ── GROUP shape: render children, show combined selection bbox ───
+            if (shape.children && shape.children.length > 0) {
+                for (const child of shape.children) {
+                    renderFinishedShapeGeometry(ctx, child, W, H, displayScale);
+                }
+                if (drawMode === 'selected' && isSelected) {
+                    const allPts = shape.children.flatMap(c => c.points);
+                    if (allPts.length > 0) {
+                        const xs = allPts.map(p => p.x * W);
+                        const ys = allPts.map(p => p.y * H);
+                        const pad = 10 * displayScale;
+                        ctx.save();
+                        ctx.strokeStyle = '#C9A96E';
+                        ctx.lineWidth = 1.5 * displayScale;
+                        ctx.setLineDash([5 * displayScale, 4 * displayScale]);
+                        ctx.globalAlpha = 0.8;
+                        ctx.shadowBlur = 0;
+                        ctx.strokeRect(
+                            Math.min(...xs) - pad, Math.min(...ys) - pad,
+                            Math.max(...xs) - Math.min(...xs) + pad * 2,
+                            Math.max(...ys) - Math.min(...ys) + pad * 2,
+                        );
+                        ctx.restore();
+                    }
+                }
+                ctx.restore();
+                continue;
+            }
+
+            if (shape.points.length < 1) { ctx.restore(); continue; }
+            const pts = shape.points;
+            const n = pts.length;
+            const segCount = shape.closed ? n : n - 1;
+
             const getP0 = (i: number) =>
                 !shape.closed && i === 0 ? pts[0] : pts[(i - 1 + n) % n];
             const getP3 = (i: number) =>
                 !shape.closed && i === segCount - 1 ? pts[n - 1] : pts[(i + 2) % n];
 
             if (shape.id === '__current__') {
-                // ── In-progress: clean bezier stroke, no reshaping/taper ────────
+                // ── In-progress: clean bezier stroke ─────────────────────────
                 ctx.strokeStyle = getDrawColorHex(shape.color);
                 ctx.lineWidth = MAX_R * 2;
                 ctx.lineJoin = 'round';
@@ -712,10 +983,8 @@ export default function PhotoStudioModal({
                     ctx.beginPath();
                     ctx.moveTo(pts[0].x * W, pts[0].y * H);
                     for (let i = 0; i < segCount; i++) {
-                        const p0 = getP0(i);
-                        const p1 = pts[i];
-                        const p2 = pts[(i + 1) % n];
-                        const p3 = getP3(i);
+                        const p0 = getP0(i), p1 = pts[i];
+                        const p2 = pts[(i + 1) % n], p3 = getP3(i);
                         const x1 = p1.x * W, y1 = p1.y * H;
                         const x2 = p2.x * W, y2 = p2.y * H;
                         if (p1.smooth && p2.smooth && n >= 3) {
@@ -730,41 +999,8 @@ export default function PhotoStudioModal({
                     ctx.stroke();
                 }
             } else {
-                // ── Finished shape: dot-sampled for organic sketch look ───────
-                ctx.fillStyle = getDrawColorHex(shape.color);
-                if (segCount > 0) {
-                    ctx.beginPath();
-                    for (let i = 0; i < segCount; i++) {
-                        const p0 = getP0(i);
-                        const p1 = pts[i];
-                        const p2 = pts[(i + 1) % n];
-                        const p3 = getP3(i);
-                        const x1 = p1.x * W, y1 = p1.y * H;
-                        const x2 = p2.x * W, y2 = p2.y * H;
-                        const startStep = i === 0 ? 0 : 1;
-                        for (let s = startStep; s <= STEPS; s++) {
-                            const u = s / STEPS;
-                            let sx: number, sy: number;
-                            if (p1.smooth && p2.smooth && n >= 3) {
-                                const [cp1x, cp1y, cp2x, cp2y] = catmullRomToBezier(
-                                    p0.x * W, p0.y * H, x1, y1, x2, y2, p3.x * W, p3.y * H
-                                );
-                                sx = cubicBezierVal(x1, cp1x, cp2x, x2, u);
-                                sy = cubicBezierVal(y1, cp1y, cp2y, y2, u);
-                            } else {
-                                sx = x1 + (x2 - x1) * u;
-                                sy = y1 + (y2 - y1) * u;
-                            }
-                            ctx.moveTo(sx + MAX_R, sy);
-                            ctx.arc(sx, sy, MAX_R, 0, Math.PI * 2);
-                        }
-                    }
-                    ctx.fill();
-                } else if (n === 1) {
-                    ctx.beginPath();
-                    ctx.arc(pts[0].x * W, pts[0].y * H, MAX_R, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                // ── Finished shape ────────────────────────────────────────────
+                renderFinishedShapeGeometry(ctx, shape, W, H, displayScale);
             }
 
             // ── Rubber-band dashed line for in-progress shape ────────────────
@@ -867,6 +1103,28 @@ export default function PhotoStudioModal({
 
             ctx.restore();
         }
+
+        // ── Multi-select highlight (shown while selecting before grouping) ─
+        for (const id of multiSelectedIds) {
+            const shape = drawShapes.find(s => s.id === id);
+            if (!shape || shape.points.length === 0) continue;
+            const xs = shape.points.map(p => p.x * W);
+            const ys = shape.points.map(p => p.y * H);
+            const pad = 8 * displayScale;
+            ctx.save();
+            ctx.strokeStyle = '#C9A96E';
+            ctx.lineWidth = 1.5 * displayScale;
+            ctx.setLineDash([4 * displayScale, 3 * displayScale]);
+            ctx.globalAlpha = 0.65;
+            ctx.shadowBlur = 0;
+            ctx.strokeRect(
+                Math.min(...xs) - pad, Math.min(...ys) - pad,
+                Math.max(...xs) - Math.min(...xs) + pad * 2,
+                Math.max(...ys) - Math.min(...ys) + pad * 2,
+            );
+            ctx.restore();
+        }
+
         // ── Text annotations ─────────────────────────────────────────────────
         if (drawVisible) {
             const fontSize = 24 * displayScale;
@@ -915,7 +1173,7 @@ export default function PhotoStudioModal({
             }
         }
     }, [drawShapes, currentPoints, drawVisible, drawColor, drawMode, selectedShapeId, mousePos, imageUrl,
-        textAnnotations, editingTextId, selectedTextId, textToolActive]);
+        textAnnotations, editingTextId, selectedTextId, textToolActive, strokeStyle, multiSelectedIds]);
 
     function getCanvasXY(e: React.PointerEvent<HTMLCanvasElement>) {
         const canvas = e.currentTarget;
@@ -1014,6 +1272,9 @@ export default function PhotoStudioModal({
 
     // Returns which shape's bounding box contains the click (for select/drag)
     function hitTestShapeBody(shape: DrawShape, nx: number, ny: number, canvas: HTMLCanvasElement): boolean {
+        if (shape.children && shape.children.length > 0) {
+            return shape.children.some(child => hitTestShapeBody(child, nx, ny, canvas));
+        }
         if (shape.points.length === 0) return false;
         const rect = canvas.getBoundingClientRect();
         const PAD = 14 / (rect.width || 1);
@@ -1110,7 +1371,13 @@ export default function PhotoStudioModal({
 
         if (drawMode === 'drawing') {
             e.stopPropagation();
-            const [x, y] = getDrawNormXY(e);
+            let [x, y] = getDrawNormXY(e);
+            // Shift → snap to nearest 45° from the last placed point
+            const shiftSnap = e.shiftKey && currentPoints.length >= 1;
+            if (shiftSnap) {
+                const last = currentPoints[currentPoints.length - 1];
+                [x, y] = snapTo45(last.x, last.y, x, y);
+            }
             // If clicking near the first point (≥3 pts already) → close the shape
             if (currentPoints.length >= 3) {
                 const canvas = drawCanvasRef.current!;
@@ -1119,21 +1386,43 @@ export default function PhotoStudioModal({
                 if (Math.abs(x - first.x) < 14 / (rect.width || 1) &&
                     Math.abs(y - first.y) < 14 / (rect.height || 1)) {
                     const newId = `shape-${Date.now()}`;
-                    setDrawShapes(shapes => [...shapes, { id: newId, points: currentPoints, closed: true, color: drawColor }]);
+                    setDrawShapes(shapes => [...shapes, { id: newId, points: currentPoints, closed: true, color: drawColor, strokeStyle }]);
                     setCurrentPoints([]);
                     setMousePos(null);
-                    setSelectedShapeId(newId);
-                    setDrawMode('selected');
+                    setSelectedShapeId(null);
+                    setDrawMode('drawing');
                     return;
                 }
             }
-            setCurrentPoints(prev => [...prev, { x, y, smooth: true }]);
+            // Shift-snapped points use smooth:false (straight segment)
+            setCurrentPoints(prev => [...prev, { x, y, smooth: !shiftSnap }]);
             return;
         }
         if (drawMode === 'idle' || drawMode === 'selected' || drawMode === 'editing') {
             const canvas = drawCanvasRef.current!;
             const [nx, ny] = getDrawNormXY(e);
             const hit = hitTestAnyShape(drawShapes, nx, ny, canvas);
+
+            if (e.metaKey || e.ctrlKey) {
+                // Cmd/Ctrl+click → toggle multi-select
+                // If a single shape was already selected, carry it into multiSelectedIds first
+                if (hit) {
+                    setMultiSelectedIds(prev => {
+                        const base = selectedShapeId && !prev.includes(selectedShapeId)
+                            ? [...prev, selectedShapeId]
+                            : prev;
+                        return base.includes(hit.id)
+                            ? base.filter(id => id !== hit.id)
+                            : [...base, hit.id];
+                    });
+                    setSelectedShapeId(null);
+                    setDrawMode('idle');
+                }
+                return;
+            }
+
+            // Normal click: clear multi-select
+            setMultiSelectedIds([]);
             if (hit) {
                 setSelectedShapeId(hit.id);
                 setDrawMode('selected');
@@ -1152,9 +1441,10 @@ export default function PhotoStudioModal({
                 const newId = `shape-${Date.now()}`;
                 // Double-click = open path (no line back to first point)
                 // To close: click on the first point while drawing
-                setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: false, color: drawColor }]);
-                setSelectedShapeId(newId);
-                setDrawMode('selected');
+                setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: false, color: drawColor, strokeStyle }]);
+                // Stay in drawing mode — user can keep drawing immediately
+                setSelectedShapeId(null);
+                setDrawMode('drawing');
             }
             setCurrentPoints([]);
             setMousePos(null);
@@ -1278,6 +1568,8 @@ export default function PhotoStudioModal({
         }
 
         if (drawMode === 'selected' || drawMode === 'idle') {
+            // Cmd/Ctrl+click → let onClick handle multi-select, don't start drag
+            if (e.metaKey || e.ctrlKey) return;
             // Try to grab a shape for whole-shape drag
             const hit = hitTestAnyShape(drawShapes, nx, ny, canvas);
             if (hit) {
@@ -1318,7 +1610,12 @@ export default function PhotoStudioModal({
         }
         // Rubber-band preview while drawing
         if (drawMode === 'drawing') {
-            const [x, y] = getPointerNormXY(e);
+            let [x, y] = getPointerNormXY(e);
+            // Shift held → snap preview to nearest 45° from last placed point
+            if (e.shiftKey && currentPoints.length >= 1) {
+                const last = currentPoints[currentPoints.length - 1];
+                [x, y] = snapTo45(last.x, last.y, x, y);
+            }
             setMousePos([x, y]);
         }
         // Point drag (editing mode)
@@ -1387,15 +1684,18 @@ export default function PhotoStudioModal({
             const dy = ny - shapeDragRef.current.lastNy;
             if (Math.abs(dx) > 0.0005 || Math.abs(dy) > 0.0005) didDragRef.current = true;
             const { shapeId } = shapeDragRef.current;
-            setDrawShapes(shapes => shapes.map(s =>
-                s.id === shapeId
-                    ? { ...s, points: s.points.map(p => ({
-                        ...p,
-                        x: Math.max(0, Math.min(1, p.x + dx)),
-                        y: Math.max(0, Math.min(1, p.y + dy)),
-                    }))}
-                    : s
-            ));
+            const movePoints = (pts: DrawPoint[]) => pts.map(p => ({
+                ...p,
+                x: Math.max(0, Math.min(1, p.x + dx)),
+                y: Math.max(0, Math.min(1, p.y + dy)),
+            }));
+            setDrawShapes(shapes => shapes.map(s => {
+                if (s.id !== shapeId) return s;
+                if (s.children) {
+                    return { ...s, children: s.children.map(c => ({ ...c, points: movePoints(c.points) })) };
+                }
+                return { ...s, points: movePoints(s.points) };
+            }));
             shapeDragRef.current.lastNx = nx;
             shapeDragRef.current.lastNy = ny;
             return;
@@ -1450,12 +1750,63 @@ export default function PhotoStudioModal({
         setDrawShapes([]);
         setCurrentPoints([]);
         setSelectedShapeId(null);
+        setMultiSelectedIds([]);
         setDrawMode('idle');
         setMousePos(null);
         setTextAnnotations([]);
         setEditingTextId(null);
         setSelectedTextId(null);
         textMetricsRef.current.clear();
+    }
+
+    function handleGroupShapes() {
+        const toGroup = drawShapes.filter(s => multiSelectedIds.includes(s.id));
+        if (toGroup.length < 2) return;
+        const groupId = `group-${Date.now()}`;
+        setDrawShapes(prev => [
+            ...prev.filter(s => !multiSelectedIds.includes(s.id)),
+            { id: groupId, points: [], closed: false, color: toGroup[0].color, children: toGroup },
+        ]);
+        setMultiSelectedIds([]);
+        setSelectedShapeId(groupId);
+        setDrawMode('selected');
+    }
+
+    function handleUngroupShape() {
+        if (!selectedShapeId) return;
+        const group = drawShapes.find(s => s.id === selectedShapeId);
+        if (!group?.children) return;
+        setDrawShapes(prev => [
+            ...prev.filter(s => s.id !== selectedShapeId),
+            ...group.children!,
+        ]);
+        setSelectedShapeId(null);
+        setDrawMode('idle');
+    }
+
+    function handleDrawContextMenu(e: React.MouseEvent<HTMLCanvasElement>) {
+        e.preventDefault();
+        const canvas = drawCanvasRef.current!;
+        const [nx, ny] = getDrawNormXY(e);
+        const hit = hitTestAnyShape(drawShapes, nx, ny, canvas);
+
+        // If right-clicking on a shape while others are already multi-selected, include it
+        if (hit && !multiSelectedIds.includes(hit.id)) {
+            setMultiSelectedIds(prev => {
+                const base = selectedShapeId && !prev.includes(selectedShapeId) ? [...prev, selectedShapeId] : prev;
+                return [...base, hit.id];
+            });
+            setSelectedShapeId(null);
+            setDrawMode('idle');
+        } else if (hit && !selectedShapeId) {
+            // Right-click on single shape with nothing selected
+            setSelectedShapeId(hit.id);
+            setDrawMode('selected');
+        }
+
+        if (hit || multiSelectedIds.length >= 1 || selectedShapeId) {
+            setContextMenu({ x: e.clientX, y: e.clientY });
+        }
     }
 
     function handleFlipHorizontal() {
@@ -1838,9 +2189,33 @@ export default function PhotoStudioModal({
                         <ArrowLeft size={15} />
                         <span className="hidden sm:inline">Volver</span>
                     </button>
-                    <p className="text-white font-semibold truncate flex-1 text-sm">
-                        {activeFile.name}
-                    </p>
+                    <div className="flex-1 flex items-center gap-3 min-w-0">
+                        <p className="text-white font-semibold truncate text-sm hidden sm:block">
+                            {activeFile.name}
+                        </p>
+                        <div className="flex items-center bg-white/5 rounded-lg p-0.5 flex-shrink-0">
+                            <button
+                                onClick={() => setStudioMode('editor')}
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                                    studioMode === 'editor'
+                                        ? 'bg-white/15 text-white'
+                                        : 'text-white/40 hover:text-white/70'
+                                }`}
+                            >
+                                Editar Foto
+                            </button>
+                            <button
+                                onClick={() => setStudioMode('canvas')}
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                                    studioMode === 'canvas'
+                                        ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
+                                        : 'text-white/40 hover:text-white/70'
+                                }`}
+                            >
+                                Canvas
+                            </button>
+                        </div>
+                    </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {selectedIds.size > 0 && (
                             <button
@@ -2010,6 +2385,7 @@ export default function PhotoStudioModal({
                                         onPointerMove={handleDrawPointerMove}
                                         onPointerUp={handleDrawPointerUp}
                                         onPointerLeave={() => { setMousePos(null); shapeDragRef.current = null; dragStateRef.current = null; cornerDragRef.current = null; rotationDragRef.current = null; textDragRef.current = null; textResizeDragRef.current = null; }}
+                                        onContextMenu={handleDrawContextMenu}
                                     />
                                     {/* Text annotation editing overlay */}
                                     {textAnnotations.map(ta => {
@@ -2181,6 +2557,12 @@ export default function PhotoStudioModal({
                                 setSelectedTextId(null);
                             }}
                             textAnnotationCount={textAnnotations.length}
+                            strokeStyle={strokeStyle}
+                            onSetStrokeStyle={s => setStrokeStyle(s as 'taper' | 'velocity' | 'nib' | 'brush' | 'pencil')}
+                            multiSelectedCount={multiSelectedIds.length}
+                            onGroupShapes={handleGroupShapes}
+                            selectedShapeIsGroup={!!(selectedShapeId && drawShapes.find(s => s.id === selectedShapeId)?.children)}
+                            onUngroupShape={handleUngroupShape}
                         />
                         </div>
                     </div>
@@ -2272,13 +2654,21 @@ export default function PhotoStudioModal({
                         >
                             <Grid size={13} /> Grilla
                         </button>
-                        {/* Undo bg removal — mobile */}
+                        {/* Cancelar / Confirmar bg removal — mobile */}
                         {bgDone && (
                             <button
                                 onClick={handleUndoBgRemoval}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/50 transition-colors"
                             >
-                                <X size={13} /> Deshacer fondo
+                                <X size={13} /> Cancelar
+                            </button>
+                        )}
+                        {bgDone && (
+                            <button
+                                onClick={handleConfirmBg}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-blue-600/80 text-white font-semibold transition-colors hover:bg-blue-600"
+                            >
+                                <Check size={13} /> Confirmar
                             </button>
                         )}
                         {/* BG color selector — only when bg removed */}
@@ -2439,6 +2829,60 @@ export default function PhotoStudioModal({
                 </motion.div>
             )}
         </AnimatePresence>
+
+        {/* ── Draw Context Menu ────────────────────────────────────────────── */}
+        {contextMenu && (
+            <>
+                {/* backdrop to close */}
+                <div
+                    className="fixed inset-0 z-[90]"
+                    onClick={() => setContextMenu(null)}
+                    onContextMenu={e => { e.preventDefault(); setContextMenu(null); }}
+                />
+                <div
+                    className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-xl py-1.5 min-w-[160px]"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                >
+                    {/* Agrupar — when 2+ shapes selected */}
+                    {(multiSelectedIds.length >= 2 || (multiSelectedIds.length >= 1 && selectedShapeId)) && (
+                        <button
+                            onClick={() => { handleGroupShapes(); setContextMenu(null); }}
+                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                        >
+                            <span className="text-[#C9A96E]">⊞</span> Agrupar selección
+                        </button>
+                    )}
+                    {/* Desagrupar — when a group is selected */}
+                    {selectedShapeId && drawShapes.find(s => s.id === selectedShapeId)?.children && (
+                        <button
+                            onClick={() => { handleUngroupShape(); setContextMenu(null); }}
+                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                        >
+                            <span className="text-white/50">⊟</span> Desagrupar
+                        </button>
+                    )}
+                    {/* Eliminar */}
+                    {(selectedShapeId || multiSelectedIds.length >= 1) && (
+                        <button
+                            onClick={() => {
+                                if (multiSelectedIds.length >= 1) {
+                                    setDrawShapes(prev => prev.filter(s => !multiSelectedIds.includes(s.id)));
+                                    setMultiSelectedIds([]);
+                                } else if (selectedShapeId) {
+                                    setDrawShapes(prev => prev.filter(s => s.id !== selectedShapeId));
+                                    setSelectedShapeId(null);
+                                    setDrawMode('idle');
+                                }
+                                setContextMenu(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 transition-colors flex items-center gap-2"
+                        >
+                            <span>✕</span> Eliminar
+                        </button>
+                    )}
+                </div>
+            </>
+        )}
         </>
     );
 }
@@ -2483,6 +2927,12 @@ interface ToolsPanelProps {
     textToolActive: boolean;
     onToggleTextTool: () => void;
     textAnnotationCount: number;
+    strokeStyle: string;
+    onSetStrokeStyle: (s: string) => void;
+    multiSelectedCount: number;
+    onGroupShapes: () => void;
+    selectedShapeIsGroup: boolean;
+    onUngroupShape: () => void;
 }
 
 function ToolsPanel({
@@ -2517,6 +2967,9 @@ function ToolsPanel({
     onFlipHorizontal,
     textToolActive, onToggleTextTool,
     textAnnotationCount,
+    strokeStyle, onSetStrokeStyle,
+    multiSelectedCount, onGroupShapes,
+    selectedShapeIsGroup, onUngroupShape,
 }: ToolsPanelProps) {
     return (
         <>
@@ -2723,12 +3176,20 @@ function ToolsPanel({
                                 </button>
                             ))}
                         </div>
-                        <button
-                            onClick={onConfirmBg}
-                            className="w-full mt-1 py-2 rounded-lg bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <Check size={14} /> Confirmar
-                        </button>
+                        <div className="flex gap-2 mt-1">
+                            <button
+                                onClick={onUndoBg}
+                                className="flex-1 py-2 rounded-lg bg-white/10 text-white/60 text-sm hover:bg-white/20 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                <X size={14} /> Cancelar
+                            </button>
+                            <button
+                                onClick={onConfirmBg}
+                                className="flex-1 py-2 rounded-lg bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                <Check size={14} /> Confirmar
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -2758,10 +3219,11 @@ function ToolsPanel({
                     }`}
                 >
                     <PenLine size={12} />
-                    {drawMode === 'drawing' ? 'Dibujando — doble clic para cerrar'
-                     : drawMode === 'selected' ? 'Forma seleccionada'
-                     : drawMode === 'editing' ? 'Editando puntos'
-                     : 'Activar trazo'}
+                    {drawMode === 'drawing'
+                        ? '● Dibujando — clic aquí para detener'
+                        : drawMode === 'selected' ? 'Forma seleccionada'
+                        : drawMode === 'editing' ? 'Editando puntos'
+                        : 'Activar trazo'}
                 </button>
 
                 {drawMode !== 'idle' && (
@@ -2783,6 +3245,30 @@ function ToolsPanel({
                     </div>
                 )}
 
+                {/* Stroke style selector */}
+                <div className="grid grid-cols-5 gap-1">
+                    {([
+                        { id: 'taper',    label: 'Taper',    title: 'Taper — fino en puntas, grueso en medio' },
+                        { id: 'velocity', label: 'Firma',    title: 'Firma — rápido=fino, lento=grueso' },
+                        { id: 'nib',      label: 'Pluma',    title: 'Pluma — caligrafía a 45°' },
+                        { id: 'brush',    label: 'Pincel',   title: 'Pincel — taper + transparencia' },
+                        { id: 'pencil',   label: 'Lápiz',    title: 'Lápiz — trazo fino con textura' },
+                    ] as const).map(opt => (
+                        <button
+                            key={opt.id}
+                            title={opt.title}
+                            onClick={() => onSetStrokeStyle(opt.id)}
+                            className={`py-1 rounded text-[10px] font-medium transition-all border ${
+                                strokeStyle === opt.id
+                                    ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/40'
+                                    : 'bg-white/5 text-white/40 border-white/10 hover:text-white/70 hover:border-white/20'
+                            }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+
                 {(drawShapeCount > 0 || currentPointCount > 0) && (
                     <div className="flex gap-1.5">
                         <button
@@ -2798,6 +3284,29 @@ function ToolsPanel({
                             <X size={11} /> Borrar todo
                         </button>
                     </div>
+                )}
+
+                {/* Multi-select group button */}
+                {multiSelectedCount >= 2 && (
+                    <button
+                        onClick={onGroupShapes}
+                        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/40 hover:bg-[#C9A96E]/30 transition-colors"
+                    >
+                        Agrupar {multiSelectedCount} formas
+                    </button>
+                )}
+                {multiSelectedCount >= 1 && multiSelectedCount < 2 && (
+                    <p className="text-white/30 text-[10px]">Cmd+clic en más formas para seleccionar</p>
+                )}
+
+                {/* Ungroup button */}
+                {selectedShapeIsGroup && (
+                    <button
+                        onClick={onUngroupShape}
+                        className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs bg-white/5 text-white/50 hover:text-white/80 border border-white/10 transition-colors"
+                    >
+                        Desagrupar
+                    </button>
                 )}
 
                 {drawMode === 'drawing' && currentPointCount > 0 && (
