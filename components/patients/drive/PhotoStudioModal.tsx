@@ -413,6 +413,32 @@ export default function PhotoStudioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedShapeId, drawShapes, drawClipboard]);
 
+    // Keyboard shortcut: Delete / Backspace → delete selected shape or text annotation
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+            // Don't intercept when typing in an input / textarea
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (editingTextId) return;
+            if (selectedShapeId && (drawMode === 'selected' || drawMode === 'editing')) {
+                e.preventDefault();
+                setDrawShapes(prev => prev.filter(s => s.id !== selectedShapeId));
+                setSelectedShapeId(null);
+                setDrawMode('idle');
+                return;
+            }
+            if (selectedTextId) {
+                e.preventDefault();
+                setTextAnnotations(prev => prev.filter(t => t.id !== selectedTextId));
+                setSelectedTextId(null);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedShapeId, drawMode, selectedTextId, editingTextId]);
+
     function handleSwitchFile(newFile: DriveFile) {
         if (newFile.id === activeFile?.id) return;
         if (isDirty && !confirm('Tenés cambios sin guardar. ¿Cambiar de foto de todas formas?')) return;
