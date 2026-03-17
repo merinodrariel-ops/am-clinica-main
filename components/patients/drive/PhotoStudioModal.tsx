@@ -176,6 +176,8 @@ export default function PhotoStudioModal({
     const justFinishedEditRef = useRef<string | null>(null); // guards against blur-then-click creating new text
 
     const [zoom, setZoom] = useState(1);
+    const zoomRef = useRef(1); // mirrors zoom for non-reactive wheel handler
+    useEffect(() => { zoomRef.current = zoom; }, [zoom]);
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -208,6 +210,20 @@ export default function PhotoStudioModal({
 
     // Image files for the thumbnail strip (only images)
     const imageFiles = allFolderFiles.filter(isImageFile);
+
+    // Always-current navigate function — used by wheel handler + arrow keys
+    const switchToAdjacentRef = useRef<(dir: 1 | -1) => void>(() => {});
+    useEffect(() => {
+        switchToAdjacentRef.current = (dir: 1 | -1) => {
+            if (imageFiles.length <= 1) return;
+            const idx = imageFiles.findIndex(f => f.id === activeFile?.id);
+            if (idx === -1) return;
+            const nextIdx = Math.max(0, Math.min(imageFiles.length - 1, idx + dir));
+            const next = imageFiles[nextIdx];
+            if (next && next.id !== activeFile?.id) handleSwitchFile(next);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [imageFiles, activeFile?.id]);
 
     // Tools panel visibility
     const [toolsHidden, setToolsHidden] = useState(false);
@@ -301,6 +317,26 @@ export default function PhotoStudioModal({
         return () => window.removeEventListener('keydown', handler);
     }, [presentationMode, imageFiles.length]);
 
+    // Arrow-key navigation in normal studio view (mirrors presentation mode arrows)
+    useEffect(() => {
+        if (presentationMode) return; // presentation mode has its own handler
+        const handler = (e: KeyboardEvent) => {
+            // Skip when typing in an input / textarea or editing a text annotation
+            if (editingTextId) return;
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                switchToAdjacentRef.current(1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                switchToAdjacentRef.current(-1);
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [presentationMode, editingTextId]);
+
     // Non-passive wheel + touch handlers (prevents page scroll / browser pinch-zoom interference)
     useEffect(() => {
         const el = canvasContainerRef.current;
@@ -308,6 +344,11 @@ export default function PhotoStudioModal({
 
         const wheelHandler = (e: WheelEvent) => {
             e.preventDefault();
+            if (zoomRef.current <= 1) {
+                // Navigate between photos when not zoomed in
+                switchToAdjacentRef.current(e.deltaY > 0 ? 1 : -1);
+                return;
+            }
             const delta = e.deltaY > 0 ? -0.15 : 0.15;
             setZoom(prev => {
                 const next = Math.min(5, Math.max(1, prev + delta));
