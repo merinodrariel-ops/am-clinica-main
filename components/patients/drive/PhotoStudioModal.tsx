@@ -13,6 +13,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction } from '@/app/actions/patient-files-drive';
+import CanvasCompositor from './CanvasCompositor';
 
 interface PhotoStudioModalProps {
     file: DriveFile | null;
@@ -2150,6 +2151,18 @@ export default function PhotoStudioModal({
 
     if (!file || !activeFile) return null;
 
+    async function handleCanvasSave(blob: Blob, filename: string) {
+        try {
+            const formData = new FormData();
+            formData.append('file', new File([blob], filename, { type: 'image/jpeg' }));
+            await uploadEditedPhotoAction(folderId, filename, formData);
+            toast.success('Canvas guardado en Drive');
+            onSaved();
+        } catch {
+            toast.error('Error al guardar el canvas');
+        }
+    }
+
     // Canvas background style (for bg removal preview)
     const canvasBg = bgDone
         ? bgColor === 'white'
@@ -2260,6 +2273,13 @@ export default function PhotoStudioModal({
                 </div>
 
                 {/* ── Body ───────────────────────────────────────────────── */}
+                {studioMode === 'canvas' ? (
+                    <CanvasCompositor
+                        files={allFolderFiles}
+                        canSave={canSave}
+                        onSaveToDrive={handleCanvasSave}
+                    />
+                ) : (<>
                 <div className="flex-1 flex overflow-hidden min-h-0">
 
                     {/* Thumbnail strip — vertical on desktop */}
@@ -2694,6 +2714,7 @@ export default function PhotoStudioModal({
                         )}
                     </div>
                 </div>
+                </>)} {/* end studioMode === 'editor' */}
 
                 {/* ── Save dialog (bottom sheet) ──────────────────────────── */}
                 <AnimatePresence>
