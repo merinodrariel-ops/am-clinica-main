@@ -651,12 +651,18 @@ export default function PhotoStudioModal({
     }, [selectedShapeId, drawShapes, drawClipboard]);
 
     // Keyboard shortcut: Delete / Backspace → delete selected shape or text annotation
+    // Escape while drawing → cancel current in-progress path
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-            // Don't intercept when typing in an input / textarea
             const tag = (e.target as HTMLElement)?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (e.key === 'Escape' && drawMode === 'drawing') {
+                e.preventDefault();
+                setCurrentPoints([]);
+                setMousePos(null);
+                return;
+            }
+            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
             if (editingTextId) return;
             if (selectedShapeId && (drawMode === 'selected' || drawMode === 'editing')) {
                 e.preventDefault();
