@@ -29,7 +29,7 @@ interface Props {
     onSaved?: () => void;
 }
 
-const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
+const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEAE/review';
 
 // ─── Image utilities ──────────────────────────────────────────────────────────
 

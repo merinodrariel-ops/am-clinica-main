@@ -212,7 +212,7 @@ const HELP_LINKS = {
     mp_consulta_staff: 'https://mpago.la/2MJhrW6',
     mp_pago_libre: 'https://link.mercadopago.com.ar/amesteticadental',
     whatsapp: 'https://wa.link/zolb52',
-    google_opinion: 'https://bit.ly/AM-DejanosTuOpinion'
+    google_opinion: 'https://g.page/r/CQ3df5Xn-J6oEAE/review'
 };
 
 const GOOGLE_REVIEW_LINK = HELP_LINKS.google_opinion;
