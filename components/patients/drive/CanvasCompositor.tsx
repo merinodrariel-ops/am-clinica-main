@@ -17,10 +17,11 @@ export interface CanvasLayer {
     w: number;      // width, normalized 0–1
     h: number;      // height, normalized 0–1
     rotation: number; // degrees
+    brightness: number; // 0–200, default 100
     img: HTMLImageElement;
 }
 
-const RATIOS: { label: string; value: CanvasRatio; desc: string; w: number; h: number }[] = [
+export const RATIOS: { label: string; value: CanvasRatio; desc: string; w: number; h: number }[] = [
     { label: '1:1',  value: '1:1',  desc: 'Instagram Post',     w: 1,  h: 1  },
     { label: '4:5',  value: '4:5',  desc: 'Instagram Portrait', w: 4,  h: 5  },
     { label: '9:16', value: '9:16', desc: 'Story / Reels',      w: 9,  h: 16 },
@@ -30,9 +31,9 @@ const RATIOS: { label: string; value: CanvasRatio; desc: string; w: number; h: n
 const EXPORT_BASE = 1080;
 const HANDLE_SIZE = 8;
 
-// ── Module-level helpers ──────────────────────────────────────────────────────
+// ── Module-level helpers (exported for reuse in PhotoStudioModal) ─────────────
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -42,7 +43,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     });
 }
 
-function makeLayer(
+export function makeLayer(
     img: HTMLImageElement,
     src: string,
     fileId?: string,
@@ -60,11 +61,12 @@ function makeLayer(
         y: Math.max(h / 2, Math.min(1 - h / 2, dropY)),
         w, h,
         rotation: 0,
+        brightness: 100,
         img,
     };
 }
 
-function getLayerCorners(layer: CanvasLayer, cw: number, ch: number): [number, number][] {
+export function getLayerCorners(layer: CanvasLayer, cw: number, ch: number): [number, number][] {
     const cx = layer.x * cw, cy = layer.y * ch;
     const hw = (layer.w * cw) / 2, hh = (layer.h * ch) / 2;
     const rad = layer.rotation * Math.PI / 180;
@@ -74,7 +76,7 @@ function getLayerCorners(layer: CanvasLayer, cw: number, ch: number): [number, n
     );
 }
 
-function hitTestCorner(layer: CanvasLayer, nx: number, ny: number, cw: number, ch: number): number {
+export function hitTestCorner(layer: CanvasLayer, nx: number, ny: number, cw: number, ch: number): number {
     const corners = getLayerCorners(layer, cw, ch);
     const px = nx * cw, py = ny * ch;
     for (let i = 0; i < corners.length; i++) {
@@ -84,7 +86,7 @@ function hitTestCorner(layer: CanvasLayer, nx: number, ny: number, cw: number, c
     return -1;
 }
 
-function hitTestLayerBody(layer: CanvasLayer, nx: number, ny: number, cw: number, ch: number): boolean {
+export function hitTestLayerBody(layer: CanvasLayer, nx: number, ny: number, cw: number, ch: number): boolean {
     const lx = layer.x * cw, ly = layer.y * ch;
     const px = nx * cw - lx, py = ny * ch - ly;
     const rad = -layer.rotation * Math.PI / 180;

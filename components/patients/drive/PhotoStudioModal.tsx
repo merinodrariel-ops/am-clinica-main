@@ -13,7 +13,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction } from '@/app/actions/patient-files-drive';
-import CanvasCompositor from './CanvasCompositor';
+import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 
 interface PhotoStudioModalProps {
     file: DriveFile | null;
@@ -360,7 +360,20 @@ export default function PhotoStudioModal({
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [mousePos, setMousePos] = useState<[number, number] | null>(null);
     const [drawClipboard, setDrawClipboard] = useState<DrawShape | null>(null);
-    const [studioMode, setStudioMode] = useState<'editor' | 'canvas'>('editor');
+
+    // ── Canvas compositor state ────────────────────────────────────────────────
+    const [canvasActive, setCanvasActive] = useState(false);
+    const [canvasLayers, setCanvasLayers] = useState<CanvasLayer[]>([]);
+    const [canvasRatio, setCanvasRatio] = useState<CanvasRatio>('1:1');
+    const [canvasSelectedId, setCanvasSelectedId] = useState<string | null>(null);
+    const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
+    const canvasLayersRef = useRef<HTMLCanvasElement>(null);
+    const canvasLayerDragRef = useRef<{
+        layerId: string;
+        mode: 'move' | 'resize' | 'rotate';
+        startX: number; startY: number;
+        origLayer: CanvasLayer;
+    } | null>(null);
 
     // Stroke style
     type StrokeStyle = 'taper' | 'velocity' | 'nib' | 'brush' | 'pencil';
@@ -903,20 +916,29 @@ export default function PhotoStudioModal({
     // Redraw annotation layer whenever shapes or visibility change
     useEffect(() => {
         const canvas = drawCanvasRef.current;
-        const img = imgRef.current;
-        if (!canvas || !img) return;
-        const W = img.naturalWidth || img.width;
-        const H = img.naturalHeight || img.height;
-        if (W === 0 || H === 0) return;
+        let W: number, H: number, displayScale: number;
+        if (canvasActive) {
+            // In canvas mode: size draw canvas to match the layers canvas (display pixels)
+            const layersCanvas = canvasLayersRef.current;
+            if (!canvas || !layersCanvas || !layersCanvas.clientWidth) return;
+            W = layersCanvas.clientWidth;
+            H = layersCanvas.clientHeight;
+            displayScale = 1; // already in display pixels
+        } else {
+            const img = imgRef.current;
+            if (!canvas || !img) return;
+            W = img.naturalWidth || img.width;
+            H = img.naturalHeight || img.height;
+            if (W === 0 || H === 0) return;
+            const rect = canvas.getBoundingClientRect();
+            displayScale = rect.width > 0 ? W / rect.width : 1;
+        }
         canvas.width = W;
         canvas.height = H;
         const ctx = canvas.getContext('2d')!;
         ctx.clearRect(0, 0, W, H);
         if (!drawVisible) return;
-
-        // Scale radius from display pixels → natural image pixels
         const rect = canvas.getBoundingClientRect();
-        const displayScale = rect.width > 0 ? W / rect.width : 1;
         // Stroke radius constants (natural pixels)
         const MAX_R = 1.0 * displayScale; // widest point
         const MIN_R = 0.1 * displayScale; // tip radius for taper
@@ -1174,7 +1196,209 @@ export default function PhotoStudioModal({
             }
         }
     }, [drawShapes, currentPoints, drawVisible, drawColor, drawMode, selectedShapeId, mousePos, imageUrl,
-        textAnnotations, editingTextId, selectedTextId, textToolActive, strokeStyle, multiSelectedIds]);
+        textAnnotations, editingTextId, selectedTextId, textToolActive, strokeStyle, multiSelectedIds, canvasActive]);
+
+    // ── Canvas layers rendering ───────────────────────────────────────────────
+    useEffect(() => {
+        if (!canvasActive) return;
+        const canvas = canvasLayersRef.current;
+        if (!canvas || !canvas.clientWidth) return;
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        const ctx = canvas.getContext('2d')!;
+        const W = canvas.width, H = canvas.height;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+        for (const layer of canvasLayers) {
+            const px = layer.x * W, py = layer.y * H;
+            const pw = layer.w * W, ph = layer.h * H;
+            ctx.save();
+            ctx.filter = `brightness(${layer.brightness ?? 100}%)`;
+            ctx.translate(px, py);
+            ctx.rotate(layer.rotation * Math.PI / 180);
+            ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
+            ctx.restore();
+        }
+        if (canvasSelectedId) {
+            const sel = canvasLayers.find(l => l.id === canvasSelectedId);
+            if (sel) {
+                const corners = getLayerCorners(sel, W, H);
+                ctx.save();
+                ctx.strokeStyle = '#C9A96E';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                corners.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+                ctx.closePath();
+                ctx.stroke();
+                ctx.setLineDash([]);
+                corners.forEach(([x, y]) => {
+                    ctx.fillStyle = '#C9A96E';
+                    ctx.strokeStyle = '#0D0D12';
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(x - 4, y - 4, 8, 8);
+                    ctx.strokeRect(x - 4, y - 4, 8, 8);
+                });
+                ctx.restore();
+            }
+        }
+    }, [canvasActive, canvasLayers, canvasSelectedId]);
+
+    // ── Canvas layer interaction ──────────────────────────────────────────────
+    function getCanvasLayerNorm(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
+        const rect = e.currentTarget.getBoundingClientRect();
+        return [(e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height];
+    }
+
+    function handleCanvasLayerPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+        const [nx, ny] = getCanvasLayerNorm(e);
+        const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
+        for (let i = canvasLayers.length - 1; i >= 0; i--) {
+            const layer = canvasLayers[i];
+            const ci = hitTestLayerCorner(layer, nx, ny, W, H);
+            if (ci >= 0) {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                canvasLayerDragRef.current = {
+                    layerId: layer.id,
+                    mode: (e.metaKey || e.ctrlKey) ? 'rotate' : 'resize',
+                    startX: nx, startY: ny, origLayer: { ...layer },
+                };
+                setCanvasSelectedId(layer.id);
+                return;
+            }
+            if (hitTestLayerBody(layer, nx, ny, W, H)) {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                canvasLayerDragRef.current = { layerId: layer.id, mode: 'move', startX: nx, startY: ny, origLayer: { ...layer } };
+                setCanvasSelectedId(layer.id);
+                return;
+            }
+        }
+        setCanvasSelectedId(null);
+    }
+
+    function handleCanvasLayerPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (!canvasLayerDragRef.current) return;
+        const [nx, ny] = getCanvasLayerNorm(e);
+        const { layerId, mode, startX, startY, origLayer } = canvasLayerDragRef.current;
+        const dx = nx - startX, dy = ny - startY;
+        setCanvasLayers(prev => prev.map(l => {
+            if (l.id !== layerId) return l;
+            if (mode === 'move') return {
+                ...l,
+                x: Math.max(l.w / 2, Math.min(1 - l.w / 2, origLayer.x + dx)),
+                y: Math.max(l.h / 2, Math.min(1 - l.h / 2, origLayer.y + dy)),
+            };
+            if (mode === 'rotate') {
+                const angle = Math.atan2(ny - origLayer.y, nx - origLayer.x) - Math.atan2(startY - origLayer.y, startX - origLayer.x);
+                return { ...l, rotation: origLayer.rotation + angle * 180 / Math.PI };
+            }
+            const dist = Math.sqrt(dx * dx + dy * dy) * (dx + dy >= 0 ? 1 : -1);
+            const newW = Math.max(0.05, origLayer.w + dist * 1.5);
+            return { ...l, w: newW, h: newW / (origLayer.w / (origLayer.h || 1)) };
+        }));
+    }
+
+    function handleCanvasLayerPointerUp() { canvasLayerDragRef.current = null; }
+
+    async function handleCanvasLayerDrop(e: React.DragEvent<HTMLCanvasElement>) {
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const dropX = (e.clientX - rect.left) / rect.width;
+        const dropY = (e.clientY - rect.top) / rect.height;
+        const fileId = e.dataTransfer.getData('driveFileId');
+        if (fileId) {
+            try {
+                const img = await loadCanvasImage(`/api/drive/file/${fileId}`);
+                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, `/api/drive/file/${fileId}`, fileId, dropX, dropY)]);
+            } catch { toast.error('No se pudo cargar la foto'); }
+            return;
+        }
+        const pcFile = e.dataTransfer.files[0];
+        if (pcFile?.type.startsWith('image/')) {
+            const src = URL.createObjectURL(pcFile);
+            try {
+                const img = await loadCanvasImage(src);
+                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, src, undefined, dropX, dropY)]);
+            } catch { URL.revokeObjectURL(src); toast.error('No se pudo cargar la imagen'); }
+        }
+    }
+
+    function handleCanvasLayerContextMenu(e: React.MouseEvent<HTMLCanvasElement>) {
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / rect.width;
+        const ny = (e.clientY - rect.top) / rect.height;
+        const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
+        for (let i = canvasLayers.length - 1; i >= 0; i--) {
+            if (hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) {
+                setCanvasSelectedId(canvasLayers[i].id);
+                setCanvasContextMenu({ x: e.clientX, y: e.clientY, layerId: canvasLayers[i].id });
+                return;
+            }
+        }
+    }
+
+    function handleActivateCanvas() {
+        setCanvasActive(true);
+        setCanvasLayers([]);
+        setCanvasSelectedId(null);
+        // Reset editor-specific state
+        setDrawMode('idle');
+        setCropActive(false);
+        setBrushMode(null);
+    }
+
+    async function exportCanvasToBlob(): Promise<Blob> {
+        const r = CANVAS_RATIOS.find(r => r.value === canvasRatio)!;
+        const shorter = Math.min(r.w, r.h);
+        const expW = Math.round(1080 * r.w / shorter);
+        const expH = Math.round(1080 * r.h / shorter);
+        const off = document.createElement('canvas');
+        off.width = expW; off.height = expH;
+        const ctx = off.getContext('2d')!;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, expW, expH);
+        for (const layer of canvasLayers) {
+            ctx.save();
+            ctx.translate(layer.x * expW, layer.y * expH);
+            ctx.rotate(layer.rotation * Math.PI / 180);
+            ctx.drawImage(layer.img, -layer.w * expW / 2, -layer.h * expH / 2, layer.w * expW, layer.h * expH);
+            ctx.restore();
+        }
+        // Bake draw annotations on top if visible
+        if (drawVisible && drawCanvasRef.current && drawCanvasRef.current.width > 0) {
+            ctx.drawImage(drawCanvasRef.current, 0, 0, expW, expH);
+        }
+        return new Promise<Blob>((res, rej) =>
+            off.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/jpeg', 0.92)
+        );
+    }
+
+    function getCanvasRatioStyle(): React.CSSProperties {
+        const r = CANVAS_RATIOS.find(r => r.value === canvasRatio)!;
+        return {
+            display: 'block',
+            aspectRatio: `${r.w} / ${r.h}`,
+            maxHeight: toolsHidden ? '90vh' : '65vh',
+            maxWidth: '100%',
+        };
+    }
+
+    function getCanvasRatioDims() {
+        const r = CANVAS_RATIOS.find(r => r.value === canvasRatio)!;
+        return { w: r.w, h: r.h };
+    }
+
+    function handleCanvasRatioChange(newRatio: CanvasRatio) {
+        const oldR = CANVAS_RATIOS.find(r => r.value === canvasRatio)!;
+        const newR = CANVAS_RATIOS.find(r => r.value === newRatio)!;
+        setCanvasRatio(newRatio);
+        setCanvasLayers(prev => prev.map(l => ({
+            ...l,
+            x: Math.max(l.w / 2, Math.min(1 - l.w / 2, l.x * oldR.w / newR.w)),
+            y: Math.max(l.h / 2, Math.min(1 - l.h / 2, l.y * oldR.h / newR.h)),
+        })));
+    }
 
     function getCanvasXY(e: React.PointerEvent<HTMLCanvasElement>) {
         const canvas = e.currentTarget;
@@ -2202,34 +2426,26 @@ export default function PhotoStudioModal({
                         <ArrowLeft size={15} />
                         <span className="hidden sm:inline">Volver</span>
                     </button>
-                    <div className="flex-1 flex items-center gap-3 min-w-0">
-                        <p className="text-white font-semibold truncate text-sm hidden sm:block">
-                            {activeFile.name}
-                        </p>
-                        <div className="flex items-center bg-white/5 rounded-lg p-0.5 flex-shrink-0">
-                            <button
-                                onClick={() => setStudioMode('editor')}
-                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                                    studioMode === 'editor'
-                                        ? 'bg-white/15 text-white'
-                                        : 'text-white/40 hover:text-white/70'
-                                }`}
-                            >
-                                Editar Foto
-                            </button>
-                            <button
-                                onClick={() => setStudioMode('canvas')}
-                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                                    studioMode === 'canvas'
-                                        ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
-                                        : 'text-white/40 hover:text-white/70'
-                                }`}
-                            >
-                                Canvas
-                            </button>
-                        </div>
-                    </div>
+                    <p className="text-white font-semibold truncate flex-1 text-sm">
+                        {canvasActive ? `Canvas ${canvasRatio}` : activeFile.name}
+                    </p>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Canvas toggle */}
+                        {canvasActive ? (
+                            <button
+                                onClick={() => { setCanvasActive(false); setCanvasLayers([]); setCanvasSelectedId(null); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E]/20 text-[#C9A96E] text-sm border border-[#C9A96E]/40 hover:bg-[#C9A96E]/30 transition-colors"
+                            >
+                                ✕ Cerrar lienzo
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleActivateCanvas}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white/70 text-sm border border-white/10 hover:bg-white/15 hover:text-white transition-colors"
+                            >
+                                + Lienzo
+                            </button>
+                        )}
                         {selectedIds.size > 0 && (
                             <button
                                 onClick={handleWebDownload}
@@ -2273,13 +2489,6 @@ export default function PhotoStudioModal({
                 </div>
 
                 {/* ── Body ───────────────────────────────────────────────── */}
-                {studioMode === 'canvas' ? (
-                    <CanvasCompositor
-                        files={allFolderFiles}
-                        canSave={canSave}
-                        onSaveToDrive={handleCanvasSave}
-                    />
-                ) : (<>
                 <div className="flex-1 flex overflow-hidden min-h-0">
 
                     {/* Thumbnail strip — vertical on desktop */}
@@ -2301,6 +2510,11 @@ export default function PhotoStudioModal({
                                     return (
                                         <button
                                             key={f.id}
+                                            draggable={canvasActive}
+                                            onDragStart={canvasActive ? (e) => {
+                                                e.dataTransfer.setData('driveFileId', f.id);
+                                                e.dataTransfer.effectAllowed = 'copy';
+                                            } : undefined}
                                             onClick={() => {
                                                 if (multiSelectMode) {
                                                     setSelectedIds(prev => {
@@ -2313,6 +2527,8 @@ export default function PhotoStudioModal({
                                                 }
                                             }}
                                             className={`relative aspect-square rounded-md overflow-hidden flex-shrink-0 border-2 transition-all ${
+                                                canvasActive ? 'cursor-grab active:cursor-grabbing' : ''
+                                            } ${
                                                 multiSelectMode && isSelected
                                                     ? 'border-[#C9A96E]'
                                                     : !multiSelectMode && f.id === activeFile.id
@@ -2381,6 +2597,19 @@ export default function PhotoStudioModal({
                                 </ReactCrop>
                             ) : (
                                 <div className="relative inline-block">
+                                    {canvasActive ? (
+                                        <canvas
+                                            ref={canvasLayersRef}
+                                            style={getCanvasRatioStyle()}
+                                            onPointerDown={handleCanvasLayerPointerDown}
+                                            onPointerMove={handleCanvasLayerPointerMove}
+                                            onPointerUp={handleCanvasLayerPointerUp}
+                                            onPointerLeave={handleCanvasLayerPointerUp}
+                                            onDragOver={e => e.preventDefault()}
+                                            onDrop={handleCanvasLayerDrop}
+                                            onContextMenu={handleCanvasLayerContextMenu}
+                                        />
+                                    ) : (
                                     <img
                                         ref={imgRef}
                                         src={imageUrl}
@@ -2388,6 +2617,7 @@ export default function PhotoStudioModal({
                                         crossOrigin="anonymous"
                                         style={imageStyle}
                                     />
+                                    )}
                                     <canvas
                                         ref={drawCanvasRef}
                                         className="absolute inset-0 w-full h-full"
@@ -2516,8 +2746,18 @@ export default function PhotoStudioModal({
                         </div>
                         <div className="flex flex-col gap-5 p-4 pt-2 overflow-y-auto flex-1">
                         <ToolsPanel
-                            rotation={rotation} setRotation={setRotation}
-                            brightness={brightness} setBrightness={setBrightness}
+                            rotation={canvasActive && canvasSelectedId
+                                ? (canvasLayers.find(l => l.id === canvasSelectedId)?.rotation ?? 0)
+                                : rotation}
+                            setRotation={canvasActive && canvasSelectedId
+                                ? (v) => setCanvasLayers(prev => prev.map(l => l.id === canvasSelectedId ? { ...l, rotation: v } : l))
+                                : setRotation}
+                            brightness={canvasActive && canvasSelectedId
+                                ? (canvasLayers.find(l => l.id === canvasSelectedId)?.brightness ?? 100)
+                                : brightness}
+                            setBrightness={canvasActive && canvasSelectedId
+                                ? (v) => setCanvasLayers(prev => prev.map(l => l.id === canvasSelectedId ? { ...l, brightness: v as number } : l))
+                                : setBrightness}
                             cropActive={cropActive}
                             setCropActive={setCropActive}
                             hasPriorCrop={preCropImageRef.current !== null}
@@ -2583,6 +2823,11 @@ export default function PhotoStudioModal({
                             onGroupShapes={handleGroupShapes}
                             selectedShapeIsGroup={!!(selectedShapeId && drawShapes.find(s => s.id === selectedShapeId)?.children)}
                             onUngroupShape={handleUngroupShape}
+                            canvasActive={canvasActive}
+                            canvasRatio={canvasRatio}
+                            onCanvasRatioChange={handleCanvasRatioChange}
+                            canvasLayerCount={canvasLayers.length}
+                            onClearCanvasLayers={() => { setCanvasLayers([]); setCanvasSelectedId(null); }}
                         />
                         </div>
                     </div>
@@ -2714,7 +2959,6 @@ export default function PhotoStudioModal({
                         )}
                     </div>
                 </div>
-                </>)} {/* end studioMode === 'editor' */}
 
                 {/* ── Save dialog (bottom sheet) ──────────────────────────── */}
                 <AnimatePresence>
@@ -2851,6 +3095,62 @@ export default function PhotoStudioModal({
             )}
         </AnimatePresence>
 
+        {/* ── Canvas Layer Context Menu ─────────────────────────────────────── */}
+        {canvasContextMenu && (
+            <>
+                <div
+                    className="fixed inset-0 z-[90]"
+                    onClick={() => setCanvasContextMenu(null)}
+                    onContextMenu={e => { e.preventDefault(); setCanvasContextMenu(null); }}
+                />
+                <div
+                    className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-xl py-1.5 min-w-[160px]"
+                    style={{ left: canvasContextMenu.x, top: canvasContextMenu.y }}
+                >
+                    <button
+                        onClick={() => {
+                            setCanvasLayers(prev => {
+                                const idx = prev.findIndex(l => l.id === canvasContextMenu.layerId);
+                                if (idx <= 0) return prev;
+                                const next = [...prev];
+                                [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                return next;
+                            });
+                            setCanvasContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                        <span className="text-[#C9A96E]">↑</span> Traer al frente
+                    </button>
+                    <button
+                        onClick={() => {
+                            setCanvasLayers(prev => {
+                                const idx = prev.findIndex(l => l.id === canvasContextMenu.layerId);
+                                if (idx < 0 || idx >= prev.length - 1) return prev;
+                                const next = [...prev];
+                                [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                                return next;
+                            });
+                            setCanvasContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                        <span className="text-white/50">↓</span> Enviar atrás
+                    </button>
+                    <button
+                        onClick={() => {
+                            setCanvasLayers(prev => prev.filter(l => l.id !== canvasContextMenu.layerId));
+                            if (canvasSelectedId === canvasContextMenu.layerId) setCanvasSelectedId(null);
+                            setCanvasContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                        <span>✕</span> Eliminar capa
+                    </button>
+                </div>
+            </>
+        )}
+
         {/* ── Draw Context Menu ────────────────────────────────────────────── */}
         {contextMenu && (
             <>
@@ -2954,6 +3254,11 @@ interface ToolsPanelProps {
     onGroupShapes: () => void;
     selectedShapeIsGroup: boolean;
     onUngroupShape: () => void;
+    canvasActive: boolean;
+    canvasRatio: CanvasRatio;
+    onCanvasRatioChange: (r: CanvasRatio) => void;
+    canvasLayerCount: number;
+    onClearCanvasLayers: () => void;
 }
 
 function ToolsPanel({
@@ -2991,6 +3296,8 @@ function ToolsPanel({
     strokeStyle, onSetStrokeStyle,
     multiSelectedCount, onGroupShapes,
     selectedShapeIsGroup, onUngroupShape,
+    canvasActive, canvasRatio, onCanvasRatioChange,
+    canvasLayerCount, onClearCanvasLayers,
 }: ToolsPanelProps) {
     return (
         <>
@@ -3383,6 +3690,49 @@ function ToolsPanel({
                     </p>
                 )}
             </div>
+
+            {/* ── Lienzo (Canvas mode) ── */}
+            {canvasActive && (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-[#C9A96E] text-xs font-semibold uppercase tracking-widest">
+                        <span>⊞</span> Lienzo
+                    </div>
+                    <p className="text-white/30 text-[10px]">Proporción</p>
+                    <div className="grid grid-cols-2 gap-1">
+                        {([
+                            { value: '1:1', label: '1:1', sub: 'Instagram' },
+                            { value: '4:5', label: '4:5', sub: 'Portrait' },
+                            { value: '9:16', label: '9:16', sub: 'Stories' },
+                            { value: '16:9', label: '16:9', sub: 'Slides' },
+                        ] as const).map(opt => (
+                            <button
+                                key={opt.value}
+                                onClick={() => onCanvasRatioChange(opt.value)}
+                                className={`flex flex-col items-center py-1.5 rounded-lg border text-xs transition-all ${
+                                    canvasRatio === opt.value
+                                        ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/40'
+                                        : 'bg-white/5 text-white/50 border-white/10 hover:text-white/80'
+                                }`}
+                            >
+                                <span className="font-semibold">{opt.label}</span>
+                                <span className="text-[9px] opacity-60">{opt.sub}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {canvasLayerCount > 0 && (
+                        <div className="flex items-center justify-between text-[10px] text-white/30 mt-1">
+                            <span>{canvasLayerCount} capa{canvasLayerCount !== 1 ? 's' : ''}</span>
+                            <button
+                                onClick={onClearCanvasLayers}
+                                className="text-red-400/60 hover:text-red-400 transition-colors"
+                            >
+                                Limpiar
+                            </button>
+                        </div>
+                    )}
+                    <p className="text-white/20 text-[10px]">Arrastrá fotos al lienzo · clic derecho en capa para opciones</p>
+                </div>
+            )}
 
             {/* Spacer + Undo + Reset */}
             <div className="flex-1" />
