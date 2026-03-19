@@ -184,7 +184,7 @@ export function generateStaffContractPDF(data: ContractPersonalData): Blob {
     // NOVENA
     addHeading('NOVENA — NO COMPETENCIA');
     addBody(
-        'El presente contrato no implica exclusividad para EL/LA LOCADOR/A, quien podrá desarrollar actividades profesionales en otros ámbitos, siempre que ello no afecte el cumplimiento de los servicios aquí contratados. Sin perjuicio de lo anterior, EL/LA LOCADOR/A se compromete a no incurrir en conductas de competencia desleal respecto de LA CONTRATANTE, durante la vigencia del contrato y por un período de seis (6) meses posteriores a su finalización. A tal efecto, queda expresamente prohibido: (a) captar pacientes de LA CONTRATANTE para derivarlos hacia la práctica propia o de terceros; (b) recomendar o facilitar la incorporación de colegas, proveedores o personal de LA CONTRATANTE a otras instituciones u emprendimientos propios; (c) inducir a otros integrantes del equipo de LA CONTRATANTE a desvincularse con el fin de incorporarlos a estructuras propias o ajenas.'
+        'El presente contrato no implica exclusividad para EL/LA LOCADOR/A, quien podrá desarrollar actividades profesionales en otros ámbitos, siempre que ello no afecte el cumplimiento de los servicios aquí contratados. Sin perjuicio de lo anterior, EL/LA LOCADOR/A asume el compromiso de no incurrir en conductas de competencia desleal respecto de LA CONTRATANTE, durante la vigencia del contrato y por un período de seis (6) meses posteriores a su finalización. En ese marco, las partes entienden por competencia desleal: (a) la captación de pacientes de LA CONTRATANTE con el fin de derivarlos hacia la práctica propia o de terceros; (b) la recomendación o facilitación activa de la incorporación de colegas, proveedores o integrantes del equipo a otras instituciones o emprendimientos propios; (c) la inducción de otros integrantes del equipo a desvincularse con el propósito de incorporarlos a estructuras propias o ajenas.'
     );
 
     // DÉCIMA
@@ -202,7 +202,7 @@ export function generateStaffContractPDF(data: ContractPersonalData): Blob {
     // DÉCIMA SEGUNDA
     addHeading('DÉCIMA SEGUNDA — JURISDICCIÓN Y LEY APLICABLE');
     addBody(
-        'Para todos los efectos del presente contrato, las partes se someten a la jurisdicción de los Tribunales Ordinarios de la Ciudad Autónoma de Buenos Aires, renunciando a cualquier otro fuero o jurisdicción que pudiera corresponderles. El presente contrato se rige por las leyes de la República Argentina.'
+        'Para todos los efectos del presente contrato, las partes acuerdan someterse a la jurisdicción de los Tribunales Ordinarios de la Ciudad Autónoma de Buenos Aires. El presente contrato se rige por las leyes de la República Argentina.'
     );
 
     addSpace(6);
@@ -294,12 +294,12 @@ export function generateStaffContractPDF(data: ContractPersonalData): Blob {
         {
             num: '3.',
             titulo: 'IMAGEN PERSONAL E INSTITUCIONAL',
-            texto: 'Toda persona que preste servicios en AM Estética Dental deberá mantener una presentación personal adecuada, cuidando su higiene, vestimenta y comportamiento en consonancia con los estándares de una clínica odontológica de alto nivel. Se prohíbe el uso de vestimenta, accesorios o elementos que resulten inapropiados para el entorno clínico, salvo autorización expresa.',
+            texto: 'Toda persona que preste servicios en AM Estética Dental deberá mantener una presentación personal adecuada, cuidando su higiene, vestimenta y comportamiento en consonancia con los estándares de una clínica odontológica de alto nivel. Se espera que la vestimenta, accesorios y elementos personales sean acordes al entorno clínico, salvo acuerdo expreso en contrario.',
         },
         {
             num: '4.',
             titulo: 'USO DE INSTALACIONES, EQUIPOS E INSUMOS',
-            texto: 'Los equipos, instalaciones e insumos del consultorio deberán ser utilizados exclusivamente para los fines propios de la actividad clínica y administrativa. Queda prohibido su uso para fines personales, ajenos al consultorio o que generen costos o desgaste innecesarios. Cualquier daño o desperfecto deberá comunicarse de inmediato a quien corresponda.',
+            texto: 'Los equipos, instalaciones e insumos del consultorio están destinados exclusivamente a los fines propios de la actividad clínica y administrativa. Su uso para fines personales o ajenos al consultorio excede el alcance del presente acuerdo y no es parte de él. Cualquier daño o desperfecto deberá comunicarse de inmediato a quien corresponda.',
         },
         {
             num: '5.',
@@ -309,7 +309,7 @@ export function generateStaffContractPDF(data: ContractPersonalData): Blob {
         {
             num: '6.',
             titulo: 'CONFIDENCIALIDAD DE INFORMACIÓN CLÍNICA Y COMERCIAL',
-            texto: 'Toda información relativa a pacientes (datos personales, diagnósticos, tratamientos, presupuestos, historias clínicas) es estrictamente confidencial. Asimismo, la información interna del consultorio (precios, estrategias, proveedores, datos financieros) es reservada. Queda prohibida su divulgación, comentario o uso fuera del ámbito estrictamente necesario para la prestación del servicio, tanto durante la vigencia del vínculo como con posterioridad a su finalización.',
+            texto: 'Toda información relativa a pacientes (datos personales, diagnósticos, tratamientos, presupuestos, historias clínicas) es estrictamente confidencial. Asimismo, la información interna del consultorio (precios, estrategias, proveedores, datos financieros) es reservada. Las partes acuerdan que dicha información se mantendrá dentro del ámbito estrictamente necesario para la prestación del servicio, tanto durante la vigencia del vínculo como con posterioridad a su finalización.',
         },
         {
             num: '7.',
@@ -349,7 +349,7 @@ export function generateStaffContractPDF(data: ContractPersonalData): Blob {
         {
             num: '14.',
             titulo: 'NO CAPTACIÓN DE PACIENTES',
-            texto: 'Queda expresamente prohibido captar pacientes del consultorio para derivarlos hacia la práctica profesional propia o de terceros, durante la vigencia del presente vínculo y hasta seis (6) meses después de su finalización. Asimismo, EL/LA LOCADOR/A no podrá contactar a pacientes del consultorio con fines comerciales o profesionales ajenos al servicio aquí contratado.',
+            texto: 'Las partes acuerdan que la captación de pacientes del consultorio para derivarlos hacia la práctica profesional propia o de terceros no es compatible con el presente vínculo, durante su vigencia y hasta seis (6) meses después de su finalización. En el mismo sentido, el contacto con pacientes del consultorio con fines comerciales o profesionales ajenos al servicio contratado excede el marco de este acuerdo.',
         },
         {
             num: '15.',
