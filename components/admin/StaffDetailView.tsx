@@ -41,6 +41,7 @@ export default function StaffDetailView({
     progressList
 }: StaffDetailViewProps) {
     const [isEditing, setIsEditing] = useState(false);
+    const [activeTab, setActiveTab] = useState<'perfil' | 'contratos'>('perfil');
     const router = useRouter();
 
     const initials = `${worker.nombre?.[0] || ''}${worker.apellido?.[0] || ''}`.toUpperCase();
@@ -73,21 +74,51 @@ export default function StaffDetailView({
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-700 pb-16">
+        <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-700 pb-16">
             {/* Header / Back */}
             <div className="flex items-center justify-between gap-2">
                 <Link href="/caja-admin/personal" className="flex items-center gap-2 text-slate-400 hover:text-white text-xs md:text-sm font-medium transition-colors w-fit border border-slate-800 px-3 py-1.5 rounded-lg">
                     <ChevronLeft size={16} />
                     <span className="hidden xs:inline">Volver</span>
                 </Link>
-                <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 px-4 py-1.5 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs md:text-sm font-bold rounded-xl border border-slate-700 transition-all"
-                >
-                    <Edit size={14} />
-                    Editar
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Tab switcher */}
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
+                        <button
+                            onClick={() => setActiveTab('perfil')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'perfil'
+                                    ? 'bg-slate-700 text-white'
+                                    : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            Perfil
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('contratos')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'contratos'
+                                    ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/30'
+                                    : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            Contratos
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center gap-2 px-4 py-1.5 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs md:text-sm font-bold rounded-xl border border-slate-700 transition-all"
+                    >
+                        <Edit size={14} />
+                        Editar
+                    </button>
+                </div>
             </div>
+
+            {/* Tab content */}
+            {activeTab === 'contratos' ? (
+                <StaffContractSection worker={worker} />
+            ) : (<>
 
             {/* Hero Card */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 md:p-8">
@@ -267,8 +298,7 @@ export default function StaffDetailView({
                 </div>
             </div>
 
-            {/* Contracts */}
-            <StaffContractSection worker={worker} />
+            </>)}
         </div>
     );
 }
