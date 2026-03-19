@@ -14,6 +14,7 @@ import {
     Settings,
     AlertTriangle,
     History,
+    FileText,
 } from 'lucide-react';
 import { getObservadosCriticalLeaders, getObservadosSlaSummary, getSucursales, type Sucursal } from '@/lib/caja-admin';
 import MovimientosTab from '@/components/caja-admin/MovimientosTab';
@@ -22,6 +23,7 @@ import PersonalTab from '@/components/caja-admin/PersonalTab';
 import ReportesTab from '@/components/caja-admin/ReportesTab';
 import ConfiguracionTab from '@/components/caja-admin/ConfiguracionTab';
 import CierresHistoricosTab from '@/components/caja-admin/CierresHistoricosTab';
+import ContratosTab from '@/components/caja-admin/ContratosTab';
 import CategoriaGuard from "@/components/auth/CategoriaGuard";
 
 const TABS = [
@@ -30,6 +32,7 @@ const TABS = [
     { id: 'cierres', label: 'Historial', icon: History },
     { id: 'personal', label: 'Liquidaciones', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+    { id: 'contratos', label: 'Contratos', icon: FileText },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
 ] as const;
 
@@ -168,6 +171,8 @@ function CajaAdminContent() {
                 );
             case 'reportes':
                 return <ReportesTab sucursal={selectedSucursal} />;
+            case 'contratos':
+                return <ContratosTab />;
             case 'configuracion':
                 return <ConfiguracionTab sucursal={selectedSucursal} />;
             default:
