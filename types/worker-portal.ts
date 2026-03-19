@@ -27,6 +27,9 @@ export interface WorkerProfile {
     whatsapp?: string;
     documento?: string;
 
+    // Identity
+    cuil?: string;
+
     // Location & Legal
     direccion?: string;
     barrio_localidad?: string;

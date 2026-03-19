@@ -475,6 +475,7 @@ export interface CreateWorkerInput {
     email?: string;
     whatsapp?: string;
     documento?: string;
+    cuil?: string;
     condicion_afip?: string;
     valor_hora_ars?: number;
     porcentaje_honorarios?: number;

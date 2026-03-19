@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, UserPlus, Save } from 'lucide-react';
+import { X, UserPlus, Save, FileText } from 'lucide-react';
 import { createProviderCompany, createWorkerWithInvite, getProviderCompanies, type CreateWorkerInput } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 
@@ -27,6 +27,8 @@ interface Props {
 export default function NewWorkerModal({ onClose, onCreated }: Props) {
     const [saving, setSaving] = useState(false);
     const [tipo, setTipo] = useState<'prestador' | 'odontologo'>('prestador');
+    const [createdWorkerId, setCreatedWorkerId] = useState<string | null>(null);
+    const [showContractPrompt, setShowContractPrompt] = useState(false);
     const [companies, setCompanies] = useState<Array<{ id: string; nombre: string; area_default?: string | null }>>([]);
     const [newCompanyName, setNewCompanyName] = useState('');
     const [creatingCompany, setCreatingCompany] = useState(false);
@@ -85,15 +87,50 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
         setSaving(true);
         try {
             const payload: CreateWorkerInput = { ...form, tipo };
-            await createWorkerWithInvite(payload);
+            const created = await createWorkerWithInvite(payload);
             toast.success('Prestador creado e invitación enviada');
             onCreated();
-            onClose();
+            setCreatedWorkerId(created.id);
+            setShowContractPrompt(true);
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : 'Error al crear prestador');
         } finally {
             setSaving(false);
         }
+    }
+
+    // Contract prompt overlay shown after worker creation
+    if (showContractPrompt && createdWorkerId) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                <div className="bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center space-y-5">
+                    <div className="w-14 h-14 bg-violet-500/10 border border-violet-500/20 rounded-2xl flex items-center justify-center mx-auto">
+                        <FileText size={24} className="text-violet-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-white">¿Querés generar el contrato ahora?</h3>
+                        <p className="text-sm text-slate-400 mt-1">
+                            El prestador fue creado. Podés generar su contrato de locación de servicios de inmediato.
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                        <a
+                            href={`/caja-admin/personal/${createdWorkerId}`}
+                            className="flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl text-sm font-bold transition-all"
+                        >
+                            <FileText size={16} />
+                            Ir al perfil y generar contrato
+                        </a>
+                        <button
+                            onClick={onClose}
+                            className="py-3 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 rounded-2xl text-sm font-bold transition-colors"
+                        >
+                            Ahora no
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -260,6 +297,15 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     value={form.documento}
                                     onChange={e => setField('documento', e.target.value)}
                                     placeholder="12.345.678"
+                                    className={inputClass}
+                                />
+                            </Field>
+                            <Field label="CUIL (opcional)">
+                                <input
+                                    type="text"
+                                    value={form.cuil || ''}
+                                    onChange={e => setField('cuil', e.target.value)}
+                                    placeholder="XX-XXXXXXXX-X"
                                     className={inputClass}
                                 />
                             </Field>

@@ -57,6 +57,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             email: fd.get('email') as string,
             whatsapp: fd.get('whatsapp') as string,
             documento: fd.get('documento') as string,
+            cuil: (fd.get('cuil') as string) || undefined,
             categoria: fd.get('rol') as string,
             especialidad: fd.get('especialidad') as string,
             direccion: fd.get('direccion') as string,
@@ -148,11 +149,20 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase ml-1">DNI / Documento</label>
-                        <div className="relative">
-                            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                            <input name="documento" defaultValue={worker.documento} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl pl-11 pr-4 py-2.5 text-white outline-none transition-all" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">DNI / Documento</label>
+                            <div className="relative">
+                                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                <input name="documento" defaultValue={worker.documento} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl pl-11 pr-4 py-2.5 text-white outline-none transition-all" />
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">CUIL (opcional)</label>
+                            <div className="relative">
+                                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                <input name="cuil" defaultValue={worker.cuil} placeholder="XX-XXXXXXXX-X" className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl pl-11 pr-4 py-2.5 text-white outline-none transition-all placeholder:text-slate-600" />
+                            </div>
                         </div>
                     </div>
 

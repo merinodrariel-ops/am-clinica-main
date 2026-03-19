@@ -20,6 +20,7 @@ import Link from 'next/link';
 import StaffPhotoUploader from '@/components/admin/StaffPhotoUploader';
 import StaffDocumentUploader from '@/components/admin/StaffDocumentUploader';
 import StaffEditForm from './StaffEditForm';
+import StaffContractSection from './StaffContractSection';
 import { useRouter } from 'next/navigation';
 
 interface StaffDetailViewProps {
@@ -265,6 +266,9 @@ export default function StaffDetailView({
                     </div>
                 </div>
             </div>
+
+            {/* Contracts */}
+            <StaffContractSection worker={worker} />
         </div>
     );
 }
