@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
     FileText, Download, CheckCircle, Clock, ChevronDown, ChevronUp,
-    User, X, Eye, Settings, List, Pencil, FileDown,
+    User, X, Eye, Settings, List, FileDown, Sparkles, Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPersonal, type Personal } from '@/lib/caja-admin';
@@ -16,6 +16,7 @@ import {
     type ContractTextParams,
 } from '@/lib/staff-contracts/template-store';
 import { generateContractWord } from '@/lib/staff-contracts/word-generator';
+import { assistFullContractAction } from '@/app/actions/contract-ai';
 import type { ContractRecord, AnexoRol } from '@/lib/staff-contracts/types';
 import ContratosConfigView from './ContratosConfigView';
 
@@ -64,6 +65,9 @@ function PreviewModal({ worker, onClose, onDownloaded }: PreviewModalProps) {
     const [view, setView] = useState<PreviewView>('datos');
     const [contractText, setContractText] = useState('');
     const [downloading, setDownloading] = useState(false);
+    const [aiInstruction, setAiInstruction] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiReply, setAiReply] = useState<string | null>(null);
 
     function set(field: keyof PreviewForm, value: string) {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -84,6 +88,19 @@ function PreviewModal({ worker, onClose, onDownloaded }: PreviewModalProps) {
     function openTextView() {
         setContractText(assembleContractFullText(buildParams()));
         setView('texto');
+    }
+
+    async function handleAIAssist() {
+        if (!aiInstruction.trim()) return;
+        setAiLoading(true);
+        setAiReply(null);
+        const result = await assistFullContractAction(contractText, aiInstruction);
+        setAiLoading(false);
+        if (result.reply) {
+            setAiReply(result.reply);
+        } else {
+            toast.error(result.error || 'Error en la IA');
+        }
     }
 
     async function handleDownloadPDF() {
@@ -225,14 +242,66 @@ function PreviewModal({ worker, onClose, onDownloaded }: PreviewModalProps) {
                     ) : (
                         <>
                             <p className="text-xs text-slate-400">
-                                Texto completo del contrato. Podés editar cualquier parte antes de descargar. Los cambios aquí son solo para esta descarga — para cambios permanentes usá <strong>Configuración</strong>.
+                                Texto completo del contrato. Editá lo que necesites antes de descargar. Para cambios permanentes usá <strong>Configuración</strong>.
                             </p>
+
                             <textarea
                                 value={contractText}
-                                onChange={e => setContractText(e.target.value)}
-                                rows={28}
+                                onChange={e => { setContractText(e.target.value); setAiReply(null); }}
+                                rows={20}
                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-3 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/50 resize-y font-mono leading-relaxed"
                             />
+
+                            {/* IA assistant panel */}
+                            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-purple-400" />
+                                    <span className="text-sm font-medium text-purple-300">Asistente IA</span>
+                                    <span className="text-xs text-slate-500">— Preguntá o pedí cambios sobre el contrato</span>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        value={aiInstruction}
+                                        onChange={e => setAiInstruction(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && void handleAIAssist()}
+                                        placeholder='Ej: "¿Falta alguna cláusula importante?" o "Reescribí la parte de honorarios de forma más clara"'
+                                        className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-purple-500/50 placeholder-slate-600"
+                                    />
+                                    <button
+                                        onClick={handleAIAssist}
+                                        disabled={aiLoading || !aiInstruction.trim()}
+                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition-colors disabled:opacity-50 flex-shrink-0"
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        {aiLoading ? 'Pensando...' : 'Consultar'}
+                                    </button>
+                                </div>
+
+                                {aiReply && (
+                                    <div className="rounded-lg bg-black/20 border border-purple-500/20 p-3 space-y-2">
+                                        <p className="text-xs font-medium text-purple-300">Respuesta:</p>
+                                        <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{aiReply}</p>
+                                        {/* If reply looks like a full contract (long), offer to apply it */}
+                                        {aiReply.length > 500 && (
+                                            <div className="flex gap-2 pt-1">
+                                                <button
+                                                    onClick={() => { setContractText(aiReply); setAiReply(null); setAiInstruction(''); }}
+                                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition-colors"
+                                                >
+                                                    <Check className="w-3 h-3" /> Aplicar al contrato
+                                                </button>
+                                                <button
+                                                    onClick={() => setAiReply(null)}
+                                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs bg-white/5 hover:bg-white/10 text-slate-400 transition-colors"
+                                                >
+                                                    <X className="w-3 h-3" /> Descartar
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </>
                     )}
                 </div>
