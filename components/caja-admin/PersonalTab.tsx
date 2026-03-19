@@ -64,6 +64,7 @@ import {
     generarLiquidacionProfesional
 } from '@/lib/caja-admin-prestaciones';
 import ObservadosTab from './ObservadosTab';
+import ContratosTab from './ContratosTab';
 import PrestacionesTab from './PrestacionesTab';
 import HorariosTab from './HorariosTab';
 import PortfolioEditor from '@/components/caja-admin/PortfolioEditor';
@@ -76,11 +77,11 @@ import { useAuth } from '@/contexts/AuthContext';
 interface Props {
     sucursal: Sucursal;
     tcBna: number | null;
-    initialTab?: MainTab | 'equipo';
+    initialTab?: MainTab | 'equipo' | 'contratos';
     initialObservedPersonalId?: string;
 }
 
-type MainTab = 'prestadores' | 'prestaciones' | 'horarios' | 'registros' | 'observados';
+type MainTab = 'prestadores' | 'prestaciones' | 'horarios' | 'registros' | 'observados' | 'contratos';
 type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza' | 'pago-hora' | 'pago-prestacion' | 'mensual';
 
 type ProviderTypeOption = {
@@ -1127,6 +1128,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 {observadosCount}
                             </span>
                         )}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        onClick={() => setActiveTab('contratos')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'contratos'
+                            ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-b-2 border-teal-500 rounded-b-none'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
+                            }`}
+                    >
+                        <FileText className="w-4 h-4" />
+                        Contratos
                     </Button>
                 </div>
 
@@ -2591,6 +2603,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     />
                 )
             }
+
+            {/* Contratos Tab */}
+            {activeTab === 'contratos' && <ContratosTab />}
 
             {/* Modal: editar prestación */}
             {editingPrestacion && (
