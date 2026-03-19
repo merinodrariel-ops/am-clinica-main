@@ -154,19 +154,19 @@ export function generateStaffContractPDF(data: ContractPersonalData): Blob {
     // CUARTA
     addHeading('CUARTA — HONORARIOS Y FORMA DE PAGO');
     addBody(
-        'La remuneración por los servicios prestados será acordada entre las partes y detallada en instrumento separado (recibo, planilla de liquidación o cualquier otro medio válido que las partes adopten). Los honorarios se liquidarán mensualmente, dentro de los primeros diez (10) días hábiles del mes siguiente al de la prestación, salvo acuerdo en contrario. EL/LA LOCADOR/A deberá emitir el comprobante fiscal correspondiente según su situación impositiva.'
+        'La remuneración por los servicios prestados será acordada entre las partes y detallada en instrumento separado (recibo, planilla de liquidación o cualquier otro medio válido que las partes adopten). Los honorarios se liquidarán mensualmente, entre el día 1 y el día 7 del mes siguiente al de la prestación, salvo acuerdo en contrario. EL/LA LOCADOR/A deberá emitir el comprobante fiscal correspondiente según su situación impositiva.'
     );
 
     // QUINTA
-    addHeading('QUINTA — GASTOS E INSUMOS');
+    addHeading('QUINTA — USO DE INSTALACIONES Y EQUIPAMIENTO');
     addBody(
-        'Los gastos en que incurra EL/LA LOCADOR/A para el cumplimiento de sus funciones serán a su exclusivo cargo, salvo acuerdo expreso y escrito en contrario. LA CONTRATANTE podrá, a su criterio, poner a disposición del/la LOCADOR/A determinados recursos, equipos o insumos necesarios para la prestación, sin que ello implique modificación del carácter independiente de la relación.'
+        'LA CONTRATANTE podrá poner a disposición de EL/LA LOCADOR/A las instalaciones, equipos y materiales del consultorio necesarios para la prestación de los servicios acordados. Dicho uso quedará limitado al horario y las condiciones establecidas por LA CONTRATANTE, sin que ello implique cesión, arrendamiento ni modificación alguna del carácter independiente de la relación. Los gastos propios de EL/LA LOCADOR/A (movilidad, insumos personales, etc.) serán a su exclusivo cargo.'
     );
 
     // SEXTA
-    addHeading('SEXTA — NATURALEZA DE LA RELACIÓN');
+    addHeading('SEXTA — NATURALEZA DE LA RELACIÓN Y AUSENCIA DE VÍNCULO LABORAL');
     addBody(
-        'Las partes declaran expresamente que la presente relación tiene carácter civil y comercial, de locación de servicios, en el marco de la Ley N° 25.164 y el Código Civil y Comercial de la Nación. En ningún caso el presente contrato implica relación de empleo, dependencia laboral, sociedad, representación o mandato. EL/LA LOCADOR/A asume la responsabilidad de cumplir con sus obligaciones impositivas y de seguridad social como trabajador/a independiente.'
+        'Las partes declaran expresamente que la presente relación tiene carácter civil y comercial, de locación de servicios, en el marco del Código Civil y Comercial de la Nación. En ningún caso el presente contrato implica relación de empleo ni dependencia laboral. En consecuencia, no corresponde el reconocimiento de beneficios propios del derecho del trabajo, tales como vacaciones pagas, antigüedad, sueldo anual complementario (aguinaldo), indemnización por despido ni ningún otro instituto laboral. EL/LA LOCADOR/A declara conocer y aceptar esta condición, y asume la responsabilidad de cumplir con sus obligaciones impositivas y previsionales como trabajador/a independiente.'
     );
 
     // SÉPTIMA
@@ -182,9 +182,9 @@ export function generateStaffContractPDF(data: ContractPersonalData): Blob {
     );
 
     // NOVENA
-    addHeading('NOVENA — EXCLUSIVIDAD Y NO COMPETENCIA');
+    addHeading('NOVENA — NO COMPETENCIA');
     addBody(
-        'El presente contrato no implica exclusividad para EL/LA LOCADOR/A, salvo acuerdo expreso en contrario. Sin perjuicio de ello, EL/LA LOCADOR/A se compromete a no realizar, durante la vigencia del contrato y por un período de seis (6) meses posteriores a su finalización, actividades que impliquen competencia directa con LA CONTRATANTE en el mismo ámbito geográfico, ni a captar pacientes o clientes de LA CONTRATANTE para sí o para terceros.'
+        'El presente contrato no implica exclusividad para EL/LA LOCADOR/A, quien podrá desarrollar actividades profesionales en otros ámbitos, siempre que ello no afecte el cumplimiento de los servicios aquí contratados. Sin perjuicio de lo anterior, EL/LA LOCADOR/A se compromete a no incurrir en conductas de competencia desleal respecto de LA CONTRATANTE, durante la vigencia del contrato y por un período de seis (6) meses posteriores a su finalización. A tal efecto, queda expresamente prohibido: (a) captar pacientes de LA CONTRATANTE para derivarlos hacia la práctica propia o de terceros; (b) recomendar o facilitar la incorporación de colegas, proveedores o personal de LA CONTRATANTE a otras instituciones u emprendimientos propios; (c) inducir a otros integrantes del equipo de LA CONTRATANTE a desvincularse con el fin de incorporarlos a estructuras propias o ajenas.'
     );
 
     // DÉCIMA
