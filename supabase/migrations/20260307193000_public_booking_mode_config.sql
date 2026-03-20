@@ -173,3 +173,4 @@ SELECT
   NOW()
 FROM staff_without_schedule
 ON CONFLICT (doctor_id, day_of_week) DO NOTHING;
+-- Finalización de trabajo para mudanza a Mac M5
