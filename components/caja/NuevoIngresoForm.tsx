@@ -624,6 +624,21 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         onClose();
     }
 
+    function shouldHandleEnterAsSubmit(event: React.KeyboardEvent) {
+        if (event.key !== 'Enter') return false;
+        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
+
+        const target = event.target as HTMLElement | null;
+        if (!target) return true;
+
+        const tag = target.tagName.toLowerCase();
+        if (tag === 'textarea') return false;
+        if ((target as HTMLInputElement).type === 'button') return false;
+        if ((target as HTMLInputElement).type === 'submit') return false;
+
+        return true;
+    }
+
     if (!isOpen) return null;
 
     const currentTotalUsd = useMultiplePayments ? getMixedUsdTotal(paymentSplits) : calculateUsdEquivalent();
@@ -633,7 +648,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
-            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-xl">
+            <div
+                className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-xl"
+                onKeyDown={(event) => {
+                    if (step !== 4 || saving) return;
+                    if (!shouldHandleEnterAsSubmit(event)) return;
+
+                    event.preventDefault();
+                    handleSubmit();
+                }}
+            >
                 {/* Barra de progreso — estilo admisión */}
                 {step < 5 && (
                     <div className="w-full h-1 bg-gray-100 dark:bg-gray-700 rounded-t-2xl overflow-hidden">
@@ -1276,14 +1300,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                 />
                             </div>
 
-                            <Button
-                                onClick={handleSubmit}
-                                disabled={saving}
-                                className="w-full py-5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all h-auto shadow-xl flex items-center justify-center gap-3"
-                            >
-                                {saving ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
-                                {saving ? 'PROCESANDO PAGO...' : 'CONFIRMAR E INGRESAR'}
-                            </Button>
+                            <div className="sticky bottom-0 z-10 -mx-6 px-6 pb-1 pt-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-t border-gray-100 dark:border-gray-700">
+                                <Button
+                                    onClick={handleSubmit}
+                                    disabled={saving}
+                                    className="w-full py-5 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all h-auto shadow-xl flex items-center justify-center gap-3"
+                                >
+                                    {saving ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
+                                    {saving ? 'PROCESANDO PAGO...' : 'CONFIRMAR E INGRESAR'}
+                                </Button>
+                            </div>
                         </div>
                     )}
 

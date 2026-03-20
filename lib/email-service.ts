@@ -1,4 +1,7 @@
 import 'server-only';
+import { render } from '@react-email/render';
+import { PremiumWelcomeEmail } from '../emails/PremiumWelcome';
+import { PremiumInvitationEmail } from '../emails/PremiumInvitation';
 import { sendResendEmail } from './resend-email';
 import * as templates from './email-templates';
 
@@ -49,12 +52,12 @@ export const EmailService = {
      * Sends a Welcome Email (Premium style)
      */
     async sendWelcome(name: string, email: string) {
-        const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/portal`;
-        const html = templates.generatePremiumWelcomeEmail(name, portalUrl);
+        // Render current React Email template to HTML string
+        const html = await render(PremiumWelcomeEmail({ patientName: name }));
         
         return this.send({
             to: email,
-            subject: 'Bienvenido a AM Clínica — Excelencia y Minimalismo',
+            subject: 'Bienvenido a la Experiencia AM Clínica ✨',
             html
         });
     },
@@ -73,14 +76,19 @@ export const EmailService = {
     },
 
     /**
-     * Sends an Invitation email
+     * Sends an Invitation email (Team/Staff)
      */
-    async sendInvitation(name: string, email: string, link: string) {
-        const html = templates.generateInvitationMessage(name, link);
+    async sendInvitation(name: string, email: string, link: string, role?: string) {
+        // Render current React Email template to HTML string
+        const html = await render(PremiumInvitationEmail({ 
+            name, 
+            inviteLink: link,
+            role: role || 'Equipo AM'
+        }));
         
         return this.send({
             to: email,
-            subject: `Invitación Exclusiva — Equipo AM`,
+            subject: `Únete al Equipo de AM Clínica 🏥`,
             html
         });
     },

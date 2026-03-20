@@ -956,6 +956,21 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     loadData();
   }
 
+  function shouldHandleEnterAsSubmit(event: React.KeyboardEvent) {
+    if (event.key !== "Enter") return false;
+    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
+
+    const target = event.target as HTMLElement | null;
+    if (!target) return true;
+
+    const tag = target.tagName.toLowerCase();
+    if (tag === "textarea") return false;
+    if ((target as HTMLInputElement).type === "button") return false;
+    if ((target as HTMLInputElement).type === "submit") return false;
+
+    return true;
+  }
+
   const filteredMovimientos = movimientos.filter((m) => {
     if (
       searchTerm &&
@@ -1259,6 +1274,13 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6"
+          onKeyDown={(event) => {
+            if (submitting) return;
+            if (!shouldHandleEnterAsSubmit(event)) return;
+
+            event.preventDefault();
+            handleSubmit();
+          }}
         >
           <div className="flex items-center justify-between mb-8">
             <div>
