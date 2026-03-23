@@ -3,26 +3,25 @@
 import { useState } from 'react';
 import AgendaCalendar from '@/components/agenda/AgendaCalendar';
 import TodaySchedulePanel from '@/components/agenda/TodaySchedulePanel';
-import WaitingRoomDashboard from '@/components/agenda/WaitingRoomDashboard';
 import DoctorScheduleConfig from '@/components/agenda/DoctorScheduleConfig';
 import CsvImportWizard from '@/components/agenda/CsvImportWizard';
 import DoctorReassignmentPanel from '@/components/agenda/DoctorReassignmentPanel';
-import { Calendar, Users, Settings, Upload } from 'lucide-react';
+import { Calendar, Settings, Upload, X } from 'lucide-react';
 
-type Tab = 'calendar' | 'waiting' | 'config' | 'import';
+type Tab = 'calendar' | 'config' | 'import';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'calendar', label: 'Agenda 360', icon: <Calendar size={15} /> },
-    { id: 'waiting', label: 'Sala de Espera', icon: <Users size={15} /> },
     { id: 'config', label: 'Configuración', icon: <Settings size={15} /> },
     { id: 'import', label: 'Importar Histórico', icon: <Upload size={15} /> },
 ];
 
 export default function AgendaPage() {
     const [activeTab, setActiveTab] = useState<Tab>('calendar');
+    const [showPanel, setShowPanel] = useState(false);
 
     return (
-        <div className="h-[calc(100vh-theme(spacing.20))] flex flex-col">
+        <div className="h-screen flex flex-col px-4 pb-4 pt-4">
             {/* Page Header */}
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
@@ -54,21 +53,45 @@ export default function AgendaPage() {
 
             {/* Tab Content */}
             {activeTab === 'calendar' && (
-                <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[minmax(0,2.1fr)_minmax(320px,1fr)] gap-4">
-                    <div className="min-h-[65vh] xl:min-h-0">
-                        <AgendaCalendar />
-                    </div>
-                    <div className="min-h-[320px] xl:min-h-0">
-                        <TodaySchedulePanel />
-                    </div>
-                </div>
-            )}
+                <div className="flex-1 min-h-0 relative">
+                    {/* Calendar — always full width */}
+                    <AgendaCalendar />
 
-            {activeTab === 'waiting' && (
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                    <div className="max-w-3xl mx-auto">
-                        <WaitingRoomDashboard />
-                    </div>
+                    {/* Floating tab to open panel */}
+                    {!showPanel && (
+                        <button
+                            onClick={() => setShowPanel(true)}
+                            className="absolute top-1/2 -translate-y-1/2 right-0 z-20 flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg rounded-l-xl px-1.5 py-4 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                            title="Ver turnos de hoy"
+                        >
+                            <span className="text-[9px] font-bold uppercase tracking-widest" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                Hoy
+                            </span>
+                        </button>
+                    )}
+
+                    {/* Drawer overlay */}
+                    {showPanel && (
+                        <>
+                            {/* Backdrop */}
+                            <div
+                                className="absolute inset-0 z-20"
+                                onClick={() => setShowPanel(false)}
+                            />
+                            {/* Panel */}
+                            <div className="absolute top-0 right-0 bottom-0 z-30 w-56 shadow-2xl">
+                                <div className="h-full relative">
+                                    <button
+                                        onClick={() => setShowPanel(false)}
+                                        className="absolute top-2 right-2 z-10 p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                    <TodaySchedulePanel />
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 

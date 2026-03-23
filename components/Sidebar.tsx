@@ -22,6 +22,7 @@ import {
     SlidersHorizontal,
     CheckSquare,
     Briefcase,
+    Mail,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -89,6 +90,12 @@ const MENU_ITEMS = [
         label: 'Mi Portal',
         href: '/portal/dashboard',
         roles: ['owner', 'admin', 'odontologo', 'asistente', 'laboratorio']
+    },
+    {
+        icon: Mail,
+        label: 'Templates Email',
+        href: '/admin/email-templates',
+        roles: ['owner', 'admin', 'developer']
     },
 ];
 

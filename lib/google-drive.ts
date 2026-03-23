@@ -799,6 +799,30 @@ export async function deleteFromDrive(fileId: string): Promise<{ success: boolea
 }
 
 /**
+ * Duplicates a file in Drive
+ */
+export async function copyDriveFile(
+    fileId: string,
+    newFileName: string
+): Promise<{ fileId?: string; error?: string }> {
+    try {
+        const drive = getDrive();
+        const response = await drive.files.copy({
+            fileId,
+            supportsAllDrives: true,
+            requestBody: {
+                name: newFileName,
+            },
+            fields: 'id',
+        });
+        return { fileId: response.data.id || undefined };
+    } catch (error) {
+        console.error('Error copying file in Drive:', error);
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
  * Uploads a file buffer directly to a specific Drive folder by ID.
  * Used for saving edited photos back to patient folders.
  */

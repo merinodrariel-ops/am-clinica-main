@@ -36,7 +36,7 @@ export async function getAppointments(start: string, end: string) {
         .from('agenda_appointments')
         .select(`
             *,
-            patient_data:patient_id (nombre, apellido, whatsapp),
+            patient_data:patient_id (nombre, apellido, whatsapp, primera_consulta_fecha),
             doctor_data:doctor_id (full_name)
         `)
         .gte('start_time', start)
@@ -58,7 +58,9 @@ export async function getAppointments(start: string, end: string) {
             ...apt,
             patient: patient ? {
                 ...patient,
-                full_name: `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'Paciente'
+                full_name: `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'Paciente',
+                primera_consulta_fecha: patient.primera_consulta_fecha ?? null,
+                fecha_alta: patient.fecha_alta ?? null,
             } : null,
             doctor: doctor || null
         };
@@ -114,7 +116,6 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     delete safeUpdates.id;
     delete safeUpdates.created_at;
     delete safeUpdates.created_by;
-    const isPrimeraVez = safeUpdates.is_primera_vez;
     delete safeUpdates.is_primera_vez;
 
     const adminClient = getAdminClient();
@@ -132,18 +133,20 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
         return { success: false, error: error.message };
     }
 
-    // Si el turno pasa a completado/arrived → auto-detectar si es primera consulta
-    if (updates.status === 'completed' || updates.status === 'arrived') {
+    // Post-update hooks: primera visita + auto-recalls al completar
+    const statusFinal = updates.status ?? '';
+    const noCancelado = statusFinal !== 'cancelled' && statusFinal !== 'no_show';
+    if (statusFinal && noCancelado) {
         const { data: apt } = await adminClient
             .from('agenda_appointments')
-            .select('patient_id, start_time, type')
+            .select('patient_id, start_time, type, doctor_id')
             .eq('id', id)
             .single();
 
-        // Solo aplica a consultas donde el checkbox fue explícitamente marcado como primera vez
-        const esConsulta = apt?.type === 'consulta';
+        const turnoPaso = apt && new Date(apt.start_time) < new Date();
 
-        if (apt?.patient_id && esConsulta && isPrimeraVez === true) {
+        if (apt?.patient_id && turnoPaso) {
+            // a) Auto-setear primera_consulta_fecha
             const { data: paciente } = await adminClient
                 .from('pacientes')
                 .select('primera_consulta_fecha')
@@ -155,6 +158,14 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
                     .from('pacientes')
                     .update({ primera_consulta_fecha: apt.start_time.split('T')[0] })
                     .eq('id_paciente', apt.patient_id);
+            }
+
+            // b) Auto-crear recalls si el turno se marca como completado
+            if (statusFinal === 'completed' && apt.type) {
+                const { createRecallsFromAppointment } = await import('@/app/actions/recalls');
+                await createRecallsFromAppointment(
+                    id, apt.type, apt.patient_id, apt.start_time, apt.doctor_id ?? null
+                ).catch(err => console.error('[recalls] auto-create failed:', err));
             }
         }
     }
@@ -341,4 +352,75 @@ export async function reassignDoctorBulk(
 
     revalidatePath('/agenda');
     return { success: true, updatedCount: data?.length || 0 };
+}
+
+// ─── Tomorrow's appointments (for bulk confirmation) ─────────────────────────
+
+export interface TomorrowAppointment {
+    id: string;
+    title: string | null;
+    start_time: string;
+    patientName: string;
+    patientPhone: string | null;
+    doctorName: string | null;
+    status: string;
+}
+
+export async function getTomorrowAppointments(): Promise<TomorrowAppointment[]> {
+    const admin = getAdminClient();
+    const now = new Date();
+    const t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const start = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 0, 0, 0);
+    const end   = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23, 59, 59);
+
+    const { data, error } = await admin
+        .from('agenda_appointments')
+        .select(`id, title, start_time, status,
+            patient_data:patient_id (nombre, apellido, whatsapp),
+            doctor_data:doctor_id (full_name)`)
+        .gte('start_time', start.toISOString())
+        .lte('start_time', end.toISOString())
+        .not('status', 'in', '("cancelled","no_show")')
+        .order('start_time', { ascending: true });
+
+    if (error) { console.error('getTomorrowAppointments:', error); return []; }
+
+    return (data ?? []).map(apt => {
+        const p = Array.isArray(apt.patient_data) ? apt.patient_data[0] : apt.patient_data;
+        const d = Array.isArray(apt.doctor_data)  ? apt.doctor_data[0]  : apt.doctor_data;
+        return {
+            id: apt.id,
+            title: apt.title,
+            start_time: apt.start_time,
+            status: apt.status,
+            patientName: p ? `${p.nombre ?? ''} ${p.apellido ?? ''}`.trim() : (apt.title ?? 'Paciente'),
+            patientPhone: p?.whatsapp ?? null,
+            doctorName: d?.full_name ?? null,
+        };
+    });
+}
+
+export async function sendBulkWhatsAppConfirmations(
+    appointments: Pick<TomorrowAppointment, 'id' | 'start_time' | 'patientName' | 'patientPhone' | 'doctorName'>[]
+): Promise<{ sent: number; failed: number; noPhone: number }> {
+    const { sendNotification } = await import('@/lib/am-scheduler/notification-service');
+    let sent = 0; let failed = 0; let noPhone = 0;
+
+    for (const apt of appointments) {
+        if (!apt.patientPhone) { noPhone++; continue; }
+        const result = await sendNotification({
+            appointmentId: apt.id,
+            templateKey: 'reminder_24h',
+            channel: 'whatsapp',
+            patientName: apt.patientName,
+            patientPhone: apt.patientPhone,
+            patientEmail: null,
+            doctorName: apt.doctorName,
+            startTime: apt.start_time,
+            endTime: apt.start_time,
+        });
+        result.success ? sent++ : failed++;
+    }
+
+    return { sent, failed, noPhone };
 }

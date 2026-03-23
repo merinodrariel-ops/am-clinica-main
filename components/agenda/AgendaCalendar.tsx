@@ -13,11 +13,12 @@ import type {
     EventInput,
     EventSourceFuncArg,
 } from '@fullcalendar/core';
-import { getAppointments, updateAppointment, deleteAppointment, getDoctors } from '@/app/actions/agenda';
+import { getAppointments, updateAppointment, deleteAppointment, getDoctors, getTomorrowAppointments, sendBulkWhatsAppConfirmations } from '@/app/actions/agenda';
+import type { TomorrowAppointment } from '@/app/actions/agenda';
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2 } from 'lucide-react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus } from 'lucide-react';
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -47,7 +48,7 @@ interface AgendaAppointmentRecord {
     patient_id: string | null;
     doctor_id: string | null;
     color_tag?: string | null;
-    patient?: { full_name?: string } | null;
+    patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null } | null;
     doctor?: { full_name?: string } | null;
 }
 
@@ -57,9 +58,10 @@ interface AgendaEventExtendedProps {
     notes?: string;
     patient_id?: string;
     doctor_id?: string;
-    patient?: { full_name?: string };
+    patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null };
     doctor?: { full_name?: string };
     conflict?: boolean;
+    start_time?: string;
 }
 
 interface Doctor {
@@ -127,6 +129,13 @@ export default function AgendaCalendar() {
     const [voiceOpen, setVoiceOpen] = useState(false);
     const [dropConfirm, setDropConfirm] = useState<DropConfirmData | null>(null);
     const [isNotifying, setIsNotifying] = useState(false);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; data: AppointmentModalData } | null>(null);
+    const [confirmTomorrowOpen, setConfirmTomorrowOpen] = useState(false);
+    const [tomorrowApts, setTomorrowApts] = useState<TomorrowAppointment[]>([]);
+    const [tomorrowLoading, setTomorrowLoading] = useState(false);
+    const [tomorrowSending, setTomorrowSending] = useState(false);
+    const [tomorrowResult, setTomorrowResult] = useState<{ sent: number; failed: number; noPhone: number } | null>(null);
+    const [selectedAptIds, setSelectedAptIds] = useState<Set<string>>(new Set());
     const { canEdit: canEditModule } = useAuth();
     const router = useRouter();
 
@@ -327,13 +336,14 @@ export default function AgendaCalendar() {
                     backgroundColor: isConflict ? '#ef4444' : color, // highlight red on conflict
                     borderColor: isConflict ? '#dc2626' : color,
                     textColor: isConflict ? '#ffffff' : textColor,
-                    className: `premium-event ${isConflict ? 'animate-pulse ring-2 ring-red-500' : ''}`,
+                    className: `premium-event ${isConflict ? 'animate-pulse ring-2 ring-red-500' : ''} ${apt.status === 'pending' ? 'tentative-event' : ''}`,
                     extendedProps: {
                         status: apt.status,
                         type: apt.type,
                         notes: apt.notes || '',
                         patient_id: apt.patient_id || '',
                         doctor_id: apt.doctor_id || '',
+                        start_time: apt.start_time,
                         patient: apt.patient || undefined,
                         doctor: apt.doctor || undefined,
                         conflict: isConflict
@@ -366,6 +376,24 @@ export default function AgendaCalendar() {
         });
     };
 
+    const handleOpenConfirmTomorrow = async () => {
+        setConfirmTomorrowOpen(true);
+        setTomorrowResult(null);
+        setTomorrowLoading(true);
+        const apts = await getTomorrowAppointments();
+        setTomorrowApts(apts);
+        setSelectedAptIds(new Set(apts.filter(a => a.patientPhone).map(a => a.id)));
+        setTomorrowLoading(false);
+    };
+
+    const handleSendConfirmations = async () => {
+        const toSend = tomorrowApts.filter(a => selectedAptIds.has(a.id));
+        setTomorrowSending(true);
+        const result = await sendBulkWhatsAppConfirmations(toSend);
+        setTomorrowResult(result);
+        setTomorrowSending(false);
+    };
+
     const canEdit = canEditModule('turnos');
 
     return (
@@ -375,13 +403,16 @@ export default function AgendaCalendar() {
                 .dark .fc { --fc-border-color: #1f2937; --fc-page-bg-color: #111827; }
                 .fc-col-header-cell-cushion { padding:12px 0!important; font-size:.85rem; font-weight:600; color:#4b5563; text-transform:uppercase; letter-spacing:.05em; }
                 .dark .fc-col-header-cell-cushion { color:#9ca3af; }
-                .fc-timegrid-slot { height:1.5rem!important; }
                 .fc-timegrid-slot-label-cushion { font-size:.72rem; color:#9ca3af; font-weight:500; }
-                .fc-event { border-radius:8px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:2px 6px; font-size:.82rem; font-weight:600; }
+                .fc-event { border-radius:8px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:4px 8px; font-size:.85rem; font-weight:600; }
                 .premium-event { transition:all .2s ease; }
                 .premium-event:hover { transform:scale(1.02); box-shadow:0 8px 20px rgba(0,0,0,.12); z-index:50; }
                 .fc-scrollgrid { border:none!important; }
                 .fc-toolbar { padding:1rem 1.25rem .5rem; margin-bottom:0!important; }
+                .fc-timegrid-slot:not(.fc-timegrid-slot-label):hover { background-color:rgba(59,130,246,.06); cursor:cell; }
+                .fc-timegrid-slot:not(.fc-timegrid-slot-label):hover::after { content:'+ Agendar'; position:absolute; left:50%; transform:translateX(-50%); font-size:.65rem; font-weight:600; color:#3b82f6; opacity:.7; pointer-events:none; }
+                .tentative-event { opacity:.65; background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.25) 4px,rgba(255,255,255,.25) 8px)!important; border-style:dashed!important; }
+                .tentative-event::before { content:'⏳ '; font-size:.7rem; }
                 .fc-button { border-radius:8px!important; font-weight:500!important; text-transform:capitalize!important; padding:.35rem .9rem!important; box-shadow:none!important; border:1px solid transparent!important; transition:all .2s!important; }
                 .fc-button-primary { background-color:white!important; color:#374151!important; border-color:#e5e7eb!important; }
                 .fc-button-primary:hover { background-color:#f9fafb!important; border-color:#d1d5db!important; }
@@ -489,6 +520,18 @@ export default function AgendaCalendar() {
                     })}
                 </div>
 
+                {/* Bulk confirm button */}
+                {canEdit && (
+                    <button
+                        onClick={handleOpenConfirmTomorrow}
+                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-all"
+                        title="Enviar WhatsApp de confirmación a todos los pacientes de mañana"
+                    >
+                        <Send size={13} />
+                        Confirmar mañana
+                    </button>
+                )}
+
                 {/* Resource View Date Navigator */}
                 {viewMode === 'resource' && (
                     <div className="ml-auto flex items-center gap-2">
@@ -531,6 +574,7 @@ export default function AgendaCalendar() {
                         }}
                         locale={esLocale}
                         height="100%"
+                        expandRows
                         editable={canEdit}
                         selectable={canEdit}
                         selectMirror
@@ -540,13 +584,14 @@ export default function AgendaCalendar() {
                         select={handleDateSelect}
                         eventClick={handleEventClick}
                         eventDrop={handleEventDrop}
-                        slotMinTime="12:00:00"
+                        hiddenDays={[0]}
+                        slotMinTime="10:00:00"
                         slotMaxTime="21:00:00"
                         scrollTime="12:00:00"
                         allDaySlot={false}
-                        slotDuration="01:00:00"
+                        slotDuration="00:30:00"
                         slotLabelInterval="01:00:00"
-                        snapDuration="01:00:00"
+                        snapDuration="00:30:00"
                         slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                         eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                         eventMinHeight={20}
@@ -560,11 +605,55 @@ export default function AgendaCalendar() {
                             }
                         }}
                         buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' }}
+                        eventDidMount={(info) => {
+                            info.el.addEventListener('contextmenu', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const event = info.event;
+                                const props = event.extendedProps as AgendaEventExtendedProps;
+                                const safeStart = event.start || new Date();
+                                const safeEnd = event.end || new Date(safeStart.getTime() + 60 * 60 * 1000);
+                                setContextMenu({
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    data: {
+                                        id: event.id,
+                                        title: event.title,
+                                        start: safeStart,
+                                        end: safeEnd,
+                                        status: props.status || 'confirmed',
+                                        type: props.type || 'consulta',
+                                        notes: props.notes || '',
+                                        patientId: props.patient_id || '',
+                                        doctorId: props.doctor_id || '',
+                                        patient: props.patient,
+                                        doctor: props.doctor,
+                                    },
+                                });
+                                setQuickPopup(null);
+                            });
+                        }}
                         eventContent={(arg) => {
                             const { event } = arg;
                             const props = event.extendedProps as AgendaEventExtendedProps;
                             const patientName = props.patient?.full_name ?? '';
                             const isTimeGridView = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
+                            // Badge solo cuando la fecha del turno coincide exactamente
+                            // con primera_consulta_fecha del paciente — dato verificado en DB.
+                            const aptDate = props.start_time?.split('T')[0] ?? '';
+                            const primeraFecha = props.patient?.primera_consulta_fecha ?? null;
+                            const isPrimeraVez = props.type === 'consulta' &&
+                                primeraFecha !== null &&
+                                primeraFecha === aptDate;
+                            const TYPE_LABELS: Record<string, string> = {
+                                control: 'Control',
+                                limpieza: 'Limpieza',
+                                cementado: 'Cementado',
+                                tallado: 'Tallado',
+                                botox: 'Botox',
+                                urgencia: 'Urgencia',
+                            };
+                            const typeLabel = isPrimeraVez ? '⭐ 1ª vez' : (TYPE_LABELS[props.type ?? ''] ?? null);
                             const primaryLine = patientName || event.title || 'Cita';
                             const treatmentLine = event.title && event.title !== primaryLine ? event.title : '';
                             const doctorLine = props.doctor?.full_name ? `Dr. ${props.doctor.full_name.split(' ')[0]}` : '';
@@ -575,6 +664,11 @@ export default function AgendaCalendar() {
                                         <span>{primaryLine}</span>
                                         {props.conflict && <span title="Conflicto de horario" className="text-white ml-1">⚠️</span>}
                                     </div>
+                                    {typeLabel && (
+                                        <div className={`text-[9px] font-bold uppercase tracking-wide opacity-90 leading-tight ${isPrimeraVez ? 'text-yellow-200' : ''}`}>
+                                            {typeLabel}
+                                        </div>
+                                    )}
                                     {!isTimeGridView && treatmentLine && (
                                         <div className="opacity-80 truncate text-[10px] leading-tight">{treatmentLine}</div>
                                     )}
@@ -624,6 +718,122 @@ export default function AgendaCalendar() {
                     />
                 )}
             </div>
+
+            {/* Right-click context menu */}
+            {contextMenu && (
+                <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setContextMenu(null)}
+                    onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+                >
+                    <div
+                        className="absolute bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 min-w-[180px] z-50"
+                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                                {contextMenu.data.patient?.full_name || contextMenu.data.title || 'Turno'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => { openFullModal(contextMenu.data); setContextMenu(null); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                        >
+                            <Edit2 size={14} />
+                            Editar turno
+                        </button>
+                        <button
+                            onClick={() => { window.open(`/patients/${contextMenu.data.patientId}`, '_blank'); setContextMenu(null); }}
+                            disabled={!contextMenu.data.patientId}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-violet-50 dark:hover:bg-violet-900/30 hover:text-violet-700 dark:hover:text-violet-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <Users size={14} />
+                            Ver ficha ↗
+                        </button>
+                        <div className="border-t border-gray-100 dark:border-gray-800 mt-1 pt-1">
+                            <button
+                                onClick={async () => { await handleQuickStatusChange(contextMenu.data.id!, 'cancelled'); setContextMenu(null); }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            >
+                                <X size={14} />
+                                Cancelar turno
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Confirmar Mañana Modal ────────────────────────────── */}
+            {confirmTomorrowOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                            <div>
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Confirmar turnos de mañana</h3>
+                                <p className="text-xs text-gray-400 mt-0.5">Envía WhatsApp a todos los pacientes del día siguiente</p>
+                            </div>
+                            <button onClick={() => { setConfirmTomorrowOpen(false); setTomorrowResult(null); }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                        </div>
+
+                        <div className="max-h-72 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800">
+                            {tomorrowLoading && (
+                                <div className="flex items-center justify-center py-10 text-sm text-gray-400">Cargando turnos…</div>
+                            )}
+                            {!tomorrowLoading && tomorrowApts.length === 0 && (
+                                <div className="flex items-center justify-center py-10 text-sm text-gray-400">No hay turnos para mañana</div>
+                            )}
+                            {!tomorrowLoading && tomorrowApts.map(apt => {
+                                const hasPhone = !!apt.patientPhone;
+                                const isSelected = selectedAptIds.has(apt.id);
+                                const time = new Date(apt.start_time).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                return (
+                                    <label key={apt.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${!hasPhone ? 'opacity-50' : ''}`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected && hasPhone}
+                                            disabled={!hasPhone}
+                                            onChange={() => {
+                                                setSelectedAptIds(prev => {
+                                                    const next = new Set(prev);
+                                                    next.has(apt.id) ? next.delete(apt.id) : next.add(apt.id);
+                                                    return next;
+                                                });
+                                            }}
+                                            className="rounded border-gray-300 text-[#25D366] focus:ring-[#25D366]"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{apt.patientName}</p>
+                                            <p className="text-xs text-gray-400">{time}{apt.doctorName ? ` · ${apt.doctorName.split(' ')[0]}` : ''}</p>
+                                        </div>
+                                        {!hasPhone && <span className="text-[10px] text-red-400 font-medium shrink-0">Sin tel.</span>}
+                                        {hasPhone && <span className="text-[10px] text-[#25D366] font-medium shrink-0">{apt.patientPhone}</span>}
+                                    </label>
+                                );
+                            })}
+                        </div>
+
+                        <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+                            {tomorrowResult ? (
+                                <div className="flex items-center gap-2 text-sm font-medium text-green-600">
+                                    <CheckCircle2 size={18} />
+                                    <span>✅ {tomorrowResult.sent} enviados · {tomorrowResult.failed} fallidos · {tomorrowResult.noPhone} sin teléfono</span>
+                                </div>
+                            ) : (
+                                <button
+                                    disabled={tomorrowLoading || tomorrowSending || selectedAptIds.size === 0}
+                                    onClick={handleSendConfirmations}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-[#25D366] text-white hover:bg-[#1ebd5a] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                    {tomorrowSending ? 'Enviando…' : (
+                                        <><Send size={15} /> Enviar a {selectedAptIds.size} paciente{selectedAptIds.size !== 1 ? 's' : ''}</>
+                                    )}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {modalOpen && (
                 <NewAppointmentModal
@@ -721,14 +931,28 @@ export default function AgendaCalendar() {
                     <div
                         className="fixed z-50 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col left-2 right-2 bottom-2 max-h-[calc(100vh-1rem)] md:w-80 md:left-auto md:right-4 md:top-24 md:bottom-auto md:max-h-[calc(100vh-7rem)]"
                     >
-                        {/* Header */}
+                        {/* Header — nombre clickeable → ficha del paciente */}
                         <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800">
                             <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                    <p className="font-semibold text-gray-900 dark:text-white text-sm truncate leading-tight">
-                                        {quickPopup.patientName || quickPopup.title}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-0.5">
+                                <div className="min-w-0 flex-1">
+                                    {quickPopup.fullData.patientId ? (
+                                        <button
+                                            onClick={() => window.open(`/patients/${quickPopup.fullData.patientId}`, '_blank')}
+                                            className="text-left group w-full"
+                                        >
+                                            <p className="font-bold text-gray-900 dark:text-white text-lg leading-tight group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">
+                                                {quickPopup.patientName || quickPopup.title}
+                                            </p>
+                                            <p className="text-[11px] text-violet-500 font-medium mt-0.5 group-hover:underline">
+                                                Ver ficha del paciente ↗
+                                            </p>
+                                        </button>
+                                    ) : (
+                                        <p className="font-bold text-gray-900 dark:text-white text-lg leading-tight truncate">
+                                            {quickPopup.patientName || quickPopup.title}
+                                        </p>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-1.5">
                                         {quickPopup.startTime}
                                         {quickPopup.doctorName && ` · ${quickPopup.doctorName.split(' ')[0]}`}
                                     </p>
@@ -744,54 +968,101 @@ export default function AgendaCalendar() {
 
                         <div className="flex-1 overflow-y-auto">
 
-                        {/* Notes / Purpose */}
+                        {/* Notes */}
                         {quickPopup.fullData.notes && (
-                            <div className="px-4 py-2 bg-amber-50/50 dark:bg-amber-900/10 border-b border-gray-100 dark:border-gray-800">
-                                <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">
-                                    Motivo / Notas
-                                </p>
-                                <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed max-h-32 overflow-y-auto custom-scrollbar whitespace-pre-wrap">
+                            <div className="px-4 py-2.5 bg-amber-50/50 dark:bg-amber-900/10 border-b border-gray-100 dark:border-gray-800">
+                                <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">Notas</p>
+                                <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                                     {quickPopup.fullData.notes}
                                 </p>
                             </div>
                         )}
 
-                        {/* Status pills */}
-                        <div className="p-3 space-y-1.5">
-                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-2">
-                                Cambiar estado
-                            </p>
-                            {STATUS_FLOW.map(s => (
-                                <button
-                                    key={s.key}
-                                    disabled={updatingStatus}
-                                    onClick={() => handleQuickStatusChange(quickPopup.appointmentId, s.key)}
-                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50 ${quickPopup.currentStatus === s.key
-                                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                        }`}
-                                >
-                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${s.color}`} />
-                                    {s.label}
-                                    {quickPopup.currentStatus === s.key && (
-                                        <span className="ml-auto text-[10px] text-gray-400">actual</span>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Rich Quick Actions */}
-                        <div className="px-3 pb-3 grid grid-cols-5 gap-2">
+                        {/* Acciones principales */}
+                        <div className="px-3 pt-3 pb-2 grid grid-cols-3 gap-2">
                             <button
                                 disabled={!canEdit}
                                 onClick={() => openFullModal(quickPopup.fullData)}
-                                title="Editar"
-                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 rounded-xl transition-colors disabled:opacity-50"
+                                className="flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 rounded-xl transition-colors disabled:opacity-50"
                             >
-                                <Edit2 size={16} />
-                                Editar
+                                <Edit2 size={18} />
+                                Editar turno
                             </button>
 
+                            <button
+                                disabled={!quickPopup.fullData.patientId}
+                                onClick={() => router.push(`/caja-recepcion?tab=caja&action=nuevo-ingreso&patientId=${quickPopup.fullData.patientId}`)}
+                                className="flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-xl transition-colors disabled:opacity-50"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+                                Cobrar
+                            </button>
+
+                            <button
+                                disabled={!quickPopup.fullData.patientId}
+                                onClick={() => {
+                                    window.open(`https://wa.me/?text=Hola ${quickPopup.patientName}, nos contactamos de AM Clínica.`, '_blank');
+                                }}
+                                className="flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-semibold text-[#25D366] bg-[#25D366]/10 hover:bg-[#25D366]/20 rounded-xl transition-colors disabled:opacity-50"
+                            >
+                                <Phone size={18} />
+                                WhatsApp
+                            </button>
+                        </div>
+
+                        {/* Próximo control */}
+                        {quickPopup.fullData.patientId && canEdit && (
+                            <div className="px-3 pb-2">
+                                <button
+                                    onClick={() => {
+                                        const nextDate = new Date();
+                                        nextDate.setMonth(nextDate.getMonth() + 6);
+                                        nextDate.setHours(10, 0, 0, 0);
+                                        const nextEnd = new Date(nextDate);
+                                        nextEnd.setHours(11, 0, 0, 0);
+                                        openFullModal({
+                                            title: '',
+                                            start: nextDate,
+                                            end: nextEnd,
+                                            patientId: quickPopup.fullData.patientId,
+                                            doctorId: quickPopup.fullData.doctorId,
+                                            status: 'confirmed',
+                                            type: 'control',
+                                            notes: '',
+                                            patient: quickPopup.fullData.patient,
+                                            doctor: quickPopup.fullData.doctor,
+                                        });
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 rounded-xl transition-colors"
+                                >
+                                    <CalendarPlus size={14} />
+                                    Agendar próximo control (+6 meses)
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Cancelar / No vino — los únicos estados que importan */}
+                        <div className="px-3 pb-2 grid grid-cols-2 gap-2">
+                            <button
+                                disabled={updatingStatus || quickPopup.currentStatus === 'cancelled'}
+                                onClick={() => handleQuickStatusChange(quickPopup.appointmentId, 'cancelled')}
+                                className="flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 rounded-xl transition-colors disabled:opacity-40"
+                            >
+                                <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                                Cancelar turno
+                            </button>
+                            <button
+                                disabled={updatingStatus || quickPopup.currentStatus === 'no_show'}
+                                onClick={() => handleQuickStatusChange(quickPopup.appointmentId, 'no_show')}
+                                className="flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 rounded-xl transition-colors disabled:opacity-40"
+                            >
+                                <div className="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" />
+                                No vino
+                            </button>
+                        </div>
+
+                        {/* Borrar */}
+                        <div className="px-3 pb-3">
                             <button
                                 disabled={!canEdit || updatingStatus}
                                 onClick={async () => {
@@ -799,9 +1070,7 @@ export default function AgendaCalendar() {
                                     setUpdatingStatus(true);
                                     try {
                                         const result = await deleteAppointment(quickPopup.appointmentId);
-                                        if (!result.success) {
-                                            throw new Error(result.error || 'No se pudo eliminar el turno');
-                                        }
+                                        if (!result.success) throw new Error(result.error || 'No se pudo eliminar');
                                         toast.success('Turno eliminado');
                                         setQuickPopup(null);
                                         refreshCalendar();
@@ -811,43 +1080,10 @@ export default function AgendaCalendar() {
                                         setUpdatingStatus(false);
                                     }
                                 }}
-                                title="Eliminar turno"
-                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 rounded-xl transition-colors disabled:opacity-50"
+                                className="w-full flex items-center justify-center gap-2 py-2 text-[11px] font-semibold text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors disabled:opacity-40"
                             >
-                                <Trash2 size={16} />
-                                Borrar
-                            </button>
-
-                            <button
-                                disabled={!quickPopup.fullData.patientId}
-                                onClick={() => router.push(`/patients/${quickPopup.fullData.patientId}`)}
-                                title="Historia Clínica"
-                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 rounded-xl transition-colors disabled:opacity-50"
-                            >
-                                <Users size={16} />
-                                Menú
-                            </button>
-
-                            <button
-                                disabled={!quickPopup.fullData.patientId}
-                                onClick={() => router.push(`/caja-recepcion?tab=caja&action=nuevo-ingreso&patientId=${quickPopup.fullData.patientId}`)}
-                                title="Ingresar Pago / Cobrar"
-                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-xl transition-colors disabled:opacity-50"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
-                                Cobrar
-                            </button>
-
-                            <button
-                                disabled={!quickPopup.fullData.patientId}
-                                onClick={() => {
-                                    window.open(`https://wa.me/?text=Hola ${quickPopup.patientName}, nos contactamos de Lity Clínica Dental.`, '_blank');
-                                }}
-                                title="Enviar WhatsApp"
-                                className="w-full flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold text-[#25D366] bg-[#25D366]/10 hover:bg-[#25D366]/20 rounded-xl transition-colors disabled:opacity-50"
-                            >
-                                <Phone size={16} />
-                                Mensaje
+                                <Trash2 size={14} />
+                                Eliminar turno permanentemente
                             </button>
                         </div>
 

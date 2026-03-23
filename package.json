@@ -65,6 +65,7 @@
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "pm2": "^6.0.14",
     "react-email": "^5.2.10",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

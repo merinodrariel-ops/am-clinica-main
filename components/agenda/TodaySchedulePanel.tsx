@@ -74,39 +74,34 @@ export default function TodaySchedulePanel() {
     }
 
     return (
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 h-full overflow-y-auto flex flex-col">
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 h-full overflow-y-auto flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                    <CalendarCheck size={16} className="text-blue-600" />
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                        Hoy
-                    </h2>
-                    <span className="text-xs text-gray-400">
-                        {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: 'short' })}
+            <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5">
+                    <CalendarCheck size={13} className="text-blue-600" />
+                    <span className="text-xs font-semibold text-gray-900 dark:text-white">Hoy</span>
+                    <span className="text-[10px] text-gray-400">
+                        {new Date().toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' })}
                     </span>
                 </div>
-                <button
-                    onClick={load}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                    <RefreshCw size={13} />
+                <button onClick={load} className="text-gray-400 hover:text-gray-600 p-0.5 rounded transition-colors">
+                    <RefreshCw size={11} />
                 </button>
             </div>
 
             {/* Summary bar */}
-            <div className="flex gap-2 mb-4 flex-shrink-0">
-                <div className="flex-1 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-2.5 text-center">
-                    <p className="text-lg font-bold text-blue-700 dark:text-blue-400 leading-none">{total}</p>
-                    <p className="text-[10px] text-blue-600/70 mt-0.5">Total</p>
+            <div className="flex gap-1.5 mb-2 flex-shrink-0">
+                <div className="flex-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-1.5 text-center">
+                    <p className="text-sm font-bold text-blue-700 dark:text-blue-400 leading-none">{total}</p>
+                    <p className="text-[9px] text-blue-600/70">Total</p>
                 </div>
-                <div className="flex-1 bg-green-50 dark:bg-green-900/20 rounded-xl p-2.5 text-center">
-                    <p className="text-lg font-bold text-green-700 dark:text-green-400 leading-none">{completed}</p>
-                    <p className="text-[10px] text-green-600/70 mt-0.5">Finalizados</p>
+                <div className="flex-1 bg-green-50 dark:bg-green-900/20 rounded-lg p-1.5 text-center">
+                    <p className="text-sm font-bold text-green-700 dark:text-green-400 leading-none">{completed}</p>
+                    <p className="text-[9px] text-green-600/70">Listos</p>
                 </div>
-                <div className="flex-1 bg-purple-50 dark:bg-purple-900/20 rounded-xl p-2.5 text-center">
-                    <p className="text-lg font-bold text-purple-700 dark:text-purple-400 leading-none">{upcoming.length}</p>
-                    <p className="text-[10px] text-purple-600/70 mt-0.5">Pendientes</p>
+                <div className="flex-1 bg-purple-50 dark:bg-purple-900/20 rounded-lg p-1.5 text-center">
+                    <p className="text-sm font-bold text-purple-700 dark:text-purple-400 leading-none">{upcoming.length}</p>
+                    <p className="text-[9px] text-purple-600/70">Pendientes</p>
                 </div>
             </div>
 
@@ -149,30 +144,21 @@ function AppointmentRow({ apt, now, muted = false }: { apt: Appointment; now: Da
     const doctor = apt.doctor?.full_name?.split(' ')[0];
 
     return (
-        <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${cfg.bg} ${
+        <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all ${cfg.bg} ${
             isNow ? 'ring-1 ring-purple-300 dark:ring-purple-700' : ''
-        } ${muted ? 'opacity-50' : ''}`}>
+        } ${muted ? 'opacity-40' : ''}`}>
             {/* Time */}
-            <div className="text-center flex-shrink-0 w-10">
-                <p className="text-xs font-bold text-gray-900 dark:text-white leading-none">{fmt(apt.start_time)}</p>
-                <p className="text-[10px] text-gray-400 leading-none mt-0.5">{fmt(apt.end_time)}</p>
+            <div className="text-center flex-shrink-0 w-8">
+                <p className="text-[10px] font-bold text-gray-900 dark:text-white leading-none">{fmt(apt.start_time)}</p>
             </div>
 
             {/* Dot */}
-            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot} ${isNow ? 'animate-pulse' : ''}`} />
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot} ${isNow ? 'animate-pulse' : ''}`} />
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate leading-tight">{name}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] text-gray-400">{cfg.label}</span>
-                    {doctor && (
-                        <>
-                            <span className="text-gray-300 dark:text-gray-600">·</span>
-                            <span className="text-[10px] text-gray-400">{doctor}</span>
-                        </>
-                    )}
-                </div>
+                <p className="text-[11px] font-medium text-gray-900 dark:text-white truncate leading-tight">{name}</p>
+                {doctor && <p className="text-[9px] text-gray-400 truncate">{doctor}</p>}
             </div>
 
             {isNow && (

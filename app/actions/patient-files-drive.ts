@@ -10,6 +10,7 @@ import {
     uploadFileToFolder,
     deleteFromDrive,
     updateFileContentInDrive,
+    copyDriveFile,
 } from '@/lib/google-drive';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -363,6 +364,35 @@ export async function deleteDriveFileAction(
         const result = await deleteFromDrive(fileId);
         if (!result.success) return { error: result.error };
         return {};
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Duplicates a file in Drive
+ */
+export async function duplicateDriveFileAction(
+    fileId: string,
+    newName: string
+): Promise<{ fileId?: string; error?: string }> {
+    try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        const { data: profile } = await supabaseServer
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .single();
+        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
+            return { error: 'Sin permisos para duplicar archivos en Drive' };
+        }
+
+        const result = await copyDriveFile(fileId, newName);
+        if (result.error) return { error: result.error };
+        return { fileId: result.fileId };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
     }

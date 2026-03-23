@@ -58,7 +58,7 @@ function formatTime(iso: string) {
 
 interface TemplateOutput { subject: string; html: string; whatsapp: string }
 
-function renderTemplate(
+export function renderTemplate(
   key: string,
   ctx: AppointmentNotificationContext
 ): TemplateOutput {

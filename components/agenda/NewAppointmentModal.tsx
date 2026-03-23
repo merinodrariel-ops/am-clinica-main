@@ -58,7 +58,16 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [status, setStatus] = useState('confirmed');
     const [type, setType] = useState('consulta');
     const [notes, setNotes] = useState('');
-    const [isPrimeraVez, setIsPrimeraVez] = useState(false);
+
+    const TYPE_DURATIONS_MIN: Record<string, number> = {
+        consulta:  60,
+        control:   60,
+        limpieza:  60,
+        urgencia:  60,
+        botox:     30,
+        cementado: 240,
+        tallado:   240,
+    };
 
     // Patient Search State
     const [searchTerm, setSearchTerm] = useState('');
@@ -115,7 +124,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setTarifarioSearch('');
             const start = new Date(initialDate);
             const end = new Date(start);
-            end.setMinutes(end.getMinutes() + 60);
+            end.setMinutes(end.getMinutes() + (TYPE_DURATIONS_MIN['consulta'] ?? 60));
             setStartTime(toDateTimeLocal(start));
             setEndTime(toDateTimeLocal(end));
             setStatus('confirmed');
@@ -215,7 +224,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     status,
                     type,
                     notes,
-                    is_primera_vez: type === 'consulta' ? isPrimeraVez : false
+                    is_primera_vez: false
                 };
                 const result = await updateAppointment(initialData.id, updates);
                 if (!result.success) {
@@ -324,6 +333,18 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     autoFocus={!initialData?.id}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && patients.length > 0) {
+                                            e.preventDefault();
+                                            const p = patients[0];
+                                            setPatientId(p.id);
+                                            setSelectedPatientName(p.full_name);
+                                            setSelectedPatientPhone(p.phone || '');
+                                            setSearchTerm('');
+                                            setPatients([]);
+                                            if (!title) setTitle(`Consulta - ${p.full_name}`);
+                                        }
+                                    }}
                                 />
                                 {searching && (
                                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -515,31 +536,31 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Tipo</label>
                             <select
-                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm appearance-none"
+                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all shadow-sm appearance-none font-medium"
                                 value={type}
-                                onChange={(e) => setType(e.target.value)}
+                                onChange={(e) => {
+                                    const newType = e.target.value;
+                                    setType(newType);
+                                    if (startTime) {
+                                        const start = new Date(startTime);
+                                        const end = new Date(start);
+                                        end.setMinutes(end.getMinutes() + (TYPE_DURATIONS_MIN[newType] ?? 60));
+                                        setEndTime(toDateTimeLocal(end));
+                                    }
+                                }}
                             >
-                                <option value="consulta">Consulta</option>
-                                <option value="tratamiento">Tratamiento</option>
+                                <option value="consulta">⭐ Consulta de primera vez</option>
                                 <option value="control">Control</option>
+                                <option value="limpieza">Limpieza</option>
+                                <option value="cementado">Cementado</option>
+                                <option value="tallado">Tallado</option>
+                                <option value="botox">Botox</option>
                                 <option value="urgencia">Urgencia</option>
-                                <option value="cirugia">Cirugía</option>
                             </select>
                             {type === 'consulta' && (
-                                <label className="flex items-center gap-2 mt-2 cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        checked={isPrimeraVez}
-                                        onChange={(e) => setIsPrimeraVez(e.target.checked)}
-                                        className="w-4 h-4 rounded accent-violet-500"
-                                    />
-                                    <span className="text-xs font-semibold text-violet-500 group-hover:text-violet-400 transition-colors">
-                                        Primera consulta
-                                    </span>
-                                    <span className="text-[10px] text-gray-400">
-                                        (se confirma al marcar como completado)
-                                    </span>
-                                </label>
+                                <p className="text-[11px] text-violet-500 font-semibold mt-1.5 pl-1">
+                                    El paciente será contabilizado como nuevo ingreso
+                                </p>
                             )}
                         </div>
                     </div>
@@ -579,7 +600,14 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm resize-none h-auto"
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                    e.preventDefault();
+                                    e.currentTarget.form?.requestSubmit();
+                                }
+                            }}
                         />
+                        <p className="text-[10px] text-gray-400 mt-1 pl-1">Ctrl+Enter para guardar</p>
                     </div>
 
                     {/* Footer Actions */}

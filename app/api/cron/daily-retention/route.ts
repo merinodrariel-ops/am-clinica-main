@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { sendNotification } from '@/lib/am-scheduler/notification-service';
+import { createRecallsFromAppointment } from '@/app/actions/recalls';
 
 export const maxDuration = 300; // 5 minutes max duration for Vercel Cron
 
@@ -16,6 +17,9 @@ export async function GET(request: Request) {
         birthdays: 0,
         postTreatment: 0,
         recalls: 0,
+        primeraConsultaBackfill: 0,
+        autoCompleted: 0,
+        recallsCreated: 0,
         errors: [] as string[]
     };
 
@@ -156,6 +160,131 @@ export async function GET(request: Request) {
             }
         } catch (err: any) {
             results.errors.push(`Recalls error: ${err.message || String(err)}`);
+        }
+
+        // ─── 4. Backfill primera_consulta_fecha ─────────────────
+        // Turno pasado + no cancelado = paciente que vino.
+        // Seteamos la fecha de la primera visita real si todavía está en NULL.
+        try {
+            const todayStart = new Date(today);
+            todayStart.setHours(0, 0, 0, 0);
+
+            const { data: pastApts, error: pastError } = await supabase
+                .from('agenda_appointments')
+                .select('patient_id, start_time')
+                .lt('start_time', todayStart.toISOString())
+                .not('status', 'in', '("cancelled","no_show")')
+                .not('patient_id', 'is', null)
+                .order('start_time', { ascending: true });
+
+            if (pastError) throw pastError;
+
+            // Agrupar: quedarnos con el turno más antiguo por paciente
+            const earliest = new Map<string, string>();
+            for (const apt of pastApts ?? []) {
+                if (apt.patient_id && !earliest.has(apt.patient_id)) {
+                    earliest.set(apt.patient_id, apt.start_time.split('T')[0]);
+                }
+            }
+
+            for (const [patientId, visitDate] of earliest.entries()) {
+                const { data: pac } = await supabase
+                    .from('pacientes')
+                    .select('primera_consulta_fecha')
+                    .eq('id_paciente', patientId)
+                    .single();
+
+                if (pac && !pac.primera_consulta_fecha) {
+                    await supabase
+                        .from('pacientes')
+                        .update({ primera_consulta_fecha: visitDate })
+                        .eq('id_paciente', patientId);
+                    results.primeraConsultaBackfill++;
+                }
+            }
+        } catch (err: any) {
+            results.errors.push(`PrimeraConsulta backfill error: ${err.message || String(err)}`);
+        }
+
+        // ─── 5. Recordatorio de confirmación para turnos tentativos ─
+        // 14 días antes de un turno pending → WhatsApp al paciente para confirmar
+        try {
+            const in14 = new Date(today);
+            in14.setDate(in14.getDate() + 14);
+            const in14Start = new Date(in14.getFullYear(), in14.getMonth(), in14.getDate(), 0, 0, 0).toISOString();
+            const in14End   = new Date(in14.getFullYear(), in14.getMonth(), in14.getDate(), 23, 59, 59).toISOString();
+
+            const { data: tentativeApts } = await supabase
+                .from('agenda_appointments')
+                .select(`
+                    id, start_time, end_time, type,
+                    patient:pacientes(nombre, apellido, whatsapp, email),
+                    doctor:profiles(full_name)
+                `)
+                .eq('status', 'pending')
+                .gte('start_time', in14Start)
+                .lte('start_time', in14End)
+                .not('patient_id', 'is', null);
+
+            for (const apt of tentativeApts ?? []) {
+                const patient = Array.isArray(apt.patient) ? apt.patient[0] : apt.patient;
+                const doctor  = Array.isArray(apt.doctor)  ? apt.doctor[0]  : apt.doctor;
+                if (!patient?.whatsapp && !patient?.email) continue;
+
+                await sendNotification({
+                    appointmentId: apt.id,
+                    templateKey: 'reminder_24h',
+                    channel: patient.whatsapp ? 'whatsapp' : 'email',
+                    patientName: `${patient.nombre ?? ''} ${patient.apellido ?? ''}`.trim(),
+                    patientPhone: patient.whatsapp ?? null,
+                    patientEmail: patient.email ?? null,
+                    doctorName: doctor?.full_name ?? null,
+                    startTime: apt.start_time,
+                    endTime: apt.end_time,
+                });
+            }
+        } catch (err: any) {
+            results.errors.push(`Tentative confirmation: ${err.message || String(err)}`);
+        }
+
+        // ─── 6. Auto-completar turnos pasados no cancelados ─────
+        // Lógica: si el turno pasó y no fue cancelado → se dio el turno → completed.
+        // Esto dispara la creación de recalls automáticamente.
+        try {
+            const now = new Date();
+
+            const { data: pendingApts } = await supabase
+                .from('agenda_appointments')
+                .select('id, patient_id, doctor_id, type, start_time, end_time')
+                .lt('end_time', now.toISOString())
+                .not('status', 'in', '("cancelled","no_show","completed")')
+                .not('patient_id', 'is', null);
+
+            for (const apt of pendingApts ?? []) {
+                // Marcar como completado
+                const { error: updateErr } = await supabase
+                    .from('agenda_appointments')
+                    .update({ status: 'completed', updated_at: now.toISOString() })
+                    .eq('id', apt.id);
+
+                if (updateErr) {
+                    results.errors.push(`Auto-complete ${apt.id}: ${updateErr.message}`);
+                    continue;
+                }
+                results.autoCompleted++;
+
+                // Disparar recalls automáticos si el tipo tiene reglas
+                if (apt.patient_id && apt.type) {
+                    try {
+                        await createRecallsFromAppointment(apt.id, apt.type, apt.patient_id, apt.start_time, apt.doctor_id ?? null);
+                        results.recallsCreated++;
+                    } catch (e: any) {
+                        results.errors.push(`Recall for ${apt.id}: ${e.message}`);
+                    }
+                }
+            }
+        } catch (err: any) {
+            results.errors.push(`Auto-complete error: ${err.message || String(err)}`);
         }
 
         return NextResponse.json({
