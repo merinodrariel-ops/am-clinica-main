@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useRef } from 'react';
+import { type MouseEvent, use, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import {
     Calendar,
@@ -599,7 +599,7 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                                 exit={{ scale: 0.85 }}
                                 transition={{ type: 'spring', damping: 25 }}
                                 className="max-w-lg w-full max-h-[85vh] relative"
-                                onClick={e => e.stopPropagation()}
+                                onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
                             >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img

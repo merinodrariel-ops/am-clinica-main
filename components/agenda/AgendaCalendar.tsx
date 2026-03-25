@@ -319,6 +319,7 @@ export default function AgendaCalendar() {
 
             const events: EventInput[] = filtered.map(apt => {
                 const isConflict = conflictMap.has(apt.id);
+                const isCancelled = apt.status === 'cancelled';
                 const doctorColor = apt.doctor_id
                     ? getDoctorColor(apt.doctor_id, doctors)
                     : getStatusColor(apt.status);
@@ -326,17 +327,19 @@ export default function AgendaCalendar() {
                 const fallbackColor = doctors.length > 0 && apt.doctor_id ? doctorColor : getStatusColor(apt.status);
                 // Ignore external color_tag when it's invalid or too light to keep weekly/daily events readable.
                 const color = normalizeEventColor(apt.color_tag, fallbackColor);
-                const textColor = getReadableTextColor(color);
+                const textColor = isCancelled ? '#4b5563' : getReadableTextColor(color);
+                const backgroundColor = isConflict ? '#ef4444' : isCancelled ? '#e5e7eb' : color;
+                const borderColor = isConflict ? '#dc2626' : isCancelled ? '#9ca3af' : color;
 
                 return {
                     id: apt.id,
                     title: apt.title || (apt.patient?.full_name ?? 'Cita'),
                     start: apt.start_time,
                     end: apt.end_time,
-                    backgroundColor: isConflict ? '#ef4444' : color, // highlight red on conflict
-                    borderColor: isConflict ? '#dc2626' : color,
+                    backgroundColor,
+                    borderColor,
                     textColor: isConflict ? '#ffffff' : textColor,
-                    className: `premium-event ${isConflict ? 'animate-pulse ring-2 ring-red-500' : ''} ${apt.status === 'pending' ? 'tentative-event' : ''}`,
+                    className: `premium-event ${isConflict ? 'animate-pulse ring-2 ring-red-500' : ''} ${apt.status === 'pending' ? 'tentative-event' : ''} ${isCancelled ? 'cancelled-event' : ''}`,
                     extendedProps: {
                         status: apt.status,
                         type: apt.type,
@@ -407,6 +410,8 @@ export default function AgendaCalendar() {
                 .fc-event { border-radius:8px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:4px 8px; font-size:.85rem; font-weight:600; }
                 .premium-event { transition:all .2s ease; }
                 .premium-event:hover { transform:scale(1.02); box-shadow:0 8px 20px rgba(0,0,0,.12); z-index:50; }
+                .cancelled-event { border:2px dashed #9ca3af!important; box-shadow:none!important; opacity:.92; }
+                .cancelled-event:hover { transform:none; box-shadow:0 4px 12px rgba(107,114,128,.18)!important; }
                 .fc-scrollgrid { border:none!important; }
                 .fc-toolbar { padding:1rem 1.25rem .5rem; margin-bottom:0!important; }
                 .fc-timegrid-slot:not(.fc-timegrid-slot-label):hover { background-color:rgba(59,130,246,.06); cursor:cell; }
@@ -645,8 +650,12 @@ export default function AgendaCalendar() {
                             const isPrimeraVez = props.type === 'consulta' &&
                                 primeraFecha !== null &&
                                 primeraFecha === aptDate;
+                            const isCancelled = props.status === 'cancelled';
                             const TYPE_LABELS: Record<string, string> = {
                                 control: 'Control',
+                                control_carilla_inmediato: 'Ctrl carilla inmediato',
+                                control_carilla_anual: 'Ctrl carilla anual',
+                                control_ortodoncia: 'Ctrl ortodoncia',
                                 limpieza: 'Limpieza',
                                 cementado: 'Cementado',
                                 tallado: 'Tallado',
@@ -659,14 +668,19 @@ export default function AgendaCalendar() {
                             const doctorLine = props.doctor?.full_name ? `Dr. ${props.doctor.full_name.split(' ')[0]}` : '';
                             const secondaryLine = treatmentLine || doctorLine;
                             return (
-                                <div className={`px-1 overflow-hidden ${isTimeGridView ? 'py-0.5' : ''}`}>
-                                    <div className="font-semibold truncate text-[11px] leading-tight flex items-center justify-between">
-                                        <span>{primaryLine}</span>
-                                        {props.conflict && <span title="Conflicto de horario" className="text-white ml-1">⚠️</span>}
-                                    </div>
-                                    {typeLabel && (
-                                        <div className={`text-[9px] font-bold uppercase tracking-wide opacity-90 leading-tight ${isPrimeraVez ? 'text-yellow-200' : ''}`}>
-                                            {typeLabel}
+                                    <div className={`px-1 overflow-hidden ${isTimeGridView ? 'py-0.5' : ''}`}>
+                                        <div className="font-semibold truncate text-[11px] leading-tight flex items-center justify-between">
+                                            <span>{primaryLine}</span>
+                                            {props.conflict && <span title="Conflicto de horario" className="text-white ml-1">⚠️</span>}
+                                        </div>
+                                        {isCancelled && (
+                                            <div className="inline-flex items-center rounded-full bg-gray-600/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-gray-700 mt-1 mb-0.5">
+                                                Cancelado
+                                            </div>
+                                        )}
+                                        {typeLabel && (
+                                            <div className={`text-[9px] font-bold uppercase tracking-wide opacity-90 leading-tight ${isPrimeraVez ? 'text-yellow-200' : ''}`}>
+                                                {typeLabel}
                                         </div>
                                     )}
                                     {!isTimeGridView && treatmentLine && (

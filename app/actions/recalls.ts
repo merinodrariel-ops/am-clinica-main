@@ -478,7 +478,8 @@ export async function getRecallStats() {
 
 // Duración por tipo de turno en minutos (para crear el turno tentativo)
 const TENTATIVE_DURATION_MIN: Record<string, number> = {
-    control: 60, limpieza: 60, botox: 30, consulta: 60,
+    control: 60, control_carilla_inmediato: 60, control_carilla_anual: 60, control_ortodoncia: 60,
+    limpieza: 60, botox: 30, consulta: 60,
     cementado: 240, tallado: 240, urgencia: 30,
 };
 

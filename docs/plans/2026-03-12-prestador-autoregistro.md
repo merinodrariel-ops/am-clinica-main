@@ -129,7 +129,7 @@ export async function registerPrestadorPublico(data: PrestadorAutoRegistroInput)
 **Step 2: Verificar que TypeScript no rompe**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npx tsc --noEmit 2>&1 | head -30
 ```
 
@@ -483,7 +483,7 @@ export default function RegistroPrestadorForm() {
 **Step 2: Verificar TypeScript**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npx tsc --noEmit 2>&1 | grep -i "RegistroPrestador\|prestador-registro" | head -20
 ```
 
@@ -619,7 +619,7 @@ Buscar donde se renderiza el título/tab "Prestadores" o "Personal". Agregar el 
 **Step 5: Verificar TypeScript**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npx tsc --noEmit 2>&1 | grep "PersonalTab" | head -10
 ```
 
@@ -802,7 +802,7 @@ Si `pendingCount > 0`, mostrar una sección separada en la lista de prestadores:
 **Step 5: Verificar TypeScript**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npx tsc --noEmit 2>&1 | grep -E "PersonalTab|activat" | head -20
 ```
 
@@ -820,7 +820,7 @@ git commit -m "feat(ui): pending prestadores section + activation modal in Perso
 **Step 1: Build completo**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npm run build 2>&1 | tail -20
 ```
 

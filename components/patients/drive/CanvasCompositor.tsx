@@ -1,7 +1,9 @@
 'use client';
-import { useRef, useState, useEffect } from 'react';
-import { Download, Save, ImageIcon } from 'lucide-react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { Download, Save, ImageIcon, Check, X as XIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -113,6 +115,13 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
     const [displaySize, setDisplaySize] = useState({ w: 500, h: 500 });
     const [saving, setSaving] = useState(false);
+    const [hoveredLayerId, setHoveredLayerId] = useState<string | null>(null);
+
+    // Inline crop state (double-click a layer to enter crop mode)
+    const [croppingLayerId, setCroppingLayerId] = useState<string | null>(null);
+    const [cropSel, setCropSel] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+    const [completedCropSel, setCompletedCropSel] = useState<PixelCrop | null>(null);
+    const cropImgRef = useRef<HTMLImageElement>(null);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -149,9 +158,24 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        canvas.width = displaySize.w;
-        canvas.height = displaySize.h;
+
+        // Render at export resolution (EXPORT_BASE) regardless of container size.
+        // The canvas is then scaled down in CSS to fit the display container.
+        // This ensures photos are drawn at full quality even in small containers.
+        const dpr = window.devicePixelRatio || 1;
+        const rw = currentRatio.w, rh = currentRatio.h;
+        const shorter = Math.min(rw, rh);
+        const renderW = Math.round(Math.max(EXPORT_BASE * rw / shorter, displaySize.w * dpr));
+        const renderH = Math.round(Math.max(EXPORT_BASE * rh / shorter, displaySize.h * dpr));
+        canvas.width = renderW;
+        canvas.height = renderH;
+        canvas.style.width = `${displaySize.w}px`;
+        canvas.style.height = `${displaySize.h}px`;
+
         const ctx = canvas.getContext('2d')!;
+        // Scale: map logical displaySize coords → renderW/H
+        ctx.scale(renderW / displaySize.w, renderH / displaySize.h);
+
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, displaySize.w, displaySize.h);
 
@@ -167,31 +191,32 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
             ctx.restore();
         }
 
-        // Selection handles
+        // Selection handles (drawn in logical coords, scaled with context)
         if (selectedId) {
             const sel = layers.find(l => l.id === selectedId);
             if (sel) {
                 const corners = getLayerCorners(sel, displaySize.w, displaySize.h);
                 ctx.save();
                 ctx.strokeStyle = '#C9A96E';
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 1.5 * (displaySize.w / renderW); // compensate scale
                 ctx.setLineDash([4, 3]);
                 ctx.beginPath();
                 corners.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
                 ctx.closePath();
                 ctx.stroke();
                 ctx.setLineDash([]);
+                const hs = HANDLE_SIZE * (displaySize.w / renderW);
                 corners.forEach(([x, y]) => {
                     ctx.fillStyle = '#C9A96E';
                     ctx.strokeStyle = '#0D0D12';
-                    ctx.lineWidth = 1;
-                    ctx.fillRect(x - HANDLE_SIZE / 2, y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
-                    ctx.strokeRect(x - HANDLE_SIZE / 2, y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
+                    ctx.lineWidth = 1 * (displaySize.w / renderW);
+                    ctx.fillRect(x - hs / 2, y - hs / 2, hs, hs);
+                    ctx.strokeRect(x - hs / 2, y - hs / 2, hs, hs);
                 });
                 ctx.restore();
             }
         }
-    }, [layers, displaySize, selectedId]);
+    }, [layers, displaySize, selectedId, currentRatio]);
 
     // ── Delete key ────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -355,6 +380,68 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
         dragRef.current = null;
     }
 
+    function handleCanvasPointerHover(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (dragRef.current) return;
+        const [nx, ny] = getNorm(e);
+        for (let i = layers.length - 1; i >= 0; i--) {
+            if (hitTestLayerBody(layers[i], nx, ny, displaySize.w, displaySize.h)) {
+                setHoveredLayerId(layers[i].id);
+                return;
+            }
+        }
+        setHoveredLayerId(null);
+    }
+
+    function handleCanvasDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / rect.width;
+        const ny = (e.clientY - rect.top) / rect.height;
+        for (let i = layers.length - 1; i >= 0; i--) {
+            if (hitTestLayerBody(layers[i], nx, ny, displaySize.w, displaySize.h)) {
+                setCroppingLayerId(layers[i].id);
+                setCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+                setCompletedCropSel(null);
+                setSelectedId(null);
+                return;
+            }
+        }
+    }
+
+    const handleConfirmLayerCrop = useCallback(async () => {
+        if (!croppingLayerId) return;
+        const layer = layers.find(l => l.id === croppingLayerId);
+        if (!layer || !cropImgRef.current) { setCroppingLayerId(null); return; }
+        if (!completedCropSel || completedCropSel.width === 0) {
+            toast.error('Dibujá el área de recorte primero');
+            return;
+        }
+        const img = cropImgRef.current;
+        const scaleX = img.naturalWidth / (img.width || 1);
+        const scaleY = img.naturalHeight / (img.height || 1);
+        const srcX = Math.round(completedCropSel.x * scaleX);
+        const srcY = Math.round(completedCropSel.y * scaleY);
+        const srcW = Math.round(completedCropSel.width * scaleX);
+        const srcH = Math.round(completedCropSel.height * scaleY);
+        const cc = document.createElement('canvas');
+        cc.width = srcW; cc.height = srcH;
+        cc.getContext('2d')!.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+        try {
+            const blob = await new Promise<Blob>((res, rej) =>
+                cc.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/jpeg', 0.95)
+            );
+            const newUrl = URL.createObjectURL(blob);
+            const newImg = await loadImage(newUrl);
+            setLayers(prev => prev.map(l => {
+                if (l.id !== croppingLayerId) return l;
+                const newAspect = srcW / (srcH || 1);
+                return { ...l, src: newUrl, img: newImg, h: l.w / newAspect };
+            }));
+            setCroppingLayerId(null);
+        } catch {
+            toast.error('No se pudo aplicar el recorte');
+        }
+    }, [croppingLayerId, layers, completedCropSel]);
+
     function handleCanvasContextMenu(e: React.MouseEvent<HTMLCanvasElement>) {
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
@@ -440,16 +527,60 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
                     >
                         <canvas
                             ref={canvasRef}
-                            className="block w-full h-full"
+                            className="block"
                             style={{
-                                cursor: selectedId ? 'move' : 'default',
+                                cursor: dragRef.current ? 'grabbing'
+                                    : hoveredLayerId ? 'grab'
+                                    : 'default',
                             }}
                             onPointerDown={handleCanvasPointerDown}
-                            onPointerMove={handleCanvasPointerMove}
+                            onPointerMove={(e) => { handleCanvasPointerMove(e); handleCanvasPointerHover(e); }}
                             onPointerUp={handleCanvasPointerUp}
-                            onPointerLeave={handleCanvasPointerUp}
+                            onPointerLeave={() => { handleCanvasPointerUp(); setHoveredLayerId(null); }}
+                            onDoubleClick={handleCanvasDoubleClick}
                             onContextMenu={handleCanvasContextMenu}
                         />
+                        {/* Inline crop overlay — appears on double-click of a layer */}
+                        {croppingLayerId && (() => {
+                            const layer = layers.find(l => l.id === croppingLayerId);
+                            if (!layer) return null;
+                            return (
+                                <div className="absolute inset-0 bg-black/80 flex flex-col z-20">
+                                    <div className="flex items-center justify-between px-3 py-2 bg-black/60 border-b border-white/10">
+                                        <span className="text-white/70 text-xs">Recortá la foto — doble clic activó modo edición</span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleConfirmLayerCrop}
+                                                className="flex items-center gap-1 px-3 py-1 rounded-md text-xs bg-blue-600 text-white font-medium"
+                                            >
+                                                <Check size={12} /> Aplicar
+                                            </button>
+                                            <button
+                                                onClick={() => setCroppingLayerId(null)}
+                                                className="flex items-center gap-1 px-3 py-1 rounded-md text-xs bg-white/10 text-white/60"
+                                            >
+                                                <XIcon size={12} /> Cancelar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+                                        <ReactCrop
+                                            crop={cropSel}
+                                            onChange={c => setCropSel(c)}
+                                            onComplete={c => setCompletedCropSel(c)}
+                                        >
+                                            <img
+                                                ref={cropImgRef}
+                                                src={layer.src}
+                                                alt="recorte"
+                                                style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 120px)', display: 'block' }}
+                                                crossOrigin="anonymous"
+                                            />
+                                        </ReactCrop>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                         {layers.length === 0 && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none select-none">
                                 <div className="w-12 h-12 rounded-2xl bg-black/20 flex items-center justify-center">

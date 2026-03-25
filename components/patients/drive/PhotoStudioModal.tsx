@@ -1,24 +1,28 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
-    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy,
+    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle,
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
-import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction } from '@/app/actions/patient-files-drive';
+import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction } from '@/app/actions/patient-files-drive';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
+import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 
 interface PhotoStudioModalProps {
     file: DriveFile | null;
     folderId: string;
     allFolderFiles: DriveFile[];   // images in same folder — for thumbnail strip
+    patientId: string;
+    patientName: string;
     canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
     onSaved: () => void;           // called after successful save → triggers folder refresh
@@ -50,6 +54,26 @@ interface TextAnnotation {
     text: string;
     color: DrawColor;
     width: number; // normalized 0–1 — controls the wrap box width
+}
+
+function AirDropIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className={className}
+            aria-hidden="true"
+        >
+            <path d="M12 20L8.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 20L15.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 4V20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M5.2 10.5C6.8 7.7 9.1 6.3 12 6.3C14.9 6.3 17.2 7.7 18.8 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M2.8 8.1C5.1 4.6 8.2 2.8 12 2.8C15.8 2.8 18.9 4.6 21.2 8.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" opacity="0.75" />
+        </svg>
+    );
 }
 
 const TEXT_LINE_HEIGHT = 1.35; // em — must match CSS in the textarea overlay
@@ -306,6 +330,8 @@ export default function PhotoStudioModal({
     file,
     folderId,
     allFolderFiles,
+    patientId,
+    patientName,
     canSave,
     onClose,
     onSaved,
@@ -358,7 +384,12 @@ export default function PhotoStudioModal({
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
     const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-    const [thumbnailContextMenu, setThumbnailContextMenu] = useState<{ x: number; y: number; file: DriveFile } | null>(null);
+    const [thumbnailContextMenu, setThumbnailContextMenu] = useState<{
+        x: number;
+        y: number;
+        file: DriveFile;
+        targetIds: string[];
+    } | null>(null);
     const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
     const [hasCanvas, setHasCanvas] = useState(false);
     const [mousePos, setMousePos] = useState<[number, number] | null>(null);
@@ -370,6 +401,10 @@ export default function PhotoStudioModal({
     const [canvasRatio, setCanvasRatio] = useState<CanvasRatio>('1:1');
     const [canvasSelectedId, setCanvasSelectedId] = useState<string | null>(null);
     const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
+    const [canvasLayerCropId, setCanvasLayerCropId] = useState<string | null>(null);
+    const [canvasLayerCropSel, setCanvasLayerCropSel] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+    const [canvasLayerCompletedCrop, setCanvasLayerCompletedCrop] = useState<PixelCrop | null>(null);
+    const canvasLayerCropImgRef = useRef<HTMLImageElement>(null);
     const canvasLayersRef = useRef<HTMLCanvasElement>(null);
     const canvasLayerDragRef = useRef<{
         layerId: string;
@@ -427,8 +462,30 @@ export default function PhotoStudioModal({
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [saving, setSaving] = useState<'replace' | 'copy' | null>(null);
 
-    // Image files for the thumbnail strip (only images)
-    const imageFiles = allFolderFiles.filter(isImageFile);
+    const baseImageFiles = useMemo(() => allFolderFiles.filter(isImageFile), [allFolderFiles]);
+    const [imageOrderIds, setImageOrderIds] = useState<string[]>(() => baseImageFiles.map(item => item.id));
+    const imageFiles = useMemo(() => {
+        const byId = new Map(baseImageFiles.map(item => [item.id, item]));
+        const ordered: DriveFile[] = [];
+
+        imageOrderIds.forEach((id) => {
+            const item = byId.get(id);
+            if (item) {
+                ordered.push(item);
+                byId.delete(id);
+            }
+        });
+
+        return [...ordered, ...byId.values()];
+    }, [baseImageFiles, imageOrderIds]);
+
+    useEffect(() => {
+        setImageOrderIds((prev) => {
+            const validPrev = prev.filter((id) => baseImageFiles.some((item) => item.id === id));
+            const missing = baseImageFiles.map((item) => item.id).filter((id) => !validPrev.includes(id));
+            return [...validPrev, ...missing];
+        });
+    }, [baseImageFiles]);
 
     // Always-current navigate function — used by wheel handler + arrow keys
     const switchToAdjacentRef = useRef<(dir: 1 | -1) => void>(() => {});
@@ -451,6 +508,53 @@ export default function PhotoStudioModal({
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [multiSelectMode, setMultiSelectMode] = useState(false);
     const [downloadingWeb, setDownloadingWeb] = useState(false);
+    const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
+    const [sharePatientItems, setSharePatientItems] = useState<ShareWithPatientItem[] | null>(null);
+    const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+    const [thumbnailDragId, setThumbnailDragId] = useState<string | null>(null);
+    const [thumbnailDropIndicator, setThumbnailDropIndicator] = useState<{ id: string; edge: 'top' | 'bottom' } | null>(null);
+    const downloadMenuRef = useRef<HTMLDivElement>(null);
+
+    const getFileById = useCallback((fileId: string) => imageFiles.find(item => item.id === fileId) ?? null, [imageFiles]);
+
+    const getContextTargetIds = useCallback((clickedId: string) => {
+        if (selectedIds.size > 1 && selectedIds.has(clickedId)) {
+            return imageFiles.filter(item => selectedIds.has(item.id)).map(item => item.id);
+        }
+        return [clickedId];
+    }, [imageFiles, selectedIds]);
+
+    const openThumbnailContextMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>, file: DriveFile) => {
+        event.preventDefault();
+        const MENU_WIDTH = 240;
+        const MENU_HEIGHT = 206;
+        const PADDING = 12;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const preferredLeft = rect.right + 12;
+        const preferredTop = rect.top + rect.height / 2 - MENU_HEIGHT / 2;
+        const left = Math.max(PADDING, Math.min(preferredLeft, window.innerWidth - MENU_WIDTH - PADDING));
+        const top = Math.max(PADDING, Math.min(preferredTop, window.innerHeight - MENU_HEIGHT - PADDING));
+
+        setThumbnailContextMenu({
+            x: left,
+            y: top,
+            file,
+            targetIds: getContextTargetIds(file.id),
+        });
+    }, [getContextTargetIds]);
+
+    useEffect(() => {
+        if (!downloadMenuOpen) return;
+
+        function handlePointerDown(event: MouseEvent) {
+            if (!downloadMenuRef.current?.contains(event.target as Node)) {
+                setDownloadMenuOpen(false);
+            }
+        }
+
+        window.addEventListener('mousedown', handlePointerDown);
+        return () => window.removeEventListener('mousedown', handlePointerDown);
+    }, [downloadMenuOpen]);
 
     // Presentation mode state
     const [presentationMode, setPresentationMode] = useState(false);
@@ -708,6 +812,58 @@ export default function PhotoStudioModal({
         }
         setActiveFile(newFile);
         setImageUrl(`/api/drive/file/${newFile.id}`);
+    }
+
+    function clearMultiSelection() {
+        setSelectedIds(new Set());
+        setSelectionAnchorId(null);
+        setMultiSelectMode(false);
+    }
+
+    function handleThumbnailSelect(file: DriveFile, e: React.MouseEvent<HTMLButtonElement>) {
+        const wantsMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey || multiSelectMode;
+
+        if (!wantsMultiSelect) {
+            clearMultiSelection();
+            setCanvasActive(false);
+            handleSwitchFile(file);
+            setSelectionAnchorId(file.id);
+            return;
+        }
+
+        setMultiSelectMode(true);
+        setCanvasActive(false);
+
+        if (e.shiftKey && selectionAnchorId) {
+            const anchorIdx = imageFiles.findIndex(item => item.id === selectionAnchorId);
+            const currentIdx = imageFiles.findIndex(item => item.id === file.id);
+            if (anchorIdx !== -1 && currentIdx !== -1) {
+                const start = Math.min(anchorIdx, currentIdx);
+                const end = Math.max(anchorIdx, currentIdx);
+                const rangeIds = imageFiles.slice(start, end + 1).map(item => item.id);
+                setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    rangeIds.forEach(id => next.add(id));
+                    return next;
+                });
+                return;
+            }
+        }
+
+        setSelectionAnchorId(file.id);
+        let nextSize = 0;
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (e.metaKey || e.ctrlKey || multiSelectMode) {
+                if (next.has(file.id)) next.delete(file.id);
+                else next.add(file.id);
+            } else {
+                next.add(file.id);
+            }
+            nextSize = next.size;
+            return next;
+        });
+        if (nextSize === 0) setMultiSelectMode(false);
     }
 
     function handleMouseDown(e: React.MouseEvent) {
@@ -1216,15 +1372,27 @@ export default function PhotoStudioModal({
         if (!canvasActive) return;
         const canvas = canvasLayersRef.current;
         if (!canvas || !canvas.clientWidth) return;
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
+
+        // Render at export resolution (1080 base) so photos look sharp, then
+        // CSS scales it down to the display container size.
+        const r = CANVAS_RATIOS.find(rv => rv.value === canvasRatio)!;
+        const shorter = Math.min(r.w, r.h);
+        const renderW = Math.round(1080 * r.w / shorter);
+        const renderH = Math.round(1080 * r.h / shorter);
+        const cssW = canvas.clientWidth;
+        const cssH = canvas.clientHeight;
+        canvas.width = renderW;
+        canvas.height = renderH;
+        canvas.style.width = `${cssW}px`;
+        canvas.style.height = `${cssH}px`;
+
+        // Draw in render-space (renderW × renderH), using normalized layer coords
         const ctx = canvas.getContext('2d')!;
-        const W = canvas.width, H = canvas.height;
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillRect(0, 0, renderW, renderH);
         for (const layer of canvasLayers) {
-            const px = layer.x * W, py = layer.y * H;
-            const pw = layer.w * W, ph = layer.h * H;
+            const px = layer.x * renderW, py = layer.y * renderH;
+            const pw = layer.w * renderW, ph = layer.h * renderH;
             ctx.save();
             ctx.filter = `brightness(${layer.brightness ?? 100}%)`;
             ctx.translate(px, py);
@@ -1232,14 +1400,16 @@ export default function PhotoStudioModal({
             ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
             ctx.restore();
         }
+
+        // Selection handles — drawn in render-space coords
         if (canvasSelectedId) {
             const sel = canvasLayers.find(l => l.id === canvasSelectedId);
             if (sel) {
-                const corners = getLayerCorners(sel, W, H);
+                const corners = getLayerCorners(sel, renderW, renderH);
                 ctx.save();
                 ctx.strokeStyle = '#C9A96E';
-                ctx.lineWidth = 1.5;
-                ctx.setLineDash([4, 3]);
+                ctx.lineWidth = 3;
+                ctx.setLineDash([8, 6]);
                 ctx.beginPath();
                 corners.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
                 ctx.closePath();
@@ -1248,14 +1418,14 @@ export default function PhotoStudioModal({
                 corners.forEach(([x, y]) => {
                     ctx.fillStyle = '#C9A96E';
                     ctx.strokeStyle = '#0D0D12';
-                    ctx.lineWidth = 1;
-                    ctx.fillRect(x - 4, y - 4, 8, 8);
-                    ctx.strokeRect(x - 4, y - 4, 8, 8);
+                    ctx.lineWidth = 2;
+                    ctx.fillRect(x - 8, y - 8, 16, 16);
+                    ctx.strokeRect(x - 8, y - 8, 16, 16);
                 });
                 ctx.restore();
             }
         }
-    }, [canvasActive, canvasLayers, canvasSelectedId]);
+    }, [canvasActive, canvasLayers, canvasSelectedId, canvasRatio]);
 
     // ── Canvas layer interaction ──────────────────────────────────────────────
     function getCanvasLayerNorm(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
@@ -1298,8 +1468,8 @@ export default function PhotoStudioModal({
             if (l.id !== layerId) return l;
             if (mode === 'move') return {
                 ...l,
-                x: Math.max(l.w / 2, Math.min(1 - l.w / 2, origLayer.x + dx)),
-                y: Math.max(l.h / 2, Math.min(1 - l.h / 2, origLayer.y + dy)),
+                x: origLayer.x + dx,
+                y: origLayer.y + dy,
             };
             if (mode === 'rotate') {
                 const angle = Math.atan2(ny - origLayer.y, nx - origLayer.x) - Math.atan2(startY - origLayer.y, startX - origLayer.x);
@@ -1312,6 +1482,58 @@ export default function PhotoStudioModal({
     }
 
     function handleCanvasLayerPointerUp() { canvasLayerDragRef.current = null; }
+
+    function handleCanvasLayerDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / rect.width;
+        const ny = (e.clientY - rect.top) / rect.height;
+        const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
+        for (let i = canvasLayers.length - 1; i >= 0; i--) {
+            if (hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) {
+                setCanvasLayerCropId(canvasLayers[i].id);
+                setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+                setCanvasLayerCompletedCrop(null);
+                setCanvasSelectedId(null);
+                return;
+            }
+        }
+    }
+
+    const handleConfirmCanvasLayerCrop = useCallback(async () => {
+        if (!canvasLayerCropId) return;
+        const layer = canvasLayers.find(l => l.id === canvasLayerCropId);
+        if (!layer || !canvasLayerCropImgRef.current) { setCanvasLayerCropId(null); return; }
+        if (!canvasLayerCompletedCrop || canvasLayerCompletedCrop.width === 0) {
+            toast.error('Dibujá el área de recorte primero');
+            return;
+        }
+        const img = canvasLayerCropImgRef.current;
+        const scaleX = img.naturalWidth / (img.width || 1);
+        const scaleY = img.naturalHeight / (img.height || 1);
+        const srcX = Math.round(canvasLayerCompletedCrop.x * scaleX);
+        const srcY = Math.round(canvasLayerCompletedCrop.y * scaleY);
+        const srcW = Math.round(canvasLayerCompletedCrop.width * scaleX);
+        const srcH = Math.round(canvasLayerCompletedCrop.height * scaleY);
+        const cc = document.createElement('canvas');
+        cc.width = srcW; cc.height = srcH;
+        cc.getContext('2d')!.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+        try {
+            const blob = await new Promise<Blob>((res, rej) =>
+                cc.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/jpeg', 0.95)
+            );
+            const newUrl = URL.createObjectURL(blob);
+            const newImg = await loadCanvasImage(newUrl);
+            setCanvasLayers(prev => prev.map(l => {
+                if (l.id !== canvasLayerCropId) return l;
+                const newAspect = srcW / (srcH || 1);
+                return { ...l, src: newUrl, img: newImg, h: l.w / newAspect };
+            }));
+            setCanvasLayerCropId(null);
+        } catch {
+            toast.error('No se pudo aplicar el recorte');
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canvasLayerCropId, canvasLayers, canvasLayerCompletedCrop]);
 
     async function handleCanvasLayerDrop(e: React.DragEvent<HTMLCanvasElement>) {
         e.preventDefault();
@@ -1355,6 +1577,10 @@ export default function PhotoStudioModal({
         setCanvasActive(true);
         setHasCanvas(true);
         setCanvasLayers([]);
+        // Reset zoom/pan so the canvas background can't be accidentally panned
+        setZoom(1);
+        setPanX(0);
+        setPanY(0);
         setCanvasSelectedId(null);
         // Reset editor-specific state
         setDrawMode('idle');
@@ -1376,6 +1602,55 @@ export default function PhotoStudioModal({
         }
         setDuplicatingId(null);
         setThumbnailContextMenu(null);
+    }
+
+    function getDefaultTargetIds() {
+        if (selectedIds.size > 0) {
+            return imageFiles.filter(item => selectedIds.has(item.id)).map(item => item.id);
+        }
+        return activeFile ? [activeFile.id] : [];
+    }
+
+    async function fetchOriginalAsFile(targetFile: DriveFile) {
+        const response = await fetch(`/api/drive/file/${targetFile.id}`);
+        const blob = await response.blob();
+        return new File([blob], targetFile.name, { type: blob.type || targetFile.mimeType || 'image/jpeg' });
+    }
+
+    async function exportVisibleFiles(targetIds: string[]): Promise<ShareWithPatientItem[]> {
+        const items: ShareWithPatientItem[] = [];
+        for (const targetId of targetIds) {
+            const targetFile = getFileById(targetId);
+            if (!targetFile) continue;
+
+            if (targetFile.id === activeFile?.id) {
+                if (!isDirty && !canvasActive) {
+                    items.push({
+                        id: targetFile.id,
+                        name: targetFile.name,
+                        driveFileId: targetFile.id,
+                    });
+                    continue;
+                }
+                const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
+                const baseName = targetFile.name.replace(/\.[^.]+$/, '');
+                const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+                items.push({
+                    id: targetFile.id,
+                    name: `${baseName}.${ext}`,
+                    file: new File([blob], `${baseName}.${ext}`, { type: blob.type }),
+                });
+                continue;
+            }
+
+            items.push({
+                id: targetFile.id,
+                name: targetFile.name,
+                driveFileId: targetFile.id,
+                file: await fetchOriginalAsFile(targetFile),
+            });
+        }
+        return items;
     }
 
     async function exportCanvasToBlob(): Promise<Blob> {
@@ -1425,8 +1700,8 @@ export default function PhotoStudioModal({
         setCanvasRatio(newRatio);
         setCanvasLayers(prev => prev.map(l => ({
             ...l,
-            x: Math.max(l.w / 2, Math.min(1 - l.w / 2, l.x * oldR.w / newR.w)),
-            y: Math.max(l.h / 2, Math.min(1 - l.h / 2, l.y * oldR.h / newR.h)),
+            x: l.x * oldR.w / newR.w,
+            y: l.y * oldR.h / newR.h,
         })));
     }
 
@@ -2218,12 +2493,16 @@ export default function PhotoStudioModal({
 
     async function handleConfirmCrop() {
         if (!completedCrop || completedCrop.width === 0) {
-            // Nothing selected — restore previous if re-crop, just exit
-            if (prevCroppedUrlRef.current) {
-                setImageUrl(prevCroppedUrlRef.current);
-                objectUrlRef.current = prevCroppedUrlRef.current.startsWith('blob:') ? prevCroppedUrlRef.current : null;
-                prevCroppedUrlRef.current = null;
+            // If there's an active crop mode but no selection drawn, warn the user
+            // instead of silently exiting (which looks like the crop was applied)
+            if (!prevCroppedUrlRef.current) {
+                toast.error('Dibujá el área de recorte antes de confirmar');
+                return;
             }
+            // Re-crop cancelled with no new selection → restore previous crop
+            setImageUrl(prevCroppedUrlRef.current);
+            objectUrlRef.current = prevCroppedUrlRef.current.startsWith('blob:') ? prevCroppedUrlRef.current : null;
+            prevCroppedUrlRef.current = null;
             setCropActive(false);
             return;
         }
@@ -2307,6 +2586,160 @@ export default function PhotoStudioModal({
         });
     }
 
+    async function handleShare(targetIds = getDefaultTargetIds()) {
+        if (targetIds.length === 0) return;
+        try {
+            setThumbnailContextMenu(null);
+            const exportableFiles = await exportVisibleFiles(targetIds);
+            const files = exportableFiles.map(item => item.file).filter((file): file is File => Boolean(file));
+            if (files.length === 0) return;
+            if (navigator.canShare?.({ files })) {
+                await navigator.share({
+                    files,
+                    title: files.length === 1 ? files[0].name.replace(/\.[^.]+$/, '') : `${files.length} fotos`,
+                });
+            } else {
+                files.forEach((file) => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(file);
+                    a.download = file.name;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                });
+                toast.info(files.length === 1 ? 'Tu browser no soporta AirDrop — se descargó el archivo' : `Tu browser no soporta AirDrop — se descargaron ${files.length} archivos`);
+            }
+        } catch (err) {
+            if (err instanceof Error && err.name !== 'AbortError') {
+                toast.error('No se pudo compartir la imagen');
+            }
+        }
+    }
+
+    async function handleShareWithPatient(targetIds = getDefaultTargetIds()) {
+        if (targetIds.length === 0) return;
+        try {
+            const items = await exportVisibleFiles(targetIds);
+            if (items.length === 0) return;
+            setSharePatientItems(items);
+            setThumbnailContextMenu(null);
+        } catch {
+            toast.error('No se pudieron preparar las fotos para compartir con el paciente');
+        }
+    }
+
+    async function downloadBlob(blob: Blob, fileName: string) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+
+    async function handleDownloadOriginal() {
+        if (!activeFile) return;
+        try {
+            const response = await fetch(`/api/drive/file/${activeFile.id}`);
+            const blob = await response.blob();
+            await downloadBlob(blob, activeFile.name);
+            setDownloadMenuOpen(false);
+        } catch {
+            toast.error('No se pudo descargar la foto original');
+        }
+    }
+
+    async function handleDownloadWebp() {
+        if (!activeFile) return;
+        try {
+            const sourceBlob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
+            const webpBlob = await convertBlobToWebp(sourceBlob);
+
+            const baseName = activeFile.name.replace(/\.[^.]+$/, '');
+            await downloadBlob(webpBlob, `${baseName}_web.webp`);
+            setDownloadMenuOpen(false);
+        } catch {
+            toast.error('No se pudo generar la versión WebP');
+        }
+    }
+
+    async function convertBlobToWebp(sourceBlob: Blob) {
+        const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const url = URL.createObjectURL(sourceBlob);
+            const img = new Image();
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve(img);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('No se pudo preparar la imagen WebP'));
+            };
+            img.src = url;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('No se pudo crear el canvas WebP');
+        ctx.drawImage(image, 0, 0);
+
+        return new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('No se pudo generar la versión WebP'));
+            }, 'image/webp', 0.72);
+        });
+    }
+
+    async function handleDownloadBatchWebp() {
+        const targetIds = getDefaultTargetIds();
+        if (targetIds.length === 0) return;
+
+        try {
+            const exportableFiles = await exportVisibleFiles(targetIds);
+            for (const item of exportableFiles) {
+                let sourceBlob: Blob;
+                if (item.file) {
+                    sourceBlob = item.file;
+                } else if (item.driveFileId) {
+                    const response = await fetch(`/api/drive/file/${item.driveFileId}`);
+                    sourceBlob = await response.blob();
+                } else {
+                    continue;
+                }
+
+                const webpBlob = await convertBlobToWebp(sourceBlob);
+                const baseName = item.name.replace(/\.[^.]+$/, '');
+                await downloadBlob(webpBlob, `${baseName}_web.webp`);
+            }
+            setDownloadMenuOpen(false);
+            toast.success(`${targetIds.length} archivo${targetIds.length > 1 ? 's' : ''} WebP descargado${targetIds.length > 1 ? 's' : ''}`);
+        } catch {
+            toast.error('No se pudo descargar el lote en WebP');
+        }
+    }
+
+    async function handleThumbnailReorder(fromId: string, toId: string, edge: 'top' | 'bottom' = 'top') {
+        if (fromId === toId) return;
+        const fromIndex = imageOrderIds.indexOf(fromId);
+        const toIndex = imageOrderIds.indexOf(toId);
+        if (fromIndex === -1 || toIndex === -1) return;
+
+        const nextOrder = [...imageOrderIds];
+        const [moved] = nextOrder.splice(fromIndex, 1);
+        const targetIndex = nextOrder.indexOf(toId);
+        const insertionIndex = edge === 'bottom' ? targetIndex + 1 : targetIndex;
+        nextOrder.splice(insertionIndex, 0, moved);
+        setImageOrderIds(nextOrder);
+        setThumbnailDragId(null);
+        setThumbnailDropIndicator(null);
+
+        if (folderId) {
+            const result = await saveFotosOrderAction(patientId, folderId, nextOrder);
+            if (result.error) toast.error(result.error);
+        }
+    }
+
     async function handleWebDownload() {
         const files = imageFiles.filter(f => selectedIds.has(f.id));
         if (files.length === 0) return;
@@ -2357,7 +2790,7 @@ export default function PhotoStudioModal({
         if (!activeFile) return;
         setSaving(mode);
         try {
-            const blob = await exportToBlob();
+            const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
             const isPng = blob.type === 'image/png';
             const ext = isPng ? 'png' : 'jpg';
             const baseName = activeFile.name.replace(/\.[^.]+$/, '');
@@ -2501,19 +2934,68 @@ export default function PhotoStudioModal({
                         )}
                         {canSave && (
                             <button
-                                onClick={() => setSaveDialogOpen(true)}
+                                onClick={() => {
+                                    if (cropActive) {
+                                        toast.error('Confirmá o cancelá el recorte antes de guardar');
+                                        return;
+                                    }
+                                    setSaveDialogOpen(true);
+                                }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#b8924e] transition-colors"
                             >
                                 <Save size={14} />
                                 <span className="hidden sm:inline">Guardar en Drive</span>
                             </button>
                         )}
+                        <div ref={downloadMenuRef} className="relative">
+                            <button
+                                onClick={() => setDownloadMenuOpen(prev => !prev)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
+                            >
+                                <Download size={14} />
+                                <span className="hidden sm:inline">Descargar</span>
+                            </button>
+                            {downloadMenuOpen && (
+                                <div className="absolute right-0 top-full mt-2 z-20 w-52 rounded-xl border border-white/15 bg-[#1A1A24] p-1.5 shadow-xl">
+                                    <button
+                                        onClick={handleDownloadOriginal}
+                                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                    >
+                                        Descargar original
+                                    </button>
+                                    <button
+                                        onClick={handleDownloadWebp}
+                                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                    >
+                                        Descargar WebP comprimida
+                                    </button>
+                                    {getDefaultTargetIds().length > 1 && (
+                                        <button
+                                            onClick={handleDownloadBatchWebp}
+                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                        >
+                                            Descargar lote WebP ({getDefaultTargetIds().length})
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setDownloadMenuOpen(false);
+                                            handleDownload();
+                                        }}
+                                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                    >
+                                        Descargar editada
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         <button
-                            onClick={handleDownload}
+                            onClick={() => handleShare()}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
+                            title="Compartir / AirDrop"
                         >
-                            <Download size={14} />
-                            <span className="hidden sm:inline">Descargar</span>
+                            <Globe2 size={14} />
+                            <span className="hidden sm:inline">Compartir</span>
                         </button>
                     </div>
                 </div>
@@ -2525,7 +3007,10 @@ export default function PhotoStudioModal({
                     <div className="hidden md:flex flex-col w-[72px] border-r border-white/10 flex-shrink-0 bg-black/20">
                         {imageFiles.length > 1 && (
                             <button
-                                onClick={() => { setMultiSelectMode(v => !v); if (multiSelectMode) setSelectedIds(new Set()); }}
+                                onClick={() => {
+                                    if (multiSelectMode) clearMultiSelection();
+                                    else setMultiSelectMode(true);
+                                }}
                                 title={multiSelectMode ? 'Cancelar selección' : 'Seleccionar varias fotos'}
                                 className={`flex-shrink-0 flex items-center justify-center h-8 border-b border-white/10 transition-colors ${
                                     multiSelectMode ? 'bg-[#C9A96E]/20 text-[#C9A96E]' : 'text-white/30 hover:text-white/60'
@@ -2534,43 +3019,64 @@ export default function PhotoStudioModal({
                                 <CheckSquare2 size={14} />
                             </button>
                         )}
+                        {selectedIds.size > 1 && (
+                            <div className="flex items-center justify-center h-7 border-b border-white/10 text-[10px] font-semibold tracking-wide text-[#C9A96E] bg-[#C9A96E]/10">
+                                {selectedIds.size} seleccionadas
+                            </div>
+                        )}
                         <div className="flex flex-col gap-1 p-1 overflow-y-auto flex-1 thin-scrollbar">
                             {imageFiles.map(f => {
                                 const isSelected = selectedIds.has(f.id);
                                 const isDuplicating = duplicatingId === f.id;
+                                const showDropTop = thumbnailDropIndicator?.id === f.id && thumbnailDropIndicator.edge === 'top';
+                                const showDropBottom = thumbnailDropIndicator?.id === f.id && thumbnailDropIndicator.edge === 'bottom';
                                 return (
                                     <button
                                         key={f.id}
-                                        draggable={canvasActive}
-                                        onContextMenu={(e) => {
-                                            e.preventDefault();
-                                            setThumbnailContextMenu({ x: e.clientX, y: e.clientY, file: f });
-                                        }}
-                                        onDragStart={canvasActive ? (e) => {
-                                            e.dataTransfer.setData('driveFileId', f.id);
-                                            e.dataTransfer.effectAllowed = 'copy';
-                                        } : undefined}
-                                        onClick={() => {
-                                            if (multiSelectMode) {
-                                                setSelectedIds(prev => {
-                                                    const next = new Set(prev);
-                                                    if (next.has(f.id)) next.delete(f.id); else next.add(f.id);
-                                                    return next;
-                                                });
-                                            } else {
-                                                setCanvasActive(false);
-                                                handleSwitchFile(f);
+                                        draggable
+                                        onContextMenu={(e) => openThumbnailContextMenu(e, f)}
+                                        onDragStart={(e) => {
+                                            if (canvasActive) {
+                                                e.dataTransfer.setData('driveFileId', f.id);
+                                                e.dataTransfer.effectAllowed = 'copy';
+                                                return;
                                             }
+                                            setThumbnailDragId(f.id);
+                                            e.dataTransfer.effectAllowed = 'move';
+                                            e.dataTransfer.setData('thumbnailReorderId', f.id);
                                         }}
+                                        onDragOver={(e) => {
+                                            if (canvasActive) return;
+                                            e.preventDefault();
+                                            e.dataTransfer.dropEffect = 'move';
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const edge = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
+                                            setThumbnailDropIndicator({ id: f.id, edge });
+                                        }}
+                                        onDrop={(e) => {
+                                            if (canvasActive) return;
+                                            e.preventDefault();
+                                            const draggedId = e.dataTransfer.getData('thumbnailReorderId') || thumbnailDragId;
+                                            if (!draggedId) return;
+                                            void handleThumbnailReorder(draggedId, f.id, thumbnailDropIndicator?.id === f.id ? thumbnailDropIndicator.edge : 'top');
+                                        }}
+                                        onDragLeave={() => {
+                                            setThumbnailDropIndicator((prev) => prev?.id === f.id ? null : prev);
+                                        }}
+                                        onDragEnd={() => {
+                                            setThumbnailDragId(null);
+                                            setThumbnailDropIndicator(null);
+                                        }}
+                                        onClick={(e) => handleThumbnailSelect(f, e)}
                                         className={`relative aspect-square rounded-md overflow-hidden flex-shrink-0 border-2 transition-all ${
-                                            canvasActive ? 'cursor-grab active:cursor-grabbing' : ''
+                                            canvasActive ? 'cursor-grab active:cursor-grabbing' : 'cursor-grab active:cursor-grabbing'
                                         } ${
-                                            multiSelectMode && isSelected
+                                            isSelected
                                                 ? 'border-[#C9A96E]'
-                                                : !multiSelectMode && !canvasActive && f.id === activeFile?.id
+                                                : !canvasActive && f.id === activeFile?.id
                                                     ? 'border-[#C9A96E]'
                                                     : 'border-transparent hover:border-white/30'
-                                        }`}
+                                        } ${thumbnailDragId === f.id ? 'opacity-60 scale-95' : ''}`}
                                     >
                                         {f.thumbnailLink ? (
                                             <img src={f.thumbnailLink} alt={f.name} referrerPolicy="no-referrer" className={`w-full h-full object-cover ${isDuplicating ? 'opacity-30' : ''}`} />
@@ -2584,11 +3090,13 @@ export default function PhotoStudioModal({
                                                 <Loader2 size={16} className="text-[#C9A96E] animate-spin" />
                                             </div>
                                         )}
-                                        {multiSelectMode && isSelected && (
+                                        {isSelected && (
                                             <div className="absolute inset-0 flex items-center justify-center bg-[#C9A96E]/30">
                                                 <Check size={16} className="text-white drop-shadow" />
                                             </div>
                                         )}
+                                        {showDropTop && <div className="absolute -top-0.5 left-1 right-1 h-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
+                                        {showDropBottom && <div className="absolute -bottom-0.5 left-1 right-1 h-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
                                     </button>
                                 );
                             })}
@@ -2598,7 +3106,7 @@ export default function PhotoStudioModal({
                                 <button
                                     onClick={() => {
                                         setCanvasActive(true);
-                                        setMultiSelectMode(false);
+                                        clearMultiSelection();
                                     }}
                                     className={`relative aspect-square rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all flex flex-col items-center justify-center p-1 ${
                                         canvasActive 
@@ -2623,15 +3131,15 @@ export default function PhotoStudioModal({
                     <div
                         ref={canvasContainerRef}
                         className={`relative flex-1 flex items-center justify-center overflow-hidden p-4 ${canvasBg}`}
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                        onDoubleClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
-                        style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+                        onMouseDown={canvasActive ? undefined : handleMouseDown}
+                        onMouseMove={canvasActive ? undefined : handleMouseMove}
+                        onMouseUp={canvasActive ? undefined : handleMouseUp}
+                        onMouseLeave={canvasActive ? undefined : handleMouseUp}
+                        onTouchStart={canvasActive ? undefined : handleTouchStart}
+                        onTouchMove={canvasActive ? undefined : handleTouchMove}
+                        onTouchEnd={canvasActive ? undefined : handleTouchEnd}
+                        onDoubleClick={canvasActive ? undefined : () => { setZoom(1); setPanX(0); setPanY(0); }}
+                        style={{ cursor: (!canvasActive && zoom > 1) ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                     >
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
                         <div style={{ transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.05s ease-out' }}>
@@ -2662,6 +3170,7 @@ export default function PhotoStudioModal({
                             ) : (
                                 <div className="relative inline-block">
                                     {canvasActive ? (
+                                        <>
                                         <canvas
                                             ref={canvasLayersRef}
                                             style={getCanvasRatioStyle()}
@@ -2669,10 +3178,53 @@ export default function PhotoStudioModal({
                                             onPointerMove={handleCanvasLayerPointerMove}
                                             onPointerUp={handleCanvasLayerPointerUp}
                                             onPointerLeave={handleCanvasLayerPointerUp}
+                                            onDoubleClick={handleCanvasLayerDoubleClick}
                                             onDragOver={e => e.preventDefault()}
                                             onDrop={handleCanvasLayerDrop}
                                             onContextMenu={handleCanvasLayerContextMenu}
                                         />
+                                        {/* Layer crop overlay — activado con doble clic */}
+                                        {canvasLayerCropId && (() => {
+                                            const layer = canvasLayers.find(l => l.id === canvasLayerCropId);
+                                            if (!layer) return null;
+                                            return (
+                                                <div className="absolute inset-0 bg-black/85 flex flex-col z-20 rounded-lg overflow-hidden">
+                                                    <div className="flex items-center justify-between px-3 py-2 bg-black/60 border-b border-white/10 shrink-0">
+                                                        <span className="text-white/70 text-xs">Recortá la foto — doble clic activó modo edición</span>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={handleConfirmCanvasLayerCrop}
+                                                                className="flex items-center gap-1 px-3 py-1 rounded-md text-xs bg-blue-600 text-white font-medium hover:bg-blue-500 transition-colors"
+                                                            >
+                                                                <Check size={12} /> Aplicar
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setCanvasLayerCropId(null)}
+                                                                className="flex items-center gap-1 px-3 py-1 rounded-md text-xs bg-white/10 text-white/60 hover:bg-white/20 transition-colors"
+                                                            >
+                                                                <X size={12} /> Cancelar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+                                                        <ReactCrop
+                                                            crop={canvasLayerCropSel}
+                                                            onChange={c => setCanvasLayerCropSel(c)}
+                                                            onComplete={c => setCanvasLayerCompletedCrop(c)}
+                                                        >
+                                                            <img
+                                                                ref={canvasLayerCropImgRef}
+                                                                src={layer.src}
+                                                                alt="recorte"
+                                                                style={{ maxWidth: '100%', maxHeight: 'calc(70vh - 80px)', display: 'block' }}
+                                                                crossOrigin="anonymous"
+                                                            />
+                                                        </ReactCrop>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                        </>
                                     ) : (
                                     <img
                                         ref={imgRef}
@@ -2845,6 +3397,7 @@ export default function PhotoStudioModal({
                                 setImageUrl(`/api/drive/file/${activeFile.id}`);
                             }}
                             onUndo={handleUndo}
+                            onPushHistory={pushHistory}
                             historyCount={history.length}
                             showGrid={showGrid}
                             setShowGrid={setShowGrid}
@@ -3038,38 +3591,68 @@ export default function PhotoStudioModal({
                                 initial={{ y: 40, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
                                 exit={{ y: 40, opacity: 0 }}
-                                onClick={e => e.stopPropagation()}
+                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
                                 className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm"
                             >
-                                <h3 className="text-white font-semibold mb-1">Guardar en Drive</h3>
-                                <p className="text-white/50 text-sm mb-5">
-                                    ¿Reemplazás la foto original o guardás una copia?
-                                </p>
-                                <div className="flex flex-col gap-3">
-                                    <button
-                                        onClick={() => handleSaveToDrive('replace')}
-                                        disabled={!!saving}
-                                        className="w-full py-3 rounded-xl bg-red-600/80 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
-                                        Reemplazar original
-                                    </button>
-                                    <button
-                                        onClick={() => handleSaveToDrive('copy')}
-                                        disabled={!!saving}
-                                        className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                        Guardar como copia
-                                    </button>
-                                    <button
-                                        onClick={() => setSaveDialogOpen(false)}
-                                        disabled={!!saving}
-                                        className="w-full py-2 rounded-xl text-white/50 text-sm hover:text-white/70 transition-colors"
-                                    >
-                                        Cancelar
-                                    </button>
-                                </div>
+                                {canvasActive ? (
+                                    // Canvas mode: always a new file, no "replace original" option
+                                    <>
+                                        <h3 className="text-white font-semibold mb-1">Guardar lienzo</h3>
+                                        <p className="text-white/50 text-sm mb-5">
+                                            Se guardará como una nueva foto en la carpeta del paciente.
+                                        </p>
+                                        <div className="flex flex-col gap-3">
+                                            <button
+                                                onClick={() => handleSaveToDrive('copy')}
+                                                disabled={!!saving}
+                                                className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                            >
+                                                {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                                Guardar lienzo
+                                            </button>
+                                            <button
+                                                onClick={() => setSaveDialogOpen(false)}
+                                                disabled={!!saving}
+                                                className="w-full py-2 rounded-xl text-white/50 text-sm hover:text-white/70 transition-colors"
+                                            >
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    // Normal photo edit mode: offer replace or copy
+                                    <>
+                                        <h3 className="text-white font-semibold mb-1">Guardar en Drive</h3>
+                                        <p className="text-white/50 text-sm mb-5">
+                                            ¿Reemplazás la foto original o guardás una copia?
+                                        </p>
+                                        <div className="flex flex-col gap-3">
+                                            <button
+                                                onClick={() => handleSaveToDrive('replace')}
+                                                disabled={!!saving}
+                                                className="w-full py-3 rounded-xl bg-red-600/80 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                            >
+                                                {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
+                                                Reemplazar original
+                                            </button>
+                                            <button
+                                                onClick={() => handleSaveToDrive('copy')}
+                                                disabled={!!saving}
+                                                className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                            >
+                                                {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                                Guardar como copia
+                                            </button>
+                                            <button
+                                                onClick={() => setSaveDialogOpen(false)}
+                                                disabled={!!saving}
+                                                className="w-full py-2 rounded-xl text-white/50 text-sm hover:text-white/70 transition-colors"
+                                            >
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </motion.div>
                         </motion.div>
                     )}
@@ -3085,7 +3668,15 @@ export default function PhotoStudioModal({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[70] bg-black flex flex-col select-none"
+                    className="fixed inset-0 z-[70] bg-black flex flex-col select-none outline-none"
+                    tabIndex={-1}
+                    // eslint-disable-next-line jsx-a11y/no-autofocus
+                    autoFocus
+                    onKeyDown={(e: React.KeyboardEvent) => {
+                        if (e.key === 'Escape') { e.stopPropagation(); setPresentationMode(false); }
+                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.stopPropagation(); setPresentationIdx(i => Math.min(i + 1, imageFiles.length - 1)); }
+                        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.stopPropagation(); setPresentationIdx(i => Math.max(i - 1, 0)); }
+                    }}
                 >
                     {/* Top bar */}
                     <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
@@ -3104,7 +3695,10 @@ export default function PhotoStudioModal({
                     </div>
 
                     {/* Main image */}
-                    <div className="flex-1 flex items-center justify-center relative">
+                    <div
+                        className="flex-1 flex items-center justify-center relative cursor-pointer"
+                        onClick={() => setPresentationIdx(i => Math.min(imageFiles.length - 1, i + 1))}
+                    >
                         <AnimatePresence mode="wait">
                             <motion.img
                                 key={imageFiles[presentationIdx]?.id}
@@ -3119,24 +3713,24 @@ export default function PhotoStudioModal({
                             />
                         </AnimatePresence>
 
-                        {/* Prev arrow */}
-                        {presentationIdx > 0 && (
-                            <button
-                                onClick={() => setPresentationIdx(i => i - 1)}
-                                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors border border-white/10"
-                            >
-                                <ChevronLeft size={26} className="text-white" />
-                            </button>
-                        )}
-                        {/* Next arrow */}
-                        {presentationIdx < imageFiles.length - 1 && (
-                            <button
-                                onClick={() => setPresentationIdx(i => i + 1)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors border border-white/10"
-                            >
-                                <ChevronRight size={26} className="text-white" />
-                            </button>
-                        )}
+                        {/* Prev — full-height zone */}
+                        <button
+                            onClick={() => setPresentationIdx(i => Math.max(0, i - 1))}
+                            disabled={presentationIdx === 0}
+                            className="absolute left-0 top-0 bottom-0 w-24 flex items-center justify-start pl-3 group transition-all disabled:opacity-0 disabled:pointer-events-none"
+                            style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.35) 0%, transparent 100%)' }}
+                        >
+                            <ChevronLeft size={52} className="text-white/60 group-hover:text-white group-hover:scale-110 transition-all drop-shadow-xl" strokeWidth={1.5} />
+                        </button>
+                        {/* Next — full-height zone */}
+                        <button
+                            onClick={() => setPresentationIdx(i => Math.min(imageFiles.length - 1, i + 1))}
+                            disabled={presentationIdx === imageFiles.length - 1}
+                            className="absolute right-0 top-0 bottom-0 w-24 flex items-center justify-end pr-3 group transition-all disabled:opacity-0 disabled:pointer-events-none"
+                            style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.35) 0%, transparent 100%)' }}
+                        >
+                            <ChevronRight size={52} className="text-white/60 group-hover:text-white group-hover:scale-110 transition-all drop-shadow-xl" strokeWidth={1.5} />
+                        </button>
                     </div>
 
                     {/* Dot indicators */}
@@ -3270,24 +3864,37 @@ export default function PhotoStudioModal({
         )}
 
         {/* ── Thumbnail Context Menu ───────────────────────────────────── */}
-        {thumbnailContextMenu && (
+        {thumbnailContextMenu && typeof document !== 'undefined' && createPortal(
             <>
-                {/* backdrop to close */}
-                <div 
-                    className="fixed inset-0 z-[90]" 
+                <div
+                    className="fixed inset-0 z-[90]"
                     onClick={() => setThumbnailContextMenu(null)}
                     onContextMenu={e => { e.preventDefault(); setThumbnailContextMenu(null); }}
                 />
-                <div 
-                    className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-xl py-1.5 min-w-[170px] backdrop-blur-md"
+                <div
+                    className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-2xl py-1.5 w-[240px] backdrop-blur-md"
                     style={{ left: thumbnailContextMenu.x, top: thumbnailContextMenu.y }}
                 >
                     <button
                         onClick={() => handleDuplicateFile(thumbnailContextMenu.file)}
-                        className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#C9A96E]/20 transition-all flex items-center gap-2.5 group"
+                        className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#C9A96E]/20 transition-all flex items-center gap-2.5 group whitespace-nowrap"
                     >
                         <Copy size={16} className="text-[#C9A96E] group-hover:scale-110 transition-transform" />
                         <span>Duplicar foto</span>
+                    </button>
+                    <button
+                        onClick={() => handleShare(thumbnailContextMenu.targetIds)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                    >
+                        <AirDropIcon size={16} className="text-sky-400 group-hover:scale-110 transition-transform" />
+                        <span>Compartir por AirDrop</span>
+                    </button>
+                    <button
+                        onClick={() => handleShareWithPatient(thumbnailContextMenu.targetIds)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                    >
+                        <MessageCircle size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span>Compartir con paciente</span>
                     </button>
                     <div className="h-px bg-white/5 my-1" />
                     <button
@@ -3297,7 +3904,17 @@ export default function PhotoStudioModal({
                         Cancelar
                     </button>
                 </div>
-            </>
+            </>,
+            document.body,
+        )}
+        {sharePatientItems && (
+            <ShareWithPatientModal
+                files={sharePatientItems}
+                folderId={folderId}
+                patientId={patientId}
+                patientName={patientName}
+                onClose={() => setSharePatientItems(null)}
+            />
         )}
         </>
     );
@@ -3324,6 +3941,7 @@ interface ToolsPanelProps {
     onSetBrushSize: (v: number) => void;
     onReset: () => void;
     onUndo: () => void;
+    onPushHistory: () => void;
     historyCount: number;
     showGrid: boolean;
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
@@ -3375,6 +3993,7 @@ function ToolsPanel({
     onSetBrushSize,
     onReset,
     onUndo,
+    onPushHistory,
     historyCount,
     showGrid, setShowGrid,
     isGridVisible,
@@ -3427,6 +4046,7 @@ function ToolsPanel({
                         <input
                             type="range" min={-180} max={180} step={0.5}
                             value={rotation}
+                            onPointerDown={() => onPushHistory()}
                             onChange={(e) => setRotation(Number(e.target.value))}
                             className="w-full accent-white/70 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer"
                         />
@@ -3437,10 +4057,7 @@ function ToolsPanel({
                         <p className="text-[10px] text-white/30 uppercase tracking-tighter font-semibold">Presets rápidos</p>
                         <div className="grid grid-cols-3 gap-1.5">
                             <button
-                                onClick={() => setRotation((r: number) => {
-                                    let n = r - 90;
-                                    return n < -180 ? n + 360 : n;
-                                })}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => { let n = r - 90; return n < -180 ? n + 360 : n; }); }}
                                 className="flex flex-col items-center gap-1 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar -90°"
                             >
@@ -3448,10 +4065,7 @@ function ToolsPanel({
                                 <span className="text-[9px] text-white/30 group-hover:text-white font-bold">-90°</span>
                             </button>
                             <button
-                                onClick={() => setRotation((r: number) => {
-                                    let n = r + 90;
-                                    return n > 180 ? n - 360 : n;
-                                })}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => { let n = r + 90; return n > 180 ? n - 360 : n; }); }}
                                 className="flex flex-col items-center gap-1 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar +90°"
                             >
@@ -3459,7 +4073,7 @@ function ToolsPanel({
                                 <span className="text-[9px] text-white/30 group-hover:text-white font-bold">+90°</span>
                             </button>
                             <button
-                                onClick={() => setRotation((r: number) => (r > 0 ? r - 180 : r + 180))}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => (r > 0 ? r - 180 : r + 180)); }}
                                 className="flex flex-col items-center gap-1 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Voltear 180°"
                             >

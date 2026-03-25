@@ -6,7 +6,7 @@
 
 ## 0. Contexto obligatorio (leer en este orden)
 
-1. `/Users/am/.claude/projects/-Users-am-Downloads-antigravity-apps-am-clinica-main/memory/MEMORY.md`
+1. `/Users/ariel/.claude/projects/-Users-am-Downloads-antigravity-apps-am-clinica-main/memory/MEMORY.md`
 2. `CLAUDE.md` (raíz del proyecto)
 3. `docs/AGENT_ROUTING.md`
 4. `docs/TASK_CONTRACT.md`

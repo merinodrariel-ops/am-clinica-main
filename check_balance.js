@@ -1,7 +1,7 @@
 
 import fs from 'fs';
 
-const content = fs.readFileSync('/Users/am/Downloads/antigravity apps/am-clinica-main/app/caja-recepcion/CajaRecepcionClient.tsx', 'utf8');
+const content = fs.readFileSync('/Users/ariel/Downloads/antigravity apps/am-clinica-main/app/caja-recepcion/CajaRecepcionClient.tsx', 'utf8');
 
 let divOpen = 0;
 let divClose = 0;

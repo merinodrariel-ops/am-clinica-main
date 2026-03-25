@@ -19,6 +19,8 @@ interface DrivePreviewModalProps {
     file: DriveFile | null;
     folderId: string;
     allFolderFiles: DriveFile[];
+    patientId: string;
+    patientName: string;
     canSave: boolean;
     onClose: () => void;
     onSaved: () => void;
@@ -41,6 +43,8 @@ export default function DrivePreviewModal({
     file,
     folderId,
     allFolderFiles,
+    patientId,
+    patientName,
     canSave,
     onClose,
     onSaved,
@@ -56,6 +60,8 @@ export default function DrivePreviewModal({
                 file={file}
                 folderId={folderId}
                 allFolderFiles={allFolderFiles}
+                patientId={patientId}
+                patientName={patientName}
                 canSave={canSave}
                 onClose={onClose}
                 onSaved={onSaved}
@@ -132,7 +138,7 @@ export default function DrivePreviewModal({
                     )}
                     {previewType === '3d' && (
                         <div className="flex-1">
-                            <STLViewer url={proxyUrl} format={get3DFormat(file)} />
+                            <STLViewer url={proxyUrl} format={get3DFormat(file)} onClose={onClose} />
                         </div>
                     )}
                 </div>

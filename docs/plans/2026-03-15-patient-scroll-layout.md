@@ -106,7 +106,7 @@ export default function PatientSection({ id, title, icon: Icon, defaultOpen = fa
 **Step 2: Verify TypeScript**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "PatientSection" | head -10
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "PatientSection" | head -10
 ```
 
 Expected: no output (no errors).
@@ -114,7 +114,7 @@ Expected: no output (no errors).
 **Step 3: Commit**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 git add components/patients/PatientSection.tsx
 git commit -m "feat(patients): PatientSection collapsible component with lazy-mount"
 ```
@@ -330,7 +330,7 @@ Fix any remaining references.
 **Step 7: TypeScript check**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "PatientDashboard\|PatientSection" | head -20
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "PatientDashboard\|PatientSection" | head -20
 ```
 
 Expected: no output.
@@ -338,7 +338,7 @@ Expected: no output.
 **Step 8: Commit**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 git add components/patients/PatientDashboard.tsx
 git commit -m "feat(patients): replace tab system with scrollable sections layout"
 ```
@@ -375,7 +375,7 @@ Both instances. Use replace_all if possible, otherwise edit each separately.
 **Step 3: TypeScript check**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "PatientList" | head -10
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "PatientList" | head -10
 ```
 
 Expected: no output.
@@ -383,7 +383,7 @@ Expected: no output.
 **Step 4: Commit**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 git add components/patients/PatientList.tsx
 git commit -m "feat(patients): navigate directly to archivos section when opening patient"
 ```
@@ -395,7 +395,7 @@ git commit -m "feat(patients): navigate directly to archivos section when openin
 **Step 1: Verify no TypeScript errors across all changed files**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "error TS" | head -20
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit 2>&1 | grep -v "\.next/" | grep "error TS" | head -20
 ```
 
 Expected: no output.
@@ -411,7 +411,7 @@ Expected: no output.
 **Step 3: Push**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main" && git push origin main
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main" && git push origin main
 ```
 
 ---

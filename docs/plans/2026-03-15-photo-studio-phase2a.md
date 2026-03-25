@@ -559,7 +559,7 @@ There are two places in `PatientDriveTab` where `DriveUploadButton` is rendered:
 ### Step 6: Run TypeScript check
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main" && npx tsc --noEmit
 ```
 
 Expected: no errors.

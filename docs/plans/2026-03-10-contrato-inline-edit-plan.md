@@ -44,7 +44,7 @@ const [totalRecibido, setTotalRecibido] = useState<string>('');
 **Step 3: Verificar que el archivo compila**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npx tsc --noEmit 2>&1 | head -40
 ```
 Esperado: errores de TypeScript sobre las referencias a los estados eliminados (eso está bien, los vamos a arreglar en las tareas siguientes).
@@ -620,7 +620,7 @@ Ir a la sección de Caja → tab Contratos/Financiación → tab "Gestión inter
 **Step 3: Commit**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 git add components/caja/ContratosFinanciacionTab.tsx docs/plans/
 git commit -m "feat(contratos): inline edit en preview, simplificacion financiera y lenguaje legal correcto"
 ```

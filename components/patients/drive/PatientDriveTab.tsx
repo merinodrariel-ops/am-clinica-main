@@ -29,6 +29,9 @@ import type { DriveFile, FolderWithFiles } from '@/app/actions/patient-files-dri
 import DriveFileCard from './DriveFileCard';
 import DrivePreviewModal from './DrivePreviewModal';
 import DriveUploadButton from './DriveUploadButton';
+import ShareWithPatientModal from './ShareWithPatientModal';
+import PhotoTagPanel from './PhotoTagPanel';
+import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo-tags';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -37,11 +40,21 @@ function SortableFileCard({
     isPortada,
     onPreview,
     onDelete,
+    onShare,
+    onShareWithPatient,
+    onShareEmail,
+    onTag,
+    photoTag,
 }: {
     file: DriveFile;
     isPortada: boolean;
     onPreview: (f: DriveFile) => void;
     onDelete?: (f: DriveFile) => void;
+    onShare?: (f: DriveFile) => void;
+    onShareWithPatient?: (f: DriveFile) => void;
+    onShareEmail?: (f: DriveFile) => void;
+    onTag?: (f: DriveFile) => void;
+    photoTag?: PhotoTag | null;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
     const style: CSSProperties = {
@@ -66,7 +79,7 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} />
+            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} />
         </div>
     );
 }
@@ -155,10 +168,40 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             return;
         }
         toast.success(`"${file.name}" eliminado`);
-        // Remove from local state immediately
         setFolders(prev => prev.map(f => ({ ...f, files: f.files.filter(fi => fi.id !== file.id) })));
         setRootFiles(prev => prev.filter(fi => fi.id !== file.id));
     }
+
+    function handleShareEmail(file: DriveFile) {
+        const subject = encodeURIComponent(`Archivo — ${file.name}`);
+        const body    = encodeURIComponent(`Te comparto este archivo de AM Clínica:\n\n${file.webViewLink}`);
+        window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+    }
+
+    async function handleShareFile(file: DriveFile) {
+        try {
+            const res = await fetch(`/api/drive/file/${file.id}`);
+            const blob = await res.blob();
+            const shareFile = new File([blob], file.name, { type: blob.type });
+            if (navigator.canShare?.({ files: [shareFile] })) {
+                await navigator.share({ files: [shareFile], title: file.name });
+            } else {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = file.name;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                toast.info('Tu browser no soporta AirDrop — se descargó el archivo');
+            }
+        } catch (err) {
+            if (err instanceof Error && err.name !== 'AbortError')
+                toast.error('No se pudo compartir');
+        }
+    }
+
+    const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
+    const [tagFile, setTagFile] = useState<DriveFile | null>(null);
+    const [photoTags, setPhotoTags] = useState<Record<string, PhotoTag>>({});
 
     const fetchFolders = useCallback(async (url: string) => {
         const folderId = extractFolderIdFromUrl(url);
@@ -199,6 +242,12 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         setOpenFolders(autoOpenIds);
         setLoadingFolders(new Set());
         setStatus('loaded');
+
+        // Load photo tags for this patient
+        const tags = await getPhotoTagsForPatientAction(patientId);
+        const tagMap: Record<string, PhotoTag> = {};
+        for (const t of tags) tagMap[t.file_id] = t;
+        setPhotoTags(tagMap);
     }, [patientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
@@ -438,8 +487,9 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const allFoldersLoaded = folders.every(f => f.loaded);
 
     return (
+        <div className="flex gap-0 items-start">
         <div
-            className="space-y-4 relative"
+            className="flex-1 min-w-0 space-y-4 relative"
             onDragEnterCapture={handleGlobalDragEnter}
             onDragOverCapture={handleGlobalDragOver}
             onDragLeaveCapture={handleGlobalDragLeave}
@@ -484,7 +534,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {rootFiles.map(file => (
-                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} onDelete={canUpload ? handleDeleteFile : undefined} />
+                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} onDelete={canUpload ? handleDeleteFile : undefined} onShare={handleShareFile} onShareWithPatient={setSharePatientFile} onShareEmail={handleShareEmail} onTag={canUpload ? setTagFile : undefined} photoTag={photoTags[file.id]} />
                         ))}
                     </div>
                 </div>
@@ -587,6 +637,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                                     isPortada={idx === 0 && file.mimeType.startsWith('image/')}
                                                                     onPreview={f => openPreview(f, folder.id)}
                                                                     onDelete={canUpload ? handleDeleteFile : undefined}
+                                                                    onShare={handleShareFile}
+                                                                    onShareWithPatient={setSharePatientFile}
+                                                                    onShareEmail={handleShareEmail}
+                                                                    onTag={canUpload ? setTagFile : undefined}
+                                                                    photoTag={photoTags[file.id]}
                                                                 />
                                                             ))}
                                                         </div>
@@ -650,10 +705,27 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 </div>
             )}
 
+            {/* Compartir con paciente */}
+            {sharePatientFile && (
+                <ShareWithPatientModal
+                    files={[{
+                        id: sharePatientFile.id,
+                        name: sharePatientFile.name,
+                        driveFileId: sharePatientFile.id,
+                    }]}
+                    folderId={previewFolderId || motherFolderId || undefined}
+                    patientId={patientId}
+                    patientName={patientName}
+                    onClose={() => setSharePatientFile(null)}
+                />
+            )}
+
             {/* Preview modal */}
             <DrivePreviewModal
                 file={previewFile}
                 folderId={previewFolderId}
+                patientId={patientId}
+                patientName={patientName}
                 canSave={canUpload}
                 allFolderFiles={
                     previewFolderId === motherFolderId
@@ -663,12 +735,29 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 }
                 onClose={() => { setPreviewFile(null); setPreviewFolderId(''); }}
                 onSaved={() => {
-                    const targetFolder = previewFolderId;
-                    setPreviewFile(null);
-                    setPreviewFolderId('');
-                    handleUploadedToFolder(targetFolder);
+                    // Refresca la carpeta pero mantiene el estudio abierto
+                    handleUploadedToFolder(previewFolderId);
                 }}
             />
+        </div>
+
+        {/* Tag panel — right sidebar */}
+        {tagFile && (
+            <PhotoTagPanel
+                file={tagFile}
+                patientId={patientId}
+                currentTag={photoTags[tagFile.id] ?? null}
+                onClose={() => setTagFile(null)}
+                onTagSaved={(tag) => {
+                    setPhotoTags(prev => {
+                        const next = { ...prev };
+                        if (tag) next[tag.file_id] = tag;
+                        else delete next[tagFile.id];
+                        return next;
+                    });
+                }}
+            />
+        )}
         </div>
     );
 }

@@ -11,7 +11,7 @@
 ANTES DE HACER CUALQUIER CAMBIO EN am-clinica-main:
 
 1) LEÉ CONTEXTO OBLIGATORIO (en este orden):
-   - /Users/am/.claude/projects/-Users-am-Downloads-antigravity-apps-am-clinica-main/memory/MEMORY.md
+   - /Users/ariel/.claude/projects/-Users-am-Downloads-antigravity-apps-am-clinica-main/memory/MEMORY.md
    - CLAUDE.md (raíz del proyecto)
    - docs/AGENT_GUARDRAILS.md
    - docs/AGENT_ROUTING.md

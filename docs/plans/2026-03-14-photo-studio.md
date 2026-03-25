@@ -66,7 +66,7 @@ export async function uploadFileToFolder(
 **Step 2: Verify TypeScript compiles**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npx tsc --noEmit 2>&1 | head -20
 ```
 Expected: no errors related to `lib/google-drive.ts`

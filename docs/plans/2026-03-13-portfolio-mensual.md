@@ -37,7 +37,7 @@
 **Step 1: Instalar paquetes**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 npm install @imgly/background-removal html2canvas jspdf react-image-crop
 npm install --save-dev @types/react-image-crop
 ```
@@ -283,7 +283,7 @@ export async function uploadPortfolioPdf(
 **Step 2: Verificar TypeScript (solo este archivo)**
 
 ```bash
-cd "/Users/am/Downloads/antigravity apps/am-clinica-main"
+cd "/Users/ariel/Downloads/antigravity apps/am-clinica-main"
 NODE_OPTIONS="--max-old-space-size=4096" npx tsc --noEmit 2>&1 | grep "portfolio" | head -20
 ```
 

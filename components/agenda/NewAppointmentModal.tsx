@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
 import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
@@ -44,6 +44,32 @@ interface NewAppointmentModalProps {
     initialDate?: Date;
 }
 
+const APPOINTMENT_TYPE_OPTIONS = [
+    { value: 'consulta', label: '⭐ Consulta de primera vez' },
+    { value: 'control', label: 'Control general' },
+    { value: 'control_carilla_inmediato', label: 'Control carilla inmediato' },
+    { value: 'control_carilla_anual', label: 'Control carilla anual' },
+    { value: 'control_ortodoncia', label: 'Control ortodoncia' },
+    { value: 'limpieza', label: 'Limpieza' },
+    { value: 'cementado', label: 'Cementado' },
+    { value: 'tallado', label: 'Tallado' },
+    { value: 'botox', label: 'Botox' },
+    { value: 'urgencia', label: 'Urgencia' },
+] as const;
+
+const TYPE_DURATIONS_MIN: Record<string, number> = {
+    consulta:  60,
+    control:   60,
+    control_carilla_inmediato: 60,
+    control_carilla_anual: 60,
+    control_ortodoncia: 60,
+    limpieza:  60,
+    urgencia:  60,
+    botox:     30,
+    cementado: 240,
+    tallado:   240,
+};
+
 export default function NewAppointmentModal({ isOpen, onClose, onSave, initialData, initialDate }: NewAppointmentModalProps) {
     const supabase = createClient();
     const [loading, setLoading] = useState(false);
@@ -58,16 +84,6 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [status, setStatus] = useState('confirmed');
     const [type, setType] = useState('consulta');
     const [notes, setNotes] = useState('');
-
-    const TYPE_DURATIONS_MIN: Record<string, number> = {
-        consulta:  60,
-        control:   60,
-        limpieza:  60,
-        urgencia:  60,
-        botox:     30,
-        cementado: 240,
-        tallado:   240,
-    };
 
     // Patient Search State
     const [searchTerm, setSearchTerm] = useState('');
@@ -86,13 +102,32 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [doctorSearch, setDoctorSearch] = useState('');
     const [showDoctorResults, setShowDoctorResults] = useState(false);
 
+    const loadDoctors = useCallback(async () => {
+        const docs = await getDoctors();
+        setDoctors(docs);
+    }, []);
+
+    const loadTarifario = useCallback(async () => {
+        try {
+            const { data } = await supabase
+                .from('tarifario_items')
+                .select(`*, tarifario_versiones!inner(estado)`)
+                .eq('tarifario_versiones.estado', 'vigente')
+                .eq('activo', true)
+                .order('concepto_nombre');
+            setTarifarioItems(data || []);
+        } catch (error) {
+            console.error('Error loading tarifario:', error);
+        }
+    }, [supabase]);
+
     // Cargar datos de soporte solo cuando abre el modal
     useEffect(() => {
         if (isOpen) {
             loadDoctors();
             loadTarifario();
         }
-    }, [isOpen]);
+    }, [isOpen, loadDoctors, loadTarifario]);
 
     // Inicializar formulario cuando cambian los datos iniciales
     useEffect(() => {
@@ -166,33 +201,23 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
-    const loadDoctors = async () => {
-        const docs = await getDoctors();
-        setDoctors(docs);
-    };
-
-    const loadTarifario = async () => {
-        try {
-            const { data } = await supabase
-                .from('tarifario_items')
-                .select(`*, tarifario_versiones!inner(estado)`)
-                .eq('tarifario_versiones.estado', 'vigente')
-                .eq('activo', true)
-                .order('concepto_nombre');
-            setTarifarioItems(data || []);
-        } catch (error) {
-            console.error('Error loading tarifario:', error);
-        }
-    };
-
     const selectTarifarioItem = (item: TarifarioItem) => {
         setTitle(item.concepto_nombre);
         setTarifarioSearch(item.concepto_nombre);
         setShowTarifarioResults(false);
-        if (item.categoria.toLowerCase().includes('cirugia')) {
+        const categoria = item.categoria.toLowerCase();
+        const concepto = item.concepto_nombre.toLowerCase();
+
+        if (categoria.includes('cirugia')) {
             setType('cirugia');
-        } else if (item.categoria.toLowerCase().includes('control')) {
-            setType('control');
+        } else if (categoria.includes('control') || concepto.includes('control')) {
+            if (concepto.includes('ortodoncia') || concepto.includes('alineador')) {
+                setType('control_ortodoncia');
+            } else if (concepto.includes('carilla') || concepto.includes('faceta') || concepto.includes('veneer')) {
+                setType('control_carilla_inmediato');
+            } else {
+                setType('control');
+            }
         } else {
             setType('tratamiento');
         }
@@ -549,13 +574,9 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     }
                                 }}
                             >
-                                <option value="consulta">⭐ Consulta de primera vez</option>
-                                <option value="control">Control</option>
-                                <option value="limpieza">Limpieza</option>
-                                <option value="cementado">Cementado</option>
-                                <option value="tallado">Tallado</option>
-                                <option value="botox">Botox</option>
-                                <option value="urgencia">Urgencia</option>
+                                {APPOINTMENT_TYPE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
                             </select>
                             {type === 'consulta' && (
                                 <p className="text-[11px] text-violet-500 font-semibold mt-1.5 pl-1">

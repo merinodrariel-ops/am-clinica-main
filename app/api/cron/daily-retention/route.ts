@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { sendNotification } from '@/lib/am-scheduler/notification-service';
 import { createRecallsFromAppointment } from '@/app/actions/recalls';
+import { EmailService } from '@/lib/email-service';
 
 export const maxDuration = 300; // 5 minutes max duration for Vercel Cron
 
@@ -20,6 +21,7 @@ export async function GET(request: Request) {
         primeraConsultaBackfill: 0,
         autoCompleted: 0,
         recallsCreated: 0,
+        scheduledMessagesSent: 0,
         errors: [] as string[]
     };
 
@@ -285,6 +287,79 @@ export async function GET(request: Request) {
             }
         } catch (err: any) {
             results.errors.push(`Auto-complete error: ${err.message || String(err)}`);
+        }
+
+        // ─── 7. Enviar mensajes programados (fotos al paciente) ─────
+        try {
+            const now = new Date();
+
+            const { data: pendingMsgs } = await supabase
+                .from('scheduled_messages')
+                .select('*')
+                .eq('status', 'pending')
+                .lte('scheduled_for', now.toISOString());
+
+            for (const msg of pendingMsgs ?? []) {
+                let sent = false;
+                let sendError = '';
+
+                try {
+                    if (msg.channel === 'whatsapp' && msg.phone) {
+                        const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+                        const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+                        const FROM_WA = process.env.TWILIO_WHATSAPP_FROM ?? 'whatsapp:+14155238886';
+
+                        if (!ACCOUNT_SID || !AUTH_TOKEN) {
+                            sendError = 'Twilio not configured';
+                        } else {
+                            const toPhone = msg.phone.startsWith('+') ? msg.phone : `+${msg.phone}`;
+                            const body = new URLSearchParams({
+                                From: FROM_WA.startsWith('whatsapp:') ? FROM_WA : `whatsapp:${FROM_WA}`,
+                                To: `whatsapp:${toPhone}`,
+                                Body: msg.message,
+                                ...(msg.media_url ? { MediaUrl: msg.media_url } : {}),
+                            });
+                            const resp = await fetch(
+                                `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}/Messages.json`,
+                                {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded',
+                                        Authorization: `Basic ${Buffer.from(`${ACCOUNT_SID}:${AUTH_TOKEN}`).toString('base64')}`,
+                                    },
+                                    body: body.toString(),
+                                }
+                            );
+                            if (resp.ok) sent = true;
+                            else sendError = `Twilio HTTP ${resp.status}`;
+                        }
+                    } else if (msg.channel === 'email' && msg.email) {
+                        const emailResult = await EmailService.send({
+                            to: msg.email,
+                            subject: 'Fotos de tu tratamiento — AM Clínica',
+                            html: `<p>${msg.message.replace(/\n/g, '<br>')}</p>${msg.media_url ? `<p><a href="${msg.media_url}">Ver foto</a></p>` : ''}`,
+                        });
+                        if (emailResult?.id) sent = true;
+                        else sendError = 'Email send failed';
+                    }
+                } catch (e: any) {
+                    sendError = e.message || String(e);
+                }
+
+                await supabase
+                    .from('scheduled_messages')
+                    .update({
+                        status: sent ? 'sent' : 'error',
+                        sent_at: sent ? now.toISOString() : null,
+                        error: sendError || null,
+                    })
+                    .eq('id', msg.id);
+
+                if (sent) results.scheduledMessagesSent++;
+                else results.errors.push(`ScheduledMsg ${msg.id}: ${sendError}`);
+            }
+        } catch (err: any) {
+            results.errors.push(`Scheduled messages error: ${err.message || String(err)}`);
         }
 
         return NextResponse.json({

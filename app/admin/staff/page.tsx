@@ -945,12 +945,12 @@ export default function StaffListPage() {
                                         draggable={isRoleColumn}
                                         onDragStart={() => isRoleColumn && onCategoryColumnDragStart(column.key)}
                                         onDragEnd={() => isRoleColumn && onCategoryColumnDragEnd()}
-                                        onDragOver={(e) => {
+                                        onDragOver={(e: DragEvent<HTMLDivElement>) => {
                                             if (!isRoleColumn) return;
                                             onCategoryColumnDragOver(e, column.key);
                                             onDragOverCategory(e, column.key);
                                         }}
-                                        onDrop={(e) => {
+                                        onDrop={(e: DragEvent<HTMLDivElement>) => {
                                             if (!isRoleColumn) return;
                                             onCategoryColumnDrop(e, column.key);
                                             onDropCategory(e, column.key);
@@ -992,7 +992,7 @@ export default function StaffListPage() {
                                                             exit={{ opacity: 0, y: 10 }}
                                                             key={worker.id}
                                                             draggable={!isUpdating && isRoleColumn}
-                                                            onDragStart={(e) => {
+                                                            onDragStart={(e: DragEvent<HTMLDivElement>) => {
                                                                 if (!isRoleColumn) return;
                                                                 e.stopPropagation();
                                                                 onDragStart(worker.id);

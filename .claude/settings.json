@@ -1,15 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C \"/Users/am/Downloads/antigravity apps/am-clinica-main\" diff components/caja/ContratosFinanciacionTab.tsx)",
-      "Bash(xargs -I {} sh -c 'grep -l \"\"CREATE TABLE.*caja_recepcion_movimientos\"\" \"\"/Users/am/Downloads/antigravity apps/am-clinica-main/supabase/migrations/{}\"\" 2>/dev/null')",
-      "Read(//Users/am/Documents/ScreenShots/**)",
+      "Bash(git -C \"/Users/ariel/Downloads/antigravity apps/am-clinica-main\" diff components/caja/ContratosFinanciacionTab.tsx)",
+      "Bash(xargs -I {} sh -c 'grep -l \"\"CREATE TABLE.*caja_recepcion_movimientos\"\" \"\"/Users/ariel/Downloads/antigravity apps/am-clinica-main/supabase/migrations/{}\"\" 2>/dev/null')",
+      "Read(//Users/ariel/Documents/ScreenShots/**)",
       "Bash(npx --yes acorn --ecma2022 --module components/caja/NuevoIngresoForm.tsx)",
       "WebFetch(domain:doc-0c-8c-sheets.googleusercontent.com)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=512\" npx next build)",
       "Bash(node --max-old-space-size=4096 node_modules/.bin/tsc --noEmit)",
       "Bash(node --max-old-space-size=4096 node_modules/.bin/next build)",
-      "Read(//Users/am/.claude/**)",
+      "Read(//Users/ariel/.claude/**)",
       "Bash(cat app/mi-clinica/*/page.tsx)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit)",
       "Bash(node --max-old-space-size=4096 ./node_modules/.bin/tsc --noEmit --skipLibCheck)",
@@ -19,9 +19,9 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=3072\" npx tsc --noEmit)"
     ],
     "additionalDirectories": [
-      "/Users/am/Downloads/antigravity apps/am-clinica-main/app/inventario/productos/[id]",
-      "/Users/am/Downloads/antigravity apps/am-clinica-main/app/api/design-review/[patientId]",
-      "/Users/am/Downloads/antigravity apps/am-clinica-main/docs/plans"
+      "/Users/ariel/Downloads/antigravity apps/am-clinica-main/app/inventario/productos/[id]",
+      "/Users/ariel/Downloads/antigravity apps/am-clinica-main/app/api/design-review/[patientId]",
+      "/Users/ariel/Downloads/antigravity apps/am-clinica-main/docs/plans"
     ]
   }
 }

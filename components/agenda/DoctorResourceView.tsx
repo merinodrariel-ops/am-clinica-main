@@ -106,6 +106,26 @@ function getStatusBadgeStyle(status: string): string {
     return map[status] ?? 'bg-blue-500';
 }
 
+function getAppointmentCardStyle(status: string, doctorColor: string) {
+    if (status === 'cancelled') {
+        return {
+            background: '#e5e7eb',
+            border: '#9ca3af',
+            text: '#374151',
+            mutedText: '#6b7280',
+            chip: 'bg-gray-600/15 text-gray-700',
+        };
+    }
+
+    return {
+        background: doctorColor,
+        border: doctorColor,
+        text: '#ffffff',
+        mutedText: 'rgba(255,255,255,0.78)',
+        chip: 'bg-white/20 text-white',
+    };
+}
+
 // ─── Time label column ────────────────────────────────────────────────────────
 
 function TimeColumn() {
@@ -203,16 +223,20 @@ function DoctorColumn({
                 const topPx = pxFromMinutes(window.visibleStart);
                 const heightPx = Math.max(SLOT_HEIGHT, (visibleDurationMins / SLOT_MINS) * SLOT_HEIGHT);
                 const isShort = heightPx <= SLOT_HEIGHT;
+                const isCancelled = apt.status === 'cancelled';
+                const style = getAppointmentCardStyle(apt.status, color);
 
                 return (
                     <div
                         key={apt.id}
-                        className="absolute left-1 right-1 rounded-lg z-10 overflow-hidden shadow-md cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all group"
+                        className={`absolute left-1 right-1 rounded-lg z-10 overflow-hidden shadow-md cursor-pointer transition-all group ${isCancelled ? 'border-2 border-dashed hover:shadow-md' : 'hover:shadow-lg hover:scale-[1.01]'}`}
                         style={{
                             top:        topPx,
                             height:     heightPx,
-                            background: color,
+                            background: style.background,
+                            borderColor: style.border,
                             minHeight:  SLOT_HEIGHT,
+                            opacity: isCancelled ? 0.94 : 1,
                         }}
                         onClick={(e) => {
                             e.stopPropagation();
@@ -223,16 +247,21 @@ function DoctorColumn({
                         <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${getStatusBadgeStyle(apt.status)}`} />
 
                         <div className="pl-2.5 pr-1.5 py-1 h-full flex flex-col justify-start overflow-hidden">
-                            <p className="text-white text-[11px] font-bold leading-tight truncate">
+                            {isCancelled && !isShort && (
+                                <span className={`mb-1 inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${style.chip}`}>
+                                    Cancelado
+                                </span>
+                            )}
+                            <p className="text-[11px] font-bold leading-tight truncate" style={{ color: style.text }}>
                                 {apt.title || apt.patient?.full_name || 'Cita'}
                             </p>
                             {!isShort && apt.patient?.full_name && apt.patient.full_name !== apt.title && (
-                                <p className="text-white/80 text-[10px] truncate leading-tight mt-0.5">
+                                <p className="text-[10px] truncate leading-tight mt-0.5" style={{ color: style.mutedText }}>
                                     {apt.patient.full_name}
                                 </p>
                             )}
                             {!isShort && (
-                                <p className="text-white/70 text-[10px] leading-tight mt-auto">
+                                <p className="text-[10px] leading-tight mt-auto" style={{ color: style.mutedText }}>
                                     {formatTime(apt.start_time)} – {formatTime(apt.end_time)}
                                 </p>
                             )}
