@@ -499,7 +499,7 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
             type: linkType,
             email: targetUser.email!,
             options: {
-                redirectTo: `${publicUrl}/auth/update-password`
+                redirectTo: `${publicUrl}/auth/callback?next=/auth/update-password`
             }
         });
 
@@ -541,8 +541,10 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
 export async function resetUserPassword(email: string) {
     try {
         // Send recovery email
+        // redirectTo must go through /auth/callback so the code is exchanged for a session
+        // before landing on the update-password page (PKCE flow requires this)
         const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-            redirectTo: `${getAppPublicUrl()}/auth/update-password`
+            redirectTo: `${getAppPublicUrl()}/auth/callback?next=/auth/update-password`
         });
 
         if (error) throw error;
