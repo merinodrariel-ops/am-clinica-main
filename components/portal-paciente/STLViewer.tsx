@@ -157,11 +157,11 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
         let mr: MediaRecorder;
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            mr = new MediaRecorder((oc as any).captureStream(30), { mimeType, videoBitsPerSecond: FMTS[fmt].bps });
+            mr = new MediaRecorder((oc as any).captureStream(), { mimeType, videoBitsPerSecond: FMTS[fmt].bps });
         } catch {
             try {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                mr = new MediaRecorder((oc as any).captureStream(30));
+                mr = new MediaRecorder((oc as any).captureStream());
             } catch (e2) {
                 sr.setPostRenderHook?.(null);
                 console.error('[3DRecord] MediaRecorder not supported:', e2);
@@ -342,8 +342,9 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                 // (compensates the typical ~15-20° upward tilt of dental PLY exports)
                 camera.position.set(0, 40, 140);
 
-                // preserveDrawingBuffer required for drawImage() to read WebGL frames
-                const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+                // preserveDrawingBuffer NOT needed — drawImage fires in the same rAF callback,
+                // before the browser compositor clears the buffer. Removing it restores GPU pipelining.
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
                 renderer.setSize(w, h);
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 renderer.shadowMap.enabled = true;
@@ -631,10 +632,20 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                  everywhere except the control bar and the draggable selection rect */}
             {loadStatus === 'ready' && mode === 'selecting' && sel.w > 0 && (
                 <div className="absolute inset-0 pointer-events-none">
-                    {/* Top control bar — pointer-events-auto so buttons are clickable */}
+                    {/* Top control bar — pointer-events-auto so buttons are clickable.
+                         Wheel forwarded so zoom works when cursor is over this bar. */}
                     <div
                         className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 bg-black/80 backdrop-blur border-b border-white/10 z-10 pointer-events-auto"
                         style={{ height: CTRL_H }}
+                        onWheel={(e) => {
+                            const canvas = sceneRef.current?.renderer?.domElement;
+                            if (!canvas) return;
+                            canvas.dispatchEvent(new WheelEvent('wheel', {
+                                deltaY: e.deltaY, deltaX: e.deltaX, deltaZ: e.deltaZ,
+                                deltaMode: e.deltaMode, ctrlKey: e.ctrlKey,
+                                bubbles: false, cancelable: true,
+                            }));
+                        }}
                     >
                         <div className="flex items-center gap-1.5">
                             {(Object.keys(FMTS) as RecordFmt[]).map(k => (
@@ -678,7 +689,8 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     <div className="absolute bg-black/55 pointer-events-none"
                         style={{ left: sel.x + sel.w, top: sel.y, right: 0, height: sel.h }} />
 
-                    {/* Draggable selection rect — pointer-events-auto so drag works */}
+                    {/* Draggable selection rect — pointer-events-auto so drag works.
+                         Wheel events are forwarded to the canvas so zoom still works. */}
                     <div
                         className="absolute cursor-move select-none pointer-events-auto"
                         style={{ left: sel.x, top: sel.y, width: sel.w, height: sel.h, touchAction: 'none' }}
@@ -686,6 +698,15 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                         onPointerMove={onSelPtrMove}
                         onPointerUp={onSelPtrUp}
                         onPointerCancel={onSelPtrUp}
+                        onWheel={(e) => {
+                            const canvas = sceneRef.current?.renderer?.domElement;
+                            if (!canvas) return;
+                            canvas.dispatchEvent(new WheelEvent('wheel', {
+                                deltaY: e.deltaY, deltaX: e.deltaX, deltaZ: e.deltaZ,
+                                deltaMode: e.deltaMode, ctrlKey: e.ctrlKey,
+                                bubbles: false, cancelable: true,
+                            }));
+                        }}
                     >
                         <div className="absolute inset-0 border border-white/60" />
                         {/* Corner brackets */}
