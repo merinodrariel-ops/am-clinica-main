@@ -992,9 +992,8 @@ export default function StaffListPage() {
                                                             exit={{ opacity: 0, y: 10 }}
                                                             key={worker.id}
                                                             draggable={!isUpdating && isRoleColumn}
-                                                            onDragStart={(e: DragEvent<HTMLDivElement>) => {
+                                                            onDragStart={(_e, _info) => {
                                                                 if (!isRoleColumn) return;
-                                                                e.stopPropagation();
                                                                 onDragStart(worker.id);
                                                             }}
                                                             onDragEnd={onDragEnd}
