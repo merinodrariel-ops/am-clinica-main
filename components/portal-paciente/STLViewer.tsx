@@ -12,6 +12,7 @@ interface VideoPreview {
     blob: Blob;
     mimeType: string;
     fmt: RecordFmt;
+    secs: number;
 }
 
 // Output dimensions per format — true 4K for post & presentation
@@ -25,7 +26,8 @@ function getOutDims(fmt: RecordFmt): { w: number; h: number; ar: number; label: 
     return FMTS[fmt];
 }
 
-const REC_SECS   = 8;
+const REC_DURATIONS = [8, 10, 12, 15] as const;
+type RecDuration = typeof REC_DURATIONS[number];
 const CTRL_H     = 52; // top control bar height in selecting mode
 
 function computeSel(cw: number, ch: number, ar: number): SelRect {
@@ -71,6 +73,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
     const [wireframe,    setWireframe]   = useState(false);
     const [isDragOver,   setIsDragOver]  = useState(false);
     const [secondModel,  setSecondModel] = useState<'none' | 'loading' | 'loaded'>('none');
+    const [recSecs,      setRecSecs]     = useState<RecDuration>(8);
 
     // ── Enter selection mode ───────────────────────────────────────────────────
     const enterSelecting = useCallback(() => {
@@ -172,7 +175,8 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
 
         chunksRef.current = [];
         mrRef.current = mr;
-        const snapFmt = fmt;
+        const snapFmt  = fmt;
+        const snapSecs = recSecs;
 
         mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         mr.onstop = () => {
@@ -181,14 +185,14 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
             const blob      = new Blob(chunksRef.current, { type: finalMime });
             const blobUrl   = URL.createObjectURL(blob);
             // Show preview — share/download triggered by user click (user gesture context)
-            setVidPreview({ url: blobUrl, blob, mimeType: finalMime, fmt: snapFmt });
+            setVidPreview({ url: blobUrl, blob, mimeType: finalMime, fmt: snapFmt, secs: snapSecs });
             setMode('idle');
             setCdown(0);
         };
 
         mr.start(100);
         setMode('recording');
-        setCdown(REC_SECS);
+        setCdown(recSecs);
 
         tickRef.current = setInterval(() => {
             setCdown(prev => {
@@ -199,8 +203,8 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
         setTimeout(() => {
             if (mrRef.current?.state === 'recording') mrRef.current.stop();
             if (tickRef.current) clearInterval(tickRef.current);
-        }, REC_SECS * 1000);
-    }, [mode, fmt, sel]);
+        }, recSecs * 1000);
+    }, [mode, fmt, sel, recSecs]);
 
     const stopRecording = useCallback(() => {
         if (mrRef.current?.state === 'recording') mrRef.current.stop();
@@ -418,33 +422,158 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     renderer.setSize(nw, nh);
                 });
                 ro.observe(container);
-                // ── Wireframe mode — shows actual polygon triangles ─────────────────────────
+                // ── Wireframe ↔ solid cinematic transition ──────────────────────────────────
+                // p = 0 → fully solid | p = 1 → fully wireframe
+                // Overlap cross-fade: solid fades out (0→0.6), wire fades in (0.4→1)
+                // On solidify (wire→solid) the material also "resolves":
+                //   roughness 1→orig, clearcoat 0→orig, etc. for dental realism
                 const origMaterials = new Map<string, any>();
                 let wireframeActive = false;
-                function setWireframeFn(on: boolean) {
-                    wireframeActive = on;
+                let wfProgress      = 0;  // current animation position
+                let wfAnimId        = 0;
+
+                function easeInOutCubic(t: number) {
+                    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+                }
+
+                function applyWFProgress(p: number) {
                     scene.traverse((obj: any) => {
-                        if (!obj.isMesh) return;
-                        if (on) {
-                            if (!origMaterials.has(obj.uuid)) origMaterials.set(obj.uuid, obj.material);
-                            const orig = obj.material;
-                            const hasVertexColors = !!obj.geometry?.attributes?.color;
-                            obj.material = new THREE.MeshBasicMaterial({
-                                wireframe: true,
-                                ...(hasVertexColors
-                                    ? { vertexColors: true }
-                                    : { color: orig.color ?? 0xF7F3EE }),
-                                opacity: 0.65,
-                                transparent: true,
-                            });
-                        } else {
-                            const orig = origMaterials.get(obj.uuid);
-                            if (orig) {
-                                if (obj.material !== orig) obj.material.dispose();
+                        if (!obj.isMesh || obj.userData._isWFGhost) return;
+                        const orig = origMaterials.get(obj.uuid);
+                        if (!orig) return;
+                        const hasVC = !!obj.geometry?.attributes?.color;
+                        const wireColor = hasVC ? null : (orig.color ?? new THREE.Color(0xF7F3EE));
+
+                        // ── Fully solid ────────────────────────────────────────────────────
+                        if (p <= 0) {
+                            if (obj.userData._wfGhost) {
+                                scene.remove(obj.userData._wfGhost);
+                                obj.userData._wfGhost.material.dispose();
+                                delete obj.userData._wfGhost;
+                            }
+                            if (obj.userData._transMat) {
+                                if (obj.material === obj.userData._transMat) obj.material = orig;
+                                obj.userData._transMat.dispose();
+                                delete obj.userData._transMat;
+                            } else if (obj.material !== orig) {
+                                obj.material.dispose();
                                 obj.material = orig;
                             }
+                            return;
+                        }
+
+                        // ── Fully wireframe ───────────────────────────────────────────────
+                        if (p >= 1) {
+                            if (obj.userData._wfGhost) {
+                                scene.remove(obj.userData._wfGhost);
+                                obj.userData._wfGhost.material.dispose();
+                                delete obj.userData._wfGhost;
+                            }
+                            if (obj.userData._transMat) {
+                                if (obj.material === obj.userData._transMat) obj.material = orig;
+                                obj.userData._transMat.dispose();
+                                delete obj.userData._transMat;
+                            }
+                            if (!obj.material.wireframe) {
+                                if (obj.material !== orig) obj.material.dispose();
+                                obj.material = new THREE.MeshBasicMaterial({
+                                    wireframe: true, transparent: true, opacity: 0.65,
+                                    ...(hasVC ? { vertexColors: true } : { color: wireColor }),
+                                });
+                            }
+                            return;
+                        }
+
+                        // ── Cross-fade in-between ─────────────────────────────────────────
+                        // solidOpacity: 1 at p=0, 0 at p=0.6
+                        // wireOpacity:  0 at p=0.4, 0.65 at p=1
+                        const solidOpacity = Math.max(0, 1 - p / 0.6);
+                        const wireOpacity  = Math.max(0, (p - 0.4) / 0.6) * 0.65;
+
+                        // Solid layer — use a clone so we don't mutate the original
+                        if (!obj.userData._transMat) {
+                            const m = orig.clone();
+                            m.transparent = true;
+                            obj.userData._transMat = m;
+                            obj.material = m;
+                        } else if (obj.material !== obj.userData._transMat) {
+                            obj.material = obj.userData._transMat;
+                        }
+                        const tm = obj.userData._transMat;
+                        tm.opacity = solidOpacity;
+
+                        // Material resolution: as solid materialises (wireframe→solid),
+                        // roughness starts at 1.0 and settles to the real value, giving a
+                        // "3D scan resolves into dental material" look.
+                        // solidMaterialT: 0 when invisible, 1 when fully opaque
+                        const solidT = 1 - solidOpacity; // 0→1 as solid appears from wire side
+                        if (!wireframeActive && solidT > 0) {
+                            // resolving from wireframe → solid: animate material props
+                            if (tm.roughness !== undefined) {
+                                const targetR = orig.roughness ?? 0.18;
+                                tm.roughness = 1.0 - solidT * (1.0 - targetR);
+                            }
+                            if (tm.clearcoat !== undefined) {
+                                tm.clearcoat = solidT * (orig.clearcoat ?? 0.5);
+                            }
+                            if (tm.metalness !== undefined) {
+                                const targetM = orig.metalness ?? 0.02;
+                                tm.metalness = solidT * targetM;
+                            }
+                            if (tm.transmission !== undefined) {
+                                tm.transmission = solidT * (orig.transmission ?? 0.1);
+                            }
+                        }
+
+                        // Wireframe ghost layer
+                        if (wireOpacity > 0) {
+                            if (!obj.userData._wfGhost) {
+                                const wireMat = new THREE.MeshBasicMaterial({
+                                    wireframe: true, transparent: true, opacity: 0,
+                                    ...(hasVC ? { vertexColors: true } : { color: wireColor }),
+                                });
+                                const ghost = new THREE.Mesh(obj.geometry, wireMat);
+                                ghost.scale.copy(obj.scale);
+                                ghost.userData._isWFGhost = true;
+                                scene.add(ghost);
+                                obj.userData._wfGhost = ghost;
+                            }
+                            obj.userData._wfGhost.material.opacity = wireOpacity;
+                        } else if (obj.userData._wfGhost) {
+                            scene.remove(obj.userData._wfGhost);
+                            obj.userData._wfGhost.material.dispose();
+                            delete obj.userData._wfGhost;
                         }
                     });
+                }
+
+                function setWireframeFn(on: boolean) {
+                    wireframeActive = on;
+                    cancelAnimationFrame(wfAnimId);
+
+                    // Ensure all current model meshes have their originals saved
+                    scene.traverse((obj: any) => {
+                        if (!obj.isMesh || obj.userData._isWFGhost) return;
+                        if (!origMaterials.has(obj.uuid)) origMaterials.set(obj.uuid, obj.material);
+                    });
+
+                    const startP   = wfProgress;
+                    const targetP  = on ? 1 : 0;
+                    const dist     = Math.abs(targetP - startP);
+                    if (dist < 0.01) return;
+
+                    const DURATION = 950 * dist; // shorter when interrupting mid-transition
+                    const startTime = performance.now();
+
+                    function tick() {
+                        const raw   = Math.min((performance.now() - startTime) / DURATION, 1);
+                        const eased = easeInOutCubic(raw);
+                        wfProgress  = startP + (targetP - startP) * eased;
+                        applyWFProgress(wfProgress);
+                        if (raw < 1) { wfAnimId = requestAnimationFrame(tick); }
+                        else { wfProgress = targetP; applyWFProgress(targetP); }
+                    }
+                    wfAnimId = requestAnimationFrame(tick);
                 }
 
                 // ── Load second model (lower arch) ──────────────────────────────────────────
@@ -485,6 +614,12 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     scene.traverse((obj: any) => { if (obj.userData?.isSecondModel) toRemove.push(obj); });
                     for (const obj of toRemove) {
                         origMaterials.delete(obj.uuid);
+                        // clean up any transition ghosts or cloned materials
+                        if (obj.userData._wfGhost) {
+                            scene.remove(obj.userData._wfGhost);
+                            obj.userData._wfGhost.material?.dispose();
+                        }
+                        if (obj.userData._transMat) obj.userData._transMat.dispose();
                         scene.remove(obj);
                         obj.geometry?.dispose?.();
                         const m = obj.material;
@@ -504,6 +639,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                 return () => {
                     ro.disconnect();
                     cancelAnimationFrame(animId);
+                    cancelAnimationFrame(wfAnimId);
                     renderer.dispose();
                     if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
                 };
@@ -662,6 +798,20 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                                     <span className="ml-1 opacity-60">{FMTS[k].ratio}</span>
                                 </button>
                             ))}
+                            <span className="w-px h-4 bg-white/15 mx-0.5" />
+                            {REC_DURATIONS.map(s => (
+                                <button
+                                    key={s}
+                                    onClick={() => setRecSecs(s)}
+                                    className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                                        recSecs === s
+                                            ? 'bg-white/20 text-white'
+                                            : 'text-white/40 hover:text-white/70'
+                                    }`}
+                                >
+                                    {s}s
+                                </button>
+                            ))}
                         </div>
                         <div className="flex items-center gap-2">
                             <button
@@ -674,7 +824,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                                 onClick={startRecording}
                                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#C9A96E] text-[#0D0D12] font-semibold text-xs hover:bg-[#d4b87e] transition-colors"
                             >
-                                <Video size={12} /> Grabar {REC_SECS}s
+                                <Video size={12} /> Grabar {recSecs}s
                             </button>
                         </div>
                     </div>
@@ -795,7 +945,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
 
                     {/* Format label */}
                     <p className="text-white/40 text-xs">
-                        {getOutDims(vidPreview.fmt).label} · {getOutDims(vidPreview.fmt).w}×{getOutDims(vidPreview.fmt).h} · {REC_SECS}s
+                        {getOutDims(vidPreview.fmt).label} · {getOutDims(vidPreview.fmt).w}×{getOutDims(vidPreview.fmt).h} · {vidPreview.secs}s
                     </p>
 
                     {/* AirDrop not available hint */}
