@@ -336,7 +336,7 @@ export async function GET(request: Request) {
                     } else if (msg.channel === 'email' && msg.email) {
                         const emailResult = await EmailService.send({
                             to: msg.email,
-                            subject: 'Fotos de tu tratamiento — AM Clínica',
+                            subject: msg.subject || 'Fotos de tu tratamiento — AM Clinica',
                             html: `<p>${msg.message.replace(/\n/g, '<br>')}</p>${msg.media_url ? `<p><a href="${msg.media_url}">Ver foto</a></p>` : ''}`,
                         });
                         if (emailResult?.id) sent = true;

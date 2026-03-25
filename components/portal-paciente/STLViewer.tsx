@@ -54,6 +54,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
         loadSecondModel?: (buf: ArrayBuffer, isPly: boolean) => Promise<void>;
         removeSecondModel?: () => void;
         setWireframeMode?: (on: boolean) => void;
+        setSmileDesignMode?: (on: boolean) => void;
         setPostRenderHook?: (fn: (() => void) | null) => void;
     } | null>(null);
     const dragRef            = useRef<{ sx: number; sy: number; orig: SelRect; resize: boolean } | null>(null);
@@ -71,6 +72,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
     const [vidPreview, setVidPreview] = useState<VideoPreview | null>(null);
     const [shareHint,  setShareHint]  = useState(false); // true when browser doesn't support file share
     const [wireframe,    setWireframe]   = useState(false);
+    const [smileDesign,  setSmileDesign] = useState(false);
     const [isDragOver,   setIsDragOver]  = useState(false);
     const [secondModel,  setSecondModel] = useState<'none' | 'loading' | 'loaded'>('none');
     const [recSecs,      setRecSecs]     = useState<RecDuration>(8);
@@ -215,9 +217,9 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
     // ── Wireframe toggle (W key) ────────────────────────────────────────────────
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
-            if (e.code === 'KeyW' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                setWireframe(prev => !prev);
-            }
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.code === 'KeyW') setWireframe(prev => !prev);
+            if (e.code === 'KeyA') setSmileDesign(prev => !prev);
         }
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -226,6 +228,10 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
     useEffect(() => {
         sceneRef.current?.setWireframeMode?.(wireframe);
     }, [wireframe, loadStatus]); // re-apply if model just loaded while wireframe was already on
+
+    useEffect(() => {
+        sceneRef.current?.setSmileDesignMode?.(smileDesign);
+    }, [smileDesign, loadStatus]);
 
     // ── Drag handlers (second model) ───────────────────────────────────────────
     const onViewerDragOver = useCallback((e: React.DragEvent) => {
@@ -422,158 +428,30 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     renderer.setSize(nw, nh);
                 });
                 ro.observe(container);
-                // ── Wireframe ↔ solid cinematic transition ──────────────────────────────────
-                // p = 0 → fully solid | p = 1 → fully wireframe
-                // Overlap cross-fade: solid fades out (0→0.6), wire fades in (0.4→1)
-                // On solidify (wire→solid) the material also "resolves":
-                //   roughness 1→orig, clearcoat 0→orig, etc. for dental realism
+                // ── Wireframe ↔ solid — instant toggle ───────────────────────────────────────
                 const origMaterials = new Map<string, any>();
                 let wireframeActive = false;
-                let wfProgress      = 0;  // current animation position
-                let wfAnimId        = 0;
 
-                function easeInOutCubic(t: number) {
-                    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
-                }
-
-                function applyWFProgress(p: number) {
+                function setWireframeFn(on: boolean) {
+                    wireframeActive = on;
                     scene.traverse((obj: any) => {
-                        if (!obj.isMesh || obj.userData._isWFGhost) return;
-                        const orig = origMaterials.get(obj.uuid);
-                        if (!orig) return;
+                        if (!obj.isMesh) return;
+                        if (!origMaterials.has(obj.uuid)) origMaterials.set(obj.uuid, obj.material);
+                        const orig  = origMaterials.get(obj.uuid)!;
                         const hasVC = !!obj.geometry?.attributes?.color;
-                        const wireColor = hasVC ? null : (orig.color ?? new THREE.Color(0xF7F3EE));
-
-                        // ── Fully solid ────────────────────────────────────────────────────
-                        if (p <= 0) {
-                            if (obj.userData._wfGhost) {
-                                scene.remove(obj.userData._wfGhost);
-                                obj.userData._wfGhost.material.dispose();
-                                delete obj.userData._wfGhost;
-                            }
-                            if (obj.userData._transMat) {
-                                if (obj.material === obj.userData._transMat) obj.material = orig;
-                                obj.userData._transMat.dispose();
-                                delete obj.userData._transMat;
-                            } else if (obj.material !== orig) {
-                                obj.material.dispose();
-                                obj.material = orig;
-                            }
-                            return;
-                        }
-
-                        // ── Fully wireframe ───────────────────────────────────────────────
-                        if (p >= 1) {
-                            if (obj.userData._wfGhost) {
-                                scene.remove(obj.userData._wfGhost);
-                                obj.userData._wfGhost.material.dispose();
-                                delete obj.userData._wfGhost;
-                            }
-                            if (obj.userData._transMat) {
-                                if (obj.material === obj.userData._transMat) obj.material = orig;
-                                obj.userData._transMat.dispose();
-                                delete obj.userData._transMat;
-                            }
+                        if (on) {
                             if (!obj.material.wireframe) {
                                 if (obj.material !== orig) obj.material.dispose();
                                 obj.material = new THREE.MeshBasicMaterial({
                                     wireframe: true, transparent: true, opacity: 0.65,
-                                    ...(hasVC ? { vertexColors: true } : { color: wireColor }),
+                                    ...(hasVC ? { vertexColors: true } : { color: orig.color ?? new THREE.Color(0xF7F3EE) }),
                                 });
                             }
-                            return;
-                        }
-
-                        // ── Cross-fade in-between ─────────────────────────────────────────
-                        // solidOpacity: 1 at p=0, 0 at p=0.6
-                        // wireOpacity:  0 at p=0.4, 0.65 at p=1
-                        const solidOpacity = Math.max(0, 1 - p / 0.6);
-                        const wireOpacity  = Math.max(0, (p - 0.4) / 0.6) * 0.65;
-
-                        // Solid layer — use a clone so we don't mutate the original
-                        if (!obj.userData._transMat) {
-                            const m = orig.clone();
-                            m.transparent = true;
-                            obj.userData._transMat = m;
-                            obj.material = m;
-                        } else if (obj.material !== obj.userData._transMat) {
-                            obj.material = obj.userData._transMat;
-                        }
-                        const tm = obj.userData._transMat;
-                        tm.opacity = solidOpacity;
-
-                        // Material resolution: as solid materialises (wireframe→solid),
-                        // roughness starts at 1.0 and settles to the real value, giving a
-                        // "3D scan resolves into dental material" look.
-                        // solidMaterialT: 0 when invisible, 1 when fully opaque
-                        const solidT = 1 - solidOpacity; // 0→1 as solid appears from wire side
-                        if (!wireframeActive && solidT > 0) {
-                            // resolving from wireframe → solid: animate material props
-                            if (tm.roughness !== undefined) {
-                                const targetR = orig.roughness ?? 0.18;
-                                tm.roughness = 1.0 - solidT * (1.0 - targetR);
-                            }
-                            if (tm.clearcoat !== undefined) {
-                                tm.clearcoat = solidT * (orig.clearcoat ?? 0.5);
-                            }
-                            if (tm.metalness !== undefined) {
-                                const targetM = orig.metalness ?? 0.02;
-                                tm.metalness = solidT * targetM;
-                            }
-                            if (tm.transmission !== undefined) {
-                                tm.transmission = solidT * (orig.transmission ?? 0.1);
-                            }
-                        }
-
-                        // Wireframe ghost layer
-                        if (wireOpacity > 0) {
-                            if (!obj.userData._wfGhost) {
-                                const wireMat = new THREE.MeshBasicMaterial({
-                                    wireframe: true, transparent: true, opacity: 0,
-                                    ...(hasVC ? { vertexColors: true } : { color: wireColor }),
-                                });
-                                const ghost = new THREE.Mesh(obj.geometry, wireMat);
-                                ghost.scale.copy(obj.scale);
-                                ghost.userData._isWFGhost = true;
-                                scene.add(ghost);
-                                obj.userData._wfGhost = ghost;
-                            }
-                            obj.userData._wfGhost.material.opacity = wireOpacity;
-                        } else if (obj.userData._wfGhost) {
-                            scene.remove(obj.userData._wfGhost);
-                            obj.userData._wfGhost.material.dispose();
-                            delete obj.userData._wfGhost;
+                        } else {
+                            if (obj.material !== orig) obj.material.dispose();
+                            obj.material = orig;
                         }
                     });
-                }
-
-                function setWireframeFn(on: boolean) {
-                    wireframeActive = on;
-                    cancelAnimationFrame(wfAnimId);
-
-                    // Ensure all current model meshes have their originals saved
-                    scene.traverse((obj: any) => {
-                        if (!obj.isMesh || obj.userData._isWFGhost) return;
-                        if (!origMaterials.has(obj.uuid)) origMaterials.set(obj.uuid, obj.material);
-                    });
-
-                    const startP   = wfProgress;
-                    const targetP  = on ? 1 : 0;
-                    const dist     = Math.abs(targetP - startP);
-                    if (dist < 0.01) return;
-
-                    const DURATION = 950 * dist; // shorter when interrupting mid-transition
-                    const startTime = performance.now();
-
-                    function tick() {
-                        const raw   = Math.min((performance.now() - startTime) / DURATION, 1);
-                        const eased = easeInOutCubic(raw);
-                        wfProgress  = startP + (targetP - startP) * eased;
-                        applyWFProgress(wfProgress);
-                        if (raw < 1) { wfAnimId = requestAnimationFrame(tick); }
-                        else { wfProgress = targetP; applyWFProgress(targetP); }
-                    }
-                    wfAnimId = requestAnimationFrame(tick);
                 }
 
                 // ── Load second model (lower arch) ──────────────────────────────────────────
@@ -628,18 +506,141 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     }
                 }
 
+                // ── Smile Design overlay — single measurement, counter + fill bar ──────────
+                let smileDesignGroup: any = null;
+                let smileAnimId           = 0;
+
+                function setSmileDesignFn(on: boolean) {
+                    cancelAnimationFrame(smileAnimId);
+                    if (smileDesignGroup) {
+                        scene.remove(smileDesignGroup);
+                        smileDesignGroup.traverse((o: any) => {
+                            o.geometry?.dispose?.();
+                            if (o.material) { o.material.map?.dispose?.(); o.material.dispose?.(); }
+                        });
+                        smileDesignGroup = null;
+                    }
+                    if (!on) return;
+
+                    const bb = new THREE.Box3();
+                    scene.traverse((o: any) => { if (o.isMesh) bb.expandByObject(o); });
+                    if (bb.isEmpty()) return;
+                    const sz     = bb.getSize(new THREE.Vector3());
+                    const ctr    = bb.getCenter(new THREE.Vector3());
+                    const frontZ = bb.max.z + 2;
+
+                    const group = new THREE.Group();
+                    smileDesignGroup = group;
+                    scene.add(group);
+
+                    // ── Label sprite: prefix + counter + fill bar ────────────────────────────
+                    const FINAL_MM = 10.6; // avg clinical upper central incisor length
+                    function makeLabel(): { sp: any; update: (p: number) => void } {
+                        const W = 192, H = 52;
+                        const cv  = document.createElement('canvas');
+                        cv.width = W; cv.height = H;
+                        const ctx = cv.getContext('2d')!;
+                        const tex = new THREE.CanvasTexture(cv);
+                        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false });
+                        const sp  = new THREE.Sprite(mat);
+                        sp.scale.set(13, 3.5, 1);
+
+                        function draw(p: number) { // p: 0 → 1
+                            ctx.clearRect(0, 0, W, H);
+                            // background
+                            ctx.fillStyle = 'rgba(8,8,14,0.82)';
+                            ctx.fillRect(0, 0, W, H);
+                            // gold left accent
+                            ctx.fillStyle = '#C9A96E';
+                            ctx.fillRect(0, 0, 3, H);
+                            // prefix
+                            ctx.fillStyle = 'rgba(201,169,110,0.75)';
+                            ctx.font = '10px system-ui,sans-serif';
+                            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                            ctx.fillText('Incisivo Central Superior', 9, 12);
+                            // value counter
+                            ctx.fillStyle = '#ffffff';
+                            ctx.font = 'bold 17px system-ui,sans-serif';
+                            ctx.fillText(`${(FINAL_MM * p).toFixed(1)} mm`, 9, 29);
+                            // bar track
+                            const bx = 9, by = 42, bw = W - 18, bh = 4;
+                            ctx.fillStyle = 'rgba(255,255,255,0.10)';
+                            ctx.fillRect(bx, by, bw, bh);
+                            // bar fill
+                            if (p > 0) {
+                                ctx.fillStyle = '#C9A96E';
+                                ctx.fillRect(bx, by, bw * p, bh);
+                            }
+                            tex.needsUpdate = true;
+                        }
+                        draw(0);
+                        return { sp, update: draw };
+                    }
+
+                    // ── Line + tick helpers ──────────────────────────────────────────────────
+                    function makeLine(color: number) {
+                        const pos = new Float32Array([0,0,0, 0,0,0]);
+                        const geo = new THREE.BufferGeometry();
+                        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                        const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
+                        return { line: new THREE.Line(geo, mat), geo };
+                    }
+                    function makeTick(pt: any, perpDir: any, color: number) {
+                        const h   = perpDir.clone().multiplyScalar(2);
+                        const geo = new THREE.BufferGeometry().setFromPoints([pt.clone().sub(h), pt.clone().add(h)]);
+                        return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0 }));
+                    }
+
+                    // ── Measurement: height of left central incisor (cervical → incisal) ─────
+                    // Line sits just outside the left central incisor; label floats to the left.
+                    const hX = ctr.x - sz.x * 0.07 - 10;
+                    const hA = new THREE.Vector3(hX, bb.max.y - sz.y * 0.54, frontZ + 2);
+                    const hB = new THREE.Vector3(hX, bb.max.y - sz.y * 0.04, frontZ + 2);
+                    const { line, geo } = makeLine(0x88DDFF);
+                    const tkA = makeTick(hA, new THREE.Vector3(1, 0, 0), 0x88DDFF);
+                    const tkB = makeTick(hB, new THREE.Vector3(1, 0, 0), 0x88DDFF);
+                    const { sp, update } = makeLabel();
+                    sp.position.set(hX - 20, (hA.y + hB.y) / 2, frontZ + 2);
+                    group.add(line, tkA, tkB, sp);
+
+                    // ── Animation ────────────────────────────────────────────────────────────
+                    const DRAW = 900; // ms — line draws while counter fills
+                    const t0   = performance.now();
+
+                    function smileTick() {
+                        const rawLine = Math.min(1, (performance.now() - t0) / DRAW);
+                        const p       = 1 - (1 - rawLine) * (1 - rawLine); // ease-out quad
+                        // grow line from hA toward hB
+                        const pos = geo.attributes.position;
+                        pos.setXYZ(0, hA.x, hA.y, hA.z);
+                        pos.setXYZ(1, hA.x, hA.y + (hB.y - hA.y) * p, hA.z);
+                        pos.needsUpdate = true;
+                        line.material.opacity = Math.min(0.7, p * 2);
+                        // ticks + label appear after line is 40% drawn
+                        const pLabel = Math.max(0, Math.min(1, (rawLine - 0.35) / 0.65));
+                        tkA.material.opacity = pLabel * 0.7;
+                        tkB.material.opacity = pLabel * 0.7;
+                        sp.material.opacity  = pLabel;
+                        update(p); // drives both counter and bar fill
+                        if (rawLine < 1) smileAnimId = requestAnimationFrame(smileTick);
+                    }
+                    smileAnimId = requestAnimationFrame(smileTick);
+                }
+
                 sceneRef.current = {
                     renderer, camera, controls, animId, scene,
                     loadSecondModel: loadSecondModelFn,
                     removeSecondModel: removeSecondModelFn,
                     setWireframeMode: setWireframeFn,
+                    setSmileDesignMode: setSmileDesignFn,
                     setPostRenderHook: (fn) => { postRenderHook = fn; },
                 };
 
                 return () => {
                     ro.disconnect();
                     cancelAnimationFrame(animId);
-                    cancelAnimationFrame(wfAnimId);
+                    cancelAnimationFrame(smileAnimId);
+                    if (smileDesignGroup) scene.remove(smileDesignGroup);
                     renderer.dispose();
                     if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
                 };
@@ -729,7 +730,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
             {loadStatus === 'ready' && mode === 'idle' && !vidPreview && (
                 <>
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-black/40 backdrop-blur border border-white/10 pointer-events-none">
-                        <p className="text-white/50 text-xs">Arrastrá · Scroll · Pellizcá · <span className="font-mono">W</span> malla</p>
+                        <p className="text-white/50 text-xs">Arrastrá · Scroll · <span className="font-mono">W</span> malla · <span className="font-mono">A</span> medición</p>
                     </div>
                     <button
                         onClick={enterSelecting}
@@ -743,6 +744,11 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                         {wireframe && (
                             <div className="px-2.5 py-1 rounded-full bg-white/10 border border-white/25 text-white/70 text-xs font-medium pointer-events-none">
                                 W · Malla
+                            </div>
+                        )}
+                        {smileDesign && (
+                            <div className="px-2.5 py-1 rounded-full bg-[#C9A96E]/15 border border-[#C9A96E]/40 text-[#C9A96E] text-xs font-medium pointer-events-none">
+                                A · Smile Design
                             </div>
                         )}
                         {secondModel === 'loaded' && (

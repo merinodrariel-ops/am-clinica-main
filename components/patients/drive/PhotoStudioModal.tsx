@@ -514,6 +514,12 @@ export default function PhotoStudioModal({
     const [thumbnailDragId, setThumbnailDragId] = useState<string | null>(null);
     const [thumbnailDropIndicator, setThumbnailDropIndicator] = useState<{ id: string; edge: 'top' | 'bottom' } | null>(null);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
+    const currentTargetIds = useMemo(() => {
+        if (selectedIds.size > 0) {
+            return imageFiles.filter(item => selectedIds.has(item.id)).map(item => item.id);
+        }
+        return activeFile ? [activeFile.id] : [];
+    }, [activeFile, imageFiles, selectedIds]);
 
     const getFileById = useCallback((fileId: string) => imageFiles.find(item => item.id === fileId) ?? null, [imageFiles]);
 
@@ -1605,10 +1611,7 @@ export default function PhotoStudioModal({
     }
 
     function getDefaultTargetIds() {
-        if (selectedIds.size > 0) {
-            return imageFiles.filter(item => selectedIds.has(item.id)).map(item => item.id);
-        }
-        return activeFile ? [activeFile.id] : [];
+        return currentTargetIds;
     }
 
     async function fetchOriginalAsFile(targetFile: DriveFile) {
@@ -2647,6 +2650,25 @@ export default function PhotoStudioModal({
         }
     }
 
+    async function handleDownloadBatchOriginal() {
+        const targetIds = getDefaultTargetIds();
+        if (targetIds.length === 0) return;
+
+        try {
+            for (const targetId of targetIds) {
+                const targetFile = getFileById(targetId);
+                if (!targetFile) continue;
+                const response = await fetch(`/api/drive/file/${targetFile.id}`);
+                const blob = await response.blob();
+                await downloadBlob(blob, targetFile.name);
+            }
+            setDownloadMenuOpen(false);
+            toast.success(`${targetIds.length} archivo${targetIds.length > 1 ? 's' : ''} original${targetIds.length > 1 ? 'es' : ''} descargado${targetIds.length > 1 ? 's' : ''}`);
+        } catch {
+            toast.error('No se pudo descargar el lote original');
+        }
+    }
+
     async function handleDownloadWebp() {
         if (!activeFile) return;
         try {
@@ -2953,10 +2975,18 @@ export default function PhotoStudioModal({
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
                             >
                                 <Download size={14} />
-                                <span className="hidden sm:inline">Descargar</span>
+                                <span className="hidden sm:inline">Descargar{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
                             </button>
                             {downloadMenuOpen && (
                                 <div className="absolute right-0 top-full mt-2 z-20 w-52 rounded-xl border border-white/15 bg-[#1A1A24] p-1.5 shadow-xl">
+                                    {currentTargetIds.length > 1 && (
+                                        <button
+                                            onClick={handleDownloadBatchOriginal}
+                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                        >
+                                            Descargar lote original ({currentTargetIds.length})
+                                        </button>
+                                    )}
                                     <button
                                         onClick={handleDownloadOriginal}
                                         className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
@@ -2969,12 +2999,12 @@ export default function PhotoStudioModal({
                                     >
                                         Descargar WebP comprimida
                                     </button>
-                                    {getDefaultTargetIds().length > 1 && (
+                                    {currentTargetIds.length > 1 && (
                                         <button
                                             onClick={handleDownloadBatchWebp}
                                             className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
                                         >
-                                            Descargar lote WebP ({getDefaultTargetIds().length})
+                                            Descargar lote WebP ({currentTargetIds.length})
                                         </button>
                                     )}
                                     <button
@@ -2990,12 +3020,20 @@ export default function PhotoStudioModal({
                             )}
                         </div>
                         <button
+                            onClick={() => handleShareWithPatient()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/85 text-white text-sm font-semibold border border-emerald-400/20 hover:bg-emerald-600 transition-colors"
+                            title={currentTargetIds.length > 1 ? `Compartir ${currentTargetIds.length} fotos con el paciente` : 'Compartir con paciente'}
+                        >
+                            <MessageCircle size={14} />
+                            <span className="hidden sm:inline">Paciente{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
+                        </button>
+                        <button
                             onClick={() => handleShare()}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
                             title="Compartir / AirDrop"
                         >
                             <Globe2 size={14} />
-                            <span className="hidden sm:inline">Compartir</span>
+                            <span className="hidden sm:inline">AirDrop{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
                         </button>
                     </div>
                 </div>

@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
 
 // Service-role client bypasses RLS for agenda mutations.
 // Auth is still verified via SSR client before calling these.
@@ -139,14 +140,14 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     if (statusFinal && noCancelado) {
         const { data: apt } = await adminClient
             .from('agenda_appointments')
-            .select('patient_id, start_time, type, doctor_id')
+            .select('patient_id, start_time, type, doctor_id, notes')
             .eq('id', id)
             .single();
 
-        const turnoPaso = apt && new Date(apt.start_time) < new Date();
+        const pacienteAsistio = statusFinal === 'completed' || statusFinal === 'arrived';
 
-        if (apt?.patient_id && turnoPaso) {
-            // a) Auto-setear primera_consulta_fecha
+        if (apt?.patient_id && pacienteAsistio) {
+            // a) Auto-setear primera_consulta_fecha — solo cuando el paciente realmente asistió
             const { data: paciente } = await adminClient
                 .from('pacientes')
                 .select('primera_consulta_fecha')
@@ -154,10 +155,21 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
                 .single();
 
             if (paciente && !paciente.primera_consulta_fecha) {
-                await adminClient
-                    .from('pacientes')
-                    .update({ primera_consulta_fecha: apt.start_time.split('T')[0] })
-                    .eq('id_paciente', apt.patient_id);
+                // Solo setear si este es el ÚNICO turno del paciente (o el más antiguo).
+                // Pacientes con turnos previos no son "primera vez" aunque el campo esté vacío
+                // (pueden ser importados o creados antes de que existiera este campo).
+                const { count: prevCount } = await adminClient
+                    .from('agenda_appointments')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('patient_id', apt.patient_id)
+                    .lt('start_time', apt.start_time);
+
+                if (prevCount === 0) {
+                    await adminClient
+                        .from('pacientes')
+                        .update({ primera_consulta_fecha: apt.start_time.split('T')[0] })
+                        .eq('id_paciente', apt.patient_id);
+                }
             }
 
             // b) Auto-crear recalls si el turno se marca como completado
@@ -166,6 +178,61 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
                 await createRecallsFromAppointment(
                     id, apt.type, apt.patient_id, apt.start_time, apt.doctor_id ?? null
                 ).catch(err => console.error('[recalls] auto-create failed:', err));
+
+                if (apt.type === 'control_ortodoncia') {
+                    const replacementDays = parseOrthoReplacementDays(apt.notes) ?? 15;
+                    const { data: patientContact } = await adminClient
+                        .from('pacientes')
+                        .select('nombre, apellido, email')
+                        .eq('id_paciente', apt.patient_id)
+                        .single();
+
+                    if (patientContact?.email) {
+                        const scheduledFor = new Date(apt.start_time);
+                        scheduledFor.setDate(scheduledFor.getDate() + replacementDays);
+                        scheduledFor.setUTCHours(12, 0, 0, 0);
+
+                        const patientName = `${patientContact.nombre ?? ''} ${patientContact.apellido ?? ''}`.trim() || 'Paciente';
+                        const subject = 'Recordatorio de recambio de alineadores — AM Clinica';
+                        const message = [
+                            `Hola ${patientName},`,
+                            '',
+                            `Te recordamos que hoy corresponde revisar el recambio de tus alineadores segun la indicacion que dejamos en tu ultimo control.`,
+                            '',
+                            'Si tenes dudas o sentis que el alineador no adapto bien, escribinos antes de hacer el cambio.',
+                            '',
+                            'AM Clinica',
+                        ].join('\n');
+
+                        const { data: existingReminder } = await adminClient
+                            .from('scheduled_messages')
+                            .select('id')
+                            .eq('patient_id', apt.patient_id)
+                            .eq('channel', 'email')
+                            .eq('email', patientContact.email)
+                            .eq('subject', subject)
+                            .gte('scheduled_for', new Date(scheduledFor.getTime() - 60000).toISOString())
+                            .lte('scheduled_for', new Date(scheduledFor.getTime() + 60000).toISOString())
+                            .limit(1);
+
+                        if (!existingReminder || existingReminder.length === 0) {
+                            await adminClient
+                                .from('scheduled_messages')
+                                .insert({
+                                    patient_id: apt.patient_id,
+                                    channel: 'email',
+                                    email: patientContact.email,
+                                    message,
+                                    subject,
+                                    scheduled_for: scheduledFor.toISOString(),
+                                    created_by: user.id,
+                                })
+                                .then(({ error }) => {
+                                    if (error) console.error('[ortho-reminder] schedule failed:', error);
+                                });
+                        }
+                    }
+                }
             }
         }
     }

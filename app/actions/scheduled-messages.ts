@@ -8,6 +8,7 @@ export interface ScheduleMessageInput {
     channel: 'whatsapp' | 'email';
     phone?: string;
     email?: string;
+    subject?: string;
     message: string;
     mediaUrl?: string;
     scheduledFor: string; // ISO string
@@ -18,6 +19,7 @@ export interface ScheduleMessageBatchInput {
     channel: 'whatsapp' | 'email';
     phone?: string;
     email?: string;
+    subject?: string;
     message: string;
     mediaUrls?: string[];
     scheduledFor: string; // ISO string
@@ -34,6 +36,7 @@ export async function schedulePatientMessageAction(input: ScheduleMessageInput) 
         channel: input.channel,
         phone: input.phone ?? null,
         email: input.email ?? null,
+        subject: input.subject ?? null,
         message: input.message,
         media_url: input.mediaUrl ?? null,
         scheduled_for: input.scheduledFor,
@@ -56,6 +59,7 @@ export async function schedulePatientMessageBatchAction(input: ScheduleMessageBa
         channel: input.channel,
         phone: input.phone ?? null,
         email: input.email ?? null,
+        subject: input.subject ?? null,
         message: input.message,
         media_url: mediaUrl,
         scheduled_for: input.scheduledFor,

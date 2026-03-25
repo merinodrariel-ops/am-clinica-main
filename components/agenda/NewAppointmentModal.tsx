@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/Textarea";
 
 import { createClient } from '@/utils/supabase/client';
 import { type TarifarioItem } from '@/lib/supabase';
+import { parseOrthoReplacementDays, serializeAppointmentNotes, stripAppointmentMeta } from '@/lib/agenda-appointment-meta';
 
 interface Patient {
     id: string;
@@ -46,15 +47,16 @@ interface NewAppointmentModalProps {
 
 const APPOINTMENT_TYPE_OPTIONS = [
     { value: 'consulta', label: '⭐ Consulta de primera vez' },
-    { value: 'control', label: 'Control general' },
     { value: 'control_carilla_inmediato', label: 'Control carilla inmediato' },
     { value: 'control_carilla_anual', label: 'Control carilla anual' },
     { value: 'control_ortodoncia', label: 'Control ortodoncia' },
+    { value: 'resinas_diseno_sonrisa', label: 'Diseño de sonrisa en resinas' },
     { value: 'limpieza', label: 'Limpieza' },
     { value: 'cementado', label: 'Cementado' },
     { value: 'tallado', label: 'Tallado' },
     { value: 'botox', label: 'Botox' },
     { value: 'urgencia', label: 'Urgencia' },
+    { value: 'control', label: 'Control general' },
 ] as const;
 
 const TYPE_DURATIONS_MIN: Record<string, number> = {
@@ -63,6 +65,7 @@ const TYPE_DURATIONS_MIN: Record<string, number> = {
     control_carilla_inmediato: 60,
     control_carilla_anual: 60,
     control_ortodoncia: 60,
+    resinas_diseno_sonrisa: 240,
     limpieza:  60,
     urgencia:  60,
     botox:     30,
@@ -84,6 +87,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [status, setStatus] = useState('confirmed');
     const [type, setType] = useState('consulta');
     const [notes, setNotes] = useState('');
+    const [orthoReplacementDays, setOrthoReplacementDays] = useState<10 | 15>(15);
 
     // Patient Search State
     const [searchTerm, setSearchTerm] = useState('');
@@ -142,11 +146,13 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             }
             const start = initialData.start instanceof Date ? initialData.start : new Date(initialData.start);
             const end = initialData.end instanceof Date ? initialData.end : new Date(initialData.end);
+            const parsedDays = parseOrthoReplacementDays(initialData.notes || '');
             setStartTime(toDateTimeLocal(start));
             setEndTime(toDateTimeLocal(end));
             setStatus(initialData.status || 'confirmed');
             setType(initialData.type || 'consulta');
-            setNotes(initialData.notes || '');
+            setNotes(stripAppointmentMeta(initialData.notes || ''));
+            setOrthoReplacementDays(parsedDays ?? 15);
             setSelectedPatientName(initialData.patient?.full_name || '');
         } else if (initialDate) {
             // Create Mode con fecha específica
@@ -165,6 +171,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setStatus('confirmed');
             setType('consulta');
             setNotes('');
+            setOrthoReplacementDays(15);
         }
     }, [isOpen, initialData, initialDate]);
 
@@ -235,7 +242,13 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         formData.append('endTime', new Date(endTime).toISOString());
         formData.append('status', status);
         formData.append('type', type);
-        formData.append('notes', notes);
+        const serializedNotes = serializeAppointmentNotes({
+            visibleNotes: notes,
+            type,
+            orthoReplacementDays,
+        });
+
+        formData.append('notes', serializedNotes);
 
         try {
             if (initialData?.id) {
@@ -248,7 +261,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     end_time: new Date(endTime).toISOString(),
                     status,
                     type,
-                    notes,
+                    notes: serializedNotes,
                     is_primera_vez: false
                 };
                 const result = await updateAppointment(initialData.id, updates);
@@ -593,7 +606,6 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             {[
                                 { val: 'confirmed', label: 'Confirmado', color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
                                 { val: 'pending', label: 'Pendiente', color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
-                                { val: 'arrived', label: 'En Sala', color: 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' },
                                 { val: 'cancelled', label: 'Cancelado', color: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' },
                             ].map((opt) => (
                                 <Button
@@ -611,6 +623,34 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             ))}
                         </div>
                     </div>
+
+                    {type === 'control_ortodoncia' && (
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1">Recambio alineadores</label>
+                            <div className="flex gap-2">
+                                {([
+                                    { value: 10, label: 'Cada 10 dias' },
+                                    { value: 15, label: 'Cada 15 dias' },
+                                ] as const).map((option) => (
+                                    <Button
+                                        key={option.value}
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => setOrthoReplacementDays(option.value)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all h-auto ${orthoReplacementDays === option.value
+                                            ? 'ring-2 ring-offset-1 ring-gray-300 dark:ring-gray-600 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                            : 'bg-white dark:bg-gray-800 text-gray-600 border-gray-200 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        {option.label}
+                                    </Button>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-1 pl-1">
+                                Se usa para programar el recordatorio automatico de recambio cuando el control quede realizado.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Notes */}
                     <div>

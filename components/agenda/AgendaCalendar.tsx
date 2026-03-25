@@ -22,6 +22,7 @@ import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Sen
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { stripAppointmentMeta } from '@/lib/agenda-appointment-meta';
 
 interface AppointmentModalData {
     id?: string;
@@ -656,6 +657,7 @@ export default function AgendaCalendar() {
                                 control_carilla_inmediato: 'Ctrl carilla inmediato',
                                 control_carilla_anual: 'Ctrl carilla anual',
                                 control_ortodoncia: 'Ctrl ortodoncia',
+                                resinas_diseno_sonrisa: 'Resinas sonrisa',
                                 limpieza: 'Limpieza',
                                 cementado: 'Cementado',
                                 tallado: 'Tallado',
@@ -983,11 +985,11 @@ export default function AgendaCalendar() {
                         <div className="flex-1 overflow-y-auto">
 
                         {/* Notes */}
-                        {quickPopup.fullData.notes && (
+                        {stripAppointmentMeta(quickPopup.fullData.notes) && (
                             <div className="px-4 py-2.5 bg-amber-50/50 dark:bg-amber-900/10 border-b border-gray-100 dark:border-gray-800">
                                 <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">Notas</p>
                                 <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                    {quickPopup.fullData.notes}
+                                    {stripAppointmentMeta(quickPopup.fullData.notes)}
                                 </p>
                             </div>
                         )}
