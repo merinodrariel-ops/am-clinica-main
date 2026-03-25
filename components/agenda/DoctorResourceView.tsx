@@ -126,6 +126,14 @@ function getAppointmentCardStyle(status: string, doctorColor: string) {
     };
 }
 
+function getAppointmentDisplayColor(type: string | null | undefined, doctorColor: string) {
+    if (type === 'cirugia_implantes' || type === 'cirugia') {
+        return '#dc2626';
+    }
+
+    return doctorColor;
+}
+
 // ─── Time label column ────────────────────────────────────────────────────────
 
 function TimeColumn() {
@@ -224,7 +232,8 @@ function DoctorColumn({
                 const heightPx = Math.max(SLOT_HEIGHT, (visibleDurationMins / SLOT_MINS) * SLOT_HEIGHT);
                 const isShort = heightPx <= SLOT_HEIGHT;
                 const isCancelled = apt.status === 'cancelled';
-                const style = getAppointmentCardStyle(apt.status, color);
+                const appointmentColor = getAppointmentDisplayColor(apt.type, color);
+                const style = getAppointmentCardStyle(apt.status, appointmentColor);
 
                 return (
                     <div

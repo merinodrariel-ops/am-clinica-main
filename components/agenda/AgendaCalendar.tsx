@@ -107,6 +107,8 @@ const DOCTOR_COLORS = [
     '#FF3B30', '#00C7BE', '#FF6B35', '#BF5AF2',
 ];
 
+const SURGERY_APPOINTMENT_TYPES = new Set(['cirugia_implantes', 'cirugia']);
+
 function getDoctorColor(doctorId: string, doctors: Doctor[]): string {
     const idx = doctors.findIndex(d => d.id === doctorId);
     return DOCTOR_COLORS[idx >= 0 ? idx % DOCTOR_COLORS.length : 0];
@@ -321,13 +323,16 @@ export default function AgendaCalendar() {
             const events: EventInput[] = filtered.map(apt => {
                 const isConflict = conflictMap.has(apt.id);
                 const isCancelled = apt.status === 'cancelled';
-                const doctorColor = apt.doctor_id
+                const isSurgery = SURGERY_APPOINTMENT_TYPES.has(apt.type);
+                const doctorColor = isSurgery
+                    ? '#dc2626'
+                    : apt.doctor_id
                     ? getDoctorColor(apt.doctor_id, doctors)
                     : getStatusColor(apt.status);
 
                 const fallbackColor = doctors.length > 0 && apt.doctor_id ? doctorColor : getStatusColor(apt.status);
                 // Ignore external color_tag when it's invalid or too light to keep weekly/daily events readable.
-                const color = normalizeEventColor(apt.color_tag, fallbackColor);
+                const color = isSurgery ? '#dc2626' : normalizeEventColor(apt.color_tag, fallbackColor);
                 const textColor = isCancelled ? '#4b5563' : getReadableTextColor(color);
                 const backgroundColor = isConflict ? '#ef4444' : isCancelled ? '#e5e7eb' : color;
                 const borderColor = isConflict ? '#dc2626' : isCancelled ? '#9ca3af' : color;
@@ -653,16 +658,17 @@ export default function AgendaCalendar() {
                                 primeraFecha === aptDate;
                             const isCancelled = props.status === 'cancelled';
                             const TYPE_LABELS: Record<string, string> = {
-                                control: 'Control',
+                                control: 'Control / urgencia',
                                 control_carilla_inmediato: 'Ctrl carilla inmediato',
                                 control_carilla_anual: 'Ctrl carilla anual',
                                 control_ortodoncia: 'Ctrl ortodoncia',
                                 resinas_diseno_sonrisa: 'Resinas sonrisa',
+                                cirugia_implantes: 'Cirugía / implantes',
+                                urgencia: 'Control / urgencia',
                                 limpieza: 'Limpieza',
                                 cementado: 'Cementado',
                                 tallado: 'Tallado',
                                 botox: 'Botox',
-                                urgencia: 'Urgencia',
                             };
                             const typeLabel = isPrimeraVez ? '⭐ 1ª vez' : (TYPE_LABELS[props.type ?? ''] ?? null);
                             const primaryLine = patientName || event.title || 'Cita';

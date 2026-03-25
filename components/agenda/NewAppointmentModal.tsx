@@ -51,12 +51,12 @@ const APPOINTMENT_TYPE_OPTIONS = [
     { value: 'control_carilla_anual', label: 'Control carilla anual' },
     { value: 'control_ortodoncia', label: 'Control ortodoncia' },
     { value: 'resinas_diseno_sonrisa', label: 'Diseño de sonrisa en resinas' },
+    { value: 'cirugia_implantes', label: 'Cirugía / implantes' },
     { value: 'limpieza', label: 'Limpieza' },
     { value: 'cementado', label: 'Cementado' },
     { value: 'tallado', label: 'Tallado' },
     { value: 'botox', label: 'Botox' },
-    { value: 'urgencia', label: 'Urgencia' },
-    { value: 'control', label: 'Control general' },
+    { value: 'control', label: 'Control general / urgencia' },
 ] as const;
 
 const TYPE_DURATIONS_MIN: Record<string, number> = {
@@ -66,8 +66,8 @@ const TYPE_DURATIONS_MIN: Record<string, number> = {
     control_carilla_anual: 60,
     control_ortodoncia: 60,
     resinas_diseno_sonrisa: 240,
+    cirugia_implantes: 180,
     limpieza:  60,
-    urgencia:  60,
     botox:     30,
     cementado: 240,
     tallado:   240,
@@ -150,7 +150,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setStartTime(toDateTimeLocal(start));
             setEndTime(toDateTimeLocal(end));
             setStatus(initialData.status || 'confirmed');
-            setType(initialData.type || 'consulta');
+            setType(initialData.type === 'urgencia' ? 'control' : (initialData.type || 'consulta'));
             setNotes(stripAppointmentMeta(initialData.notes || ''));
             setOrthoReplacementDays(parsedDays ?? 15);
             setSelectedPatientName(initialData.patient?.full_name || '');
@@ -216,7 +216,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         const concepto = item.concepto_nombre.toLowerCase();
 
         if (categoria.includes('cirugia')) {
-            setType('cirugia');
+            setType('cirugia_implantes');
         } else if (categoria.includes('control') || concepto.includes('control')) {
             if (concepto.includes('ortodoncia') || concepto.includes('alineador')) {
                 setType('control_ortodoncia');
