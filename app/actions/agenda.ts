@@ -144,10 +144,10 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
             .eq('id', id)
             .single();
 
-        const pacienteAsistio = statusFinal === 'completed' || statusFinal === 'arrived';
+        const turnoPaso = apt && new Date(apt.start_time) < new Date();
 
-        if (apt?.patient_id && pacienteAsistio) {
-            // a) Auto-setear primera_consulta_fecha — solo cuando el paciente realmente asistió
+        if (apt?.patient_id && turnoPaso) {
+            // a) Auto-setear primera_consulta_fecha
             const { data: paciente } = await adminClient
                 .from('pacientes')
                 .select('primera_consulta_fecha')
