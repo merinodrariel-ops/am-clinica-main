@@ -157,11 +157,11 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
         let mr: MediaRecorder;
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            mr = new MediaRecorder((oc as any).captureStream(), { mimeType, videoBitsPerSecond: FMTS[fmt].bps });
+            mr = new MediaRecorder((oc as any).captureStream(30), { mimeType, videoBitsPerSecond: FMTS[fmt].bps });
         } catch {
             try {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                mr = new MediaRecorder((oc as any).captureStream());
+                mr = new MediaRecorder((oc as any).captureStream(30));
             } catch (e2) {
                 sr.setPostRenderHook?.(null);
                 console.error('[3DRecord] MediaRecorder not supported:', e2);
