@@ -178,9 +178,12 @@ export default function RegistroPrestadorForm() {
                         <Check className="w-10 h-10 text-black" strokeWidth={2.5} />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <h1 className="text-3xl font-semibold text-white">¡Registro enviado!</h1>
+                        <h1 className="text-3xl font-semibold text-white">¡Todo listo!</h1>
                         <p className="text-white/50 leading-relaxed">
-                            Tus datos fueron recibidos. El equipo de administración los revisará y te contactará para confirmar el inicio.
+                            Tus datos fueron recibidos. Te enviamos un email para que puedas crear tu contraseña y acceder al portal de AM Clínica.
+                        </p>
+                        <p className="text-white/30 text-sm mt-1">
+                            Revisá tu bandeja de entrada (y spam, por las dudas).
                         </p>
                     </div>
                 </motion.div>

@@ -1,7 +1,10 @@
 'use server';
 
 import { createAdminClient } from '@/utils/supabase/admin';
+import { EmailService } from '@/lib/email-service';
 import { revalidatePath } from 'next/cache';
+
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica-main.vercel.app').replace(/\/$/, '');
 
 export interface PrestadorAutoRegistroInput {
     // Paso 1
@@ -61,6 +64,55 @@ export async function registerPrestadorPublico(
     if (error) {
         console.error('registerPrestadorPublico error:', error);
         return { error: 'Error al registrar. Intentá de nuevo.' };
+    }
+
+    // Crear cuenta de acceso e invitar automáticamente por email.
+    // Si ya tiene una cuenta (reintento), generateLink con type 'recovery' también funciona.
+    try {
+        const fullName = `${data.nombre} ${data.apellido}`;
+
+        // Intentar crear el usuario (puede ya existir si rellenó el form antes)
+        const { data: existingAuthUser } = await adminSupabase.auth.admin.listUsers();
+        const alreadyExists = existingAuthUser?.users?.some((u: { email?: string }) => u.email === data.email);
+
+        let linkType: 'invite' | 'recovery' = 'invite';
+        if (alreadyExists) {
+            linkType = 'recovery';
+        } else {
+            // Crear usuario en auth con metadata
+            await adminSupabase.auth.admin.createUser({
+                email: data.email,
+                user_metadata: {
+                    full_name: fullName,
+                    categoria: 'laboratorio', // default; admin puede cambiarlo luego
+                },
+                email_confirm: false,
+            });
+            linkType = 'invite';
+        }
+
+        const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+            type: linkType,
+            email: data.email,
+            options: {
+                redirectTo: `${APP_URL}/auth/callback?next=/auth/update-password`,
+                data: { full_name: fullName },
+            },
+        });
+
+        if (!linkError && linkData?.properties?.action_link) {
+            await EmailService.sendInvitation(
+                fullName,
+                data.email,
+                linkData.properties.action_link,
+                data.tipo_trabajo,
+            );
+        } else {
+            console.error('[registerPrestadorPublico] invite link error:', linkError);
+        }
+    } catch (inviteErr) {
+        // No bloqueamos el registro si falla el email; el admin puede reenviar luego
+        console.error('[registerPrestadorPublico] invite error (non-blocking):', inviteErr);
     }
 
     revalidatePath('/caja-admin/personal');
