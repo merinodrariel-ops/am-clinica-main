@@ -56,6 +56,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
+import { shouldRegenerateReceiptAfterEdit } from '@/lib/caja-recepcion/receipt-regeneration';
 
 
 // Types
@@ -712,6 +713,31 @@ function CajaRecepcionContent() {
 
             if (error) throw error;
 
+            if (editingMov.origen !== 'transferencias_caja') {
+                const shouldRegenerateReceipt = shouldRegenerateReceiptAfterEdit(editingMov, {
+                    monto: editMonto,
+                    moneda: editMoneda,
+                    metodo_pago: editMetodo,
+                    concepto_nombre: editConcepto,
+                    estado: editEstado,
+                    fecha_movimiento: newFecha,
+                });
+
+                if (shouldRegenerateReceipt) {
+                    await regenerateReceiptForMovement({
+                        ...editingMov,
+                        monto: editMonto,
+                        moneda: editMoneda,
+                        metodo_pago: editMetodo,
+                        concepto_nombre: editConcepto,
+                        estado: editEstado,
+                        fecha_movimiento: newFecha,
+                        comprobante_url: null,
+                        usd_equivalente,
+                    });
+                }
+            }
+
             // Reload data
             await loadData();
             setEditingMov(null);
@@ -808,9 +834,12 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 : undefined;
 
             const receiptNumber = generateReciboNumber();
+            const receiptDate = mov.fecha_movimiento
+                ? new Date(`${mov.fecha_movimiento}T12:00:00`)
+                : new Date(mov.fecha_hora);
             const imageDataUrl = drawReceiptOnCanvas(canvas, {
                 numero: receiptNumber,
-                fecha: new Date(mov.fecha_hora),
+                fecha: receiptDate,
                 paciente: patientLabel,
                 concepto: mov.concepto_nombre,
                 monto: Math.abs(mov.monto),
