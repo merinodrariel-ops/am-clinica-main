@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import CajaRecepcionClient from './CajaRecepcionClient';
+import CategoriaGuard from '@/components/auth/CategoriaGuard';
 
 export const metadata = {
     title: 'Caja Recepción - AM Clínica',
@@ -8,12 +9,14 @@ export const metadata = {
 
 export default function CajaRecepcionPage() {
     return (
-        <Suspense fallback={
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" />
-            </div>
-        }>
-            <CajaRecepcionClient />
-        </Suspense>
+        <CategoriaGuard allowedCategorias={['admin', 'owner', 'reception']}>
+            <Suspense fallback={
+                <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" />
+                </div>
+            }>
+                <CajaRecepcionClient />
+            </Suspense>
+        </CategoriaGuard>
     );
 }
