@@ -252,6 +252,19 @@ function DoctorColumn({
                             onEventClick(apt);
                         }}
                     >
+                        {apt.status === 'pending' && (
+                            <div
+                                className="pointer-events-none absolute inset-[-2px] rounded-[11px] p-[2px]"
+                                style={{
+                                    animation: 'pendingOrbit 2.7s linear infinite',
+                                    background: 'conic-gradient(from 0deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,0) 210deg, rgba(255,255,255,0.92) 260deg, rgba(255,255,255,0) 320deg, rgba(255,255,255,0) 360deg)',
+                                    WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                    WebkitMaskComposite: 'xor',
+                                    maskComposite: 'exclude',
+                                }}
+                            />
+                        )}
+
                         {/* Status indicator strip */}
                         <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${getStatusBadgeStyle(apt.status)}`} />
 

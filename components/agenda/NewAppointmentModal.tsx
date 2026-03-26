@@ -52,7 +52,8 @@ const APPOINTMENT_TYPE_OPTIONS = [
     { value: 'control_ortodoncia', label: 'Control ortodoncia' },
     { value: 'resinas_diseno_sonrisa', label: 'Diseño de sonrisa en resinas' },
     { value: 'cirugia_implantes', label: 'Cirugía / implantes' },
-    { value: 'limpieza', label: 'Limpieza' },
+    { value: 'limpieza_convencional', label: 'Limpieza convencional' },
+    { value: 'limpieza_laser', label: 'Limpieza con láser' },
     { value: 'cementado', label: 'Cementado' },
     { value: 'tallado', label: 'Tallado' },
     { value: 'botox', label: 'Botox' },
@@ -68,6 +69,8 @@ const TYPE_DURATIONS_MIN: Record<string, number> = {
     resinas_diseno_sonrisa: 240,
     cirugia_implantes: 180,
     limpieza:  60,
+    limpieza_convencional: 60,
+    limpieza_laser: 60,
     botox:     30,
     cementado: 240,
     tallado:   240,
@@ -105,6 +108,15 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     // Doctor Search State
     const [doctorSearch, setDoctorSearch] = useState('');
     const [showDoctorResults, setShowDoctorResults] = useState(false);
+
+    const filteredTarifarioItems = tarifarioItems
+        .filter(item =>
+            item.concepto_nombre.toLowerCase().includes(tarifarioSearch.toLowerCase()) ||
+            item.categoria.toLowerCase().includes(tarifarioSearch.toLowerCase())
+        )
+        .slice(0, 8);
+
+    const filteredDoctors = doctors.filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase()));
 
     const loadDoctors = useCallback(async () => {
         const docs = await getDoctors();
@@ -150,7 +162,13 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setStartTime(toDateTimeLocal(start));
             setEndTime(toDateTimeLocal(end));
             setStatus(initialData.status || 'confirmed');
-            setType(initialData.type === 'urgencia' ? 'control' : (initialData.type || 'consulta'));
+            setType(
+                initialData.type === 'urgencia'
+                    ? 'control'
+                    : initialData.type === 'limpieza'
+                        ? 'limpieza_convencional'
+                        : (initialData.type || 'consulta')
+            );
             setNotes(stripAppointmentMeta(initialData.notes || ''));
             setOrthoReplacementDays(parsedDays ?? 15);
             setSelectedPatientName(initialData.patient?.full_name || '');
@@ -208,6 +226,37 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleEsc = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || loading) return;
+            onClose();
+        };
+
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [isOpen, loading, onClose]);
+
+    const shouldHandleEnterAsSubmit = useCallback((event: React.KeyboardEvent<HTMLFormElement>) => {
+        if (event.key !== 'Enter') return false;
+        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
+
+        const target = event.target as HTMLElement | null;
+        if (!target) return true;
+
+        const tag = target.tagName.toLowerCase();
+        if (tag === 'textarea') return false;
+        if ((target as HTMLInputElement).type === 'button') return false;
+        if ((target as HTMLInputElement).type === 'submit') return false;
+
+        if (target instanceof HTMLInputElement && target.name === 'patient-search' && patients.length > 0) return false;
+        if (target instanceof HTMLInputElement && target.name === 'title-search' && showTarifarioResults && filteredTarifarioItems.length > 0) return false;
+        if (target instanceof HTMLInputElement && target.name === 'doctor-search' && showDoctorResults && filteredDoctors.length > 0) return false;
+
+        return true;
+    }, [filteredDoctors.length, filteredTarifarioItems.length, patients.length, showDoctorResults, showTarifarioResults]);
+
     const selectTarifarioItem = (item: TarifarioItem) => {
         setTitle(item.concepto_nombre);
         setTarifarioSearch(item.concepto_nombre);
@@ -217,6 +266,12 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
         if (categoria.includes('cirugia')) {
             setType('cirugia_implantes');
+        } else if (categoria.includes('limpieza') || concepto.includes('limpieza')) {
+            if (concepto.includes('laser') || concepto.includes('láser')) {
+                setType('limpieza_laser');
+            } else {
+                setType('limpieza_convencional');
+            }
         } else if (categoria.includes('control') || concepto.includes('control')) {
             if (concepto.includes('ortodoncia') || concepto.includes('alineador')) {
                 setType('control_ortodoncia');
@@ -320,7 +375,15 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     </Button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                <form
+                    onSubmit={handleSubmit}
+                    onKeyDown={(event) => {
+                        if (loading || !shouldHandleEnterAsSubmit(event)) return;
+                        event.preventDefault();
+                        event.currentTarget.requestSubmit();
+                    }}
+                    className="p-6 space-y-5"
+                >
 
                     {/* Patient Search - Hero Field */}
                     <div className="relative group">
@@ -365,6 +428,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     <Search className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <Input
+                                    name="patient-search"
                                     type="text"
                                     placeholder="Buscar por nombre..."
                                     className="block w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
@@ -434,6 +498,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Título / Tratamiento</label>
                         <div className="relative">
                             <Input
+                                name="title-search"
                                 type="text"
                                 required
                                 placeholder="Ej: Limpieza Dental"
@@ -455,13 +520,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                         {/* Tarifario Search Results */}
                         {showTarifarioResults && tarifarioSearch.length >= 2 && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 max-h-48 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
-                                {tarifarioItems
-                                    .filter(item =>
-                                        item.concepto_nombre.toLowerCase().includes(tarifarioSearch.toLowerCase()) ||
-                                        item.categoria.toLowerCase().includes(tarifarioSearch.toLowerCase())
-                                    )
-                                    .slice(0, 8)
-                                    .map(item => (
+                                {filteredTarifarioItems.map(item => (
                                         <Button
                                             key={item.id}
                                             type="button"
@@ -477,10 +536,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                         </Button>
                                     ))
                                 }
-                                {tarifarioItems.filter(item =>
-                                    item.concepto_nombre.toLowerCase().includes(tarifarioSearch.toLowerCase()) ||
-                                    item.categoria.toLowerCase().includes(tarifarioSearch.toLowerCase())
-                                ).length === 0 && (
+                                {filteredTarifarioItems.length === 0 && (
                                         <div className="px-4 py-3 text-xs text-gray-500 italic">
                                             No se encontraron servicios exactos. Puedes usar un concepto libre.
                                         </div>
@@ -520,6 +576,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             <div className="relative">
                                 <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <Input
+                                    name="doctor-search"
                                     type="text"
                                     placeholder="Buscar odontologo..."
                                     className="block w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"

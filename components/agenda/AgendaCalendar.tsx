@@ -90,6 +90,8 @@ interface DropConfirmData {
     arg: EventDropArg;
 }
 
+type CleaningAppointmentType = 'limpieza_convencional' | 'limpieza_laser';
+
 type ViewMode = 'calendar' | 'resource';
 
 const STATUS_FLOW: { key: string; label: string; color: string }[] = [
@@ -108,6 +110,23 @@ const DOCTOR_COLORS = [
 ];
 
 const SURGERY_APPOINTMENT_TYPES = new Set(['cirugia_implantes', 'cirugia']);
+
+function inferCleaningType(type: string | null | undefined, title: string | null | undefined): CleaningAppointmentType {
+    if (type === 'limpieza_laser') return 'limpieza_laser';
+    if (type === 'limpieza_convencional') return 'limpieza_convencional';
+
+    const normalizedTitle = (title || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
+    if (normalizedTitle.includes('laser')) return 'limpieza_laser';
+    return 'limpieza_convencional';
+}
+
+function getCleaningTitle(type: CleaningAppointmentType): string {
+    return type === 'limpieza_laser' ? 'Limpieza con láser' : 'Limpieza convencional';
+}
 
 function getDoctorColor(doctorId: string, doctors: Doctor[]): string {
     const idx = doctors.findIndex(d => d.id === doctorId);
@@ -422,8 +441,9 @@ export default function AgendaCalendar() {
                 .fc-toolbar { padding:1rem 1.25rem .5rem; margin-bottom:0!important; }
                 .fc-timegrid-slot:not(.fc-timegrid-slot-label):hover { background-color:rgba(59,130,246,.06); cursor:cell; }
                 .fc-timegrid-slot:not(.fc-timegrid-slot-label):hover::after { content:'+ Agendar'; position:absolute; left:50%; transform:translateX(-50%); font-size:.65rem; font-weight:600; color:#3b82f6; opacity:.7; pointer-events:none; }
-                .tentative-event { opacity:.65; background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.25) 4px,rgba(255,255,255,.25) 8px)!important; border-style:dashed!important; }
-                .tentative-event::before { content:'⏳ '; font-size:.7rem; }
+                .tentative-event { opacity:.9; border:1px solid rgba(255,255,255,.22)!important; overflow:visible!important; isolation:isolate; }
+                .tentative-event::after { content:''; position:absolute; inset:-2px; border-radius:10px; padding:2px; background:conic-gradient(from 0deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,0) 210deg, rgba(255,255,255,.9) 260deg, rgba(255,255,255,0) 320deg, rgba(255,255,255,0) 360deg); -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; animation:pendingOrbit 2.7s linear infinite; pointer-events:none; }
+                @keyframes pendingOrbit { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
                 .fc-button { border-radius:8px!important; font-weight:500!important; text-transform:capitalize!important; padding:.35rem .9rem!important; box-shadow:none!important; border:1px solid transparent!important; transition:all .2s!important; }
                 .fc-button-primary { background-color:white!important; color:#374151!important; border-color:#e5e7eb!important; }
                 .fc-button-primary:hover { background-color:#f9fafb!important; border-color:#d1d5db!important; }
@@ -664,6 +684,8 @@ export default function AgendaCalendar() {
                                 control_ortodoncia: 'Ctrl ortodoncia',
                                 resinas_diseno_sonrisa: 'Resinas sonrisa',
                                 cirugia_implantes: 'Cirugía / implantes',
+                                limpieza_convencional: 'Limpieza convencional',
+                                limpieza_laser: 'Limpieza con láser',
                                 urgencia: 'Control / urgencia',
                                 limpieza: 'Limpieza',
                                 cementado: 'Cementado',
@@ -1035,31 +1057,65 @@ export default function AgendaCalendar() {
                         {/* Próximo control */}
                         {quickPopup.fullData.patientId && canEdit && (
                             <div className="px-3 pb-2">
-                                <button
-                                    onClick={() => {
-                                        const nextDate = new Date();
-                                        nextDate.setMonth(nextDate.getMonth() + 6);
-                                        nextDate.setHours(10, 0, 0, 0);
-                                        const nextEnd = new Date(nextDate);
-                                        nextEnd.setHours(11, 0, 0, 0);
-                                        openFullModal({
-                                            title: '',
-                                            start: nextDate,
-                                            end: nextEnd,
-                                            patientId: quickPopup.fullData.patientId,
-                                            doctorId: quickPopup.fullData.doctorId,
-                                            status: 'confirmed',
-                                            type: 'control',
-                                            notes: '',
-                                            patient: quickPopup.fullData.patient,
-                                            doctor: quickPopup.fullData.doctor,
-                                        });
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 rounded-xl transition-colors"
-                                >
-                                    <CalendarPlus size={14} />
-                                    Agendar próximo control (+6 meses)
-                                </button>
+                                {(['limpieza', 'limpieza_convencional', 'limpieza_laser'].includes(quickPopup.fullData.type) ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[4, 6].map((months) => (
+                                            <button
+                                                key={months}
+                                                onClick={() => {
+                                                    const sourceStart = new Date(quickPopup.fullData.start);
+                                                    const durationMs = Math.max(30 * 60 * 1000, new Date(quickPopup.fullData.end).getTime() - sourceStart.getTime());
+                                                    const nextDate = new Date(sourceStart);
+                                                    nextDate.setMonth(nextDate.getMonth() + months);
+                                                    const nextEnd = new Date(nextDate.getTime() + durationMs);
+                                                    const cleaningType = inferCleaningType(quickPopup.fullData.type, quickPopup.fullData.title);
+
+                                                    openFullModal({
+                                                        title: getCleaningTitle(cleaningType),
+                                                        start: nextDate,
+                                                        end: nextEnd,
+                                                        patientId: quickPopup.fullData.patientId,
+                                                        doctorId: quickPopup.fullData.doctorId,
+                                                        status: 'pending',
+                                                        type: cleaningType,
+                                                        notes: '',
+                                                        patient: quickPopup.fullData.patient,
+                                                        doctor: quickPopup.fullData.doctor,
+                                                    });
+                                                }}
+                                                className="w-full flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 rounded-xl transition-colors"
+                                            >
+                                                <CalendarPlus size={14} />
+                                                {`Limpieza +${months} meses`}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            const nextDate = new Date(quickPopup.fullData.start);
+                                            nextDate.setMonth(nextDate.getMonth() + 6);
+                                            const durationMs = Math.max(30 * 60 * 1000, new Date(quickPopup.fullData.end).getTime() - new Date(quickPopup.fullData.start).getTime());
+                                            const nextEnd = new Date(nextDate.getTime() + durationMs);
+                                            openFullModal({
+                                                title: '',
+                                                start: nextDate,
+                                                end: nextEnd,
+                                                patientId: quickPopup.fullData.patientId,
+                                                doctorId: quickPopup.fullData.doctorId,
+                                                status: 'pending',
+                                                type: 'control',
+                                                notes: '',
+                                                patient: quickPopup.fullData.patient,
+                                                doctor: quickPopup.fullData.doctor,
+                                            });
+                                        }}
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 rounded-xl transition-colors"
+                                    >
+                                        <CalendarPlus size={14} />
+                                        Agendar próximo control (+6 meses)
+                                    </button>
+                                ))}
                             </div>
                         )}
 
