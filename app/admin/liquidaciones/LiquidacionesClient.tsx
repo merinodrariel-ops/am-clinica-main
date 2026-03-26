@@ -20,10 +20,13 @@ import {
     markLiquidacionesEmpresaPaid,
     rejectLiquidacion,
     updateLiquidacionManual,
+    getPrestacionesDelMes,
     LiquidacionAdminRow,
     LiquidacionResult,
     UpdateLiquidacionManualInput,
+    type PrestacionRealizada,
 } from '@/app/actions/liquidaciones';
+import PrestacionesDetallePanel from '@/components/admin/liquidaciones/PrestacionesDetallePanel';
 import {
     getPrestacionesCatalogoCompleto,
     createPrestacionCatalogoItem,
@@ -1397,6 +1400,8 @@ export default function LiquidacionesPage() {
     const [editing, setEditing] = useState<{ row: LiquidacionAdminRow; liq: LiquidacionResult } | null>(null);
     const [savingEdit, setSavingEdit] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [prestacionesData, setPrestacionesData] = useState<Record<string, PrestacionRealizada[]>>({});
+    const [prestacionesLoading, setPrestacionesLoading] = useState<string | null>(null);
     const [detalleHorasTarget, setDetalleHorasTarget] = useState<LiquidacionAdminRow | null>(null);
     const [detalleHorasRows, setDetalleHorasRows] = useState<RegistroHoras[]>([]);
     const [detalleHorasLoading, setDetalleHorasLoading] = useState(false);
@@ -1891,6 +1896,32 @@ export default function LiquidacionesPage() {
         }
     }
 
+    async function loadPrestacionesForRow(personalId: string, rowMes: string) {
+        if (prestacionesData[personalId]) return;
+        setPrestacionesLoading(personalId);
+        try {
+            const data = await getPrestacionesDelMes(personalId, rowMes);
+            setPrestacionesData(prev => ({ ...prev, [personalId]: data }));
+        } catch {
+            toast.error('No se pudieron cargar las prestaciones');
+        } finally {
+            setPrestacionesLoading(null);
+        }
+    }
+
+    async function refreshPrestacionesForRow(personalId: string, rowMes: string) {
+        setPrestacionesLoading(personalId);
+        try {
+            const data = await getPrestacionesDelMes(personalId, rowMes);
+            setPrestacionesData(prev => ({ ...prev, [personalId]: data }));
+            await load();
+        } catch {
+            toast.error('No se pudo recargar');
+        } finally {
+            setPrestacionesLoading(null);
+        }
+    }
+
     // ── Render ───────────────────────────────────────────────────────────────
     return (
         <div className="min-h-screen bg-slate-950 text-white p-6">
@@ -2376,7 +2407,13 @@ export default function LiquidacionesPage() {
                                                     <td className="px-2 py-3 text-center">
                                                         {liq ? (
                                                             <button
-                                                                onClick={() => setExpandedRow(isExpanded ? null : row.personal_id)}
+                                                                onClick={() => {
+                                                                    const next = isExpanded ? null : row.personal_id;
+                                                                    setExpandedRow(next);
+                                                                    if (next && liq && (liq.modelo_pago || row.modelo_pago) === 'prestacion_usd') {
+                                                                        loadPrestacionesForRow(row.personal_id, mes);
+                                                                    }
+                                                                }}
                                                                 className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
                                                                 title={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
                                                             >
@@ -2547,27 +2584,43 @@ export default function LiquidacionesPage() {
 
                                                 {liq && isExpanded && (
                                                     <tr className="bg-slate-950/60">
-                                                        <td colSpan={6} className="px-4 py-3">
-                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">TC</p>
-                                                                    <p className="text-sm text-white font-semibold">{Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
+                                                        <td colSpan={6} className="px-4 py-4">
+                                                            {(liq.modelo_pago || row.modelo_pago) === 'prestacion_usd' ? (
+                                                                prestacionesLoading === row.personal_id ? (
+                                                                    <p className="text-xs text-slate-500 animate-pulse py-2">Cargando prestaciones...</p>
+                                                                ) : (
+                                                                    <PrestacionesDetallePanel
+                                                                        liquidacionId={liq.id}
+                                                                        personalId={row.personal_id}
+                                                                        mes={mes}
+                                                                        prestaciones={prestacionesData[row.personal_id] || []}
+                                                                        liquidacionEstado={liq.estado}
+                                                                        tc={Number(liq.tc_liquidacion || 1050)}
+                                                                        onRefresh={() => refreshPrestacionesForRow(row.personal_id, mes)}
+                                                                    />
+                                                                )
+                                                            ) : (
+                                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">TC</p>
+                                                                        <p className="text-sm text-white font-semibold">{Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
+                                                                    </div>
+                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Precio</p>
+                                                                        <p className="text-sm text-white font-semibold">
+                                                                            {manualOverride?.moneda === 'USD' ? 'USD' : 'ARS'} {Number(manualOverride?.precio_unitario || liq.valor_hora_snapshot || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Cantidad</p>
+                                                                        <p className="text-sm text-white font-semibold">{Number(manualOverride?.cantidad || liq.total_horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
+                                                                    </div>
+                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Observaciones</p>
+                                                                        <p className="text-sm text-slate-200 truncate">{liq.observaciones || 'Sin notas'}</p>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Precio</p>
-                                                                    <p className="text-sm text-white font-semibold">
-                                                                        {manualOverride?.moneda === 'USD' ? 'USD' : 'ARS'} {Number(manualOverride?.precio_unitario || liq.valor_hora_snapshot || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
-                                                                    </p>
-                                                                </div>
-                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Cantidad</p>
-                                                                    <p className="text-sm text-white font-semibold">{Number(manualOverride?.cantidad || liq.total_horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
-                                                                </div>
-                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Observaciones</p>
-                                                                    <p className="text-sm text-slate-200 truncate">{liq.observaciones || 'Sin notas'}</p>
-                                                                </div>
-                                                            </div>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 )}

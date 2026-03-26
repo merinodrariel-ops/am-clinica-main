@@ -687,3 +687,155 @@ export async function getMonthlyLeaderboard(limit = 10): Promise<LeaderboardEntr
         ranking: Number(row.ranking),
     }));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRESTACIONES REALIZADAS — CRUD + RECÁLCULO
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PrestacionRealizada {
+    id: string;
+    profesional_id: string;
+    prestacion_nombre: string;
+    fecha_realizacion: string;
+    monto_honorarios: number;
+    slides_url: string | null;
+}
+
+export interface UpsertPrestacionInput {
+    id?: string;           // si undefined → INSERT, si presente → UPDATE
+    profesional_id: string;
+    prestacion_nombre: string;
+    fecha_realizacion: string;   // 'YYYY-MM-DD'
+    monto_honorarios: number;    // USD
+    slides_url?: string | null;
+}
+
+export async function getPrestacionesDelMes(
+    personalId: string,
+    mes: string   // 'YYYY-MM'
+): Promise<PrestacionRealizada[]> {
+    const admin = getAdminClient();
+    const [y, m] = mes.split('-').map(Number);
+    const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const endDate = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const { data, error } = await admin
+        .from('prestaciones_realizadas')
+        .select('id, profesional_id, prestacion_nombre, fecha_realizacion, monto_honorarios, slides_url')
+        .eq('profesional_id', personalId)
+        .gte('fecha_realizacion', startDate)
+        .lte('fecha_realizacion', endDate)
+        .order('fecha_realizacion', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as PrestacionRealizada[];
+}
+
+export async function upsertPrestacion(
+    input: UpsertPrestacionInput
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const admin = getAdminClient();
+        if (input.id) {
+            const { error } = await admin
+                .from('prestaciones_realizadas')
+                .update({
+                    prestacion_nombre: input.prestacion_nombre,
+                    fecha_realizacion: input.fecha_realizacion,
+                    monto_honorarios: input.monto_honorarios,
+                    slides_url: input.slides_url ?? null,
+                })
+                .eq('id', input.id);
+            if (error) throw error;
+        } else {
+            const { error } = await admin
+                .from('prestaciones_realizadas')
+                .insert({
+                    profesional_id: input.profesional_id,
+                    prestacion_nombre: input.prestacion_nombre,
+                    fecha_realizacion: input.fecha_realizacion,
+                    monto_honorarios: input.monto_honorarios,
+                    slides_url: input.slides_url ?? null,
+                });
+            if (error) throw error;
+        }
+        revalidatePath('/admin/liquidaciones');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'Error' };
+    }
+}
+
+export async function deletePrestacion(
+    id: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const admin = getAdminClient();
+        const { error } = await admin
+            .from('prestaciones_realizadas')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+        revalidatePath('/admin/liquidaciones');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'Error' };
+    }
+}
+
+export async function recalcularTotalesLiquidacion(
+    liquidacionId: string,
+    personalId: string,
+    mes: string  // 'YYYY-MM'
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const admin = getAdminClient();
+        const tcBnaVenta = await fetchBnaVenta();
+
+        const prestaciones = await getPrestacionesDelMes(personalId, mes);
+        const withSlides = prestaciones.filter(p => p.slides_url);
+        const withoutSlides = prestaciones.filter(p => !p.slides_url);
+
+        const rawUsd = withSlides.reduce((s, p) => s + Number(p.monto_honorarios || 0), 0);
+        const totalUsd = Math.round(rawUsd * 100) / 100;
+        const totalArs = Math.round(rawUsd * tcBnaVenta * 100) / 100;
+
+        const breakdown = {
+            con_slides: withSlides.map(p => ({
+                id: p.id,
+                descripcion: p.prestacion_nombre,
+                monto_usd: p.monto_honorarios,
+                fecha: p.fecha_realizacion,
+            })),
+            sin_slides: withoutSlides.map(p => ({
+                id: p.id,
+                descripcion: p.prestacion_nombre,
+                monto_usd: p.monto_honorarios,
+                fecha: p.fecha_realizacion,
+            })),
+            tc_bna_venta: tcBnaVenta,
+            total_usd: totalUsd,
+            total_ars: totalArs,
+        };
+
+        const { error } = await admin
+            .from('liquidaciones_mensuales')
+            .update({
+                total_usd: totalUsd,
+                total_ars: totalArs,
+                tc_liquidacion: tcBnaVenta,
+                prestaciones_validadas: withSlides.length,
+                prestaciones_pendientes: withoutSlides.length,
+                breakdown,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', liquidacionId);
+
+        if (error) throw error;
+        revalidatePath('/admin/liquidaciones');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'Error' };
+    }
+}
