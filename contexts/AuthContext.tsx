@@ -8,6 +8,7 @@ import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
 const supabase = createClient();
 
 import { WorkerCategory } from '@/types/worker-portal';
+import { AccessOverrides, getCategoryDefault } from '@/lib/access-overrides';
 
 interface Profile {
     id: string;
@@ -15,6 +16,7 @@ interface Profile {
     full_name: string | null;
     categoria: WorkerCategory;
     is_active: boolean;
+    access_overrides: AccessOverrides | null;
 }
 
 interface AuthContextType {
@@ -30,6 +32,7 @@ interface AuthContextType {
     impersonatedCategoria: WorkerCategory | null;
     setImpersonatedCategoria: (categoria: WorkerCategory | null) => void;
     canEdit: (module: string) => boolean;
+    moduleAccess: (key: string) => 'full' | 'read' | 'none';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -81,7 +84,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         email: user.email || null,
                         full_name: (user.user_metadata?.full_name as string) || null,
                         categoria: (normalizeCategoriaAlias(user.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
-                        is_active: true
+                        is_active: true,
+                        access_overrides: null
                     });
                 }
             } else if (data) {
@@ -128,7 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     email: currentUser.email || null,
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
                     categoria: (normalizeCategoriaAlias(currentUser.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
-                    is_active: true
+                    is_active: true,
+                    access_overrides: null
                 });
                 fetchProfile(currentUser.id);
             } else {
@@ -149,7 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     email: currentUser.email || null,
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
                     categoria: (normalizeCategoriaAlias(currentUser.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
-                    is_active: true
+                    is_active: true,
+                    access_overrides: null
                 });
                 fetchProfile(currentUser.id);
             } else {
@@ -174,6 +180,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isAdmin = effectiveCategoria === 'admin' || effectiveCategoria === 'owner';
     const isOwner = effectiveCategoria === 'owner';
+
+    // Per-user module access: checks access_overrides first, then falls back to category defaults.
+    const moduleAccess = (key: string): 'full' | 'read' | 'none' => {
+        const overrides = profile?.access_overrides;
+        if (overrides && key in overrides) {
+            const level = overrides[key];
+            if (level === 'none') return 'none';
+            if (level === 'edit') return 'full';
+            if (level === 'read') return 'read';
+            // 'inherit' falls through to category default
+        }
+        const cat = effectiveCategoria || 'partner_viewer';
+        return getCategoryDefault(cat, key) === 'full' ? 'full' : 'none';
+    };
 
     // Permission Logic (Simplified Default Rule)
     const canEdit = (module: string): boolean => {
@@ -231,7 +251,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isRealOwner,
             impersonatedCategoria,
             setImpersonatedCategoria: handleSetImpersonatedCategoria,
-            canEdit
+            canEdit,
+            moduleAccess
         }}>
             {children}
         </AuthContext.Provider>

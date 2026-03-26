@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import {
     Plus, MoreVertical, Mail, Ban, CheckCircle,
-    Edit2, RotateCcw, Search, User as UserIcon, Phone
+    Edit2, RotateCcw, Search, User as UserIcon, Phone, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { inviteUser, suspendUser, reactivateUser, resetUserPassword, updateUser, resendInvitation } from '@/app/actions/user-management';
+import { inviteUser, suspendUser, reactivateUser, resetUserPassword, updateUser, resendInvitation, updateUserAccessOverrides } from '@/app/actions/user-management';
+import UserPermissionsPanel from '@/components/admin/UserPermissionsPanel';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { useRouter } from 'next/navigation';
 
@@ -19,6 +21,7 @@ interface User {
     created_at: string;
     last_sign_in_at?: string;
     invitation_sent_at?: string;
+    access_overrides?: Record<string, string> | null;
 }
 
 const APP_CATEGORY_OPTIONS = [
@@ -45,12 +48,15 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
     const [search, setSearch] = useState('');
 
     const router = useRouter();
+    const { user: currentUser } = useAuth();
 
     // Modals
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [loadingAction, setLoadingAction] = useState(false);
+    const [editOverrides, setEditOverrides] = useState<Record<string, string>>({});
+    const [showPermissionsPanel, setShowPermissionsPanel] = useState(false);
 
     // Refresh data (naive implementation, better to leverage server revalidation)
     // Users are passed from server component, but for interactive updates without full reload:
@@ -82,7 +88,7 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
 
     const handleEdit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedUser) return;
+        if (!selectedUser || !currentUser) return;
 
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
@@ -93,7 +99,11 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
         };
 
         const success = await handleAction(() => updateUser(selectedUser.id, data));
-        if (success) setShowEditModal(false);
+        if (!success) return;
+
+        // Save access overrides
+        await updateUserAccessOverrides(selectedUser.id, editOverrides, currentUser.id);
+        setShowEditModal(false);
     };
 
     const filteredUsers = users.filter(u =>
@@ -206,7 +216,12 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                                         {/* Dropdown Menu (Quick CSS-only implementation for brevity, usually use Headless UI) */}
                                         <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 py-1 z-10 hidden group-hover/menu:block hover:block">
                                             <button
-                                                onClick={() => { setSelectedUser(user); setShowEditModal(true); }}
+                                                onClick={() => {
+                                                    setSelectedUser(user);
+                                                    setEditOverrides(user.access_overrides ? { ...user.access_overrides } : {});
+                                                    setShowPermissionsPanel(false);
+                                                    setShowEditModal(true);
+                                                }}
                                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
                                             >
                                                 <Edit2 size={16} /> Editar
@@ -292,32 +307,56 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
             {/* Edit Modal */}
             {showEditModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
-                        <h3 className="text-xl font-bold mb-4">Editar Usuario</h3>
-                        <form onSubmit={handleEdit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Nombre Completo</label>
-                                <input name="fullName" defaultValue={selectedUser.full_name} type="text" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">WhatsApp</label>
-                                <input name="whatsapp" defaultValue={selectedUser.whatsapp || ''} type="tel" className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Categoría</label>
-                                <select name="categoria" defaultValue={selectedUser.categoria} required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
-                                    {APP_CATEGORY_OPTIONS.map((catOption) => (
-                                        <option key={catOption.value} value={catOption.value}>{catOption.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex justify-end gap-2 mt-6">
-                                <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
-                                <button disabled={loadingAction} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                                    {loadingAction ? 'Guardando...' : 'Guardar Cambios'}
-                                </button>
-                            </div>
-                        </form>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <h3 className="text-xl font-bold mb-4">Editar Usuario</h3>
+                            <form onSubmit={handleEdit} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Nombre Completo</label>
+                                    <input name="fullName" defaultValue={selectedUser.full_name} type="text" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">WhatsApp</label>
+                                    <input name="whatsapp" defaultValue={selectedUser.whatsapp || ''} type="tel" className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Categoría</label>
+                                    <select name="categoria" defaultValue={selectedUser.categoria} required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700">
+                                        {APP_CATEGORY_OPTIONS.map((catOption) => (
+                                            <option key={catOption.value} value={catOption.value}>{catOption.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Permissions panel */}
+                                <div className="border dark:border-gray-700 rounded-xl overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPermissionsPanel(p => !p)}
+                                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900/50 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900/80 transition-colors"
+                                    >
+                                        <span>Acceso por módulo</span>
+                                        {showPermissionsPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    </button>
+                                    {showPermissionsPanel && (
+                                        <div className="p-4 bg-zinc-900">
+                                            <UserPermissionsPanel
+                                                categoria={selectedUser.categoria}
+                                                overrides={editOverrides}
+                                                onChange={setEditOverrides}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-end gap-2 mt-6">
+                                    <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Cancelar</button>
+                                    <button disabled={loadingAction} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                        {loadingAction ? 'Guardando...' : 'Guardar Cambios'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}

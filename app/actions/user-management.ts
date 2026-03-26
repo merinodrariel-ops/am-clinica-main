@@ -594,3 +594,45 @@ export async function setUserPassword(targetUserId: string, newPassword: string,
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
+
+export async function updateUserAccessOverrides(
+    targetUserId: string,
+    overrides: Record<string, string>,
+    requesterId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!targetUserId || !requesterId) throw new Error('Datos inválidos');
+
+        // Verify requester is owner or admin
+        const { data: requesterProfile, error: reqError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, categoria')
+            .eq('id', requesterId)
+            .single();
+
+        if (reqError || !requesterProfile || !['owner', 'admin'].includes(requesterProfile.categoria)) {
+            throw new Error('No autorizado: solo owner o admin pueden modificar permisos');
+        }
+
+        // Sanitize: drop 'inherit' entries (NULL = inherit all is the default)
+        const sanitized: Record<string, string> = {};
+        for (const [key, value] of Object.entries(overrides)) {
+            if (['read', 'edit', 'none'].includes(value)) {
+                sanitized[key] = value;
+            }
+        }
+        const overridesToStore = Object.keys(sanitized).length > 0 ? sanitized : null;
+
+        const { error } = await supabaseAdmin
+            .from('profiles')
+            .update({ access_overrides: overridesToStore })
+            .eq('id', targetUserId);
+
+        if (error) throw error;
+
+        revalidatePath('/admin-users');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}

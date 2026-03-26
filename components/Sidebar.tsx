@@ -35,73 +35,84 @@ const MENU_ITEMS = [
         icon: LayoutDashboard,
         label: 'Dashboard',
         href: '/dashboard',
+        key: null,
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'odontologo', 'recaptacion']
     },
     {
         icon: CalendarDays,
         label: 'Agenda 360',
         href: '/agenda',
+        key: 'agenda',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: Users,
         label: 'Pacientes',
         href: '/patients',
+        key: 'patients',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: Banknote,
         label: 'Caja Recepción',
         href: '/caja-recepcion',
+        key: 'caja_recepcion',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer']
     },
     {
         icon: Wallet,
         label: 'Caja Administración',
         href: '/caja-admin',
+        key: 'caja_admin',
         roles: ['owner', 'admin', 'partner_viewer', 'developer']
     },
     {
         icon: Package,
         label: 'Inventario',
         href: '/inventario',
+        key: 'inventario',
         roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio', 'asistente']
     },
     {
         icon: GitGraph,
         label: 'Workflows',
         href: '/workflows',
+        key: 'workflows',
         roles: ['owner', 'admin', 'reception', 'developer', 'laboratorio', 'asistente', 'odontologo']
     },
     {
         icon: Bell,
         label: 'Recall Engine',
         href: '/recalls',
+        key: 'recalls',
         roles: ['owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: CheckSquare,
         label: 'Tareas',
         href: '/todos',
+        key: 'todos',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
     },
     {
         icon: Briefcase,
         label: 'Mi Portal',
         href: '/portal/dashboard',
+        key: 'portal',
         roles: ['owner', 'admin', 'odontologo', 'asistente', 'laboratorio']
     },
     {
         icon: Mail,
         label: 'Templates Email',
         href: '/admin/email-templates',
+        key: 'email_templates',
         roles: ['owner', 'admin', 'developer']
     },
 ];
 
 export default function Sidebar() {
     const pathname = usePathname();
-    const { categoria, profile, signOut, user, isRealOwner, impersonatedCategoria, setImpersonatedCategoria } = useAuth();
+    const { categoria, profile, signOut, user, isRealOwner, impersonatedCategoria, setImpersonatedCategoria, moduleAccess } = useAuth();
     const [collapsed, setCollapsed] = useState(() => readSidebarCollapsed());
     const [mobileOpen, setMobileOpen] = useState(false);
     const [isDesktop, setIsDesktop] = useState(() =>
@@ -256,7 +267,10 @@ export default function Sidebar() {
                 </div>
 
                 <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-                    {MENU_ITEMS.filter(item => item.roles.includes(userCategoria)).map((item) => {
+                    {MENU_ITEMS.filter(item => {
+                        if (item.key && moduleAccess(item.key) === 'none') return false;
+                        return item.roles.includes(userCategoria);
+                    }).map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname.startsWith(item.href);
 
