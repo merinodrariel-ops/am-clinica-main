@@ -610,8 +610,8 @@ export async function updateUserAccessOverrides(
             .eq('id', requesterId)
             .single();
 
-        if (reqError || !requesterProfile || !['owner', 'admin'].includes(requesterProfile.categoria)) {
-            throw new Error('No autorizado: solo owner o admin pueden modificar permisos');
+        if (reqError || !requesterProfile || requesterProfile.categoria !== 'owner') {
+            throw new Error('No autorizado: solo el dueño puede modificar permisos de acceso');
         }
 
         // Sanitize: drop 'inherit' entries (NULL = inherit all is the default)

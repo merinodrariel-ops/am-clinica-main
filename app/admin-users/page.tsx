@@ -58,7 +58,7 @@ export default function UserManagementPage() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    const { session } = useAuth();
+    const { session, isOwner } = useAuth();
     const [users, setUsers] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [showInviteModal, setShowInviteModal] = useState(false);
@@ -702,26 +702,28 @@ export default function UserManagementPage() {
                                     />
                                 </div>
 
-                                {/* Permissions panel */}
-                                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPermissionsPanel(p => !p)}
-                                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/50 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                    >
-                                        <span>Acceso por módulo</span>
-                                        {showPermissionsPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                    </button>
-                                    {showPermissionsPanel && (
-                                        <div className="p-4 bg-zinc-900">
-                                            <UserPermissionsPanel
-                                                categoria={editData.categoria}
-                                                overrides={editOverrides}
-                                                onChange={setEditOverrides}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
+                                {/* Permissions panel — solo visible para el owner */}
+                                {isOwner && (
+                                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPermissionsPanel(p => !p)}
+                                            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/50 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        >
+                                            <span>Acceso por módulo</span>
+                                            {showPermissionsPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                        </button>
+                                        {showPermissionsPanel && (
+                                            <div className="p-4 bg-zinc-900">
+                                                <UserPermissionsPanel
+                                                    categoria={editData.categoria}
+                                                    overrides={editOverrides}
+                                                    onChange={setEditOverrides}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {editStatus === 'error' && (
                                     <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
