@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import UserPermissionsPanel from '@/components/admin/UserPermissionsPanel';
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface Profile {
     id: string;
@@ -91,6 +92,11 @@ export default function UserManagementPage() {
     const [selectedUserForPassword, setSelectedUserForPassword] = useState<Profile | null>(null);
     const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
     const [passwordStatus, setPasswordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+    // Keyboard shortcuts for modals
+    useModalKeyboard(showEditModal, () => setShowEditModal(false), handleEditSubmit);
+    useModalKeyboard(showInviteModal, () => setShowInviteModal(false), handleInvite);
+    useModalKeyboard(showPasswordModal, () => setShowPasswordModal(false), handlePasswordSubmit);
 
     const loadUsers = useCallback(async () => {
         try {
@@ -214,7 +220,7 @@ export default function UserManagementPage() {
                 email: editData.email,
                 estado: editData.estado,
                 is_active: editData.isActive,
-            });
+            }, session.user.id);
 
             if (result.success) {
                 // Save access overrides

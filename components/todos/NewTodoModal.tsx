@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -57,6 +58,8 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData, pro
     const [isPinned, setIsPinned] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<{ title?: string }>({});
+
+    useModalKeyboard(isOpen, onClose);
 
     useEffect(() => {
         if (initialData) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 import { X, DollarSign, Check, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -35,6 +36,7 @@ interface ExpenseData {
 export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: NuevoGastoFormProps) {
     const { user } = useAuth();
     const [saving, setSaving] = useState(false);
+    useModalKeyboard(isOpen, onClose, () => { if (!saving) handleSubmit(); });
     const receiptCanvasRef = useRef<HTMLCanvasElement>(null);
 
     // Form data

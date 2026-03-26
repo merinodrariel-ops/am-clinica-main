@@ -241,14 +241,22 @@ interface UpdateUserData {
     is_active?: boolean;
 }
 
-export async function updateUser(userId: string, data: UpdateUserData) {
+export async function updateUser(userId: string, data: UpdateUserData, requesterId?: string) {
     try {
         const normalizedCategoria = typeof data.categoria === 'string'
             ? (normalizeCategoriaAlias(data.categoria) || undefined)
             : undefined;
 
+        // Block category changes to provider roles, UNLESS the requester is the owner
         if (typeof normalizedCategoria === 'string' && PROVIDER_MANAGED_CATEGORIES.has(normalizedCategoria)) {
-            throw new Error('Las altas y cambios de categoría de prestadores se gestionan desde Prestadores / Personal.');
+            let requesterIsOwner = false;
+            if (requesterId) {
+                const { data: rp } = await supabaseAdmin.from('profiles').select('categoria').eq('id', requesterId).single();
+                requesterIsOwner = rp?.categoria === 'owner';
+            }
+            if (!requesterIsOwner) {
+                throw new Error('Las altas y cambios de categoría de prestadores se gestionan desde Prestadores / Personal.');
+            }
         }
 
         const profilePatch: Record<string, unknown> = {

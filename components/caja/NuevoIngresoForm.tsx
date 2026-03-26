@@ -639,6 +639,23 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         return true;
     }
 
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && !saving) { handleClose(); return; }
+            if (event.key === 'Enter' && !saving) {
+                const tag = (event.target as HTMLElement).tagName;
+                if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT' || tag === 'A') return;
+                event.preventDefault();
+                handleSubmit();
+            }
+        };
+
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [handleClose, handleSubmit, isOpen, saving]);
+
     if (!isOpen) return null;
 
     const currentTotalUsd = useMultiplePayments ? getMixedUsdTotal(paymentSplits) : calculateUsdEquivalent();

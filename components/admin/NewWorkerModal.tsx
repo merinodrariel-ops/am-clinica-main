@@ -26,6 +26,12 @@ interface Props {
 
 export default function NewWorkerModal({ onClose, onCreated }: Props) {
     const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose, saving]);
     const [tipo, setTipo] = useState<'prestador' | 'odontologo'>('prestador');
     const [createdWorkerId, setCreatedWorkerId] = useState<string | null>(null);
     const [showContractPrompt, setShowContractPrompt] = useState(false);
