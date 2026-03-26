@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { resendUserAccessEmail, inviteUser, setUserPassword, updateUser, deleteUserAccount } from '@/app/actions/user-management';
+import { resendUserAccessEmail, inviteUser, setUserPassword, updateUser, deleteUserAccount, updateUserAccessOverrides } from '@/app/actions/user-management';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import {
     Mail,
@@ -16,8 +16,11 @@ import {
     Edit2,
     Search,
     Trash2,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import UserPermissionsPanel from '@/components/admin/UserPermissionsPanel';
 
 interface Profile {
     id: string;
@@ -28,6 +31,7 @@ interface Profile {
     estado?: string;
     is_active: boolean;
     created_at: string;
+    access_overrides?: Record<string, string> | null;
 }
 
 const APP_CATEGORY_OPTIONS = [
@@ -78,6 +82,8 @@ export default function UserManagementPage() {
     const [selectedUserForEdit, setSelectedUserForEdit] = useState<Profile | null>(null);
     const [editData, setEditData] = useState({ fullName: '', categoria: '', whatsapp: '', email: '', estado: '', isActive: true });
     const [editStatus, setEditStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'success_refresh'>('idle');
+    const [editOverrides, setEditOverrides] = useState<Record<string, string>>({});
+    const [showPermissionsPanel, setShowPermissionsPanel] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Password Reset Manual State
@@ -187,6 +193,8 @@ export default function UserManagementPage() {
             estado: user.estado || (user.is_active ? 'activo' : 'inactivo'),
             isActive: user.is_active,
         });
+        setEditOverrides(user.access_overrides ? { ...user.access_overrides } : {});
+        setShowPermissionsPanel(false);
         setEditStatus('idle');
         setErrorMessage('');
         setShowEditModal(true);
@@ -209,6 +217,8 @@ export default function UserManagementPage() {
             });
 
             if (result.success) {
+                // Save access overrides
+                await updateUserAccessOverrides(selectedUserForEdit.id, editOverrides, session.user.id);
                 setEditStatus('success');
                 setActionMessage({ type: 'success', text: 'Usuario actualizado correctamente.' });
                 setTimeout(() => {
@@ -616,7 +626,7 @@ export default function UserManagementPage() {
                 {/* Edit User Modal */}
                 {showEditModal && selectedUserForEdit && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
                             <div className="p-6 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <Edit2 className="text-blue-600" size={20} />
@@ -690,6 +700,27 @@ export default function UserManagementPage() {
                                         onChange={e => setEditData({ ...editData, whatsapp: e.target.value })}
                                         placeholder="+54 9 ..."
                                     />
+                                </div>
+
+                                {/* Permissions panel */}
+                                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPermissionsPanel(p => !p)}
+                                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/50 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    >
+                                        <span>Acceso por módulo</span>
+                                        {showPermissionsPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    </button>
+                                    {showPermissionsPanel && (
+                                        <div className="p-4 bg-zinc-900">
+                                            <UserPermissionsPanel
+                                                categoria={editData.categoria}
+                                                overrides={editOverrides}
+                                                onChange={setEditOverrides}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {editStatus === 'error' && (
