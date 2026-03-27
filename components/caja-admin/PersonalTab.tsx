@@ -48,6 +48,9 @@ import {
     getRegistroHoras,
     getLiquidaciones,
     registrarHoras,
+    updateRegistroHoras,
+    eliminarRegistroHoras,
+    calculateWorkedHours,
     generarLiquidacion,
     countObservadosPendientes,
     createPersonal,
@@ -113,6 +116,15 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [personalAreas, setPersonalAreas] = useState<PersonalArea[]>([]);
     const [registros, setRegistros] = useState<RegistroHoras[]>([]);
+    const [editingHorasRegistro, setEditingHorasRegistro] = useState<RegistroHoras | null>(null);
+    const [horasEditForm, setHorasEditForm] = useState({
+        hora_ingreso: '',
+        hora_egreso: '',
+        salida_dia_siguiente: false,
+        observaciones: '',
+        fecha: '',
+        horas: 0
+    });
     const [liquidaciones, setLiquidaciones] = useState<LiquidacionMensual[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -191,6 +203,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         personal_id: '',
         fecha: new Date().toISOString().split('T')[0],
         horas: 0,
+        hora_ingreso: '',
+        hora_egreso: '',
+        salida_dia_siguiente: false,
         observaciones: '',
     });
     const [submitting, setSubmitting] = useState(false);
@@ -371,6 +386,18 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setActiveTab(initialTab === 'equipo' ? 'prestadores' : initialTab);
     }, [initialTab]);
 
+    // Auto-calculate hours in form
+    useEffect(() => {
+        if (horasForm.hora_ingreso && horasForm.hora_egreso) {
+            const calculated = calculateWorkedHours({
+                horaIngreso: horasForm.hora_ingreso,
+                horaEgreso: horasForm.hora_egreso,
+                salidaDiaSiguiente: horasForm.salida_dia_siguiente
+            });
+            setHorasForm(prev => ({ ...prev, horas: calculated }));
+        }
+    }, [horasForm.hora_ingreso, horasForm.hora_egreso, horasForm.salida_dia_siguiente]);
+
     function openEditForm(p: Personal) {
         setEditingPersonal(p);
         setFormData({
@@ -538,24 +565,74 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     }
 
     async function handleRegistrarHoras() {
-        if (!horasForm.personal_id || horasForm.horas <= 0) return;
+        if (!horasForm.personal_id || (horasForm.horas <= 0 && (!horasForm.hora_ingreso || !horasForm.hora_egreso))) return;
 
         setSubmitting(true);
-        await registrarHoras(
+        const result = await registrarHoras(
             horasForm.personal_id,
             horasForm.fecha,
             horasForm.horas,
-            horasForm.observaciones || undefined
+            horasForm.observaciones || undefined,
+            horasForm.hora_ingreso || undefined,
+            horasForm.hora_egreso || undefined,
+            horasForm.salida_dia_siguiente
         );
+
+        if (result.success) {
+            toast.success('Horas registradas correctamente');
+            setShowHorasForm(false);
+            setHorasForm({
+                personal_id: personal[0]?.id || '',
+                fecha: new Date().toISOString().split('T')[0],
+                horas: 0,
+                hora_ingreso: '',
+                hora_egreso: '',
+                salida_dia_siguiente: false,
+                observaciones: '',
+            });
+            loadData();
+        } else {
+            toast.error(result.error || 'Error al registrar horas');
+        }
         setSubmitting(false);
-        setShowHorasForm(false);
-        setHorasForm({
-            personal_id: personal[0]?.id || '',
-            fecha: new Date().toISOString().split('T')[0],
-            horas: 0,
-            observaciones: '',
+    }
+
+    async function handleUpdateRegistroHoras() {
+        if (!editingHorasRegistro) return;
+
+        setSubmitting(true);
+        const result = await updateRegistroHoras(editingHorasRegistro.id, {
+            hora_ingreso: horasEditForm.hora_ingreso,
+            hora_egreso: horasEditForm.hora_egreso,
+            salida_dia_siguiente: horasEditForm.salida_dia_siguiente,
+            observaciones: horasEditForm.observaciones,
+            fecha: horasEditForm.fecha,
+            horas: horasEditForm.horas
         });
-        loadData();
+
+        if (result.success) {
+            toast.success('Registro actualizado correctamente');
+            setEditingHorasRegistro(null);
+            loadData();
+        } else {
+            toast.error(result.error || 'Error al actualizar registro');
+        }
+        setSubmitting(false);
+    }
+
+    async function handleEliminarRegistroHoras(id: string) {
+        if (!confirm('¿Estás seguro de que querés eliminar este registro?')) return;
+
+        setSubmitting(true);
+        const result = await eliminarRegistroHoras(id);
+
+        if (result.success) {
+            toast.success('Registro eliminado');
+            loadData();
+        } else {
+            toast.error(result.error || 'Error al eliminar');
+        }
+        setSubmitting(false);
     }
 
     async function handleRegistrarPrestacion() {
@@ -2203,6 +2280,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                 personal_id: p.id,
                                                                 fecha: new Date().toISOString().split('T')[0],
                                                                 horas: 0,
+                                                                hora_ingreso: '',
+                                                                hora_egreso: '',
+                                                                salida_dia_siguiente: false,
                                                                 observaciones: '',
                                                             });
                                                             setShowHorasForm(true);
@@ -2289,9 +2369,70 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         />
                                     </div>
 
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Horas *
+                                            Ingreso
+                                        </label>
+                                        <Input
+                                            type="time"
+                                            value={horasForm.hora_ingreso}
+                                            onChange={(e) => {
+                                                const newIngreso = e.target.value;
+                                                const newHoras = calculateWorkedHours({
+                                                    horaIngreso: newIngreso,
+                                                    horaEgreso: horasForm.hora_egreso,
+                                                    salidaDiaSiguiente: horasForm.salida_dia_siguiente
+                                                });
+                                                setHorasForm({ ...horasForm, hora_ingreso: newIngreso, horas: newHoras });
+                                            }}
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Egreso
+                                        </label>
+                                        <div className="flex flex-col gap-2">
+                                            <Input
+                                                type="time"
+                                                value={horasForm.hora_egreso}
+                                                onChange={(e) => {
+                                                    const newEgreso = e.target.value;
+                                                    const newHoras = calculateWorkedHours({
+                                                        horaIngreso: horasForm.hora_ingreso,
+                                                        horaEgreso: newEgreso,
+                                                        salidaDiaSiguiente: horasForm.salida_dia_siguiente
+                                                    });
+                                                    setHorasForm({ ...horasForm, hora_egreso: newEgreso, horas: newHoras });
+                                                }}
+                                                className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            />
+                                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={horasForm.salida_dia_siguiente}
+                                                    onChange={(e) => {
+                                                        const newVal = e.target.checked;
+                                                        const newHoras = calculateWorkedHours({
+                                                            horaIngreso: horasForm.hora_ingreso,
+                                                            horaEgreso: horasForm.hora_egreso,
+                                                            salidaDiaSiguiente: newVal
+                                                        });
+                                                        setHorasForm({ ...horasForm, salida_dia_siguiente: newVal, horas: newHoras });
+                                                    }}
+                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                                <span className="text-xs text-slate-500 font-medium">Sale el día siguiente</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Total Horas *
                                         </label>
                                         <Input
                                             type="number"
@@ -2299,11 +2440,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             min="0"
                                             value={horasForm.horas}
                                             onChange={(e) => setHorasForm({ ...horasForm, horas: parseFloat(e.target.value) || 0 })}
-                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                            className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-bold text-indigo-600"
                                         />
                                     </div>
 
-                                    <div>
+                                    <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Observaciones
                                         </label>
@@ -2597,6 +2738,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Personal</th>
                                             <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Horas</th>
                                             <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Observaciones</th>
+                                            <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -2608,8 +2750,45 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         {new Date(reg.fecha).toLocaleDateString('es-AR')}
                                                     </td>
                                                     <td className="px-6 py-3 text-sm font-medium">{persona?.nombre || '-'}</td>
-                                                    <td className="px-6 py-3 text-sm text-center font-bold">{reg.horas}h</td>
+                                                    <td className="px-6 py-3 text-sm text-center font-bold">
+                                                        <div className="flex flex-col items-center">
+                                                            <span>{reg.horas}h</span>
+                                                            {reg.salida_dia_siguiente && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">
+                                                                    Cruza medianoche
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                     <td className="px-6 py-3 text-sm text-slate-500">{reg.observaciones || '-'}</td>
+                                                    <td className="px-6 py-3 text-right text-sm">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingHorasRegistro(reg);
+                                                                    setHorasEditForm({
+                                                                        fecha: reg.fecha,
+                                                                        hora_ingreso: reg.hora_ingreso || '',
+                                                                        hora_egreso: reg.hora_egreso || '',
+                                                                        salida_dia_siguiente: reg.salida_dia_siguiente || false,
+                                                                        observaciones: reg.observaciones || '',
+                                                                        horas: reg.horas
+                                                                    });
+                                                                }}
+                                                                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                                                title="Editar registro"
+                                                            >
+                                                                <Pencil className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleEliminarRegistroHoras(reg.id)}
+                                                                className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                                                title="Eliminar registro"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
@@ -2802,6 +2981,129 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     onClose={() => setPortfolioModal(null)}
                 />
             )}
+            {/* Modal Editar Horas */}
+            <AnimatePresence>
+                {editingHorasRegistro && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm shadow-2xl">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700"
+                        >
+                            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Editar Registro de Horas</h2>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                        Modificando registro del {new Date(horasEditForm.fecha).toLocaleDateString('es-AR')}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setEditingHorasRegistro(null)}
+                                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 transition-colors"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="p-8 space-y-6">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Ingreso</label>
+                                        <input
+                                            type="time"
+                                            value={horasEditForm.hora_ingreso}
+                                            onChange={(e) => {
+                                                const newIngreso = e.target.value;
+                                                const newHoras = calculateWorkedHours({
+                                                    horaIngreso: newIngreso,
+                                                    horaEgreso: horasEditForm.hora_egreso,
+                                                    salidaDiaSiguiente: horasEditForm.salida_dia_siguiente
+                                                });
+                                                setHorasEditForm({ ...horasEditForm, hora_ingreso: newIngreso, horas: newHoras });
+                                            }}
+                                            className="w-full px-4 py-3 rounded-2xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 transition-all font-mono text-lg"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Egreso</label>
+                                        <div className="space-y-3">
+                                            <input
+                                                type="time"
+                                                value={horasEditForm.hora_egreso}
+                                                onChange={(e) => {
+                                                    const newEgreso = e.target.value;
+                                                    const newHoras = calculateWorkedHours({
+                                                        horaIngreso: horasEditForm.hora_ingreso,
+                                                        horaEgreso: newEgreso,
+                                                        salidaDiaSiguiente: horasEditForm.salida_dia_siguiente
+                                                    });
+                                                    setHorasEditForm({ ...horasEditForm, hora_egreso: newEgreso, horas: newHoras });
+                                                }}
+                                                className="w-full px-4 py-3 rounded-2xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 transition-all font-mono text-lg"
+                                            />
+                                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={horasEditForm.salida_dia_siguiente}
+                                                    onChange={(e) => {
+                                                        const newVal = e.target.checked;
+                                                        const newHoras = calculateWorkedHours({
+                                                            horaIngreso: horasEditForm.hora_ingreso,
+                                                            horaEgreso: horasEditForm.hora_egreso,
+                                                            salidaDiaSiguiente: newVal
+                                                        });
+                                                        setHorasEditForm({ ...horasEditForm, salida_dia_siguiente: newVal, horas: newHoras });
+                                                    }}
+                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shadow-sm transition-all"
+                                                />
+                                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Sale el día siguiente</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800">
+                                    <div className="flex items-center gap-3">
+                                        <Clock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                        <span className="text-sm font-medium text-indigo-900 dark:text-indigo-100">Cálculo de Horas Totales</span>
+                                    </div>
+                                    <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
+                                        {horasEditForm.horas}h
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Observaciones</label>
+                                    <textarea
+                                        value={horasEditForm.observaciones}
+                                        onChange={(e) => setHorasEditForm({ ...horasEditForm, observaciones: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-2xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 h-24 focus:ring-2 focus:ring-indigo-500 resize-none transition-all"
+                                        placeholder="Ej: Ajuste por marcación olvidada..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700 mt-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setEditingHorasRegistro(null)}
+                                    className="px-6 py-2.5 rounded-2xl font-bold border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                                >
+                                    Cerrar
+                                </Button>
+                                <Button
+                                    onClick={handleUpdateRegistroHoras}
+                                    disabled={submitting}
+                                    className="px-8 py-2.5 rounded-2xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20 transform transition-all active:scale-95 disabled:opacity-50"
+                                >
+                                    {submitting ? 'Guardando...' : 'Aplicar Cambios'}
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div >
     );
 }

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { MessageCircle, Sparkles, Star } from 'lucide-react';
 import { ImageComparator } from '@/components/patients/ImageComparator';
 
-const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEAE/review';
+const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
 
 function SmileComparisonContent() {
     const searchParams = useSearchParams();

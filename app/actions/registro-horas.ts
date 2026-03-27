@@ -20,6 +20,7 @@ export interface RegistroHoras {
     horas: number;
     hora_ingreso: string | null;
     hora_egreso: string | null;
+    salida_dia_siguiente: boolean | null;
     estado: string;
     observaciones: string | null;
     created_at: string;
@@ -47,6 +48,7 @@ export interface EditarRegistroInput {
         horas?: number;
         hora_ingreso?: string;
         hora_egreso?: string;
+        salida_dia_siguiente?: boolean;
         fecha?: string;
     };
 }
@@ -103,7 +105,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
 
     const { data } = await admin
         .from('registro_horas')
-        .select('personal_id, horas, hora_ingreso, hora_egreso, personal!inner(nombre, apellido)')
+        .select('personal_id, horas, hora_ingreso, hora_egreso, salida_dia_siguiente, personal!inner(nombre, apellido)')
         .gte('fecha', start)
         .lte('fecha', end);
 
@@ -190,7 +192,7 @@ export async function editarRegistroHoras(
     // Fetch current values for audit log
     const { data: current, error: fetchErr } = await admin
         .from('registro_horas')
-        .select('horas, hora_ingreso, hora_egreso, fecha')
+        .select('horas, hora_ingreso, hora_egreso, salida_dia_siguiente, fecha')
         .eq('id', input.registroId)
         .single();
 
@@ -208,8 +210,8 @@ export async function editarRegistroHoras(
     if (updateErr) return { success: false, error: updateErr.message };
 
     // Insert audit records for each changed field
-    const auditRows: object[] = [];
-    const campos = ['horas', 'hora_ingreso', 'hora_egreso', 'fecha'] as const;
+    const auditRows: any[] = [];
+    const campos = ['horas', 'hora_ingreso', 'hora_egreso', 'salida_dia_siguiente', 'fecha'] as const;
 
     for (const campo of campos) {
         if (input.cambios[campo] !== undefined) {

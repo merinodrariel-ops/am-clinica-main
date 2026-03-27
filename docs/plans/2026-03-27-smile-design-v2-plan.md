@@ -604,7 +604,7 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '' 
         style={{ left: `${pos}%`, transform: 'translateX(-50%)' }}
       >
         {/* Handle */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white shadow-xl flex items-center justify-content-center">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white shadow-xl flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-600 mx-auto" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M8 12h8M15 9l3 3-3 3M9 9l-3 3 3 3" />
           </svg>

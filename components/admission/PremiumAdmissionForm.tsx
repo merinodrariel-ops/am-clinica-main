@@ -1049,13 +1049,13 @@ export default function PremiumAdmissionForm() {
                 <div className="space-y-3 pt-4">
                     <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider ml-1">3. Cómo llegar</p>
                     <div className="grid grid-cols-2 gap-3">
-                        <a href="https://maps.app.goo.gl/MF3w2f2qPGMgUwKx5" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group text-center">
+                        <a href="https://maps.app.goo.gl/5kWar9VL6qjhdEGM7" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group text-center">
                             <div className="flex flex-col items-center gap-2">
                                 <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><MapPin className="w-5 h-5" /></div>
                                 <h4 className="text-sm font-medium text-white group-hover:text-zinc-300 transition-colors">Google Maps</h4>
                             </div>
                         </a>
-                        <a href="https://waze.com/ul/hd1uy2s0h8" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group text-center">
+                        <a href="https://waze.com/ul/h69y7pcqyu" target="_blank" className="block p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-white/30 hover:bg-white/5 transition-all group text-center">
                             <div className="flex flex-col items-center gap-2">
                                 <div className="w-10 h-10 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center shrink-0"><Navigation className="w-5 h-5" /></div>
                                 <h4 className="text-sm font-medium text-white group-hover:text-zinc-300 transition-colors">Waze</h4>

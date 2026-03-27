@@ -995,7 +995,10 @@ export async function registrarHoras(
     personalId: string,
     fecha: string,
     horas: number,
-    observaciones?: string
+    observaciones?: string,
+    horaIngreso?: string,
+    horaEgreso?: string,
+    salidaDiaSiguiente?: boolean
 ): Promise<{ success: boolean; error?: string }> {
     const { error } = await getSupabase()
         .from('registro_horas')
@@ -1004,6 +1007,10 @@ export async function registrarHoras(
             fecha,
             horas,
             observaciones,
+            hora_ingreso: horaIngreso,
+            hora_egreso: horaEgreso,
+            salida_dia_siguiente: salidaDiaSiguiente,
+            estado: 'Registrado'
         });
 
     if (error) {
@@ -1011,6 +1018,41 @@ export async function registrarHoras(
     }
     return { success: true };
 }
+
+export async function updateRegistroHoras(
+    id: string,
+    updates: {
+        fecha?: string;
+        horas?: number;
+        observaciones?: string;
+        hora_ingreso?: string;
+        hora_egreso?: string;
+        salida_dia_siguiente?: boolean;
+    }
+): Promise<{ success: boolean; error?: string }> {
+    const { error } = await getSupabase()
+        .from('registro_horas')
+        .update(updates)
+        .eq('id', id);
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+    return { success: true };
+}
+
+export async function eliminarRegistroHoras(id: string): Promise<{ success: boolean; error?: string }> {
+    const { error } = await getSupabase()
+        .from('registro_horas')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+    return { success: true };
+}
+
 
 export async function getLiquidaciones(options: {
     personalId?: string;

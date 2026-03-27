@@ -104,7 +104,7 @@ export function generatePremiumWelcomeEmail(nombre: string, portalUrl?: string):
                                     <td width="30" valign="top" style="color:rgba(255,255,255,0.3);padding-top:2px;font-size:16px;">📍</td>
                                     <td style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.5;">
                                         <strong>Location:</strong> Camila O'Gorman 412, Piso 17, Dpto. 1701, Puerto Madero. <br>
-                                        <a href="https://maps.app.goo.gl/4uU7dtb4Q1RYHeVw8" style="color:#C9A96E;text-decoration:none;font-size:12px;">Cómo llegar &rarr;</a>
+                                        <a href="https://maps.app.goo.gl/5kWar9VL6qjhdEGM7" style="color:#C9A96E;text-decoration:none;font-size:12px;">Cómo llegar &rarr;</a>
                                     </td>
                                 </tr>
                             </table>

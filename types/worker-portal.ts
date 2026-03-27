@@ -91,6 +91,7 @@ export interface WorkLog {
 
     hora_ingreso?: string;
     hora_egreso?: string;
+    salida_dia_siguiente?: boolean;
     evidencia_url?: string;
 
     created_at: string;

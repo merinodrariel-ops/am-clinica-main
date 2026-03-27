@@ -778,6 +778,7 @@ export async function importProsoftData(
                 horas: reg.horas,
                 hora_ingreso: reg.entrada,
                 hora_egreso: reg.salida,
+                salida_dia_siguiente: reg.salidaDiaSiguiente ?? false,
                 estado,
                 motivo_observado: motivoObservado,
                 original_hora_ingreso: reg.entrada,
