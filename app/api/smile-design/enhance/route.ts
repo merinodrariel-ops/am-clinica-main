@@ -3,49 +3,74 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-// Intensity descriptions (1=natural, 10=Hollywood)
-const INTENSITY: Record<number, string> = {
-    1: 'Subtle Touch-up — preserve original shapes, clean only',
-    2: 'Natural Cleaning — professional polish, very subtle',
-    3: 'Gentle Whitening — natural appearance, healthy look',
-    4: 'Professional Whitening — noticeable but balanced',
-    5: 'Balanced Aesthetic — healthy, symmetrical and bright',
-    6: 'Enhanced Cosmetic — bright, standard cosmetic dentistry',
-    7: 'High-End Transformation — very bright and perfectly aligned',
-    8: 'Premium Hollywood — brilliant white, major impact',
-    9: 'Ultra-Premium Hollywood — top-tier aesthetic result',
-    10: 'Maximum Transformation — blinding white, flawless symmetry',
+const LEVEL_PROMPTS: Record<string, string> = {
+    'Natural': 'Keep whitening extremely subtle — healthy clean look, no artificial brightness. Preserve the original tooth shade, just clean.',
+    'Natural White': 'Apply moderate natural whitening — brighter than the original but still looks completely natural and healthy, not artificial.',
+    'Natural Ultra White': 'Apply maximum whitening while maintaining a natural appearance — very bright but with realistic translucency and texture.',
+};
+
+const EDGES_PROMPTS: Record<string, string> = {
+    'Sutil': 'Add very subtle incisal translucency — barely noticeable blue-white edge effect.',
+    'Medio': 'Add natural incisal translucency — the typical blue-white edge seen in healthy young teeth.',
+    'Marcado': 'Add prominent incisal translucency — clearly visible blue-white edge effect for dramatic aesthetic result.',
+};
+
+const TEXTURE_PROMPTS: Record<string, string> = {
+    'Sutil': 'Add very subtle surface micro-texture — smooth with just a hint of natural tooth structure.',
+    'Medio': 'Add natural surface micro-texture — the typical horizontal perikymata and subtle lobes of healthy teeth.',
+    'Detallado': 'Add detailed realistic surface texture — prominent perikymata, lobes, and natural surface variations.',
+};
+
+// Legacy intensity → level mapping
+const LEGACY_LEVEL: Record<number, string> = {
+    1: 'Natural', 2: 'Natural', 3: 'Natural',
+    4: 'Natural White', 5: 'Natural White', 6: 'Natural White',
+    7: 'Natural Ultra White', 8: 'Natural Ultra White',
+    9: 'Natural Ultra White', 10: 'Natural Ultra White',
 };
 
 export async function POST(req: NextRequest) {
     try {
-        const { imageBase64, mimeType, intensity } = await req.json();
+        const {
+            imageBase64, mimeType,
+            level, edges, edgesIntensity, texture, textureIntensity, shape,
+            intensity, // legacy
+        } = await req.json();
 
         if (!imageBase64 || !mimeType) {
             return NextResponse.json({ error: 'imageBase64 and mimeType required' }, { status: 400 });
         }
 
-        const level = Math.max(1, Math.min(10, Math.round(intensity ?? 5)));
+        // Resolve whitening level
+        const resolvedLevel: string = level
+            ?? LEGACY_LEVEL[Math.max(1, Math.min(10, Math.round(intensity ?? 5)))]
+            ?? 'Natural White';
 
-        const aestheticPrompt = level <= 2
-            ? 'slightly whiter, cleaner teeth. Remove visible stains and yellowing. Keep the natural shape and alignment.'
-            : level <= 5
-                ? 'noticeably whiter and straighter teeth. Improve alignment to be more symmetrical. Use a natural bright shade (like Vita A1).'
-                : level <= 8
-                    ? 'bright, perfectly aligned teeth like professional porcelain veneers. Use a very white shade (like BL3). Straighten and perfect the dental arch.'
-                    : 'ultra-bright, perfectly symmetrical Hollywood-style teeth. Maximum whiteness. Flawless alignment and shape.';
+        const baseWhitening = LEVEL_PROMPTS[resolvedLevel] ?? LEVEL_PROMPTS['Natural White'];
+        const edgesInstruction = edges && edgesIntensity ? EDGES_PROMPTS[edgesIntensity] ?? '' : '';
+        const textureInstruction = texture && textureIntensity ? TEXTURE_PROMPTS[textureIntensity] ?? '' : '';
+        const shapeInstruction = shape && Math.abs(shape) > 0.1
+            ? shape < 0
+                ? 'Soften tooth shapes slightly — more rounded, feminine incisal edges and gentle curves.'
+                : 'Slightly square the tooth shapes — more defined incisal line angles and masculine proportions.'
+            : '';
 
-        const prompt = `Edit this photograph. Replace the visible teeth in this person's smile with ${aestheticPrompt}
+        const prompt = `You are an expert cosmetic dentist performing digital smile design. Enhance the teeth in this patient photo with the following specifications:
 
-The new teeth must look photorealistic and match the photo's lighting and shadows. Keep the rest of the face, lips, skin, and background completely unchanged.
+WHITENING: ${baseWhitening}
+${edgesInstruction ? `INCISAL EDGES: ${edgesInstruction}` : ''}
+${textureInstruction ? `SURFACE TEXTURE: ${textureInstruction}` : ''}
+${shapeInstruction ? `TOOTH SHAPE: ${shapeInstruction}` : ''}
 
-Quality guidelines for the teeth:
-- They should look like a real photograph, not CGI or a digital overlay.
-- Match the existing lighting direction and color temperature.
-- Include natural enamel texture and slight surface reflections.
-- The gum line should look natural and sharp.`;
+CRITICAL RULES:
+- Only modify the teeth — preserve the face, skin, lips, gums exactly as they are
+- Maintain exact facial proportions, lighting, and shadows
+- Result must look like a real photograph, not CGI
+- Close any diastemas (gaps between teeth) naturally
+- Align teeth symmetrically while preserving the patient's natural anatomy
+- Do not change the patient's smile arc or lip shape`;
 
-        console.log(`[smile-design/enhance] Processing request: level=${level}, mimeType=${mimeType}, imageSize=${imageBase64.length} chars`);
+        console.log(`[smile-design/enhance] level=${resolvedLevel}, edges=${edges}, texture=${texture}, shape=${shape}, imageSize=${imageBase64.length}`);
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.0-flash-exp-image-generation',
@@ -64,10 +89,9 @@ Quality guidelines for the teeth:
         const imagePart = parts.find((p) => p.inlineData?.data);
         const textPart = parts.find((p) => p.text);
 
-        console.log(`[smile-design/enhance] Response: hasImage=${!!imagePart}, text=${textPart?.text?.slice(0, 200) ?? 'none'}, imageSizeChars=${imagePart?.inlineData?.data?.length ?? 0}`);
+        console.log(`[smile-design/enhance] hasImage=${!!imagePart}, text=${textPart?.text?.slice(0, 100) ?? 'none'}`);
 
         if (!imagePart?.inlineData?.data) {
-            console.error('[smile-design/enhance] No image in response. Text:', textPart?.text);
             return NextResponse.json({ error: 'Gemini did not return an image. Try again or use a different photo.' }, { status: 502 });
         }
 
@@ -79,10 +103,7 @@ Quality guidelines for the teeth:
         console.error('[smile-design/enhance]', err);
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('limit: 0')) {
-            return NextResponse.json({
-                error: 'Quota de generación de imágenes agotada. Activá la facturación en Google Cloud Console para usar este modelo.',
-                billing: true,
-            }, { status: 429 });
+            return NextResponse.json({ error: 'Quota de generación de imágenes agotada. Activá la facturación en Google Cloud Console.', billing: true }, { status: 429 });
         }
         if (msg.includes('API_KEY_INVALID') || msg.includes('401')) {
             return NextResponse.json({ error: 'API Key de Gemini inválida. Verificá GEMINI_API_KEY en .env.local.' }, { status: 401 });
