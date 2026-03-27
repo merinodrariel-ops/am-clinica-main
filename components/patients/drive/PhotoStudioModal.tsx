@@ -16,6 +16,10 @@ import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction } from '@/app/actions/patient-files-drive';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
+import { useSmileDesign } from '@/hooks/useSmileDesign';
+import SmileDesignPanel from './SmileDesignPanel';
+import BeforeAfterSlider from './BeforeAfterSlider';
+import { saveSmileDesignResult, getSmileShareUrl } from '@/app/actions/smile-design';
 
 interface PhotoStudioModalProps {
     file: DriveFile | null;
@@ -503,6 +507,14 @@ export default function PhotoStudioModal({
 
     // Tools panel visibility
     const [toolsHidden, setToolsHidden] = useState(false);
+
+    // ── Smile Design ──────────────────────────────────────────────────────────
+    const smileDesign = useSmileDesign();
+    const [smileMode, setSmileMode] = useState(false);
+    const [showSmileGrid, setShowSmileGrid] = useState(false);
+    const [smileSaved, setSmileSaved] = useState(false);
+    const [smileProcessingTime, setSmileProcessingTime] = useState<number | null>(null);
+    const smileStartTimeRef = useRef<number | null>(null);
 
     // Multi-select + web download state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -2954,6 +2966,42 @@ export default function PhotoStudioModal({
                                 <span className="hidden sm:inline">Presentación</span>
                             </button>
                         )}
+                        {/* Smile Design button */}
+                        {!canvasActive && (
+                            <button
+                                onClick={async () => {
+                                    if (smileMode) {
+                                        smileDesign.reset();
+                                        setSmileMode(false);
+                                        setShowSmileGrid(false);
+                                        setSmileSaved(false);
+                                        return;
+                                    }
+                                    try {
+                                        const res = await fetch(imageUrl);
+                                        const blob = await res.blob();
+                                        setSmileMode(true);
+                                        setSmileSaved(false);
+                                        setShowSmileGrid(false);
+                                        setSmileProcessingTime(null);
+                                        smileStartTimeRef.current = Date.now();
+                                        await smileDesign.process(blob);
+                                        if (smileStartTimeRef.current) {
+                                            setSmileProcessingTime((Date.now() - smileStartTimeRef.current) / 1000);
+                                        }
+                                    } catch {
+                                        toast.error('No se pudo iniciar Smile Design');
+                                    }
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                                    smileMode
+                                        ? 'bg-purple-600/20 border-purple-500/40 text-purple-300'
+                                        : 'bg-white/10 border-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                                }`}
+                            >
+                                ✨ <span className="hidden sm:inline">Smile Design</span>
+                            </button>
+                        )}
                         {canSave && (
                             <button
                                 onClick={() => {
@@ -3348,6 +3396,41 @@ export default function PhotoStudioModal({
                             )}
                         </div>
 
+                        {/* Smile Design before/after overlay */}
+                        {smileMode && smileDesign.result && (
+                            <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#0D0D12] z-10">
+                                <div className="relative w-full h-full">
+                                    <BeforeAfterSlider
+                                        beforeSrc={smileDesign.result.beforeDataUrl}
+                                        afterSrc={smileDesign.result.afterDataUrl}
+                                        className="w-full h-full"
+                                    />
+                                    {showSmileGrid && smileDesign.gridData && (
+                                        <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" xmlns="http://www.w3.org/2000/svg">
+                                            {smileDesign.gridData.bipupilarY != null && (
+                                                <line x1="0" y1={`${smileDesign.gridData.bipupilarY * 100}%`} x2="100%" y2={`${smileDesign.gridData.bipupilarY * 100}%`} stroke="#fbbf24" strokeWidth="1" strokeDasharray="6 3" opacity="0.8" />
+                                            )}
+                                            {smileDesign.gridData.smileLineY != null && (
+                                                <line x1="0" y1={`${smileDesign.gridData.smileLineY * 100}%`} x2="100%" y2={`${smileDesign.gridData.smileLineY * 100}%`} stroke="#34d399" strokeWidth="1" strokeDasharray="6 3" opacity="0.8" />
+                                            )}
+                                            {smileDesign.gridData.midlineX != null && (
+                                                <line x1={`${smileDesign.gridData.midlineX * 100}%`} y1="0" x2={`${smileDesign.gridData.midlineX * 100}%`} y2="100%" stroke="#60a5fa" strokeWidth="1" strokeDasharray="6 3" opacity="0.7" />
+                                            )}
+                                        </svg>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        {/* Smile Design processing overlay */}
+                        {smileMode && (smileDesign.state === 'aligning' || smileDesign.state === 'enhancing') && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0D0D12]/90 z-20">
+                                <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-3" />
+                                <p className="text-white/70 text-sm">
+                                    {smileDesign.state === 'aligning' ? 'Auto-alineando...' : 'Generando smile design...'}
+                                </p>
+                            </div>
+                        )}
+
                         {/* Zoom indicator badge */}
                         {zoom > 1 && (
                             <div className="absolute bottom-3 right-3 z-10 px-2 py-1 rounded-md bg-black/50 text-white/70 text-xs font-mono pointer-events-none select-none">
@@ -3388,6 +3471,60 @@ export default function PhotoStudioModal({
 
                     {/* Tools panel — right side on desktop */}
                     <div className={`${toolsHidden ? '!hidden' : ''} hidden md:flex flex-col w-64 border-l border-white/10 overflow-y-auto flex-shrink-0 bg-black/20`}>
+                        {smileMode ? (
+                            <SmileDesignPanel
+                                state={smileDesign.state}
+                                result={smileDesign.result}
+                                gridData={smileDesign.gridData}
+                                settings={smileDesign.settings}
+                                onSettingsChange={smileDesign.setSettings}
+                                onRegenerate={async () => {
+                                    smileStartTimeRef.current = Date.now();
+                                    await smileDesign.regenerate();
+                                    if (smileStartTimeRef.current) {
+                                        setSmileProcessingTime((Date.now() - smileStartTimeRef.current) / 1000);
+                                    }
+                                }}
+                                onSave={async () => {
+                                    if (!smileDesign.result) return;
+                                    const res = await saveSmileDesignResult({
+                                        patientId: Number(patientId),
+                                        beforeDataUrl: smileDesign.result.beforeDataUrl,
+                                        afterBase64: smileDesign.result.afterBase64,
+                                        afterMime: smileDesign.result.afterMime,
+                                        settings: smileDesign.settings,
+                                    });
+                                    if (res.success) {
+                                        setSmileSaved(true);
+                                        toast.success('✨ Smile design guardado en Drive');
+                                        onSaved();
+                                    } else {
+                                        toast.error(res.error || 'Error al guardar');
+                                    }
+                                }}
+                                onShareLink={async () => {
+                                    const res = await getSmileShareUrl(Number(patientId));
+                                    if (res.success && res.url) {
+                                        await navigator.clipboard.writeText(res.url);
+                                        toast.success('Link copiado. Compartí con el paciente.');
+                                    } else {
+                                        toast.error(res.error || 'Error al generar link');
+                                    }
+                                }}
+                                onExit={() => {
+                                    smileDesign.reset();
+                                    setSmileMode(false);
+                                    setShowSmileGrid(false);
+                                    setSmileSaved(false);
+                                }}
+                                showGrid={showSmileGrid}
+                                onToggleGrid={() => setShowSmileGrid(prev => !prev)}
+                                canShare={smileSaved}
+                                error={smileDesign.error}
+                                processingTime={smileProcessingTime}
+                            />
+                        ) : (
+                        <>
                         {/* Panel header — just the hide button, title is already inside ToolsPanel */}
                         <div className="flex items-center justify-end px-4 pt-3 pb-0 flex-shrink-0">
                             <button
@@ -3485,6 +3622,8 @@ export default function PhotoStudioModal({
                             onClearCanvasLayers={() => { setCanvasLayers([]); setCanvasSelectedId(null); }}
                         />
                         </div>
+                        </>
+                        )}
                     </div>
                 </div>
 
