@@ -441,3 +441,62 @@ textarea:focus-visible,
     linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
+/* ============================================================
+   PROSE (Markdown) STYLES
+   ============================================================ */
+
+.prose-teal {
+  --tw-prose-body: hsla(210, 20%, 95%, 0.8);
+  --tw-prose-headings: hsl(210, 20%, 95%);
+  --tw-prose-links: hsla(165, 85%, 50%, 1);
+  --tw-prose-bold: hsl(210, 20%, 95%);
+  --tw-prose-counters: hsl(230, 10%, 55%);
+  --tw-prose-bullets: hsla(165, 100%, 42%, 0.5);
+  --tw-prose-hr: hsl(230, 15%, 18%);
+  --tw-prose-quotes: hsl(210, 20%, 95%);
+  --tw-prose-quote-borders: hsl(165, 100%, 42%);
+  --tw-prose-captions: hsl(230, 10% 55%);
+  --tw-prose-code: hsla(165, 85%, 50%, 1);
+  --tw-prose-pre-code: hsl(210, 20%, 95%);
+  --tw-prose-pre-bg: rgba(255, 255, 255, 0.05);
+  --tw-prose-th-borders: hsl(230, 15%, 18%);
+  --tw-prose-td-borders: hsl(230, 15%, 18%);
+}
+
+.prose {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  letter-spacing: -0.025em;
+  color: hsl(210, 20%, 95%);
+}
+
+.prose h1 { font-size: 1.875rem; border-bottom: 1px solid rgba(255, 255, 255, 0.15); padding-bottom: 0.5rem; }
+.prose h2 { font-size: 1.5rem; color: hsla(165, 85%, 50%, 1); }
+.prose h3 { font-size: 1.25rem; }
+
+.prose p { margin-bottom: 1.25rem; color: hsla(210, 20%, 95%, 0.7); }
+.prose ul { list-style-type: disc !important; padding-left: 1.5rem !important; margin-bottom: 1.25rem !important; }
+.prose li { margin-bottom: 0.5rem; color: hsla(210, 20%, 95%, 0.7); }
+
+.prose table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.875rem; color: hsla(210, 20%, 95%, 0.8); }
+.prose th { background: rgba(255,255,255,0.03); padding: 0.75rem; border: 1px solid rgba(255, 255, 255, 0.15); text-align: left; color: hsla(165, 85%, 50%, 1); }
+.prose td { padding: 0.75rem; border: 1px solid rgba(255, 255, 255, 0.15); }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsla(165, 100%, 42%, 0.3);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsla(165, 100%, 42%, 0.5);
+}
