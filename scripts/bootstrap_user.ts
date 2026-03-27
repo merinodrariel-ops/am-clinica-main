@@ -38,7 +38,7 @@ async function bootstrap() {
     console.log('Bootstrapping Owner User...');
 
     const email = 'owner@clinica.com';
-    const password = 'password123';
+    const password = env.INITIAL_SEED_PASSWORD || process.env.INITIAL_SEED_PASSWORD || 'password123';
     const fullName = 'Owner User';
 
     // 1. Check if user exists

@@ -34,22 +34,24 @@ const supabaseAdmin = createClient(
     }
 );
 
+const INITIAL_PASS = env.INITIAL_SEED_PASSWORD || process.env.INITIAL_SEED_PASSWORD || '1234567890123';
+
 const USERS = [
     {
         email: 'dr.arielmerinopersonal@gmail.com',
-        password: '1234567890123',
+        password: INITIAL_PASS,
         fullName: 'Dr. Ariel Merino (Owner)',
         categoria: 'owner'
     },
     {
         email: 'amesteticadentaladm@gmail.com', // Corrected from 'amd' to 'adm'
-        password: '1234567890123',
+        password: INITIAL_PASS,
         fullName: 'Administración',
         categoria: 'admin'
     },
     {
         email: 'drarielmerino@gmail.com',
-        password: '1234567890123',
+        password: INITIAL_PASS,
         fullName: 'Recepción',
         categoria: 'reception'
     }

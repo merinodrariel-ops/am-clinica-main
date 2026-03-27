@@ -27,6 +27,7 @@ import { getPersonal, getPersonalAreas, createPersonalArea, togglePersonalActivo
 import { updateSucursalValoresHora, getValoresHoraHistoria, createValoresHoraHistoriaEntry, deleteValoresHoraHistoriaEntry } from "@/lib/caja-admin/services";
 import { CajaAdminCategoria, Sucursal, Personal, ValoresHoraHistoria } from "@/lib/caja-admin/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface Props {
     sucursal: Sucursal;
@@ -433,6 +434,9 @@ export default function ConfiguracionTab({ sucursal }: Props) {
             setError(err instanceof Error ? err.message : "Error al guardar");
         }
     }
+
+    useModalKeyboard(showAddPeriodo, () => setShowAddPeriodo(false), () => void handleSavePeriodo(), { disabled: isSavingPeriodo || !newPeriodoFecha });
+    useModalKeyboard(isEditing, () => setIsEditing(false), () => void handleSave(), { disabled: !editingItem.nombre });
 
     async function handleDelete(id: string) {
         if (!confirm("¿Eliminar categoría? Los movimientos existentes podrían perder su referencia.")) return;

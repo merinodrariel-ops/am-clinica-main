@@ -103,7 +103,7 @@ export default function UserManagementPage() {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
-                .neq('estado', 'eliminado')
+                .not('estado', 'in', '("inactivo","eliminado")')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -683,7 +683,6 @@ export default function UserManagementPage() {
                                     >
                                         <option value="activo">Activo</option>
                                         <option value="invitado">Invitado</option>
-                                        <option value="suspendido">Suspendido</option>
                                         <option value="inactivo">Inactivo</option>
                                     </select>
                                 </div>

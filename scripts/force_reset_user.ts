@@ -27,7 +27,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
 const supabaseClient = createClient(SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 const TARGET_EMAIL = 'dr.arielmerinopersonal@gmail.com';
-const TARGET_PASSWORD = '1234567890123';
+const TARGET_PASSWORD = env.INITIAL_SEED_PASSWORD || process.env.INITIAL_SEED_PASSWORD || '1234567890123';
 
 async function forceReset() {
     console.log(`Starting force reset for ${TARGET_EMAIL}...`);

@@ -25,6 +25,7 @@ import { getLocalISODate, formatDateForLocale } from '@/lib/local-date';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface Props {
     sucursal: Sucursal;
@@ -196,6 +197,9 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
             setSubmitting(false);
         }
     }
+
+    useModalKeyboard(showAbrirModal, () => setShowAbrirModal(false), () => void handleAbrir(), { disabled: opening });
+    useModalKeyboard(showCerrarModal, () => setShowCerrarModal(false), () => void handleCerrar(), { disabled: submitting });
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando...</div>;
 

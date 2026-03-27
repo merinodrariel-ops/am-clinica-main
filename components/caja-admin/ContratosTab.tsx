@@ -19,6 +19,7 @@ import { generateContractWord } from '@/lib/staff-contracts/word-generator';
 import { assistFullContractAction } from '@/app/actions/contract-ai';
 import type { ContractRecord, AnexoRol } from '@/lib/staff-contracts/types';
 import ContratosConfigView from './ContratosConfigView';
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 const ANEXO_LABELS: Record<AnexoRol, string> = {
     odontologo: 'Odontólogo/a',
@@ -149,6 +150,8 @@ function PreviewModal({ worker, onClose, onDownloaded }: PreviewModalProps) {
         generateContractWord(text, `Contrato_${form.apellido}_${form.nombre}_${form.fecha}.doc`);
         toast.success('Contrato Word descargado');
     }
+
+    useModalKeyboard(true, onClose, () => void handleDownloadPDF(), { disabled: downloading || !form.nombre || !form.apellido });
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

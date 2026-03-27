@@ -135,6 +135,11 @@ interface ManualReviewCase {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+function isValidUuid(id: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+}
+
 async function main() {
     console.log('═══════════════════════════════════════════════════════════');
     console.log('PASO 1: BACKUP DE SEGURIDAD');
@@ -445,7 +450,7 @@ SET is_deleted    = true,
     deleted_at    = now(),
     delete_reason = 'Limpieza de duplicados fuzzy - auto'
 WHERE id_paciente IN (
-  ${loserIds.map(id => `'${id}'`).join(',\n  ')}
+  ${loserIds.filter(isValidUuid).map(id => `'${id}'`).join(',\n  ')}
 );
 
 COMMIT;

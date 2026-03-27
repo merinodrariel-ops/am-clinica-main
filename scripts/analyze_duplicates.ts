@@ -20,6 +20,14 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+/**
+ * Validates if a string is a valid UUID.
+ */
+function isValidUuid(id: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+}
+
 async function main() {
     console.log('═══════════════════════════════════════════════════════════');
     console.log('PASO 1: BACKUP DE SEGURIDAD');
@@ -236,7 +244,7 @@ SET is_deleted = true,
     deleted_at = now(), 
     delete_reason = 'Limpieza de duplicados masiva'
 WHERE id_paciente IN (
-  ${allLoserIds.map(id => `'${id}'`).join(',\n  ')}
+  ${allLoserIds.filter(isValidUuid).map(id => `'${id}'`).join(',\n  ')}
 );
 
 -- O eliminacion fisica si el usuario confirma:
