@@ -47,3 +47,6 @@ lint_report.txt
 # Google Credentials
 google_credentials.json
 google_client_secret.json
+
+# Visual brainstorming companion
+.superpowers/

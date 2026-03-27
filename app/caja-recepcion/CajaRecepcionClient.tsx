@@ -207,13 +207,13 @@ const PAYMENT_DATA: Record<string, PaymentMethod> = {
 };
 
 const HELP_LINKS = {
-    maps: 'https://bit.ly/Clínica-AM-Google-Maps',
-    waze: 'https://bit.ly/ClínicaAM-Waze',
+    maps: 'https://maps.app.goo.gl/5kWar9VL6qjhdEGM7',
+    waze: 'https://waze.com/ul/h69y7pcqyu',
     mp_consulta_am: 'https://mpago.la/2rjmF2W',
     mp_consulta_staff: 'https://mpago.la/2MJhrW6',
     mp_pago_libre: 'https://link.mercadopago.com.ar/amesteticadental',
     whatsapp: 'https://wa.link/zolb52',
-    google_opinion: 'https://g.page/r/CQ3df5Xn-J6oEAE/review'
+    google_opinion: 'https://g.page/r/CQ3df5Xn-J6oEBM/review'
 };
 
 const GOOGLE_REVIEW_LINK = HELP_LINKS.google_opinion;
