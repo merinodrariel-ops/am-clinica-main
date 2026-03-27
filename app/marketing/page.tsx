@@ -17,6 +17,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMarketingLeads, getMarketingStats, getMarketingCampaigns, executeCampaign, sendTestCampaignEmail, MarketingLead } from '@/app/actions/marketing';
+import { getMarketingAudit } from '@/app/actions/marketing-audit';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 
 export default function MarketingPage() {
@@ -24,8 +27,9 @@ export default function MarketingPage() {
     const [leads, setLeads] = useState<MarketingLead[]>([]);
     const [campaigns, setCampaigns] = useState<any[]>([]);
     const [stats, setStats] = useState<any>(null);
+    const [auditContent, setAuditContent] = useState<string>('');
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'campaigns'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'campaigns' | 'audit' | 'suite'>('dashboard');
 
     useEffect(() => {
         loadData();
@@ -34,14 +38,16 @@ export default function MarketingPage() {
     async function loadData() {
         setLoading(true);
         try {
-            const [leadsData, statsData, campaignsData] = await Promise.all([
+            const [leadsData, statsData, campaignsData, auditData] = await Promise.all([
                 getMarketingLeads(),
                 getMarketingStats(),
-                getMarketingCampaigns()
+                getMarketingCampaigns(),
+                getMarketingAudit()
             ]);
             setLeads(leadsData);
             setStats(statsData);
             setCampaigns(campaignsData);
+            if (auditData.success) setAuditContent(auditData.content || '');
         } catch (error) {
             toast.error('Error al cargar datos de marketing');
         } finally {
@@ -88,8 +94,10 @@ export default function MarketingPage() {
             <nav className="mb-8 flex gap-1 p-1 bg-black/20 border border-white/5 rounded-xl w-fit">
                 {[
                     { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
-                    { id: 'leads', label: 'Leads Scraped', icon: Users },
-                    { id: 'campaigns', label: 'Campañas', icon: Mail }
+                    { id: 'leads', label: 'Prospectos', icon: Users },
+                    { id: 'campaigns', label: 'Campañas', icon: Mail },
+                    { id: 'audit', label: 'Auditoría AI', icon: Target },
+                    { id: 'suite', label: 'Suite Marketing', icon: Filter }
                 ].map((tab) => (
                     <button
                         key={tab.id}
@@ -266,6 +274,76 @@ export default function MarketingPage() {
                         )}
                     </motion.div>
                 )}
+
+                {activeTab === 'audit' && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        key="audit"
+                        className="glass-card p-8 rounded-2xl border border-white/10 max-h-[70vh] overflow-y-auto custom-scrollbar"
+                    >
+                        <div className="prose prose-invert prose-teal max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {auditContent || '# No hay auditoría disponible\n\nEjecuta `/market audit` para generar una.'}
+                            </ReactMarkdown>
+                        </div>
+                    </motion.div>
+                )}
+
+                {activeTab === 'suite' && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        key="suite"
+                        className="space-y-6"
+                    >
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <AgentToolCard 
+                                title="AI Auditor" 
+                                command="/market audit" 
+                                desc="Analiza el sitio web completo y genera un reporte de 20+ páginas con Quick Wins."
+                                icon={Target}
+                            />
+                            <AgentToolCard 
+                                title="AI Copywriter" 
+                                command="/market copy" 
+                                desc="Genera guiones para Reels, anuncios o emails basados en el perfil del paciente."
+                                icon={Mail}
+                            />
+                            <AgentToolCard 
+                                title="AI Funnel Designer" 
+                                command="/market funnel" 
+                                desc="Arquitecta embudos de conversión para tratamientos específicos (ej. Carillas)."
+                                icon={Filter}
+                            />
+                            <AgentToolCard 
+                                title="Competitor Analysis" 
+                                command="/market competitive" 
+                                desc="Compara la clínica contra competidores locales en CABA."
+                                icon={Search}
+                            />
+                            <AgentToolCard 
+                                title="Strategic Planning" 
+                                command="/market strategy" 
+                                desc="Crea un plan de 90 días para escalar la captación de pacientes."
+                                icon={TrendingUp}
+                            />
+                        </div>
+
+                        <div className="p-6 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-300">
+                            <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                <AlertCircle size={18} />
+                                Cómo usar estos agentes
+                            </h4>
+                            <p className="text-sm opacity-80 leading-relaxed">
+                                Estas herramientas están integradas como <strong>Skills de Agente</strong>. 
+                                Para usarlas, simplemente pídeme en el chat que ejecutes el comando correspondiente o que analices un aspecto específico usando la Suite de Marketing.
+                            </p>
+                        </div>
+                    </motion.div>
+                )}
             </AnimatePresence>
         </div>
     );
@@ -349,6 +427,23 @@ function CampaignCard({ campaign, onRefresh }: { campaign: any, onRefresh: () =>
                 >
                     <Target size={16} />
                 </button>
+            </div>
+        </div>
+    );
+}
+
+function AgentToolCard({ title, command, desc, icon: Icon }: any) {
+    return (
+        <div className="glass-card p-6 rounded-2xl border border-white/10 hover:border-teal-500/30 transition-all group">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-teal-500/10 border border-teal-500/10 text-teal-400">
+                    <Icon size={20} />
+                </div>
+                <h3 className="font-semibold">{title}</h3>
+            </div>
+            <p className="text-xs text-slate-400 mb-4 h-10 line-clamp-2">{desc}</p>
+            <div className="p-2 rounded bg-black/40 border border-white/5 font-mono text-[10px] text-teal-400/70 group-hover:text-teal-400 transition-colors">
+                {command}
             </div>
         </div>
     );
