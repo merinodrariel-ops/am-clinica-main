@@ -98,8 +98,12 @@ export async function POST(req: NextRequest) {
   const rawBody  = await req.text();
   const sig      = req.headers.get('Calendly-Webhook-Signature');
 
-  // Verify signature (skip in development)
-  if (process.env.NODE_ENV === 'production' && secret) {
+  // ─── Signature Verification ───────────────────────────────────────────────────
+  if (process.env.NODE_ENV === 'production') {
+    if (!secret) {
+      console.error('[Calendly] CALENDLY_WEBHOOK_SECRET is NOT set in production');
+      return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
+    }
     const valid = verifyCalendlySignature(rawBody, sig, secret);
     if (!valid) {
       console.warn('[Calendly] Invalid webhook signature');

@@ -65,9 +65,9 @@ export async function POST(req: NextRequest) {
         const nombre = patient.nombre || 'Paciente';
 
         // 5. Send email
-        console.log(`[MagicLink] Attempting to send magic link to: ${patient.email}`);
+        console.log(`[MagicLink] Sending link to patient ID: ${patient.id_paciente}`);
         const emailResult = await EmailService.sendMagicLink(nombre, patient.email, portalUrl);
-        console.log(`[MagicLink] Email result for ${patient.email}:`, emailResult);
+        console.log(`[MagicLink] Send result:`, emailResult.success ? 'Success' : 'Failed');
 
         if (!emailResult.success) {
             console.error('[MagicLink] Email send failure:', emailResult.error);
