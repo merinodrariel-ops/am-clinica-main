@@ -395,7 +395,7 @@ export async function deleteUserAccount(targetUserId: string, requesterId: strin
                     full_name: `Eliminado (${targetProfile?.full_name || targetUserId.slice(0, 8)})`,
                     email: softEmail,
                     categoria: 'partner_viewer',
-                    estado: 'eliminado',
+                    estado: 'invitado',
                     is_active: false,
                     whatsapp: null,
                 })
