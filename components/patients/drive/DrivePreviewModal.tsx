@@ -24,6 +24,7 @@ interface DrivePreviewModalProps {
     canSave: boolean;
     onClose: () => void;
     onSaved: () => void;
+    autoStartSmile?: boolean;
 }
 
 function getPreviewType(file: DriveFile): 'image' | 'video' | '3d' | null {
@@ -48,6 +49,7 @@ export default function DrivePreviewModal({
     canSave,
     onClose,
     onSaved,
+    autoStartSmile,
 }: DrivePreviewModalProps) {
     if (!file) return null;
 
@@ -65,6 +67,7 @@ export default function DrivePreviewModal({
                 canSave={canSave}
                 onClose={onClose}
                 onSaved={onSaved}
+                autoStartSmile={autoStartSmile}
             />
         );
     }

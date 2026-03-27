@@ -39,6 +39,7 @@ interface DriveFileCardProps {
     onShareEmail?: (file: DriveFile) => void;
     onTag?: (file: DriveFile) => void;
     photoTag?: PhotoTag | null;
+    onSmileDesign?: (file: DriveFile) => void;
 }
 
 function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'other' {
@@ -95,7 +96,7 @@ const COLOR_MAP = {
     other: 'text-gray-400 bg-gray-400/10',
 };
 
-export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag }: DriveFileCardProps) {
+export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign }: DriveFileCardProps) {
     const [showShare, setShowShare] = useState(false);
     const category = getFileCategory(file);
     const Icon = ICON_MAP[category];
@@ -249,6 +250,15 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                         title="Clasificar foto"
                     >
                         <Tag size={13} />
+                    </button>
+                )}
+                {onSmileDesign && category === 'image' && (
+                    <button
+                        onClick={e => { e.stopPropagation(); onSmileDesign(file); }}
+                        className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-black/60 text-purple-300 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-purple-600 hover:text-white z-10"
+                        title="Smile Design con IA"
+                    >
+                        ✨
                     </button>
                 )}
             </div>

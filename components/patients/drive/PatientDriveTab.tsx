@@ -45,6 +45,7 @@ function SortableFileCard({
     onShareEmail,
     onTag,
     photoTag,
+    onSmileDesign,
 }: {
     file: DriveFile;
     isPortada: boolean;
@@ -55,6 +56,7 @@ function SortableFileCard({
     onShareEmail?: (f: DriveFile) => void;
     onTag?: (f: DriveFile) => void;
     photoTag?: PhotoTag | null;
+    onSmileDesign?: (f: DriveFile) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
     const style: CSSProperties = {
@@ -79,7 +81,7 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} />
+            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} />
         </div>
     );
 }
@@ -128,6 +130,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
     const [previewFolderId, setPreviewFolderId] = useState<string>('');
+    const [previewAutoSmile, setPreviewAutoSmile] = useState(false);
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
     const [creating, setCreating] = useState(false);
     const [uploadTargetFolderId, setUploadTargetFolderId] = useState(() => extractFolderIdFromUrl(motherFolderUrl) || '');
@@ -259,6 +262,13 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     }, [currentFolderUrl, status, fetchFolders]);
 
     function openPreview(file: DriveFile, folderId: string) {
+        setPreviewAutoSmile(false);
+        setPreviewFile(file);
+        setPreviewFolderId(folderId);
+    }
+
+    function openSmileDesign(file: DriveFile, folderId: string) {
+        setPreviewAutoSmile(true);
         setPreviewFile(file);
         setPreviewFolderId(folderId);
     }
@@ -534,7 +544,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {rootFiles.map(file => (
-                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} onDelete={canUpload ? handleDeleteFile : undefined} onShare={handleShareFile} onShareWithPatient={setSharePatientFile} onShareEmail={handleShareEmail} onTag={canUpload ? setTagFile : undefined} photoTag={photoTags[file.id]} />
+                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} onDelete={canUpload ? handleDeleteFile : undefined} onShare={handleShareFile} onShareWithPatient={setSharePatientFile} onShareEmail={handleShareEmail} onTag={canUpload ? setTagFile : undefined} photoTag={photoTags[file.id]} onSmileDesign={f => openSmileDesign(f, motherFolderId || '')} />
                         ))}
                     </div>
                 </div>
@@ -642,6 +652,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                                     onShareEmail={handleShareEmail}
                                                                     onTag={canUpload ? setTagFile : undefined}
                                                                     photoTag={photoTags[file.id]}
+                                                                    onSmileDesign={f => openSmileDesign(f, folder.id)}
                                                                 />
                                                             ))}
                                                         </div>
@@ -733,7 +744,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         : (folders.find(f => f.id === previewFolderId)?.files ?? [])
                             .filter(f => f.mimeType.toLowerCase().startsWith('image/'))
                 }
-                onClose={() => { setPreviewFile(null); setPreviewFolderId(''); }}
+                autoStartSmile={previewAutoSmile}
+                onClose={() => { setPreviewFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
                 onSaved={() => {
                     // Refresca la carpeta pero mantiene el estudio abierto
                     handleUploadedToFolder(previewFolderId);

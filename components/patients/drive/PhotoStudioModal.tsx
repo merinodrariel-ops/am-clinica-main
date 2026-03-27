@@ -30,6 +30,7 @@ interface PhotoStudioModalProps {
     canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
     onSaved: () => void;           // called after successful save → triggers folder refresh
+    autoStartSmile?: boolean;      // if true, auto-launches Smile Design when photo loads
 }
 
 type BgColor = 'transparent' | 'white' | 'black';
@@ -339,6 +340,7 @@ export default function PhotoStudioModal({
     canSave,
     onClose,
     onSaved,
+    autoStartSmile,
 }: PhotoStudioModalProps) {
     const imgRef = useRef<HTMLImageElement>(null);
     const objectUrlRef = useRef<string | null>(null);
@@ -515,6 +517,27 @@ export default function PhotoStudioModal({
     const [smileSaved, setSmileSaved] = useState(false);
     const [smileProcessingTime, setSmileProcessingTime] = useState<number | null>(null);
     const smileStartTimeRef = useRef<number | null>(null);
+    const autoStartSmileRef = useRef(autoStartSmile ?? false);
+
+    // Auto-trigger Smile Design when opened via quick-access button
+    useEffect(() => {
+        if (!autoStartSmileRef.current || !imageUrl || smileMode) return;
+        const run = async () => {
+            try {
+                const res = await fetch(imageUrl);
+                const blob = await res.blob();
+                setSmileMode(true);
+                setSmileProcessingTime(null);
+                smileStartTimeRef.current = Date.now();
+                await smileDesign.process(blob);
+                if (smileStartTimeRef.current) {
+                    setSmileProcessingTime((Date.now() - smileStartTimeRef.current) / 1000);
+                }
+            } catch { /* silently fail */ }
+        };
+        run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [imageUrl]);
 
     // Multi-select + web download state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
