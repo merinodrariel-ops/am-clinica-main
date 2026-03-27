@@ -22,6 +22,7 @@ import {
     type CajaAdminCategoria,
     MotivoObservado,
 } from './types';
+import { calculateWorkedHours } from './attendance-utils';
 
 // ==========================================
 // MÉTODOS DE CATEGORÍAS (NEW)
@@ -1251,7 +1252,7 @@ export async function getRegistrosObservados(options: {
     let query = getSupabase()
         .from('registro_horas')
         .select('*, personal(*)')
-        .eq('estado', 'Observado')
+        .in('estado', ['Observado', 'observado'])
         .order('fecha', { ascending: false });
 
     if (options.mes) {
@@ -1281,7 +1282,7 @@ export async function countObservadosPendientes(mes?: string): Promise<number> {
     let query = getSupabase()
         .from('registro_horas')
         .select('id', { count: 'exact', head: true })
-        .eq('estado', 'Observado');
+        .in('estado', ['Observado', 'observado']);
 
     if (mes) {
         const startDate = `${mes}-01`;
@@ -1418,11 +1419,11 @@ export async function resolverRegistro(
     // Calculate new hours if times provided
     let newHoras = current.horas;
     if (data.hora_ingreso && data.hora_egreso) {
-        const [inH, inM] = data.hora_ingreso.split(':').map(Number);
-        const [outH, outM] = data.hora_egreso.split(':').map(Number);
-        const inMinutes = inH * 60 + inM;
-        const outMinutes = outH * 60 + outM;
-        newHoras = Math.max(0, (outMinutes - inMinutes) / 60);
+        newHoras = calculateWorkedHours({
+            horaIngreso: data.hora_ingreso,
+            horaEgreso: data.hora_egreso,
+            salidaDiaSiguiente: data.salida_dia_siguiente,
+        });
     }
 
     // Update the record
@@ -1432,6 +1433,7 @@ export async function resolverRegistro(
             estado: 'approved',
             hora_ingreso: data.hora_ingreso || current.hora_ingreso,
             hora_egreso: data.hora_egreso || current.hora_egreso,
+            salida_dia_siguiente: data.salida_dia_siguiente ?? current.salida_dia_siguiente ?? false,
             horas: newHoras,
             nota_resolucion: data.nota_resolucion,
             metodo_verificacion: data.metodo_verificacion,
@@ -1468,6 +1470,19 @@ export async function resolverRegistro(
             campo_modificado: 'hora_egreso',
             valor_anterior: current.hora_egreso || current.original_hora_egreso || null,
             valor_nuevo: data.hora_egreso,
+            motivo: data.nota_resolucion,
+            metodo_verificacion: data.metodo_verificacion,
+            evidencia_url: data.evidencia_url,
+        });
+    }
+
+    if ((data.salida_dia_siguiente ?? false) !== (current.salida_dia_siguiente ?? false)) {
+        auditEntries.push({
+            registro_horas_id: registroId,
+            usuario: data.resuelto_por,
+            campo_modificado: 'salida_dia_siguiente',
+            valor_anterior: String(current.salida_dia_siguiente ?? false),
+            valor_nuevo: String(data.salida_dia_siguiente ?? false),
             motivo: data.nota_resolucion,
             metodo_verificacion: data.metodo_verificacion,
             evidencia_url: data.evidencia_url,

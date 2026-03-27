@@ -23,6 +23,7 @@ import {
     CheckSquare,
     Briefcase,
     Mail,
+    Megaphone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -51,6 +52,13 @@ const MENU_ITEMS = [
         href: '/patients',
         key: 'patients',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
+    },
+    {
+        icon: Megaphone,
+        label: 'Marketing',
+        href: '/marketing',
+        key: 'marketing',
+        roles: ['owner', 'admin', 'developer', 'recaptacion']
     },
     {
         icon: Banknote,

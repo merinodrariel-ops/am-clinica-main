@@ -22,9 +22,11 @@ import {
     resolverRegistro,
     anularRegistro
 } from '@/lib/caja-admin';
+import { inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface Props {
     mes: string;
@@ -95,6 +97,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
     const [resolucionForm, setResolucionForm] = useState<Partial<ResolucionData>>({
         hora_ingreso: '',
         hora_egreso: '',
+        salida_dia_siguiente: false,
         nota_resolucion: '',
         metodo_verificacion: undefined,
         evidencia_url: '',
@@ -151,6 +154,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
         setResolucionForm({
             hora_ingreso: registro.hora_ingreso || '',
             hora_egreso: registro.hora_egreso || '',
+            salida_dia_siguiente: registro.salida_dia_siguiente || inferSalidaDiaSiguiente(registro.hora_ingreso, registro.hora_egreso),
             nota_resolucion: '',
             metodo_verificacion: undefined,
             evidencia_url: '',
@@ -175,6 +179,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
         const result = await resolverRegistro(selectedRegistro.id, {
             hora_ingreso: resolucionForm.hora_ingreso || undefined,
             hora_egreso: resolucionForm.hora_egreso || undefined,
+            salida_dia_siguiente: resolucionForm.salida_dia_siguiente ?? false,
             nota_resolucion: resolucionForm.nota_resolucion,
             metodo_verificacion: resolucionForm.metodo_verificacion,
             evidencia_url: resolucionForm.evidencia_url || undefined,
@@ -215,6 +220,8 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
         setSelectedRegistro(null);
         loadData();
     }
+
+    useModalKeyboard(!!selectedRegistro, () => setSelectedRegistro(null), () => void handleResolver(), { disabled: submitting });
 
     if (loading) {
         return (
@@ -406,7 +413,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
                                 <h2 className="text-xl font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
                                     <AlertTriangle className="w-6 h-6" />
-                                    Resolver Marcación Faltante
+                                    Resolver marcación observada
                                 </h2>
                                 <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                                     {selectedRegistro.personal?.nombre} • {new Date(selectedRegistro.fecha).toLocaleDateString('es-AR', {
@@ -444,6 +451,11 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                         <p className="font-medium text-amber-600">
                                             {selectedRegistro.motivo_observado ? MOTIVOS_LABELS[selectedRegistro.motivo_observado] : 'No especificado'}
                                         </p>
+                                        {selectedRegistro.observaciones && (
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {selectedRegistro.observaciones}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -471,6 +483,25 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                             className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="rounded-xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/80 dark:bg-indigo-900/10 px-4 py-3">
+                                    <label className="flex items-start gap-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(resolucionForm.salida_dia_siguiente)}
+                                            onChange={(e) => setResolucionForm({ ...resolucionForm, salida_dia_siguiente: e.target.checked })}
+                                            className="mt-0.5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <div>
+                                            <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
+                                                La salida corresponde al día siguiente
+                                            </p>
+                                            <p className="text-xs text-indigo-700/80 dark:text-indigo-300/80 mt-1">
+                                                Úsalo para turnos que terminan después de medianoche, por ejemplo 20:00 a 01:00.
+                                            </p>
+                                        </div>
+                                    </label>
                                 </div>
 
                                 <div>

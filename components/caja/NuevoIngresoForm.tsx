@@ -21,6 +21,7 @@ import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
 import { syncPagoCuotaAction } from '@/app/actions/financiacion-cuotas';
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface Paciente {
     id_paciente: string;
@@ -625,36 +626,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     }
 
     function shouldHandleEnterAsSubmit(event: React.KeyboardEvent) {
-        if (event.key !== 'Enter') return false;
-        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
-
-        const target = event.target as HTMLElement | null;
-        if (!target) return true;
-
-        const tag = target.tagName.toLowerCase();
-        if (tag === 'textarea') return false;
-        if ((target as HTMLInputElement).type === 'button') return false;
-        if ((target as HTMLInputElement).type === 'submit') return false;
-
-        return true;
+        return shouldSubmitOnEnter(event.nativeEvent);
     }
 
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handleKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && !saving) { handleClose(); return; }
-            if (event.key === 'Enter' && !saving) {
-                const tag = (event.target as HTMLElement).tagName;
-                if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT' || tag === 'A') return;
-                event.preventDefault();
-                handleSubmit();
-            }
-        };
-
-        window.addEventListener('keydown', handleKey);
-        return () => window.removeEventListener('keydown', handleKey);
-    }, [handleClose, handleSubmit, isOpen, saving]);
+    useModalKeyboard(isOpen, handleClose, handleSubmit, { disabled: saving });
 
     if (!isOpen) return null;
 

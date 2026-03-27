@@ -23,6 +23,7 @@ import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { stripAppointmentMeta } from '@/lib/agenda-appointment-meta';
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface AppointmentModalData {
     id?: string;
@@ -422,6 +423,40 @@ export default function AgendaCalendar() {
         setTomorrowSending(false);
     };
 
+    const closeConfirmTomorrowModal = useCallback(() => {
+        setConfirmTomorrowOpen(false);
+        setTomorrowResult(null);
+    }, []);
+
+    const handleDropConfirmSave = useCallback(async (notifyPatient: boolean) => {
+        if (!dropConfirm) return;
+        setIsNotifying(true);
+        try {
+            const result = await updateAppointment(dropConfirm.eventId, {
+                start_time: dropConfirm.newStart.toISOString(),
+                end_time: dropConfirm.newEnd.toISOString(),
+            });
+            if (!result.success) throw new Error(result.error || 'No se pudo reprogramar el turno');
+            toast.success(notifyPatient ? 'Turno reprogramado. Se enviará WhatsApp al paciente.' : 'Turno reprogramado exitosamente');
+            setDropConfirm(null);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Error al reprogramar');
+            dropConfirm.arg.revert();
+            setDropConfirm(null);
+        } finally {
+            setIsNotifying(false);
+        }
+    }, [dropConfirm]);
+
+    useModalKeyboard(confirmTomorrowOpen, closeConfirmTomorrowModal, handleSendConfirmations, {
+        disabled: tomorrowLoading || tomorrowSending || selectedAptIds.size === 0,
+    });
+    useModalKeyboard(!!dropConfirm, () => {
+        if (!dropConfirm) return;
+        dropConfirm.arg.revert();
+        setDropConfirm(null);
+    }, () => void handleDropConfirmSave(true), { disabled: isNotifying });
+
     const canEdit = canEditModule('turnos');
 
     return (
@@ -817,7 +852,7 @@ export default function AgendaCalendar() {
                                 <h3 className="text-base font-bold text-gray-900 dark:text-white">Confirmar turnos de mañana</h3>
                                 <p className="text-xs text-gray-400 mt-0.5">Envía WhatsApp a todos los pacientes del día siguiente</p>
                             </div>
-                            <button onClick={() => { setConfirmTomorrowOpen(false); setTomorrowResult(null); }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                            <button onClick={closeConfirmTomorrowModal} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
                         </div>
 
                         <div className="max-h-72 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800">
@@ -907,52 +942,14 @@ export default function AgendaCalendar() {
                         <div className="flex flex-col gap-3">
                             <button
                                 disabled={isNotifying}
-                                onClick={async () => {
-                                    setIsNotifying(true);
-                                    try {
-                                        const result = await updateAppointment(dropConfirm.eventId, {
-                                            start_time: dropConfirm.newStart.toISOString(),
-                                            end_time: dropConfirm.newEnd.toISOString(),
-                                        });
-                                        if (!result.success) {
-                                            throw new Error(result.error || 'No se pudo reprogramar el turno');
-                                        }
-                                        toast.success('Turno reprogramado exitosamente');
-                                        setDropConfirm(null);
-                                    } catch (err) {
-                                        toast.error(err instanceof Error ? err.message : 'Error al reprogramar');
-                                        dropConfirm.arg.revert();
-                                        setDropConfirm(null);
-                                    } finally {
-                                        setIsNotifying(false);
-                                    }
-                                }}
+                                onClick={() => void handleDropConfirmSave(false)}
                                 className="w-full py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 transition"
                             >
                                 Guardar (Sin notificar)
                             </button>
                             <button
                                 disabled={isNotifying}
-                                onClick={async () => {
-                                    setIsNotifying(true);
-                                    try {
-                                        const result = await updateAppointment(dropConfirm.eventId, {
-                                            start_time: dropConfirm.newStart.toISOString(),
-                                            end_time: dropConfirm.newEnd.toISOString(),
-                                        });
-                                        if (!result.success) {
-                                            throw new Error(result.error || 'No se pudo reprogramar el turno');
-                                        }
-                                        toast.success('Turno reprogramado. Se enviará WhatsApp al paciente.');
-                                        setDropConfirm(null);
-                                    } catch (err) {
-                                        toast.error(err instanceof Error ? err.message : 'Error al reprogramar');
-                                        dropConfirm.arg.revert();
-                                        setDropConfirm(null);
-                                    } finally {
-                                        setIsNotifying(false);
-                                    }
-                                }}
+                                onClick={() => void handleDropConfirmSave(true)}
                                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-[#25D366] text-white hover:bg-[#1ebd5a] transition"
                             >
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" /></svg>

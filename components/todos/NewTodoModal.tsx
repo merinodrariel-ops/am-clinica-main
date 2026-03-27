@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { useState, useEffect, useRef } from 'react';
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -58,8 +58,9 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData, pro
     const [isPinned, setIsPinned] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<{ title?: string }>({});
+    const formRef = useRef<HTMLFormElement>(null);
 
-    useModalKeyboard(isOpen, onClose);
+    useModalKeyboard(isOpen, onClose, () => formRef.current?.requestSubmit(), { disabled: saving });
 
     useEffect(() => {
         if (initialData) {
@@ -149,7 +150,13 @@ export default function NewTodoModal({ isOpen, onClose, onSave, initialData, pro
                         className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
                     >
                         <form
+                            ref={formRef}
                             onSubmit={handleSubmit}
+                            onKeyDown={(event) => {
+                                if (saving || !shouldSubmitOnEnter(event.nativeEvent)) return;
+                                event.preventDefault();
+                                event.currentTarget.requestSubmit();
+                            }}
                             onClick={e => e.stopPropagation()}
                             className="pointer-events-auto w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
                         >

@@ -203,6 +203,7 @@ export interface RegistroHoras {
     // Horarios de marcación
     hora_ingreso?: string;
     hora_egreso?: string;
+    salida_dia_siguiente?: boolean;
     original_hora_ingreso?: string;
     original_hora_egreso?: string;
     // Resolución
@@ -258,6 +259,7 @@ export interface DiaSinCierreAdmin {
 export interface ResolucionData {
     hora_ingreso?: string;
     hora_egreso?: string;
+    salida_dia_siguiente?: boolean;
     nota_resolucion: string;
     metodo_verificacion: MetodoVerificacion;
     evidencia_url?: string;

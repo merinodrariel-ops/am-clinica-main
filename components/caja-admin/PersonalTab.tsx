@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import MoneyInput from "@/components/ui/MoneyInput";
 import { Textarea } from "@/components/ui/Textarea";
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 import {
     type Sucursal,
     type Personal,
@@ -207,6 +208,47 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         modelo_pago: 'horas' | 'prestaciones' | 'mensual';
     }>({ area: '', modelo_pago: 'prestaciones' });
     const [activating, setActivating] = useState(false);
+
+    const handleSavePrestacionEdit = async () => {
+        if (!editingPrestacion) return;
+        setSavingPrestacion(true);
+        const [fy, fm, fd] = editPrestacionForm.fecha_realizacion.split('-').map(Number);
+        const fechaLocal = new Date(fy, fm - 1, fd, 12, 0, 0).toISOString();
+        const res = await updatePrestacionRealizada(editingPrestacion.id, {
+            prestacion_nombre: editPrestacionForm.prestacion_nombre,
+            fecha_realizacion: fechaLocal,
+            paciente_nombre: editPrestacionForm.paciente_nombre,
+            valor_cobrado: editPrestacionForm.valor_cobrado,
+            monto_honorarios: editPrestacionForm.monto_honorarios,
+            moneda_cobro: editPrestacionForm.moneda_cobro,
+            slides_url: editPrestacionForm.slides_url || null,
+            notas: editPrestacionForm.notas || undefined,
+        });
+        setSavingPrestacion(false);
+        if (res.success) { toast.success('Prestación actualizada'); setEditingPrestacion(null); loadData(); }
+        else toast.error(res.error || 'Error al guardar');
+    };
+
+    const handleActivatePrestadorConfirm = async () => {
+        if (!activatingPrestador) return;
+        setActivating(true);
+        const result = await activatePrestadorPendiente(
+            activatingPrestador.id,
+            activationData.area,
+            activationData.modelo_pago,
+        );
+        setActivating(false);
+        if (result.error) {
+            toast.error(result.error);
+        } else {
+            toast.success(`${activatingPrestador.nombre} activado`);
+            setActivatingPrestador(null);
+            loadData();
+        }
+    };
+
+    useModalKeyboard(!!editingPrestacion, () => setEditingPrestacion(null), () => void handleSavePrestacionEdit(), { disabled: savingPrestacion });
+    useModalKeyboard(!!activatingPrestador, () => setActivatingPrestador(null), () => void handleActivatePrestadorConfirm(), { disabled: activating || !activationData.area });
 
     function normalizeText(value?: string | null) {
         return (value || '')
@@ -2667,24 +2709,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             <button
                                 type="button"
                                 disabled={savingPrestacion}
-                                onClick={async () => {
-                                    setSavingPrestacion(true);
-                                    const [fy, fm, fd] = editPrestacionForm.fecha_realizacion.split('-').map(Number);
-                                    const fechaLocal = new Date(fy, fm - 1, fd, 12, 0, 0).toISOString();
-                                    const res = await updatePrestacionRealizada(editingPrestacion.id, {
-                                        prestacion_nombre: editPrestacionForm.prestacion_nombre,
-                                        fecha_realizacion: fechaLocal,
-                                        paciente_nombre: editPrestacionForm.paciente_nombre,
-                                        valor_cobrado: editPrestacionForm.valor_cobrado,
-                                        monto_honorarios: editPrestacionForm.monto_honorarios,
-                                        moneda_cobro: editPrestacionForm.moneda_cobro,
-                                        slides_url: editPrestacionForm.slides_url || null,
-                                        notas: editPrestacionForm.notas || undefined,
-                                    });
-                                    setSavingPrestacion(false);
-                                    if (res.success) { toast.success('Prestación actualizada'); setEditingPrestacion(null); loadData(); }
-                                    else toast.error(res.error || 'Error al guardar');
-                                }}
+                                onClick={() => void handleSavePrestacionEdit()}
                                 className="flex-1 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-semibold disabled:opacity-40 hover:bg-blue-700 transition-all"
                             >
                                 {savingPrestacion ? 'Guardando...' : 'Guardar cambios'}
@@ -2759,23 +2784,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             <button
                                 type="button"
                                 disabled={!activationData.area || activating}
-                                onClick={async () => {
-                                    if (!activatingPrestador) return;
-                                    setActivating(true);
-                                    const result = await activatePrestadorPendiente(
-                                        activatingPrestador.id,
-                                        activationData.area,
-                                        activationData.modelo_pago
-                                    );
-                                    setActivating(false);
-                                    if (result.error) {
-                                        toast.error(result.error);
-                                    } else {
-                                        toast.success(`${activatingPrestador.nombre} activado`);
-                                        setActivatingPrestador(null);
-                                        loadData();
-                                    }
-                                }}
+                                onClick={() => void handleActivatePrestadorConfirm()}
                                 className="flex-1 px-4 py-2.5 text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-semibold disabled:opacity-40 transition-all"
                             >
                                 {activating ? 'Activando...' : 'Activar'}

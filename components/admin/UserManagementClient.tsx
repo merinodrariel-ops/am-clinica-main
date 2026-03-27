@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Plus, MoreVertical, Mail, Ban, CheckCircle,
     Edit2, RotateCcw, Search, User as UserIcon, Phone, ChevronDown, ChevronUp
@@ -8,6 +8,7 @@ import {
 import { inviteUser, suspendUser, reactivateUser, resetUserPassword, updateUser, resendInvitation, updateUserAccessOverrides } from '@/app/actions/user-management';
 import UserPermissionsPanel from '@/components/admin/UserPermissionsPanel';
 import { useAuth } from '@/contexts/AuthContext';
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 import { useRouter } from 'next/navigation';
 
@@ -57,6 +58,11 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
     const [loadingAction, setLoadingAction] = useState(false);
     const [editOverrides, setEditOverrides] = useState<Record<string, string>>({});
     const [showPermissionsPanel, setShowPermissionsPanel] = useState(false);
+    const inviteFormRef = useRef<HTMLFormElement>(null);
+    const editFormRef = useRef<HTMLFormElement>(null);
+
+    useModalKeyboard(showInviteModal, () => setShowInviteModal(false), () => inviteFormRef.current?.requestSubmit(), { disabled: loadingAction });
+    useModalKeyboard(showEditModal, () => setShowEditModal(false), () => editFormRef.current?.requestSubmit(), { disabled: loadingAction });
 
     // Refresh data (naive implementation, better to leverage server revalidation)
     // Users are passed from server component, but for interactive updates without full reload:
@@ -272,7 +278,16 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
                         <h3 className="text-xl font-bold mb-4">Invitar Nuevo Usuario</h3>
-                        <form onSubmit={handleInvite} className="space-y-4">
+                        <form
+                            ref={inviteFormRef}
+                            onSubmit={handleInvite}
+                            onKeyDown={(event) => {
+                                if (loadingAction || !shouldSubmitOnEnter(event.nativeEvent)) return;
+                                event.preventDefault();
+                                event.currentTarget.requestSubmit();
+                            }}
+                            className="space-y-4"
+                        >
                             <div>
                                 <label className="block text-sm font-medium mb-1">Email</label>
                                 <input name="email" type="email" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />
@@ -310,7 +325,16 @@ export default function UserManagementClient({ initialUsers }: { initialUsers: U
                     <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
                             <h3 className="text-xl font-bold mb-4">Editar Usuario</h3>
-                            <form onSubmit={handleEdit} className="space-y-4">
+                            <form
+                                ref={editFormRef}
+                                onSubmit={handleEdit}
+                                onKeyDown={(event) => {
+                                    if (loadingAction || !shouldSubmitOnEnter(event.nativeEvent)) return;
+                                    event.preventDefault();
+                                    event.currentTarget.requestSubmit();
+                                }}
+                                className="space-y-4"
+                            >
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Nombre Completo</label>
                                     <input name="fullName" defaultValue={selectedUser.full_name} type="text" required className="w-full p-2 rounded-lg border dark:bg-gray-900 dark:border-gray-700" />

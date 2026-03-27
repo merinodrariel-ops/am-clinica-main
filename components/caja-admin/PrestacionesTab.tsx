@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,7 @@ import {
     createPrestacionListaItem
 } from '@/lib/caja-admin-prestaciones';
 import { toast } from 'sonner';
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 export default function PrestacionesTab() {
     const [prestaciones, setPrestaciones] = useState<PrestacionLista[]>([]);
@@ -26,6 +27,9 @@ export default function PrestacionesTab() {
     const [precioBase, setPrecioBase] = useState<number>(0);
     const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS');
     const [areaNombre, setAreaNombre] = useState('Odontología');
+    const createFormRef = useRef<HTMLFormElement>(null);
+
+    useModalKeyboard(isCreating, () => setIsCreating(false), () => createFormRef.current?.requestSubmit(), { disabled: saving });
 
     useEffect(() => {
         loadData();
@@ -119,7 +123,16 @@ export default function PrestacionesTab() {
                         className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 mb-6"
                     >
                         <h4 className="font-semibold text-slate-900 dark:text-white mb-4">Agregar Nueva Prestación</h4>
-                        <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <form
+                            ref={createFormRef}
+                            onSubmit={handleCreate}
+                            onKeyDown={(event) => {
+                                if (saving || !shouldSubmitOnEnter(event.nativeEvent)) return;
+                                event.preventDefault();
+                                event.currentTarget.requestSubmit();
+                            }}
+                            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                        >
                             <div>
                                 <label className="block text-xs font-medium text-slate-500 mb-1">Nombre</label>
                                 <Input

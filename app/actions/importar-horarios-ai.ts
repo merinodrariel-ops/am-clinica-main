@@ -3,10 +3,25 @@
 import { createClient } from '@/utils/supabase/server';
 import { GoogleGenAI } from '@google/genai';
 import * as xlsx from 'xlsx';
+import { inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY || "",
 });
+
+interface AIHorarioRegistro {
+    personal_id?: string;
+    fecha?: string;
+    hora_ingreso?: string | null;
+    hora_egreso?: string | null;
+    horas?: number;
+    estado?: string;
+}
+
+interface AIHorarioResponse {
+    registros?: AIHorarioRegistro[];
+    mensaje_al_usuario?: string;
+}
 
 export async function processHorariosFile(formData: FormData) {
     try {
@@ -72,7 +87,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
         const textOutput = result.text || "";
         const cleanJson = textOutput.replace(/```json/g, "").replace(/```/g, "").trim();
 
-        const parsedData = JSON.parse(cleanJson);
+        const parsedData = JSON.parse(cleanJson) as AIHorarioResponse;
 
         if (!parsedData.registros || !Array.isArray(parsedData.registros)) {
             throw new Error("El modelo de AI no devolvió la estructura esperada.");
@@ -80,12 +95,13 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
 
         // 5. Insert valid records into database
         const validRecords = parsedData.registros
-            .filter((r: any) => r.personal_id && r.fecha)
-            .map((r: any) => ({
+            .filter((r) => r.personal_id && r.fecha)
+            .map((r) => ({
                 personal_id: r.personal_id,
                 fecha: r.fecha,
                 hora_ingreso: r.hora_ingreso,
                 hora_egreso: r.hora_egreso,
+                salida_dia_siguiente: inferSalidaDiaSiguiente(r.hora_ingreso, r.hora_egreso),
                 horas: r.horas || 0,
                 estado: r.estado === 'observado' || r.estado === 'Observado' ? 'observado' : 'pending'
             }));
@@ -113,8 +129,8 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
             message: parsedData.mensaje_al_usuario || "Proceso completado."
         };
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Error processHorariosFile:", err);
-        return { success: false, error: err.message };
+        return { success: false, error: err instanceof Error ? err.message : 'Error desconocido' };
     }
 }

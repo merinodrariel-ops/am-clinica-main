@@ -6,6 +6,7 @@ import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle } f
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 import { createClient } from '@/utils/supabase/client';
 import { type TarifarioItem } from '@/lib/supabase';
@@ -226,29 +227,10 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handleEsc = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape' || loading) return;
-            onClose();
-        };
-
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
-    }, [isOpen, loading, onClose]);
-
     const shouldHandleEnterAsSubmit = useCallback((event: React.KeyboardEvent<HTMLFormElement>) => {
-        if (event.key !== 'Enter') return false;
-        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
+        if (!shouldSubmitOnEnter(event.nativeEvent)) return false;
 
         const target = event.target as HTMLElement | null;
-        if (!target) return true;
-
-        const tag = target.tagName.toLowerCase();
-        if (tag === 'textarea') return false;
-        if ((target as HTMLInputElement).type === 'button') return false;
-        if ((target as HTMLInputElement).type === 'submit') return false;
 
         if (target instanceof HTMLInputElement && target.name === 'patient-search' && patients.length > 0) return false;
         if (target instanceof HTMLInputElement && target.name === 'title-search' && showTarifarioResults && filteredTarifarioItems.length > 0) return false;
@@ -256,6 +238,8 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
         return true;
     }, [filteredDoctors.length, filteredTarifarioItems.length, patients.length, showDoctorResults, showTarifarioResults]);
+
+    useModalKeyboard(isOpen, onClose, undefined, { disabled: loading });
 
     const selectTarifarioItem = (item: TarifarioItem) => {
         setTitle(item.concepto_nombre);
@@ -497,21 +481,27 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     <div className="relative">
                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Título / Tratamiento</label>
                         <div className="relative">
-                            <Input
-                                name="title-search"
-                                type="text"
+                                <Input
+                                    name="title-search"
+                                    type="text"
                                 required
                                 placeholder="Ej: Limpieza Dental"
                                 className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                 value={title}
-                                onChange={(e) => {
-                                    setTitle(e.target.value);
-                                    setTarifarioSearch(e.target.value);
-                                    setShowTarifarioResults(true);
-                                }}
-                                onFocus={() => setShowTarifarioResults(true)}
-                                onBlur={() => setTimeout(() => setShowTarifarioResults(false), 150)}
-                            />
+                                    onChange={(e) => {
+                                        setTitle(e.target.value);
+                                        setTarifarioSearch(e.target.value);
+                                        setShowTarifarioResults(true);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && filteredTarifarioItems.length > 0) {
+                                            e.preventDefault();
+                                            selectTarifarioItem(filteredTarifarioItems[0]);
+                                        }
+                                    }}
+                                    onFocus={() => setShowTarifarioResults(true)}
+                                    onBlur={() => setTimeout(() => setShowTarifarioResults(false), 150)}
+                                />
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                 <Stethoscope size={16} className="text-gray-400" />
                             </div>
@@ -586,6 +576,15 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                         setShowDoctorResults(true);
                                         if (doctorId) setDoctorId(''); // Clear selection if typing
                                     }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && filteredDoctors.length > 0) {
+                                            e.preventDefault();
+                                            const doctor = filteredDoctors[0];
+                                            setDoctorId(doctor.id);
+                                            setDoctorSearch(doctor.full_name);
+                                            setShowDoctorResults(false);
+                                        }
+                                    }}
                                     onFocus={() => setShowDoctorResults(true)}
                                     onBlur={() => setTimeout(() => setShowDoctorResults(false), 150)}
                                 />
@@ -599,9 +598,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             {/* Doctor Search Results */}
                             {showDoctorResults && (
                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 max-h-48 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
-                                    {doctors
-                                        .filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase()))
-                                        .map(d => (
+                                    {filteredDoctors.map(d => (
                                             <Button
                                                 key={d.id}
                                                 type="button"
@@ -620,7 +617,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                             </Button>
                                         ))
                                     }
-                                    {doctors.filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase())).length === 0 && (
+                                    {filteredDoctors.length === 0 && (
                                         <div className="px-4 py-3 text-xs text-gray-500 italic">
                                             No se encontraron doctores.
                                         </div>

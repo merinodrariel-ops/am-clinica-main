@@ -63,6 +63,7 @@ import { Input } from "@/components/ui/Input";
 import { getLocalISODate } from "@/lib/local-date";
 import { Textarea } from "@/components/ui/Textarea";
 import MoneyInput from "@/components/ui/MoneyInput";
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface Props {
   sucursal: Sucursal;
@@ -809,6 +810,8 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     return () => window.removeEventListener("keydown", handleEsc);
   }, [editingMov]);
 
+  useModalKeyboard(showForm, () => setShowForm(false), handleSubmit, { disabled: submitting });
+
   async function handleSubmit() {
     setFormError(null);
 
@@ -957,18 +960,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   }
 
   function shouldHandleEnterAsSubmit(event: React.KeyboardEvent) {
-    if (event.key !== "Enter") return false;
-    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
-
-    const target = event.target as HTMLElement | null;
-    if (!target) return true;
-
-    const tag = target.tagName.toLowerCase();
-    if (tag === "textarea") return false;
-    if ((target as HTMLInputElement).type === "button") return false;
-    if ((target as HTMLInputElement).type === "submit") return false;
-
-    return true;
+    return shouldSubmitOnEnter(event.nativeEvent);
   }
 
   const filteredMovimientos = movimientos.filter((m) => {

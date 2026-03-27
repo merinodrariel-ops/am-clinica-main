@@ -22,6 +22,7 @@ export interface ProsoftRow {
         fecha: string;          // YYYY-MM-DD
         entrada: string;        // HH:MM
         salida: string;         // HH:MM
+        salidaDiaSiguiente?: boolean;
         horas: number;
         incompleto?: boolean;   // true when only one time is recorded
         requiereRevision?: boolean; // true when data is suspicious and needs manual check
@@ -78,6 +79,7 @@ function padTime(t: string): string {
 interface ParsedTime {
     entrada: string;
     salida: string;
+    salidaDiaSiguiente?: boolean;
     horas: number;
     incompleto?: boolean;
     requiereRevision?: boolean;
@@ -144,6 +146,7 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
             return {
                 entrada,
                 salida,
+                salidaDiaSiguiente: overnight,
                 horas,
                 requiereRevision: suspiciousLongShift,
                 motivoObservado: suspiciousLongShift ? 'HorasExcesivas' : undefined,
@@ -168,12 +171,13 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
     if (timeTokens.length > 2) {
         const entrada = timeTokens[0];
         const salida = timeTokens[timeTokens.length - 1];
-        const { horas } = computeHours(entrada, salida);
+        const { horas, overnight } = computeHours(entrada, salida);
         const hasOddCount = timeTokens.length % 2 !== 0;
 
         return {
             entrada,
             salida,
+            salidaDiaSiguiente: overnight,
             horas: horas > 0 && horas <= 24 ? horas : 0,
             incompleto: hasOddCount,
             requiereRevision: true,
@@ -755,6 +759,7 @@ export async function importProsoftData(
                         horas: reg.horas,
                         hora_ingreso: reg.entrada,
                         hora_egreso: reg.salida,
+                        salida_dia_siguiente: reg.salidaDiaSiguiente ?? false,
                         estado,
                         motivo_observado: motivoObservado,
                         original_hora_ingreso: reg.entrada,
@@ -952,6 +957,7 @@ export async function importProsoftPreviewSafe(
                             horas: reg.horas,
                             hora_ingreso: reg.entrada,
                             hora_egreso: reg.salida,
+                            salida_dia_siguiente: reg.salidaDiaSiguiente ?? false,
                             estado,
                             motivo_observado: motivoObservado,
                             original_hora_ingreso: reg.entrada,
@@ -970,6 +976,7 @@ export async function importProsoftPreviewSafe(
                     horas: reg.horas,
                     hora_ingreso: reg.entrada,
                     hora_egreso: reg.salida,
+                    salida_dia_siguiente: reg.salidaDiaSiguiente ?? false,
                     estado,
                     motivo_observado: motivoObservado,
                     original_hora_ingreso: reg.entrada,

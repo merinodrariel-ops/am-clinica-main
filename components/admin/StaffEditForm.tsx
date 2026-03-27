@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WorkerProfile, WorkerCategory } from '@/types/worker-portal';
 import { updateWorkerProfileAdmin, getAppUsers, getProviderCompanies, createProviderCompany } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 import { Save, User, Briefcase, DollarSign, Phone, Mail, MapPin, Hash, ShieldCheck, Link2, Clock, ListChecks } from 'lucide-react';
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface StaffEditFormProps {
     worker: WorkerProfile;
@@ -21,6 +22,9 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     const [newCompanyName, setNewCompanyName] = useState('');
     const [creatingCompany, setCreatingCompany] = useState(false);
     const [cobraPorHoras, setCobraPorHoras] = useState(worker.cobra_por_horas ?? false);
+    const formRef = useRef<HTMLFormElement>(null);
+
+    useModalKeyboard(true, onCancel, () => formRef.current?.requestSubmit(), { disabled: isSaving });
 
     const APP_ROLE_LABELS: Record<string, string> = {
         partner_viewer: 'Solo lectura',
@@ -102,7 +106,16 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 md:space-y-8 animate-in fade-in zoom-in duration-300">
+        <form
+            ref={formRef}
+            onSubmit={handleSubmit}
+            onKeyDown={(event) => {
+                if (isSaving || !shouldSubmitOnEnter(event.nativeEvent)) return;
+                event.preventDefault();
+                event.currentTarget.requestSubmit();
+            }}
+            className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 md:space-y-8 animate-in fade-in zoom-in duration-300"
+        >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <User className="text-indigo-400" size={20} />

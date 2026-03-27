@@ -5,6 +5,7 @@ import { X, Moon, Sun, Monitor, Database, Settings } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import DataImporter from './DataImporter';
 import { useAuth } from '@/contexts/AuthContext';
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -22,14 +23,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setMounted(true);
     }, []);
 
-    // Close on escape key
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        if (isOpen) window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
+    useModalKeyboard(isOpen, onClose);
 
     if (!isOpen) return null;
 

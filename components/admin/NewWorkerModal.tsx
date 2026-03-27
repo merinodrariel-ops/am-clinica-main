@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, UserPlus, Save, FileText } from 'lucide-react';
 import { createProviderCompany, createWorkerWithInvite, getProviderCompanies, type CreateWorkerInput } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
+import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 const AREAS = [
     'Odontología',
@@ -26,12 +27,8 @@ interface Props {
 
 export default function NewWorkerModal({ onClose, onCreated }: Props) {
     const [saving, setSaving] = useState(false);
-
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onClose(); };
-        document.addEventListener('keydown', handler);
-        return () => document.removeEventListener('keydown', handler);
-    }, [onClose, saving]);
+    const formRef = useRef<HTMLFormElement>(null);
+    useModalKeyboard(true, onClose, () => formRef.current?.requestSubmit(), { disabled: saving });
     const [tipo, setTipo] = useState<'prestador' | 'odontologo'>('prestador');
     const [createdWorkerId, setCreatedWorkerId] = useState<string | null>(null);
     const [showContractPrompt, setShowContractPrompt] = useState(false);
@@ -162,7 +159,16 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-5 md:space-y-6">
+                <form
+                    ref={formRef}
+                    onSubmit={handleSubmit}
+                    onKeyDown={(event) => {
+                        if (saving || !shouldSubmitOnEnter(event.nativeEvent)) return;
+                        event.preventDefault();
+                        event.currentTarget.requestSubmit();
+                    }}
+                    className="p-4 md:p-6 space-y-5 md:space-y-6"
+                >
                     {/* (all fields content remains the same but with improved parent spacing) */}
                     {/* ... */}
 

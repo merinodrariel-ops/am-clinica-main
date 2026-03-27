@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { X } from 'lucide-react';
+import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface ModalProps {
     isOpen: boolean;
@@ -33,30 +34,7 @@ export default function Modal({
 }: ModalProps) {
     const panelRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                onClose();
-                return;
-            }
-            if (e.key === 'Enter' && onConfirm) {
-                const tag = (e.target as HTMLElement).tagName;
-                if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT' || tag === 'A') return;
-                e.preventDefault();
-                onConfirm();
-            }
-        };
-
-        document.addEventListener('keydown', handler);
-
-        // Focus the panel so keyboard events are captured
-        panelRef.current?.focus();
-
-        return () => document.removeEventListener('keydown', handler);
-    }, [isOpen, onClose, onConfirm]);
+    useModalKeyboard(isOpen, onClose, onConfirm);
 
     if (!isOpen) return null;
 
