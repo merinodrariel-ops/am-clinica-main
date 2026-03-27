@@ -12,7 +12,7 @@ interface UserPermissionsPanelProps {
 }
 
 const LEVEL_OPTIONS: { value: ModuleLevel; label: string }[] = [
-    { value: 'inherit', label: 'Heredar' },
+    { value: 'inherit', label: 'Según su cargo' },
     { value: 'none',    label: 'Sin acceso' },
     { value: 'read',    label: 'Solo lectura' },
     { value: 'edit',    label: 'Completo' },

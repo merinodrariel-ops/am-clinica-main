@@ -5,6 +5,7 @@ import type {
   SmileState,
   SmileGridData,
   SmileResult,
+  CentralLength,
 } from '@/hooks/useSmileDesign';
 import { DEFAULT_SMILE_SETTINGS } from '@/hooks/useSmileDesign';
 import BeforeAfterSlider from './BeforeAfterSlider';
@@ -19,6 +20,7 @@ interface SmileDesignPanelProps {
   onSave: () => void;
   onShareLink: () => void;
   onExit: () => void;
+  onOpenWarpBrush?: () => void;
   showGrid: boolean;
   onToggleGrid: () => void;
   canShare: boolean;
@@ -29,6 +31,11 @@ interface SmileDesignPanelProps {
 const LEVEL_OPTIONS = ['Natural', 'Natural White', 'Natural Ultra White'] as const;
 const INTENSITY3 = ['Sutil', 'Medio', 'Marcado'] as const;
 const TEXTURE_OPTIONS = ['Sutil', 'Medio', 'Detallado'] as const;
+const CENTRAL_LENGTH_OPTIONS: { value: CentralLength; label: string }[] = [
+  { value: 'Cortos', label: 'Cortos' },
+  { value: 'Natural', label: 'Natural' },
+  { value: 'Largos', label: 'Largos' },
+];
 
 export default function SmileDesignPanel({
   state,
@@ -40,6 +47,7 @@ export default function SmileDesignPanel({
   onSave,
   onShareLink,
   onExit,
+  onOpenWarpBrush,
   showGrid,
   onToggleGrid,
   canShare,
@@ -191,6 +199,26 @@ export default function SmileDesignPanel({
               <div className="text-center text-[8px] text-purple-400 mt-0.5">Centro (default)</div>
             )}
           </div>
+
+          {/* Central incisor length */}
+          <div>
+            <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-1.5">Largo de centrales</div>
+            <div className="flex gap-1">
+              {CENTRAL_LENGTH_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => onSettingsChange({ centralLength: value })}
+                  className={`flex-1 rounded py-1.5 text-center text-[9px] transition-colors border ${
+                    settings.centralLength === value
+                      ? 'bg-purple-900/50 border-purple-500 text-purple-300 font-semibold'
+                      : 'bg-[#1e2130] border-[#2a2d3a] text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Divider */}
@@ -205,6 +233,14 @@ export default function SmileDesignPanel({
           >
             🔄 Regenerar
           </button>
+          {onOpenWarpBrush && isReady && (
+            <button
+              onClick={onOpenWarpBrush}
+              className="bg-[#1e2130] border border-purple-500/40 hover:border-purple-400 text-purple-300 text-[10px] py-2 rounded-md flex items-center justify-center gap-1"
+            >
+              🖌️ Pincel de corrección
+            </button>
+          )}
           <button
             onClick={onSave}
             disabled={isProcessing || !isReady}

@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 
 export type SmileLevel = 'Natural' | 'Natural White' | 'Natural Ultra White';
 export type SmileIntensity3 = 'Sutil' | 'Medio' | 'Marcado';
+export type CentralLength = 'Cortos' | 'Natural' | 'Largos';
 
 export interface SmileSettings {
   level: SmileLevel;
@@ -12,6 +13,7 @@ export interface SmileSettings {
   texture: boolean;
   textureIntensity: 'Sutil' | 'Medio' | 'Detallado';
   shape: number; // -1 (femenino) a 1 (masculino), 0 = centro
+  centralLength: CentralLength;
 }
 
 export const DEFAULT_SMILE_SETTINGS: SmileSettings = {
@@ -21,6 +23,7 @@ export const DEFAULT_SMILE_SETTINGS: SmileSettings = {
   texture: true,
   textureIntensity: 'Medio',
   shape: 0,
+  centralLength: 'Natural',
 };
 
 export interface SmileGridData {
@@ -46,6 +49,7 @@ export interface UseSmileDesignReturn {
   gridData: SmileGridData | null;
   settings: SmileSettings;
   setSettings: (s: Partial<SmileSettings>) => void;
+  setWarpedAfter: (dataUrl: string, base64: string) => void;
   error: string | null;
   reset: () => void;
 }
@@ -137,6 +141,7 @@ export function useSmileDesign(): UseSmileDesignReturn {
         texture: currentSettings.texture,
         textureIntensity: currentSettings.textureIntensity,
         shape: currentSettings.shape,
+        centralLength: currentSettings.centralLength,
       }),
     });
     const data = await res.json();
@@ -152,7 +157,7 @@ export function useSmileDesign(): UseSmileDesignReturn {
 
     try {
       setSmileState('aligning');
-      const compressed = await compressBlob(imageBlob);
+      const compressed = await compressBlob(imageBlob, 2400);
 
       let processedBase64 = compressed.base64;
       let processedMime = compressed.mimeType;
@@ -237,6 +242,10 @@ export function useSmileDesign(): UseSmileDesignReturn {
     }
   }, [alignedBase64, alignedMime, settings, callEnhance]);
 
+  const setWarpedAfter = useCallback((dataUrl: string, base64: string) => {
+    setResult(prev => prev ? { ...prev, afterDataUrl: dataUrl, afterBase64: base64 } : prev);
+  }, []);
+
   const reset = useCallback(() => {
     setSmileState('idle');
     setResult(null);
@@ -246,5 +255,5 @@ export function useSmileDesign(): UseSmileDesignReturn {
     setSettingsState(DEFAULT_SMILE_SETTINGS);
   }, []);
 
-  return { process, regenerate, state: smileState, result, gridData, settings, setSettings, error, reset };
+  return { process, regenerate, state: smileState, result, gridData, settings, setSettings, setWarpedAfter, error, reset };
 }

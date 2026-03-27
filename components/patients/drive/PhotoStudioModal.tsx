@@ -18,6 +18,7 @@ import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage 
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import SmileDesignPanel from './SmileDesignPanel';
+import WarpBrush from './WarpBrush';
 import BeforeAfterSlider from './BeforeAfterSlider';
 import { saveSmileDesignResult, getSmileShareUrl } from '@/app/actions/smile-design';
 
@@ -516,6 +517,7 @@ export default function PhotoStudioModal({
     const [showSmileGrid, setShowSmileGrid] = useState(false);
     const [smileSaved, setSmileSaved] = useState(false);
     const [smileProcessingTime, setSmileProcessingTime] = useState<number | null>(null);
+    const [showWarpBrush, setShowWarpBrush] = useState(false);
     const smileStartTimeRef = useRef<number | null>(null);
     const autoStartSmileRef = useRef(autoStartSmile ?? false);
 
@@ -3540,6 +3542,7 @@ export default function PhotoStudioModal({
                                     setShowSmileGrid(false);
                                     setSmileSaved(false);
                                 }}
+                                onOpenWarpBrush={() => setShowWarpBrush(true)}
                                 showGrid={showSmileGrid}
                                 onToggleGrid={() => setShowSmileGrid(prev => !prev)}
                                 canShare={smileSaved}
@@ -4106,6 +4109,18 @@ export default function PhotoStudioModal({
                 </div>
             </>,
             document.body,
+        )}
+        {showWarpBrush && smileDesign.result && (
+            <WarpBrush
+                imageSrc={smileDesign.result.afterDataUrl}
+                onSave={(warped) => {
+                    const base64 = warped.split(',')[1];
+                    smileDesign.setWarpedAfter(warped, base64);
+                    setShowWarpBrush(false);
+                    toast.success('Corrección aplicada');
+                }}
+                onCancel={() => setShowWarpBrush(false)}
+            />
         )}
         {sharePatientItems && (
             <ShareWithPatientModal
