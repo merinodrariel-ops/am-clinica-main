@@ -6,10 +6,16 @@ interface BeforeAfterSliderProps {
   beforeSrc: string;
   afterSrc: string;
   className?: string;
+  onPosChange?: (pos: number) => void;
 }
 
-export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '' }: BeforeAfterSliderProps) {
+export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '', onPosChange }: BeforeAfterSliderProps) {
   const [pos, setPos] = useState(50);
+
+  const updatePos = useCallback((newPos: number) => {
+    setPos(newPos);
+    onPosChange?.(newPos);
+  }, [onPosChange]);
   const [scale, setScale] = useState(1);
   const [origin, setOrigin] = useState({ x: 50, y: 50 }); // % from top-left
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,13 +32,13 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '' 
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     dragging.current = true;
-    setPos(getRelX(e.clientX));
-  }, []);
+    updatePos(getRelX(e.clientX));
+  }, [updatePos]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging.current) return;
-    setPos(getRelX(e.clientX));
-  }, []);
+    updatePos(getRelX(e.clientX));
+  }, [updatePos]);
 
   const onMouseUp = useCallback(() => { dragging.current = false; }, []);
 
@@ -56,7 +62,7 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '' 
     if (e.touches.length === 1) {
       dragging.current = true;
       lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      setPos(getRelX(e.touches[0].clientX));
+      updatePos(getRelX(e.touches[0].clientX));
     } else if (e.touches.length === 2) {
       dragging.current = false;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -68,7 +74,7 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '' 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     if (e.touches.length === 1 && dragging.current) {
-      setPos(getRelX(e.touches[0].clientX));
+      updatePos(getRelX(e.touches[0].clientX));
     } else if (e.touches.length === 2 && lastDist.current != null) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;

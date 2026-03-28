@@ -81,6 +81,84 @@ async function generateComparisonBase64(beforeUrl: string, afterDataUrl: string)
     });
 }
 
+/**
+ * Generates a before/after slice image at a given divider position (0-100%).
+ * The left portion draws "before" and the right portion draws "after".
+ */
+async function generateSliceBase64(beforeUrl: string, afterDataUrl: string, pos: number): Promise<string | null> {
+    return new Promise((resolve) => {
+        const imgBefore = new Image();
+        const imgAfter = new Image();
+        let loadedCount = 0;
+
+        const onBothLoaded = () => {
+            loadedCount++;
+            if (loadedCount === 2) {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const w = imgBefore.naturalWidth || imgBefore.width;
+                    const h = imgBefore.naturalHeight || imgBefore.height;
+                    const maxSide = 2400;
+                    const scale = Math.min(1, maxSide / Math.max(w, h));
+                    const sw = Math.round(w * scale);
+                    const sh = Math.round(h * scale);
+                    canvas.width = sw;
+                    canvas.height = sh;
+                    const ctx = canvas.getContext('2d', { alpha: false })!;
+
+                    // Draw full "after" image as background
+                    ctx.drawImage(imgAfter, 0, 0, sw, sh);
+
+                    // Clip left portion and draw "before"
+                    const splitX = Math.round(sw * (pos / 100));
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(0, 0, splitX, sh);
+                    ctx.clip();
+                    ctx.drawImage(imgBefore, 0, 0, sw, sh);
+                    ctx.restore();
+
+                    // Draw divider line
+                    ctx.fillStyle = 'rgba(168,85,247,0.9)'; // purple-500
+                    ctx.fillRect(splitX - 1, 0, 3, sh);
+
+                    // Draw handle circle
+                    const cx = splitX;
+                    const cy = Math.round(sh / 2);
+                    const r = Math.round(sw * 0.022);
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(168,85,247,1)';
+                    ctx.fill();
+
+                    // Labels
+                    const fontSize = Math.max(14, Math.round(sw * 0.018));
+                    ctx.font = `bold ${fontSize}px sans-serif`;
+                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                    ctx.fillText('ANTES', 12, sh - 12);
+                    ctx.textAlign = 'right';
+                    ctx.fillText('DESPUÉS', sw - 12, sh - 12);
+
+                    const result = canvas.toDataURL('image/jpeg', 0.88);
+                    resolve(result.split(',')[1]);
+                } catch (e) {
+                    console.error('Slice generation failed:', e);
+                    resolve(null);
+                }
+            }
+        };
+
+        imgBefore.onload = onBothLoaded;
+        imgAfter.onload = onBothLoaded;
+        imgBefore.onerror = () => resolve(null);
+        imgAfter.onerror = () => resolve(null);
+        imgBefore.crossOrigin = 'anonymous';
+        imgAfter.crossOrigin = 'anonymous';
+        imgBefore.src = beforeUrl;
+        imgAfter.src = afterDataUrl;
+    });
+}
+
 
 const PHOTO_CATEGORIES = [
   { group: 'Rostro (Natural)', items: ['Frente', 'Perfil Izquierdo', 'Perfil Derecho', '45 Grados'] },
@@ -628,6 +706,7 @@ export default function PhotoStudioModal({
     const [smileProcessingTime, setSmileProcessingTime] = useState<number | null>(null);
     const [showWarpBrush, setShowWarpBrush] = useState(false);
     const smileStartTimeRef = useRef<number | null>(null);
+    const slicePosRef = useRef<number>(50); // tracks the current BeforeAfterSlider divider position
     const autoStartSmileRef = useRef(autoStartSmile ?? false);
 
     // Auto-trigger Smile Design when opened via quick-access button
@@ -3646,6 +3725,7 @@ export default function PhotoStudioModal({
                                         beforeSrc={smileDesign.result.beforeDataUrl}
                                         afterSrc={smileDesign.result.afterDataUrl}
                                         className="w-full h-full"
+                                        onPosChange={(p) => { slicePosRef.current = p; }}
                                     />
                                     {showSmileGrid && smileDesign.gridData && (
                                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" xmlns="http://www.w3.org/2000/svg">
@@ -3748,15 +3828,22 @@ export default function PhotoStudioModal({
                                 }}
                                 onSave={async () => {
                                     if (!smileDesign.result) return;
-                                    const saveToastId = toast.loading("Guardando Smile Design y generando comparativa...", {
+                                    const saveToastId = toast.loading("Guardando Smile Design y generando imágenes...", {
                                         description: "Esto puede tardar unos segundos"
                                     });
                                     
                                     try {
-                                        const comparisonBase64 = await generateComparisonBase64(
-                                            smileDesign.result.beforeDataUrl,
-                                            smileDesign.result.afterDataUrl
-                                        );
+                                        const [comparisonBase64, sliceBase64] = await Promise.all([
+                                            generateComparisonBase64(
+                                                smileDesign.result.beforeDataUrl,
+                                                smileDesign.result.afterDataUrl
+                                            ),
+                                            generateSliceBase64(
+                                                smileDesign.result.beforeDataUrl,
+                                                smileDesign.result.afterDataUrl,
+                                                slicePosRef.current
+                                            ),
+                                        ]);
 
                                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
                                         const sanitizedPatient = patientName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
@@ -3768,6 +3855,8 @@ export default function PhotoStudioModal({
                                             afterBase64: smileDesign.result.afterBase64,
                                             afterMime: smileDesign.result.afterMime,
                                             comparisonBase64: comparisonBase64 || undefined,
+                                            sliceBase64: sliceBase64 || undefined,
+                                            slicePos: slicePosRef.current,
                                             settings: smileDesign.settings,
                                             customFilename: `DisenoSonrisa_${sanitizedPatient}_${timestamp}`,
                                         });
