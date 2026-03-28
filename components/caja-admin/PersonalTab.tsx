@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Plus,
-    Calendar,
     Clock,
     Check,
     X,
@@ -70,7 +69,6 @@ import {
 import ObservadosTab from './ObservadosTab';
 import ContratosTab from './ContratosTab';
 import PrestacionesTab from './PrestacionesTab';
-import HorariosTab from './HorariosTab';
 import PortfolioEditor from '@/components/caja-admin/PortfolioEditor';
 import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
@@ -85,7 +83,7 @@ interface Props {
     initialObservedPersonalId?: string;
 }
 
-type MainTab = 'prestadores' | 'prestaciones' | 'horarios' | 'registros' | 'observados' | 'contratos';
+type MainTab = 'prestadores' | 'prestaciones' | 'observados' | 'contratos';
 type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza' | 'pago-hora' | 'pago-prestacion' | 'mensual';
 
 type ProviderTypeOption = {
@@ -1212,28 +1210,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     </Button>
                     <Button
                         variant="ghost"
-                        onClick={() => setActiveTab('horarios')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'horarios'
-                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-b-2 border-blue-500 rounded-b-none'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
-                            }`}
-                    >
-                        <Calendar className="w-4 h-4" />
-                        Horarios
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        onClick={() => setActiveTab('registros')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'registros'
-                            ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-b-2 border-purple-500 rounded-b-none'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-b-none'
-                            }`}
-                    >
-                        <Clock className="w-4 h-4" />
-                        Horas & Liquidaciones
-                    </Button>
-                    <Button
-                        variant="ghost"
                         onClick={() => setActiveTab('observados')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto ${activeTab === 'observados'
                             ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-b-2 border-amber-500 rounded-b-none'
@@ -1329,26 +1305,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     </div>
                 )}
 
-                {activeTab === 'registros' && (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500 pointer-events-none" />
-                            <Input
-                                type="month"
-                                value={mesActual}
-                                onChange={(e) => setMesActual(e.target.value)}
-                                className="pl-10 h-10 w-full rounded-xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-indigo-500"
-                            />
-                        </div>
-                        <Button
-                            onClick={() => setShowHorasForm(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg hover:opacity-90 transition-opacity"
-                        >
-                            <Plus className="w-5 h-5" />
-                            Registrar Horas
-                        </Button>
-                    </div>
-                )}
             </div>
 
             {/* New/Edit Personal Form Modal */}
@@ -2323,12 +2279,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     </div>
                 )}
 
-            {/* Registros & Liquidaciones Tab Content */}
-            {
-                activeTab === 'registros' && (
-                    <>
-                        {/* Hours Form */}
-                        {showHorasForm && (
+            {/* Hours Form — shown when showHorasForm is triggered */}
+            {showHorasForm && (
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -2476,341 +2428,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     </Button>
                                 </div>
                             </motion.div>
-                        )}
-
-                        {/* Personal Summary Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {horasPorPersona.map(({ personal: p, totalHoras, liquidacion }) => {
-                                // Calculate professional totals if applicable
-                                const prestacionesProfe = prestacionesMes.filter(pr => pr.profesional_id === p.id);
-                                const totalPrestaciones = prestacionesProfe.reduce((acc, pr) => acc + pr.valor_cobrado, 0);
-                                const totalHonorarios = prestacionesProfe.reduce((acc, pr) => acc + (pr.monto_honorarios || 0), 0);
-                                const mode = getEffectiveModeloPago(p);
-                                const isProfesional = mode === 'prestaciones';
-                                const configuredHourValue = getConfiguredHourValue(p);
-                                const criticalObservadosCount = getCriticalObservadosCount(p.id);
-                                const hasCriticalObservados = criticalObservadosCount > 0;
-
-                                return (
-                                    <div
-                                        key={p.id}
-                                        className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5"
-                                    >
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isOdontologoTipo(p.tipo)
-                                                ? 'bg-emerald-100 dark:bg-emerald-900/50'
-                                                : 'bg-purple-100 dark:bg-purple-900/50'
-                                                }`}>
-                                                {isOdontologoTipo(p.tipo)
-                                                    ? <Stethoscope className="w-6 h-6 text-emerald-600" />
-                                                    : <User className="w-6 h-6 text-purple-600" />
-                                                }
-                                            </div>
-                                            <div>
-                                                <h4 className="font-semibold">{p.nombre}</h4>
-                                                <p className="text-sm text-slate-500">{p.area || p.rol}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4 mb-4">
-                                            <div>
-                                                <p className="text-xs text-slate-500">
-                                                    {mode === 'prestaciones' ? 'Prestaciones cargadas' : mode === 'mensual' ? 'Mensualidad' : 'Horas mes'}
-                                                </p>
-                                                <p className="text-xl font-bold">
-                                                    {mode === 'prestaciones'
-                                                        ? prestacionesProfe.length
-                                                        : mode === 'mensual'
-                                                            ? new Intl.NumberFormat('es-AR', {
-                                                                style: 'currency',
-                                                                currency: p.moneda_mensual === 'USD' ? 'USD' : 'ARS'
-                                                            }).format(p.monto_mensual || 0)
-                                                            : `${totalHoras}h`}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-slate-500">Esquema</p>
-                                                <p className="text-sm font-bold text-green-600 mt-1 uppercase tracking-wider text-[11px]">
-                                                    {mode === 'prestaciones' ? 'Por prestación' : mode === 'mensual' ? 'Mensualidad fija' : 'Pago por hora'}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl mb-4">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-slate-600">Total a Liquidar:</span>
-                                                <span className="font-bold">
-                                                    <SensitiveValue
-                                                        value={mode === 'prestaciones' ? totalHonorarios : mode === 'mensual' ? (p.monto_mensual || 0) : totalHoras * configuredHourValue}
-                                                        format="currency-ars"
-                                                        fieldId={`total-${p.id}`}
-                                                    />
-                                                </span>
-                                            </div>
-                                            {isProfesional && (
-                                                <div className="flex items-center justify-between mt-1 border-t border-slate-200 dark:border-slate-700 pt-1">
-                                                    <span className="text-xs text-slate-400">Total Facturado:</span>
-                                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                                        <SensitiveValue
-                                                            value={totalPrestaciones}
-                                                            format="currency-ars"
-                                                            fieldId={`facturado-${p.id}`}
-                                                        />
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {tcBna && mode === 'horas' && (
-                                                <div className="flex items-center justify-between mt-1">
-                                                    <span className="text-xs text-slate-400">Equiv. USD:</span>
-                                                    <span className="text-sm text-green-600">
-                                                        <SensitiveValue
-                                                            value={(totalHoras * configuredHourValue) / tcBna}
-                                                            format="currency"
-                                                            fieldId={`total-usd-${p.id}`}
-                                                        />
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {liquidacion ? (
-                                            <div className={`p-3 rounded-xl text-center ${liquidacion.estado === 'Pagado'
-                                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700'
-                                                : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700'
-                                                }`}>
-                                                <span className="text-sm font-medium">
-                                                    Liquidación: {liquidacion.estado}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <Button
-                                                    onClick={() => handleGenerarLiquidacion(p.id)}
-                                                    disabled={submitting || hasCriticalObservados || (mode === 'prestaciones' ? totalHonorarios === 0 : mode === 'mensual' ? (p.monto_mensual || 0) === 0 : totalHoras === 0)}
-                                                    className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl font-medium disabled:opacity-50 hover:bg-indigo-200 h-auto"
-                                                >
-                                                    <DollarSign className="w-4 h-4" />
-                                                    Generar Liquidación
-                                                </Button>
-                                                {hasCriticalObservados && (
-                                                    <p className="text-[11px] text-red-600 dark:text-red-400 font-medium text-center">
-                                                        Bloqueado: {criticalObservadosCount} observado(s) crítico(s) sin resolver.
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Portfolio button */}
-                                        {isProfesional && prestacionesProfe.length > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setPortfolioModal({
-                                                    profesional: p,
-                                                    prestaciones: prestacionesProfe
-                                                })}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 rounded-lg transition-colors"
-                                            >
-                                                Portfolio
-                                            </button>
-                                        )}
-
-                                        {/* Expandable prestaciones list */}
-                                        {isProfesional && prestacionesProfe.length > 0 && (
-                                            <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setExpandedPrestaciones(prev => {
-                                                        const next = new Set(prev);
-                                                        if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
-                                                        return next;
-                                                    })}
-                                                    className="w-full flex items-center justify-between text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                                                >
-                                                    <span>{expandedPrestaciones.has(p.id) ? 'Ocultar prestaciones' : `Ver ${prestacionesProfe.length} prestaciones del mes`}</span>
-                                                    <ChevronDown className={`w-4 h-4 transition-transform ${expandedPrestaciones.has(p.id) ? 'rotate-180' : ''}`} />
-                                                </button>
-
-                                                {expandedPrestaciones.has(p.id) && (
-                                                    <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
-                                                        {prestacionesProfe
-                                                            .slice()
-                                                            .sort((a, b) => new Date(b.fecha_realizacion).getTime() - new Date(a.fecha_realizacion).getTime())
-                                                            .map(pr => (
-                                                                <div key={pr.id} className={`rounded-lg px-3 py-2 text-xs ${pr.estado_pago === 'pendiente' ? 'bg-slate-50 dark:bg-slate-900' : 'bg-green-50 dark:bg-green-900/10'}`}>
-                                                                    <div className="flex items-start justify-between gap-2">
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="font-medium text-slate-800 dark:text-slate-200 truncate">{pr.prestacion_nombre}</p>
-                                                                            <p className="text-slate-500 truncate">{pr.paciente_nombre || '—'} · {new Date(pr.fecha_realizacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</p>
-                                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                                                                    {pr.moneda_cobro} {new Intl.NumberFormat('es-AR').format(pr.valor_cobrado)}
-                                                                                </span>
-                                                                                {pr.slides_url && (
-                                                                                    <a href={pr.slides_url} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline flex items-center gap-0.5">
-                                                                                        <ExternalLink className="w-3 h-3" /> HC
-                                                                                    </a>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                        {pr.estado_pago === 'pendiente' && (
-                                                                            <div className="flex gap-1 shrink-0">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    title="Editar"
-                                                                                    onClick={() => {
-                                                                                        setEditingPrestacion(pr);
-                                                                                        setEditPrestacionForm({
-                                                                                            prestacion_nombre: pr.prestacion_nombre,
-                                                                                            fecha_realizacion: pr.fecha_realizacion.slice(0, 10),
-                                                                                            paciente_nombre: pr.paciente_nombre || '',
-                                                                                            valor_cobrado: pr.valor_cobrado,
-                                                                                            monto_honorarios: pr.monto_honorarios,
-                                                                                            moneda_cobro: pr.moneda_cobro as 'ARS' | 'USD',
-                                                                                            slides_url: pr.slides_url || '',
-                                                                                            notas: pr.notas || '',
-                                                                                        });
-                                                                                    }}
-                                                                                    className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 transition-colors"
-                                                                                >
-                                                                                    <Pencil className="w-3 h-3" />
-                                                                                </button>
-                                                                                {confirmDeletePrestacionId === pr.id ? (
-                                                                                    <div className="flex gap-1">
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={async () => {
-                                                                                                const res = await eliminarPrestacion(pr.id);
-                                                                                                if (res.success) { toast.success('Prestación eliminada'); loadData(); }
-                                                                                                else toast.error(res.error || 'Error al eliminar');
-                                                                                                setConfirmDeletePrestacionId(null);
-                                                                                            }}
-                                                                                            className="px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
-                                                                                        >Sí</button>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => setConfirmDeletePrestacionId(null)}
-                                                                                            className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 text-[10px] font-bold"
-                                                                                        >No</button>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        title="Eliminar"
-                                                                                        onClick={() => setConfirmDeletePrestacionId(pr.id)}
-                                                                                        className="p-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 transition-colors"
-                                                                                    >
-                                                                                        <Trash2 className="w-3 h-3" />
-                                                                                    </button>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Recent Registros Table */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-                                <h3 className="font-semibold flex items-center gap-2">
-                                    <Clock className="w-5 h-5 text-indigo-500" />
-                                    Registro de Horas del Mes
-                                </h3>
-                            </div>
-
-                            {registros.length === 0 ? (
-                                <div className="p-12 text-center text-slate-400">
-                                    <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                    <p>No hay horas registradas este mes</p>
-                                </div>
-                            ) : (
-                                <table className="w-full">
-                                    <thead className="bg-slate-50 dark:bg-slate-900">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Fecha</th>
-                                            <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Personal</th>
-                                            <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Horas</th>
-                                            <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Observaciones</th>
-                                            <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                        {registros.map((reg) => {
-                                            const persona = personal.find(p => p.id === reg.personal_id);
-                                            return (
-                                                <tr key={reg.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
-                                                    <td className="px-6 py-3 text-sm">
-                                                        {new Date(reg.fecha).toLocaleDateString('es-AR')}
-                                                    </td>
-                                                    <td className="px-6 py-3 text-sm font-medium">{persona?.nombre || '-'}</td>
-                                                    <td className="px-6 py-3 text-sm text-center font-bold">
-                                                        <div className="flex flex-col items-center">
-                                                            <span>{reg.horas}h</span>
-                                                            {reg.salida_dia_siguiente && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">
-                                                                    Cruza medianoche
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-3 text-sm text-slate-500">{reg.observaciones || '-'}</td>
-                                                    <td className="px-6 py-3 text-right text-sm">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditingHorasRegistro(reg);
-                                                                    setHorasEditForm({
-                                                                        fecha: reg.fecha,
-                                                                        hora_ingreso: reg.hora_ingreso || '',
-                                                                        hora_egreso: reg.hora_egreso || '',
-                                                                        salida_dia_siguiente: reg.salida_dia_siguiente || false,
-                                                                        observaciones: reg.observaciones || '',
-                                                                        horas: reg.horas
-                                                                    });
-                                                                }}
-                                                                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                                                                title="Editar registro"
-                                                            >
-                                                                <Pencil className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleEliminarRegistroHoras(reg.id)}
-                                                                className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                                                                title="Eliminar registro"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    </>
-                )
-            }
-
+            )}
             {/* Prestaciones Tab Content */}
             {
                 activeTab === 'prestaciones' && (
                     <PrestacionesTab />
-                )
-            }
-
-            {/* Horarios Tab Content */}
-            {
-                activeTab === 'horarios' && (
-                    <HorariosTab />
                 )
             }
 
