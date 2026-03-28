@@ -17,7 +17,7 @@ export interface SmileSettings {
 }
 
 export const DEFAULT_SMILE_SETTINGS: SmileSettings = {
-  level: 'Natural White',
+  level: 'Natural',
   edges: true,
   edgesIntensity: 'Medio',
   texture: true,
@@ -157,7 +157,7 @@ export function useSmileDesign(): UseSmileDesignReturn {
 
     try {
       setSmileState('aligning');
-      const compressed = await compressBlob(imageBlob, 2400);
+      const compressed = await compressBlob(imageBlob, 3840, 0.98);
 
       let processedBase64 = compressed.base64;
       let processedMime = compressed.mimeType;
@@ -176,23 +176,30 @@ export function useSmileDesign(): UseSmileDesignReturn {
         });
         const alignData = await alignRes.json();
 
-        if (alignData.leftPupil && alignData.rightPupil) {
-          const dx = (alignData.rightPupil.x - alignData.leftPupil.x) * compressed.width;
-          const dy = (alignData.rightPupil.y - alignData.leftPupil.y) * compressed.height;
-          const angleDeg = -(Math.atan2(dy, dx) * 180) / Math.PI;
-
-          if (Math.abs(angleDeg) > 0.5) {
-            const rotated = await rotateDataUrl(compressed.dataUrl, angleDeg);
-            processedBase64 = rotated.split(',')[1];
-            processedMime = 'image/jpeg';
-          }
-        }
-
+        // Start with original grid coordinates
         grid = {
           bipupilarY: alignData.bipupilarY ?? null,
           smileLineY: alignData.smileLineY ?? null,
           midlineX: alignData.midlineX ?? null,
         };
+
+        if (alignData.leftPupil && alignData.rightPupil) {
+          const dx = (alignData.rightPupil.x - alignData.leftPupil.x) * compressed.width;
+          const dy = (alignData.rightPupil.y - alignData.leftPupil.y) * compressed.height;
+          const angleDeg = -(Math.atan2(dy, dx) * 180) / Math.PI;
+
+          // Note: Automatic rotation based on pupils is disabled based on user feedback 
+          // ("siento que todo el lado derecho de la cara del paciente está como más levantado").
+          // We respect the manual alignment from the Photo Studio instead.
+          /*
+          if (Math.abs(angleDeg) > 0.5) {
+            const rotated = await rotateDataUrl(compressed.dataUrl, angleDeg);
+            processedBase64 = rotated.split(',')[1];
+            processedMime = 'image/jpeg';
+            ...
+          }
+          */
+        }
       } catch {
         console.warn('[useSmileDesign] align skipped, proceeding with original');
       }

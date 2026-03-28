@@ -11,7 +11,24 @@ import {
     deleteFromDrive,
     updateFileContentInDrive,
     copyDriveFile,
+    renameFileInDrive,
 } from '@/lib/google-drive';
+
+/**
+ * Server action to rename a file in Drive (categorization)
+ */
+export async function renameDriveFileAction(
+    fileId: string,
+    newName: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const res = await renameFileInDrive(fileId, newName);
+        return res;
+    } catch (error) {
+        console.error('[renameDriveFileAction] Error:', error);
+        return { success: false, error: 'Failed to rename file' };
+    }
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;

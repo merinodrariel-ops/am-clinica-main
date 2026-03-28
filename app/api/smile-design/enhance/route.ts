@@ -8,9 +8,9 @@ function getAI() {
 }
 
 const LEVEL_PROMPTS: Record<string, string> = {
-    'Natural': 'Keep whitening extremely subtle — healthy clean look, no artificial brightness. Preserve the original tooth shade, just clean.',
-    'Natural White': 'Apply moderate natural whitening — brighter than the original but still looks completely natural and healthy, not artificial.',
-    'Natural Ultra White': 'Apply maximum whitening while maintaining a natural appearance — very bright but with realistic translucency and texture.',
+    'Natural': 'Apply a radiant and healthy naturally white tooth shade (A1/B1). Remove all yellow or brown stains. Teeth must look clean, vibrant, and bright while maintaining standard natural tooth coloration.',
+    'Natural White': 'Apply a luminous, fresh white (BL4/BL3 shade). The teeth must look aesthetically perfect and exceptionally clean, but without being aggressively white or artificial. No artifacts.',
+    'Natural Ultra White': 'Apply a spectacular, ultra-bright Hollywood white (BL1/BL2 shade). Teeth must be radiantly luminous and perfectly white. Uncompromising brilliance and cleanliness.',
 };
 
 const EDGES_PROMPTS: Record<string, string> = {
@@ -48,15 +48,15 @@ export async function POST(req: NextRequest) {
         // Resolve whitening level
         const resolvedLevel: string = level
             ?? LEGACY_LEVEL[Math.max(1, Math.min(10, Math.round(intensity ?? 5)))]
-            ?? 'Natural White';
+            ?? 'Natural';
 
-        const baseWhitening = LEVEL_PROMPTS[resolvedLevel] ?? LEVEL_PROMPTS['Natural White'];
+        const baseWhitening = LEVEL_PROMPTS[resolvedLevel] ?? LEVEL_PROMPTS['Natural'];
         const edgesInstruction = edges && edgesIntensity ? EDGES_PROMPTS[edgesIntensity] ?? '' : '';
         const textureInstruction = texture && textureIntensity ? TEXTURE_PROMPTS[textureIntensity] ?? '' : '';
         const CENTRAL_LENGTH_PROMPTS: Record<string, string> = {
-            'Cortos': 'CENTRAL INCISOR VISUAL LENGTH (shading only — no geometry): Apply subtle darkening to the incisal third of the two central incisors. This shadow gradient visually reduces their apparent length, making them appear closer in height to the lateral incisors. The change is purely a color/luminance gradient. Do NOT move, extend, or warp any tooth or tissue.',
+            'Cortos': 'CENTRAL INCISOR LENGTH: Slightly shorten central incisors so they are closer in length to laterals.',
             'Natural': '',
-            'Largos': 'CENTRAL INCISOR VISUAL LENGTH (shading only — no geometry): Apply subtle brightening and highlight to the incisal third of the two central incisors. This light gradient visually emphasizes their length relative to the lateral incisors. The change is purely a color/luminance gradient. Do NOT move, extend, or warp any tooth or tissue.',
+            'Largos': 'CENTRAL INCISOR LENGTH: Slightly lengthen central incisors for a more dominant, youthful appearance.',
         };
         const centralLengthInstruction = centralLength && centralLength !== 'Natural'
             ? CENTRAL_LENGTH_PROMPTS[centralLength] ?? ''
@@ -64,40 +64,34 @@ export async function POST(req: NextRequest) {
 
         const shapeInstruction = shape && Math.abs(shape) > 0.1
             ? shape < 0
-                ? `FEMININE TOOTH SHAPE (color/shading only — no geometry): Apply a subtle shadow at the disto-incisal corner of the central incisors to visually round those corners to approximately 120–135°. The mesio-incisal corner should appear slightly more acute (~90°). Use a soft highlight on the incisal edges of the canines to suggest slight tapering. All changes are color gradients only — do NOT reposition, warp, or resize any tooth.`
-                : `MASCULINE TOOTH SHAPE (color/shading only — no geometry): Apply a flat, even highlight across the incisal edges of the central incisors to make them appear squared at approximately 90° on both mesial and distal corners. Use shading to minimize the visual hierarchy between centrals and laterals, suggesting a flat incisal plane. All changes are color gradients only — do NOT reposition, warp, or resize any tooth.`
+                ? `TOOTH SHAPE: More feminine morphology with rounded incisal embrasures and softer disto-incisal angles.`
+                : `TOOTH SHAPE: More masculine morphology with flatter incisal edges and squarer, ~90-degree line angles.`
             : '';
 
-        const prompt = `You are performing a PRECISE IN-PLACE dental retouching on this photograph. This is a photo editing task, NOT image generation — you must output the exact same photograph with ONLY the teeth modified.
+        const prompt = `You are an expert PROSTHODONTIST and cosmetic dental technician performing a highly realistic digital smile design simulation on this photograph. Your goal is to vastly improve the patient's smile aesthetics following strict clinical dental rules, while maintaining absolute photographic realism.
 
 DENTAL MODIFICATIONS REQUIRED:
-WHITENING: ${baseWhitening}
-${edgesInstruction ? `INCISAL EDGES: ${edgesInstruction}` : ''}
-${textureInstruction ? `SURFACE TEXTURE: ${textureInstruction}` : ''}
-${centralLengthInstruction ? centralLengthInstruction : ''}
-${shapeInstruction ? `TOOTH SHAPE: ${shapeInstruction}` : ''}
+1. WHITENING: ${baseWhitening}
+${edgesInstruction ? `2. INCISAL EDGES: ${edgesInstruction}` : ''}
+${textureInstruction ? `3. SURFACE TEXTURE: ${textureInstruction}` : ''}
+${centralLengthInstruction ? `4. ${centralLengthInstruction}` : ''}
+${shapeInstruction ? `5. ${shapeInstruction}` : ''}
 
-THE EDITING FRAME IS THE LIPS: Imagine the patient's lips as a hard boundary. Everything OUTSIDE the lips — eyes, cheeks, nose, forehead, jaw, neck, hair, background — must be 100% pixel-identical to the input. Zero changes. Not even subtle changes.
+CRITICAL CLINICAL ANATOMY RULES (YOU MUST FOLLOW THESE STRICTLY):
+- CLOSE ALL GAPS: You MUST completely close ANY AND ALL diastemas, black triangles, or missing teeth spaces (especially in the lower anteriors). Never leave a hole, gap, or dark empty space between the teeth.
+- GOLDEN PROPORTION: Lateral incisors MUST be visibly shorter and slightly narrower than the central incisors. Do NOT make laterals the same length as centrals.
+- CANINE ALIGNMENT: Bring flared or outward-pointing canines into proper arch alignment. They must not bulge outward excessively or rest awkwardly on the lower lip. Create a smooth, aesthetic buccal corridor.
+- GINGIVAL MARGINS: Ensure gingival zeniths are harmonious.
+- MIDLINE CORRECTION: If the dental midline is canted or off-center relative to the face, you MUST subtly correct it.
 
-ABSOLUTE CONSTRAINTS — ZERO TOLERANCE FOR VIOLATIONS:
-1. THE LIPS ARE THE FRAME: Only pixels INSIDE the lip boundary (the teeth and visible gum) may be modified. This is the only zone.
-2. NO WARPING OR REPOSITIONING: Do not move, shift, warp, distort, or reposition any tooth, gum, or surrounding tissue. Never apply geometric transforms. Only paint/color/texture changes within the teeth are allowed.
-3. FACE: Eyes, nose, cheeks, forehead, ears, hair — completely unchanged. Same pixel values.
-4. SKIN: All skin tones, shadows, highlights outside the lips identical to input.
-5. HEAD & BODY: Head position, neck, shoulders — pixel-perfect identical to input.
-6. BACKGROUND: 100% identical to input.
-7. REALISM: Final image must look like a real retouched photograph — not AI-generated, not CGI.
+STRICT VISUAL CONSTRAINTS (DO NOT VIOLATE):
+- UPPER FACE PRESERVATION: The eyes, nose, forehead, eyes, and skin MUST remain 100% identical to the original image. Only modify the teeth and gums area.
+- EXTREME DEFINITION: The teeth and gums MUST be rendered with maximum 4K sharpness and perfect micro-contrast. Every edge must be razor-sharp. NO BLURRINESS.
+- CLEAN RADIANT WHITE: Use only pure, radiant white tones for the teeth. ABSOLUTELY NO GRAY, GREEN, YELLOW, OR DARK HALOS. 
+- NATURAL BEAUTY: The result must look like professional cosmetic dentistry (perfect porcelain veneers). The gums must look healthy and pink.
+- NO AI NOISE: The image must be flawless, high-resolution, and free of digital artifacts.
 
-TEETH-ONLY EDITS ALLOWED (all via color/shading — no geometry):
-- Whitening/color of tooth enamel
-- Incisal edge translucency (blue-gray gradient on incisal 1–2 mm)
-- Surface micro-texture (horizontal perikymata, developmental lobes)
-- SMILE ARC: Apply a subtle highlight to the incisal edges of the lateral incisors and canines to visually reinforce a positive smile arc — the incisal curve should appear to follow the curvature of the lower lip (corners approximately 1–1.5 mm higher visually than central incisal edges). Color/shading only.
-- MIDLINE DEFINITION: If the interproximal embrasure at the dental midline appears open or unclear, apply a subtle darkening shadow at the midline contact point to visually reinforce the midline. If the dental midline appears tilted relative to horizontal, use a shadow on the elevated side of the midline contact to visually correct the tilt impression. Color only.
-- LATERAL INCISOR INCISAL EDGE LEVELING: Examine both lateral incisors. If one lateral incisor's incisal edge appears diagonal (one corner higher than the other, making the edge look slanted rather than horizontal), apply a subtle shadow gradient to the elevated corner of that incisal edge to visually create a straight, horizontal appearance. The corrected lateral should match the other lateral's incisal edge orientation. Color/shading only — do not move or warp the tooth.
-- SMILE CURVE SYMMETRY: Only if asymmetry is very pronounced, apply subtle highlight/shadow corrections to incisal edges to visually balance the curve. Color/shading only — never geometric.
-
-Think of this as Photoshop retouching: you are painting over only the teeth area while everything else in the image is locked.`;
+The objective is a high-end, ultra-sharp, and brilliantly white smile simulation that looks like a real 4K photograph.`;
 
 
         console.log(`[smile-design/enhance] level=${resolvedLevel}, edges=${edges}, texture=${texture}, shape=${shape}, imageSize=${imageBase64.length}`);

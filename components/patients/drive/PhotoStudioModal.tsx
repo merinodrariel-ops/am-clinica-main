@@ -7,13 +7,13 @@ import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
-    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle,
+    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
-import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction } from '@/app/actions/patient-files-drive';
+import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction } from '@/app/actions/patient-files-drive';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
@@ -21,6 +21,75 @@ import SmileDesignPanel from './SmileDesignPanel';
 import WarpBrush from './WarpBrush';
 import BeforeAfterSlider from './BeforeAfterSlider';
 import { saveSmileDesignResult, getSmileShareUrl } from '@/app/actions/smile-design';
+
+/**
+ * Generates a side-by-side (before/after) base64 string for saving.
+ */
+async function generateComparisonBase64(beforeUrl: string, afterDataUrl: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        const imgBefore = new Image();
+        const imgAfter = new Image();
+        let loadedCount = 0;
+
+        const onBothLoaded = () => {
+            loadedCount++;
+            if (loadedCount === 2) {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const w = imgBefore.naturalWidth || imgBefore.width;
+                    const h = imgBefore.naturalHeight || imgBefore.height;
+                    
+                    // Constrain for performance/safety
+                    const maxSide = 3200;
+                    let scale = 1;
+                    if (w > maxSide || h > maxSide) {
+                        scale = maxSide / Math.max(w, h);
+                    }
+                    
+                    const sw = Math.round(w * scale);
+                    const sh = Math.round(h * scale);
+                    
+                    canvas.width = sw * 2;
+                    canvas.height = sh;
+                    const ctx = canvas.getContext('2d', { alpha: false })!;
+                    
+                    ctx.drawImage(imgBefore, 0, 0, sw, sh);
+                    ctx.drawImage(imgAfter, sw, 0, sw, sh);
+                    
+                    // Separator line
+                    ctx.fillStyle = '#ffffff44';
+                    ctx.fillRect(sw - 1, 0, 2, sh);
+
+                    const result = canvas.toDataURL('image/jpeg', 0.85);
+                    resolve(result.split(',')[1]);
+                } catch (e) {
+                    console.error('Comparison generation failed:', e);
+                    resolve(null);
+                }
+            }
+        };
+
+        imgBefore.onload = onBothLoaded;
+        imgAfter.onload = onBothLoaded;
+        imgBefore.onerror = () => resolve(null);
+        imgAfter.onerror = () => resolve(null);
+
+        imgBefore.crossOrigin = "anonymous";
+        imgAfter.crossOrigin = "anonymous";
+        imgBefore.src = beforeUrl;
+        imgAfter.src = afterDataUrl;
+    });
+}
+
+
+const PHOTO_CATEGORIES = [
+  { group: 'Rostro (Natural)', items: ['Frente', 'Perfil Izquierdo', 'Perfil Derecho', '45 Grados'] },
+  { group: 'Labios / Sonrisa', items: ['Reposo', 'Sonrisa Media', 'Sonrisa Amplia', 'Perfil'] },
+  { group: 'Con Expansores', items: ['Frente en Oclusión', 'Frente en Apertura', 'Lateral Izquierdo', 'Lateral Derecho', 'Facial'] },
+  { group: 'Intraoral', items: ['Frente', 'Lateral Izquierdo', 'Lateral Derecho', 'Oclusal Superior', 'Oclusal Inferior'] },
+  { group: 'Radiología / Estudios', items: ['Panorámica', 'Telerradiografía', 'Escaneo Intraoral', 'Tomografía'] },
+  { group: 'Otros', items: ['Documento', 'Referencia'] }
+];
 
 interface PhotoStudioModalProps {
     file: DriveFile | null;
@@ -31,7 +100,47 @@ interface PhotoStudioModalProps {
     canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
     onSaved: () => void;           // called after successful save → triggers folder refresh
-    autoStartSmile?: boolean;      // if true, auto-launches Smile Design when photo loads
+    autoStartSmile?: boolean;
+}
+
+/**
+ * Heuristically guesses the category from a filename string.
+ */
+function guessCategory(filename: string): string | null {
+    const f = filename.toLowerCase();
+    
+    // Face / Rostro
+    if (f.includes('fren') && (f.includes('rost') || f.includes('fac'))) return 'Rostro (Natural) - Frente';
+    if (f.includes('per') && (f.includes('rost') || f.includes('fac'))) return 'Rostro (Natural) - Perfil Izquierdo'; // Default guess
+    if (f.includes('45')) return 'Rostro (Natural) - 45 Grados';
+    
+    // Lip / Smile
+    if (f.includes('sonr') && f.includes('media')) return 'Labios / Sonrisa - Sonrisa Media';
+    if (f.includes('sonr') && (f.includes('amp') || f.includes('max'))) return 'Labios / Sonrisa - Sonrisa Amplia';
+    if (f.includes('repo')) return 'Labios / Sonrisa - Reposo';
+    if (f.includes('sonr') || f.includes('lab')) return 'Labios / Sonrisa - Sonrisa Media';
+    
+    // Expansores
+    if (f.includes('exp') || f.includes('ret')) {
+        if (f.includes('ocl') || f.includes('mord')) return 'Con Expansores - Frente en Oclusión';
+        if (f.includes('aper') || f.includes('abie')) return 'Con Expansores - Frente en Apertura';
+        return 'Con Expansores - Frente en Oclusión';
+    }
+    
+    // Intraoral
+    if (f.includes('intra') || f.includes('buc')) {
+        if (f.includes('lat') || f.includes('der') || f.includes('izq')) return 'Intraoral - Lateral Izquierdo';
+        if (f.includes('sup') || f.includes('ocl')) return 'Intraoral - Oclusal Superior';
+        if (f.includes('inf')) return 'Intraoral - Oclusal Inferior';
+        return 'Intraoral - Frente';
+    }
+    
+    // X-Ray / Radiography
+    if (f.includes('pan') || f.includes('xray') || f.includes('rad')) return 'Radiología / Estudios - Panorámica';
+    if (f.includes('tel')) return 'Radiología / Estudios - Telerradiografía';
+    if (f.includes('scan') || f.includes('stl')) return 'Radiología / Estudios - Escaneo Intraoral';
+
+    return null;
 }
 
 type BgColor = 'transparent' | 'white' | 'black';
@@ -578,6 +687,7 @@ export default function PhotoStudioModal({
         const left = Math.max(PADDING, Math.min(preferredLeft, window.innerWidth - MENU_WIDTH - PADDING));
         const top = Math.max(PADDING, Math.min(preferredTop, window.innerHeight - MENU_HEIGHT - PADDING));
 
+        setMenuView('main');
         setThumbnailContextMenu({
             x: left,
             y: top,
@@ -585,6 +695,8 @@ export default function PhotoStudioModal({
             targetIds: getContextTargetIds(file.id),
         });
     }, [getContextTargetIds]);
+
+    const [menuView, setMenuView] = useState<'main' | 'categories'>('main');
 
     useEffect(() => {
         if (!downloadMenuOpen) return;
@@ -838,6 +950,13 @@ export default function PhotoStudioModal({
             return;
         }
         setCanvasActive(false);
+        // Exit Smile Design mode silently when switching photos
+        if (smileMode) {
+            smileDesign.reset();
+            setSmileMode(false);
+            setShowSmileGrid(false);
+            setSmileSaved(false);
+        }
         // Save current photo's editable state before switching
         if (activeFile) {
             fileStatesRef.current.set(activeFile.id, {
@@ -869,6 +988,7 @@ export default function PhotoStudioModal({
         if (!wantsMultiSelect) {
             clearMultiSelection();
             setCanvasActive(false);
+            // handleSwitchFile already handles smile mode exit
             handleSwitchFile(file);
             setSelectionAnchorId(file.id);
             return;
@@ -1631,20 +1751,90 @@ export default function PhotoStudioModal({
         setBrushMode(null);
     }
 
+    async function handleCategorizeFile(file: DriveFile, category: string) {
+        setThumbnailContextMenu(null);
+        try {
+            const ext = file.name.split('.').pop() || 'jpg';
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+            const sanitizedPatient = patientName.replace(/\s+/g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const sanitizedCategory = category.replace(/\s*-\s*/g, '_').replace(/\s+/g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            const newName = `${sanitizedPatient}_${sanitizedCategory}_${timestamp}.${ext}`;
+            
+            const res = await renameDriveFileAction(file.id, newName);
+            if (res.success) {
+                toast.success(`Foto categorizada y renombrada`);
+                onSaved();
+            } else {
+                toast.error(res.error || 'Error al categorizar');
+            }
+        } catch (err) {
+            toast.error('Error al renombrar archivo');
+        }
+    }
+
+    // ─── Duplicar foto via Context Menu ──────────────
     async function handleDuplicateFile(file: DriveFile) {
+        setThumbnailContextMenu(null);
         setDuplicatingId(file.id);
+        
+        try {
+            const namePart = file.name.split('.').slice(0, -1).join('.') || file.name;
+            const extPart = file.name.split('.').slice(-1)[0] || 'jpg';
+            const newName = `${namePart}_copia.${extPart}`;
+            
+            const result = await duplicateDriveFileAction(file.id, newName);
+            
+            if (result.fileId) {
+                toast.success('Archivo duplicado');
+                onSaved();
+            } else {
+                toast.error(result.error || 'No se pudo duplicar');
+            }
+        } catch (err) {
+            console.error('[handleDuplicateFile] Error:', err);
+            toast.error('Error inesperado al duplicar');
+        } finally {
+            setDuplicatingId(null);
+        }
+    }
+
+    async function handleManualRename(file: DriveFile) {
         const namePart = file.name.split('.').slice(0, -1).join('.') || file.name;
         const extPart = file.name.split('.').slice(-1)[0] || 'jpg';
-        const newName = `${namePart} (copia).${extPart}`;
-        const res = await duplicateDriveFileAction(file.id, newName);
-        if (res.error) {
-            toast.error(res.error);
-        } else {
-            toast.success('Foto duplicada con éxito');
-            onSaved(); // Parent refreshes allFolderFiles
+        const newNameResult = prompt('Nuevo nombre (sin extensión):', namePart);
+        if (newNameResult && newNameResult !== namePart) {
+            const res = await renameDriveFileAction(file.id, `${newNameResult}.${extPart}`);
+            if (res.success) {
+                toast.success('Archivo renombrado');
+                onSaved();
+            } else {
+                toast.error(res.error || 'Error al renombrar');
+            }
         }
-        setDuplicatingId(null);
-        setThumbnailContextMenu(null);
+    }
+
+    async function handleAutoRenamingAll() {
+        if (!confirm(`¿Estás seguro de que quieres renombrar las ${imageFiles.length} fotos de ${patientName}? Se les asignará el nombre del paciente y la fecha.`)) return;
+        
+        const tid = toast.loading('Renombrando lote de fotos...');
+        let successCount = 0;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        const sanitizedPatient = patientName.replace(/\s+/g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        for (const file of imageFiles) {
+            const ext = file.name.split('.').pop() || 'jpg';
+            const categoryMatch = guessCategory(file.name);
+            const categoryPart = categoryMatch ? categoryMatch.split(' - ').pop()?.replace(/\s+/g, '_') : 'Foto';
+            const index = imageFiles.indexOf(file) + 1;
+            const newName = `${sanitizedPatient}_${categoryPart}_${index}_${timestamp}.${ext}`;
+            
+            const res = await renameDriveFileAction(file.id, newName);
+            if (res.success) successCount++;
+        }
+        
+        toast.success(`Se renombraron ${successCount} fotos exitosamente`, { id: tid });
+        onSaved();
     }
 
     function getDefaultTargetIds() {
@@ -2680,7 +2870,9 @@ export default function PhotoStudioModal({
         try {
             const response = await fetch(`/api/drive/file/${activeFile.id}`);
             const blob = await response.blob();
-            await downloadBlob(blob, activeFile.name);
+            const cleanPatientName = patientName.replace(/\s+/g, '_');
+            const downloadName = `${cleanPatientName}_${activeFile.name}`;
+            await downloadBlob(blob, downloadName);
             setDownloadMenuOpen(false);
         } catch {
             toast.error('No se pudo descargar la foto original');
@@ -2697,7 +2889,9 @@ export default function PhotoStudioModal({
                 if (!targetFile) continue;
                 const response = await fetch(`/api/drive/file/${targetFile.id}`);
                 const blob = await response.blob();
-                await downloadBlob(blob, targetFile.name);
+                const cleanPatientName = patientName.replace(/\s+/g, '_');
+                const downloadName = `${cleanPatientName}_${targetFile.name}`;
+                await downloadBlob(blob, downloadName);
             }
             setDownloadMenuOpen(false);
             toast.success(`${targetIds.length} archivo${targetIds.length > 1 ? 's' : ''} original${targetIds.length > 1 ? 'es' : ''} descargado${targetIds.length > 1 ? 's' : ''}`);
@@ -2713,7 +2907,8 @@ export default function PhotoStudioModal({
             const webpBlob = await convertBlobToWebp(sourceBlob);
 
             const baseName = activeFile.name.replace(/\.[^.]+$/, '');
-            await downloadBlob(webpBlob, `${baseName}_web.webp`);
+            const cleanPatientName = patientName.replace(/\s+/g, '_');
+            await downloadBlob(webpBlob, `${cleanPatientName}_${baseName}_web.webp`);
             setDownloadMenuOpen(false);
         } catch {
             toast.error('No se pudo generar la versión WebP');
@@ -2769,7 +2964,8 @@ export default function PhotoStudioModal({
 
                 const webpBlob = await convertBlobToWebp(sourceBlob);
                 const baseName = item.name.replace(/\.[^.]+$/, '');
-                await downloadBlob(webpBlob, `${baseName}_web.webp`);
+                const cleanPatientName = patientName.replace(/\s+/g, '_');
+                await downloadBlob(webpBlob, `${cleanPatientName}_${baseName}_web.webp`);
             }
             setDownloadMenuOpen(false);
             toast.success(`${targetIds.length} archivo${targetIds.length > 1 ? 's' : ''} WebP descargado${targetIds.length > 1 ? 's' : ''}`);
@@ -2874,7 +3070,8 @@ export default function PhotoStudioModal({
                 setHistory([]);
             } else {
                 // Save as a new copy
-                const copyName = `${baseName}_editada.${ext}`;
+                const cleanPatientName = patientName.replace(/\s+/g, '_');
+                const copyName = `${cleanPatientName}_${baseName}_editada.${ext}`;
                 const formData = new FormData();
                 formData.append('file', blob, copyName);
                 const result = await uploadEditedPhotoAction(folderId, copyName, formData);
@@ -2948,9 +3145,16 @@ export default function PhotoStudioModal({
                         <ArrowLeft size={15} />
                         <span className="hidden sm:inline">Volver</span>
                     </button>
-                    <p className="text-white font-semibold truncate flex-1 text-sm">
-                        {canvasActive ? `Canvas ${canvasRatio}` : activeFile.name}
-                    </p>
+                    <div className="flex-1 flex flex-col justify-center gap-0.5 overflow-hidden border-l border-white/5 pl-4 ml-1">
+                        <h1 className="text-[#C9A96E] text-xl sm:text-2xl font-black uppercase tracking-tight truncate leading-none drop-shadow-sm">
+                            {patientName}
+                        </h1>
+                        <p className="text-white/30 text-[9px] font-bold uppercase tracking-[0.2em] truncate flex items-center gap-2">
+                            <span>SMILE DESIGN STUDIO</span>
+                            <span className="w-1 h-1 bg-white/10 rounded-full" />
+                            <span className="text-[#C9A96E]/50">{canvasActive ? `Lienzo ${canvasRatio}` : activeFile.name}</span>
+                        </p>
+                    </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {/* Canvas toggle */}
                         {canvasActive ? (
@@ -2991,7 +3195,6 @@ export default function PhotoStudioModal({
                                 <span className="hidden sm:inline">Presentación</span>
                             </button>
                         )}
-                        {/* Smile Design button */}
                         {!canvasActive && (
                             <button
                                 onClick={async () => {
@@ -3020,14 +3223,15 @@ export default function PhotoStudioModal({
                                 }}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                                     smileMode
-                                        ? 'bg-purple-600/20 border-purple-500/40 text-purple-300'
-                                        : 'bg-white/10 border-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                                        ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
+                                        : 'bg-purple-600/10 border-purple-500/20 text-purple-300 hover:bg-purple-600/20'
                                 }`}
                             >
-                                ✨ <span className="hidden sm:inline">Smile Design</span>
+                                {smileMode ? <X size={14} /> : '✨'}
+                                <span className="hidden sm:inline">{smileMode ? 'Salir Smile Design' : 'Smile Design'}</span>
                             </button>
                         )}
-                        {canSave && (
+                        {!smileMode && canSave && (
                             <button
                                 onClick={() => {
                                     if (cropActive) {
@@ -3042,7 +3246,8 @@ export default function PhotoStudioModal({
                                 <span className="hidden sm:inline">Guardar en Drive</span>
                             </button>
                         )}
-                        <div ref={downloadMenuRef} className="relative">
+                        {!smileMode && (
+                            <div ref={downloadMenuRef} className="relative">
                             <button
                                 onClick={() => setDownloadMenuOpen(prev => !prev)}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
@@ -3091,23 +3296,28 @@ export default function PhotoStudioModal({
                                     </button>
                                 </div>
                             )}
-                        </div>
-                        <button
-                            onClick={() => handleShareWithPatient()}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/85 text-white text-sm font-semibold border border-emerald-400/20 hover:bg-emerald-600 transition-colors"
-                            title={currentTargetIds.length > 1 ? `Compartir ${currentTargetIds.length} fotos con el paciente` : 'Compartir con paciente'}
-                        >
-                            <MessageCircle size={14} />
-                            <span className="hidden sm:inline">Paciente{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
-                        </button>
-                        <button
-                            onClick={() => handleShare()}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
-                            title="Compartir / AirDrop"
-                        >
-                            <Globe2 size={14} />
-                            <span className="hidden sm:inline">AirDrop{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
-                        </button>
+                         </div>
+                         )}
+                         {!smileMode && (
+                         <button
+                             onClick={() => handleShareWithPatient()}
+                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/85 text-white text-sm font-semibold border border-emerald-400/20 hover:bg-emerald-600 transition-colors"
+                             title={currentTargetIds.length > 1 ? `Compartir ${currentTargetIds.length} fotos con el paciente` : 'Compartir con paciente'}
+                         >
+                             <MessageCircle size={14} />
+                             <span className="hidden sm:inline">Paciente{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
+                         </button>
+                         )}
+                         {!smileMode && (
+                         <button
+                             onClick={() => handleShare()}
+                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
+                             title="Compartir / AirDrop"
+                         >
+                             <Globe2 size={14} />
+                             <span className="hidden sm:inline">AirDrop{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
+                         </button>
+                         )}
                     </div>
                 </div>
 
@@ -3130,6 +3340,13 @@ export default function PhotoStudioModal({
                                 <CheckSquare2 size={14} />
                             </button>
                         )}
+                        <button
+                            onClick={handleAutoRenamingAll}
+                            title="Renombrar todas las fotos (Pro)"
+                            className="flex-shrink-0 flex items-center justify-center h-8 border-b border-white/10 text-white/30 hover:text-emerald-400/70 transition-colors"
+                        >
+                            <Tag size={13} />
+                        </button>
                         {selectedIds.size > 1 && (
                             <div className="flex items-center justify-center h-7 border-b border-white/10 text-[10px] font-semibold tracking-wide text-[#C9A96E] bg-[#C9A96E]/10">
                                 {selectedIds.size} seleccionadas
@@ -3432,14 +3649,33 @@ export default function PhotoStudioModal({
                                     />
                                     {showSmileGrid && smileDesign.gridData && (
                                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" xmlns="http://www.w3.org/2000/svg">
+                                            <defs>
+                                                <pattern id="fineGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                                                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5" opacity="0.1" />
+                                                </pattern>
+                                                <pattern id="largeGrid" width="100" height="100" patternUnits="userSpaceOnUse">
+                                                    <rect width="100" height="100" fill="url(#fineGrid)" />
+                                                    <path d="M 100 0 L 0 0 0 100" fill="none" stroke="white" strokeWidth="1" opacity="0.2" />
+                                                </pattern>
+                                            </defs>
+                                            <rect width="100%" height="100%" fill="url(#largeGrid)" />
                                             {smileDesign.gridData.bipupilarY != null && (
-                                                <line x1="0" y1={`${smileDesign.gridData.bipupilarY * 100}%`} x2="100%" y2={`${smileDesign.gridData.bipupilarY * 100}%`} stroke="#fbbf24" strokeWidth="1" strokeDasharray="6 3" opacity="0.8" />
+                                                <g>
+                                                    <line x1="0" y1={`${smileDesign.gridData.bipupilarY * 100}%`} x2="100%" y2={`${smileDesign.gridData.bipupilarY * 100}%`} stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="6 3" opacity="0.9" />
+                                                    <text x="10" y={`calc(${smileDesign.gridData.bipupilarY * 100}% - 5px)`} fill="#fbbf24" fontSize="10" fontWeight="bold" opacity="0.9">Línea Bipupilar</text>
+                                                </g>
                                             )}
                                             {smileDesign.gridData.smileLineY != null && (
-                                                <line x1="0" y1={`${smileDesign.gridData.smileLineY * 100}%`} x2="100%" y2={`${smileDesign.gridData.smileLineY * 100}%`} stroke="#34d399" strokeWidth="1" strokeDasharray="6 3" opacity="0.8" />
+                                                <g>
+                                                    <line x1="0" y1={`${smileDesign.gridData.smileLineY * 100}%`} x2="100%" y2={`${smileDesign.gridData.smileLineY * 100}%`} stroke="#34d399" strokeWidth="1.5" strokeDasharray="6 3" opacity="0.9" />
+                                                    <text x="10" y={`calc(${smileDesign.gridData.smileLineY * 100}% - 5px)`} fill="#34d399" fontSize="10" fontWeight="bold" opacity="0.9">Línea de Sonrisa</text>
+                                                </g>
                                             )}
                                             {smileDesign.gridData.midlineX != null && (
-                                                <line x1={`${smileDesign.gridData.midlineX * 100}%`} y1="0" x2={`${smileDesign.gridData.midlineX * 100}%`} y2="100%" stroke="#60a5fa" strokeWidth="1" strokeDasharray="6 3" opacity="0.7" />
+                                                <g>
+                                                    <line x1={`${smileDesign.gridData.midlineX * 100}%`} y1="0" x2={`${smileDesign.gridData.midlineX * 100}%`} y2="100%" stroke="#60a5fa" strokeWidth="1.5" strokeDasharray="6 3" opacity="0.9" />
+                                                    <text x={`calc(${smileDesign.gridData.midlineX * 100}% + 5px)`} y="20" fill="#60a5fa" fontSize="10" fontWeight="bold" opacity="0.9">Línea Media</text>
+                                                </g>
                                             )}
                                         </svg>
                                     )}
@@ -3512,23 +3748,44 @@ export default function PhotoStudioModal({
                                 }}
                                 onSave={async () => {
                                     if (!smileDesign.result) return;
-                                    const res = await saveSmileDesignResult({
-                                        patientId: Number(patientId),
-                                        beforeDataUrl: smileDesign.result.beforeDataUrl,
-                                        afterBase64: smileDesign.result.afterBase64,
-                                        afterMime: smileDesign.result.afterMime,
-                                        settings: smileDesign.settings,
+                                    const saveToastId = toast.loading("Guardando Smile Design y generando comparativa...", {
+                                        description: "Esto puede tardar unos segundos"
                                     });
-                                    if (res.success) {
-                                        setSmileSaved(true);
-                                        toast.success('✨ Smile design guardado en Drive');
-                                        onSaved();
-                                    } else {
-                                        toast.error(res.error || 'Error al guardar');
+                                    
+                                    try {
+                                        const comparisonBase64 = await generateComparisonBase64(
+                                            smileDesign.result.beforeDataUrl,
+                                            smileDesign.result.afterDataUrl
+                                        );
+
+                                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+                                        const sanitizedPatient = patientName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+
+                                        const res = await saveSmileDesignResult({
+                                            patientId,
+                                            folderId,
+                                            beforeDataUrl: smileDesign.result.beforeDataUrl,
+                                            afterBase64: smileDesign.result.afterBase64,
+                                            afterMime: smileDesign.result.afterMime,
+                                            comparisonBase64: comparisonBase64 || undefined,
+                                            settings: smileDesign.settings,
+                                            customFilename: `DisenoSonrisa_${sanitizedPatient}_${timestamp}`,
+                                        });
+
+                                        if (res.success) {
+                                            setSmileSaved(true);
+                                            toast.success("✨ Smile design guardado exitosamente", { id: saveToastId });
+                                            onSaved();
+                                        } else {
+                                            toast.error(res.error || "Error al guardar", { id: saveToastId });
+                                        }
+                                    } catch (err) {
+                                        console.error("[SmileSave]", err);
+                                        toast.error("Ocurrió un error inesperado al guardar", { id: saveToastId });
                                     }
                                 }}
                                 onShareLink={async () => {
-                                    const res = await getSmileShareUrl(Number(patientId));
+                                    const res = await getSmileShareUrl(patientId);
                                     if (res.success && res.url) {
                                         await navigator.clipboard.writeText(res.url);
                                         toast.success('Link copiado. Compartí con el paciente.');
@@ -4078,34 +4335,102 @@ export default function PhotoStudioModal({
                     className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-2xl py-1.5 w-[240px] backdrop-blur-md"
                     style={{ left: thumbnailContextMenu.x, top: thumbnailContextMenu.y }}
                 >
-                    <button
-                        onClick={() => handleDuplicateFile(thumbnailContextMenu.file)}
-                        className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#C9A96E]/20 transition-all flex items-center gap-2.5 group whitespace-nowrap"
-                    >
-                        <Copy size={16} className="text-[#C9A96E] group-hover:scale-110 transition-transform" />
-                        <span>Duplicar foto</span>
-                    </button>
-                    <button
-                        onClick={() => handleShare(thumbnailContextMenu.targetIds)}
-                        className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all flex items-center gap-2.5 group whitespace-nowrap"
-                    >
-                        <AirDropIcon size={16} className="text-sky-400 group-hover:scale-110 transition-transform" />
-                        <span>Compartir por AirDrop</span>
-                    </button>
-                    <button
-                        onClick={() => handleShareWithPatient(thumbnailContextMenu.targetIds)}
-                        className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all flex items-center gap-2.5 group whitespace-nowrap"
-                    >
-                        <MessageCircle size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-                        <span>Compartir con paciente</span>
-                    </button>
-                    <div className="h-px bg-white/5 my-1" />
-                    <button
-                        onClick={() => setThumbnailContextMenu(null)}
-                        className="w-full text-left px-4 py-2 text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
-                    >
-                        Cancelar
-                    </button>
+                    {menuView === 'main' ? (
+                        <>
+                            <button
+                                onClick={() => handleDuplicateFile(thumbnailContextMenu.file)}
+                                className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#C9A96E]/20 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                            >
+                                <Copy size={16} className="text-[#C9A96E] group-hover:scale-110 transition-transform" />
+                                <span>Duplicar foto</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    handleManualRename(thumbnailContextMenu.file);
+                                    setThumbnailContextMenu(null);
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#C9A96E]/20 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                            >
+                                <Edit2 size={16} className="text-[#C9A96E] group-hover:scale-110 transition-transform" />
+                                <span>Cambiar nombre</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const guessed = guessCategory(thumbnailContextMenu.file.name);
+                                    if (guessed) {
+                                        handleCategorizeFile(thumbnailContextMenu.file, guessed);
+                                    } else {
+                                        toast.error('No se pudo identificar la categoría automáticamente');
+                                    }
+                                    setThumbnailContextMenu(null);
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-[#C9A96E] font-medium hover:bg-[#C9A96E]/20 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                            >
+                                <Zap size={16} className="group-hover:scale-110 transition-transform" />
+                                <span>Identificar automáticamente</span>
+                            </button>
+                            <div className="h-px bg-white/5 my-1" />
+                            <button
+                                onClick={() => setMenuView('categories')}
+                                className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#C9A96E]/20 transition-all flex items-center gap-2.5 group whitespace-nowrap justify-between"
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <Tag className="text-[#C9A96E] group-hover:scale-110 transition-transform" size={16} />
+                                    <span>Categoría manual</span>
+                                </div>
+                                <ChevronRight size={14} className="opacity-40" />
+                            </button>
+                            <button
+                                onClick={() => handleShare(thumbnailContextMenu.targetIds)}
+                                className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                            >
+                                <AirDropIcon size={16} className="text-sky-400 group-hover:scale-110 transition-transform" />
+                                <span>Compartir por AirDrop</span>
+                            </button>
+                            <button
+                                onClick={() => handleShareWithPatient(thumbnailContextMenu.targetIds)}
+                                className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                            >
+                                <MessageCircle size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                                <span>Compartir con paciente</span>
+                            </button>
+                            <div className="h-px bg-white/5 my-1" />
+                            <button
+                                onClick={() => setThumbnailContextMenu(null)}
+                                className="w-full text-left px-4 py-2 text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                        </>
+                    ) : (
+                        <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                            <button
+                                onClick={() => setMenuView('main')}
+                                className="w-full text-left px-4 py-2 text-[10px] font-bold text-white/30 uppercase tracking-[0.1em] flex items-center gap-2 hover:text-white transition-colors sticky top-0 bg-[#1A1A24] z-10 py-2.5 border-b border-white/5"
+                            >
+                                <ArrowLeft size={12} /> Volver
+                            </button>
+                            <div className="py-2">
+                                {PHOTO_CATEGORIES.map(group => (
+                                    <div key={group.group} className="mb-3 px-1.5">
+                                        <div className="px-2.5 py-1 text-[9px] uppercase tracking-wider text-[#C9A96E] font-black opacity-50 mb-1">
+                                            {group.group}
+                                        </div>
+                                        {group.items.map(item => (
+                                            <button
+                                                key={item}
+                                                onClick={() => handleCategorizeFile(thumbnailContextMenu.file, `${group.group} - ${item}`)}
+                                                className="w-full text-left px-2.5 py-1.5 text-xs text-white/70 hover:text-white hover:bg-[#C9A96E]/20 rounded-md transition-all flex items-center gap-2.5 group"
+                                            >
+                                                <div className="w-1.5 h-1.5 rounded-full bg-[#C9A96E] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <span>{item}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </>,
             document.body,
@@ -4120,6 +4445,7 @@ export default function PhotoStudioModal({
                     toast.success('Corrección aplicada');
                 }}
                 onCancel={() => setShowWarpBrush(false)}
+                patientName={patientName}
             />
         )}
         {sharePatientItems && (

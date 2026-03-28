@@ -86,9 +86,26 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '' 
 
   const resetZoom = useCallback(() => setScale(1), []);
 
+  const maxOriginX = Math.min(100, Math.max(0, origin.x));
+  const maxOriginY = Math.min(100, Math.max(0, origin.y));
+  
   const transformStyle = scale > 1
-    ? { transform: `scale(${scale})`, transformOrigin: `${origin.x}% ${origin.y}%`, transition: 'transform 0.05s ease-out' }
-    : { transform: 'scale(1)', transformOrigin: '50% 50%' };
+    ? { 
+        width: `${scale * 100}%`, 
+        height: `${scale * 100}%`, 
+        left: `${maxOriginX - (maxOriginX * scale)}%`, 
+        top: `${maxOriginY - (maxOriginY * scale)}%`,
+        position: 'absolute' as const,
+        transition: dragging.current ? 'none' : 'all 0.05s ease-out'
+      }
+    : { 
+        width: '100%', 
+        height: '100%', 
+        left: '0%', 
+        top: '0%',
+        position: 'absolute' as const,
+        transition: 'all 0.05s ease-out'
+      };
 
   return (
     <div

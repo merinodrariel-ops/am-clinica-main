@@ -862,6 +862,27 @@ export async function uploadFileToFolder(
 }
 
 /**
+ * Renames a folder or file in Drive.
+ */
+export async function renameFileInDrive(
+  fileId: string,
+  newName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const drive = getDrive();
+    await drive.files.update({
+      fileId,
+      requestBody: { name: newName },
+      supportsAllDrives: true,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('[Drive] Error renaming file:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
  * Updates the content of an existing Drive file in-place (preserves file ID, no duplicate).
  * Requires writer access on the file — works for service account as folder writer.
  */

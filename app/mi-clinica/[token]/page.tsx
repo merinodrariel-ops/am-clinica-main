@@ -251,6 +251,7 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
     const smileFiles = files.filter(f => f.file_type === 'smile_design');
     const beforePhotos = files.filter(f => f.file_type === 'photo_before');
     const afterPhotos = files.filter(f => f.file_type === 'photo_after');
+    const comparisonPhotos = files.filter(f => f.file_type === 'photo_comparison');
     const docFiles = files.filter(f => f.file_type === 'document' || f.file_type === 'comprobante');
 
     const paidCuotas = payments.filter(p => p.cuota_nro !== null && p.cuota_nro > 0).length;
@@ -453,7 +454,7 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                 )}
 
                 {/* ── Smile Design Gallery ── */}
-                {(smileFiles.length > 0 || (beforePhotos.length > 0 && afterPhotos.length > 0)) && (
+                {(smileFiles.length > 0 || comparisonPhotos.length > 0 || (beforePhotos.length > 0 && afterPhotos.length > 0)) && (
                     <FadeIn delay={0.15}>
                         <div className="rounded-3xl bg-[#14141A] border border-white/5 p-6 space-y-6">
                             <div className="flex items-center gap-2">
@@ -466,8 +467,32 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                                 <SmileSlider
                                     before={beforePhotos[0].file_url}
                                     after={afterPhotos[0].file_url}
-                                    label="Antes · Después"
+                                    label="Simulador de Sonrisa"
                                 />
+                            )}
+
+                            {/* Prominent Comparison Image */}
+                            {comparisonPhotos.length > 0 && (
+                                <div className="space-y-3">
+                                    <p className="text-xs text-white/50 uppercase tracking-widest">Antes y Después</p>
+                                    <motion.div 
+                                        whileHover={{ scale: 1.01 }}
+                                        className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 shadow-2xl relative group cursor-pointer"
+                                        onClick={() => window.open(comparisonPhotos[0].file_url, '_blank')}
+                                    >
+                                        <img 
+                                            src={comparisonPhotos[0].file_url} 
+                                            alt="Antes y Después" 
+                                            className="w-full h-auto object-cover"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <div className="px-4 py-2 bg-white/10 backdrop-blur rounded-xl text-white text-sm border border-white/20 flex items-center gap-2">
+                                                <ImageIcon size={16} />
+                                                Ver imagen completa
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </div>
                             )}
 
                             {/* Smile design renders */}

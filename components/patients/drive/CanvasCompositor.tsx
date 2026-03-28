@@ -363,14 +363,23 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
                     y: Math.max(l.h / 2, Math.min(1 - l.h / 2, origLayer.y + dy)),
                 };
             }
+            const { w: cw, h: ch } = displaySize;
+
             if (mode === 'rotate') {
                 const cx = origLayer.x, cy = origLayer.y;
-                const angle = Math.atan2(ny - cy, nx - cx) - Math.atan2(startY - cy, startX - cx);
+                // Aspect-corrected atan2 for visual rotation
+                const angle = Math.atan2((ny - cy) * ch, (nx - cx) * cw) 
+                            - Math.atan2((startY - cy) * ch, (startX - cx) * cw);
                 return { ...l, rotation: origLayer.rotation + angle * 180 / Math.PI };
             }
             // resize: scale from center, maintain aspect ratio
-            const dist = Math.sqrt(dx * dx + dy * dy) * (dx + dy >= 0 ? 1 : -1);
-            const newW = Math.max(0.05, origLayer.w + dist * 1.5);
+            const distSqStart = Math.pow((startX - origLayer.x) * cw, 2) + Math.pow((startY - origLayer.y) * ch, 2);
+            const distSqNow = Math.pow((nx - origLayer.x) * cw, 2) + Math.pow((ny - origLayer.y) * ch, 2);
+            
+            if (distSqStart < 1) return l; // Avoid tiny distances (pixels^2)
+            
+            const ratio = Math.sqrt(distSqNow / distSqStart);
+            const newW = Math.max(0.05, Math.min(2, origLayer.w * ratio));
             const aspect = origLayer.w / (origLayer.h || 1);
             return { ...l, w: newW, h: newW / aspect };
         }));

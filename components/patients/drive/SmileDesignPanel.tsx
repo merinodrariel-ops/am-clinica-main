@@ -244,9 +244,9 @@ export default function SmileDesignPanel({
           <button
             onClick={onSave}
             disabled={isProcessing || !isReady}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-semibold py-2 rounded-md"
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold py-2 rounded-md shadow-sm transition-colors"
           >
-            💾 Guardar en Drive
+            💾 Guardar Copia en Drive + Portal
           </button>
           <button
             onClick={onShareLink}

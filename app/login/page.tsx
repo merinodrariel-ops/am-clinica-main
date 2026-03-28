@@ -1,45 +1,41 @@
 'use client';
 
-import { Suspense, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { Suspense, useState, useActionState, useEffect } from 'react';
 import { signInWithGoogleOAuth } from '@/lib/googleAuthService';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { login } from '@/app/actions/auth';
 
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectPath = searchParams.get('redirect') || '/dashboard';
-    const supabase = createClient();
-
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [localError, setLocalError] = useState<string | null>(null);
+    
+    // Server action driven state
+    const [state, formAction, isPending] = useActionState(
+        async (prevState: any, formData: FormData) => {
+            setLocalError(null);
+            if (!formData.has('redirect')) formData.append('redirect', redirectPath);
+            return login(formData);
+        },
+        null
+    );
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (error) {
-                setError(error.message);
-            } else {
-                router.push(redirectPath);
-            }
-        } catch {
-            setError('Ocurrió un error inesperado');
-        } finally {
-            setLoading(false);
+    // Handle client-side redirect after server success
+    useEffect(() => {
+        const authState = state as { success?: boolean; redirect?: string; error?: string };
+        if (authState?.success && authState?.redirect) {
+            console.log("Login exitoso, redirigiendo a:", authState.redirect);
+            router.push(authState.redirect);
         }
-    };
+    }, [state, router]);
 
+    const error = (state as { error?: string })?.error || localError || null;
+    const isLoading = isPending || googleLoading;
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
@@ -77,22 +73,22 @@ function LoginForm() {
                 <div className="mt-6 flex flex-col gap-2">
                     <button
                         onClick={async () => {
-                            setLoading(true);
-                            setError(null);
-                            const { error } = await signInWithGoogleOAuth({
+                            setGoogleLoading(true);
+                            const { error: googleErr } = await signInWithGoogleOAuth({
                                 nextPath: redirectPath,
                             });
-                            if (error) {
-                                setError(error.message);
-                                setLoading(false);
+                            if (googleErr) {
+                                setGoogleLoading(false);
                             }
                         }}
                         type="button"
+                        disabled={isLoading}
                         className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200"
                         style={{
                             background: 'hsl(230 15% 14%)',
                             border: '1px solid hsl(230 15% 20%)',
                             color: 'hsl(210 20% 90%)',
+                            opacity: isLoading ? 0.6 : 1,
                         }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'hsl(230 15% 17%)'; e.currentTarget.style.borderColor = 'hsl(230 15% 25%)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'hsl(230 15% 14%)'; e.currentTarget.style.borderColor = 'hsl(230 15% 20%)'; }}
@@ -116,7 +112,7 @@ function LoginForm() {
                     </div>
                 </div>
 
-                <form className="mt-6 space-y-6" onSubmit={handleLogin}>
+                <form className="mt-6 space-y-6" action={formAction}>
                     <div className="space-y-3">
                         <div>
                             <label htmlFor="email-address" className="sr-only">Email</label>
@@ -176,7 +172,7 @@ function LoginForm() {
                     <div>
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={isLoading}
                             className="w-full flex justify-center py-2.5 px-4 text-sm font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
                                 background: 'linear-gradient(135deg, hsl(165 100% 38%), hsl(165 100% 30%))',
@@ -186,8 +182,8 @@ function LoginForm() {
                             onMouseEnter={e => e.currentTarget.style.boxShadow = '0 6px 20px hsla(165, 100%, 42%, 0.35)'}
                             onMouseLeave={e => e.currentTarget.style.boxShadow = '0 4px 14px hsla(165, 100%, 42%, 0.25)'}
                         >
-                            {loading ? (
-                                <Loader2 className="animate-spin h-5 w-5" />
+                            {isLoading ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
                                 'Iniciar Sesión'
                             )}

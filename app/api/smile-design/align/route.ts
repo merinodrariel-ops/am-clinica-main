@@ -13,12 +13,13 @@ export async function POST(req: NextRequest) {
 
         const prompt = `Analyze this dental patient portrait photo and return JSON with facial landmark coordinates (pixel positions from top-left corner 0,0):
 {
-  "leftPupil": { "x": number, "y": number },
-  "rightPupil": { "x": number, "y": number },
+  "leftEye": { "x": number, "y": number },
+  "rightEye": { "x": number, "y": number },
   "smileLineY": number
 }
 Where:
-- leftPupil and rightPupil are the center of each iris
+- leftEye is the center of the pupil on the LEFT side of the photo (viewer's left)
+- rightEye is the center of the pupil on the RIGHT side of the photo (viewer's right)
 - smileLineY is the Y coordinate of the horizontal line passing through the corners of the mouth (commissures)
 If any landmark is not visible or not detectable, return null for that field.
 Return ONLY valid JSON, no markdown.`;
@@ -38,8 +39,10 @@ Return ONLY valid JSON, no markdown.`;
         const rawText = (response.candidates?.[0]?.content?.parts?.[0] as { text?: string })?.text ?? '{}';
 
         let parsed: {
-            leftPupil: { x: number; y: number } | null;
-            rightPupil: { x: number; y: number } | null;
+            leftEye?: { x: number; y: number };
+            rightEye?: { x: number; y: number };
+            leftPupil?: { x: number; y: number };
+            rightPupil?: { x: number; y: number };
             smileLineY: number | null;
         };
         try {
@@ -54,15 +57,26 @@ Return ONLY valid JSON, no markdown.`;
         const h = imageHeight || null;
         const norm = w && h;
 
-        const leftPupil = parsed.leftPupil ? {
-            x: norm ? parsed.leftPupil.x / w! : parsed.leftPupil.x,
-            y: norm ? parsed.leftPupil.y / h! : parsed.leftPupil.y,
+        const leftRaw = parsed.leftEye || parsed.leftPupil;
+        const rightRaw = parsed.rightEye || parsed.rightPupil;
+
+        let leftPupil = leftRaw ? {
+            x: norm ? leftRaw.x / w! : leftRaw.x,
+            y: norm ? leftRaw.y / h! : leftRaw.y,
         } : null;
 
-        const rightPupil = parsed.rightPupil ? {
-            x: norm ? parsed.rightPupil.x / w! : parsed.rightPupil.x,
-            y: norm ? parsed.rightPupil.y / h! : parsed.rightPupil.y,
+        let rightPupil = rightRaw ? {
+            x: norm ? rightRaw.x / w! : rightRaw.x,
+            y: norm ? rightRaw.y / h! : rightRaw.y,
         } : null;
+
+        // CRITICAL BUGFIX: Ensure left is ACTUALLY mathematically left (lower X coordinate)
+        // If the AI swapped them (e.g. from the patient's perspective), we swap them back before calculating rotation!
+        if (leftPupil && rightPupil && leftPupil.x > rightPupil.x) {
+            const temp = leftPupil;
+            leftPupil = rightPupil;
+            rightPupil = temp;
+        }
 
         const smileLineY = parsed.smileLineY != null
             ? (norm ? parsed.smileLineY / h! : parsed.smileLineY)
