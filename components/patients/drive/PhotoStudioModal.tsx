@@ -991,7 +991,7 @@ export default function PhotoStudioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedShapeId, drawShapes, drawClipboard]);
 
-    // Keyboard shortcut: Delete / Backspace → delete selected shape or text annotation
+    // Keyboard shortcut: Delete / Backspace → delete selected shape, text annotation, or canvas layer
     // Escape while drawing → cancel current in-progress path
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -1005,6 +1005,13 @@ export default function PhotoStudioModal({
             }
             if (e.key !== 'Delete' && e.key !== 'Backspace') return;
             if (editingTextId) return;
+            // Canvas layer takes priority when canvas is active and a layer is selected
+            if (canvasActive && canvasSelectedId) {
+                e.preventDefault();
+                setCanvasLayers(prev => prev.filter(l => l.id !== canvasSelectedId));
+                setCanvasSelectedId(null);
+                return;
+            }
             if (selectedShapeId && (drawMode === 'selected' || drawMode === 'editing')) {
                 e.preventDefault();
                 setDrawShapes(prev => prev.filter(s => s.id !== selectedShapeId));
@@ -1021,7 +1028,7 @@ export default function PhotoStudioModal({
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedShapeId, drawMode, selectedTextId, editingTextId]);
+    }, [canvasActive, canvasSelectedId, selectedShapeId, drawMode, selectedTextId, editingTextId]);
 
     function handleSwitchFile(newFile: DriveFile) {
         if (newFile.id === activeFile?.id) {
@@ -1714,8 +1721,14 @@ export default function PhotoStudioModal({
                 y: origLayer.y + dy,
             };
             if (mode === 'rotate') {
-                const angle = Math.atan2(ny - origLayer.y, nx - origLayer.x) - Math.atan2(startY - origLayer.y, startX - origLayer.x);
-                return { ...l, rotation: origLayer.rotation + angle * 180 / Math.PI };
+                const angle = Math.atan2(ny - origLayer.y, nx - origLayer.x)
+                            - Math.atan2(startY - origLayer.y, startX - origLayer.x);
+                let deg = origLayer.rotation + angle * 180 / Math.PI;
+                // Shift held → snap to nearest 45°
+                if (e.shiftKey) {
+                    deg = Math.round(deg / 45) * 45;
+                }
+                return { ...l, rotation: deg };
             }
             const dist = Math.sqrt(dx * dx + dy * dy) * (dx + dy >= 0 ? 1 : -1);
             const newW = Math.max(0.05, origLayer.w + dist * 1.5);
@@ -1750,8 +1763,11 @@ export default function PhotoStudioModal({
             return;
         }
         const img = canvasLayerCropImgRef.current;
-        const scaleX = img.naturalWidth / (img.width || 1);
-        const scaleY = img.naturalHeight / (img.height || 1);
+        // getBoundingClientRect gives the true rendered size that ReactCrop uses
+        // (img.width is CSS element size and can differ when objectFit:contain is active)
+        const rect = img.getBoundingClientRect();
+        const scaleX = img.naturalWidth / (rect.width || 1);
+        const scaleY = img.naturalHeight / (rect.height || 1);
         const srcX = Math.round(canvasLayerCompletedCrop.x * scaleX);
         const srcY = Math.round(canvasLayerCompletedCrop.y * scaleY);
         const srcW = Math.round(canvasLayerCompletedCrop.width * scaleX);
@@ -3937,7 +3953,15 @@ export default function PhotoStudioModal({
                             cropActive={cropActive}
                             setCropActive={setCropActive}
                             hasPriorCrop={preCropImageRef.current !== null}
-                            onEnterCropMode={handleEnterCropMode}
+                            onEnterCropMode={canvasActive && canvasSelectedId
+                                // When a canvas layer is selected, crop that layer (not the main photo)
+                                ? () => {
+                                    setCanvasLayerCropId(canvasSelectedId);
+                                    setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+                                    setCanvasLayerCompletedCrop(null);
+                                    setCanvasSelectedId(null);
+                                }
+                                : handleEnterCropMode}
                             onConfirmCrop={handleConfirmCrop}
                             onCancelCrop={handleCancelCrop}
                             bgProcessing={bgProcessing} bgDone={bgDone}
