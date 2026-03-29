@@ -1763,11 +1763,10 @@ export default function PhotoStudioModal({
             return;
         }
         const img = canvasLayerCropImgRef.current;
-        // getBoundingClientRect gives the true rendered size that ReactCrop uses
-        // (img.width is CSS element size and can differ when objectFit:contain is active)
-        const rect = img.getBoundingClientRect();
-        const scaleX = img.naturalWidth / (rect.width || 1);
-        const scaleY = img.naturalHeight / (rect.height || 1);
+        // Without objectFit:contain the element size == rendered image size,
+        // so img.width and img.height give the correct rendered dimensions.
+        const scaleX = img.naturalWidth / (img.width || 1);
+        const scaleY = img.naturalHeight / (img.height || 1);
         const srcX = Math.round(canvasLayerCompletedCrop.x * scaleX);
         const srcY = Math.round(canvasLayerCompletedCrop.y * scaleY);
         const srcW = Math.round(canvasLayerCompletedCrop.width * scaleX);
@@ -2849,14 +2848,10 @@ export default function PhotoStudioModal({
                 i.onerror = () => rej(new Error('load failed'));
                 i.src = sourceUrl;
             });
-            // Use getBoundingClientRect() for the actual rendered size of the image element.
-            // imgRef.current.width gives the CSS element width (which may differ from the
-            // rendered image width when objectFit:contain is active and the container is
-            // wider/taller than the image). getBoundingClientRect() gives the correct
-            // rendered pixel dimensions that ReactCrop uses to compute its coordinates.
-            const rect = imgRef.current?.getBoundingClientRect();
-            const dispW = rect?.width ?? img.naturalWidth;
-            const dispH = rect?.height ?? img.naturalHeight;
+            // Without objectFit:contain on the crop <img>, the element size == rendered image
+            // size so img.width/.height give the correct rendered pixel dimensions.
+            const dispW = imgRef.current?.width ?? img.naturalWidth;
+            const dispH = imgRef.current?.height ?? img.naturalHeight;
             const scaleX = img.naturalWidth / dispW;
             const scaleY = img.naturalHeight / dispH;
             const srcX = Math.round(completedCrop.x * scaleX);
@@ -3594,13 +3589,26 @@ export default function PhotoStudioModal({
                                     onChange={c => setCrop(c)}
                                     onComplete={c => setCompletedCrop(c)}
                                 >
-                                    {/* No CSS rotation in crop mode — coordinates must be in unrotated space */}
+                                    {/*
+                                      IMPORTANT: do NOT use objectFit:contain here.
+                                      With objectFit:contain the <img> CSS box is larger than the
+                                      rendered image content (letterboxing). ReactCrop measures
+                                      coordinates against the full element box, so the crop selection
+                                      would be offset/wrong. Without it, the element size exactly
+                                      matches the rendered image size (maxWidth/maxHeight scale it
+                                      proportionally), making img.naturalWidth/img.width correct.
+                                    */}
                                     <img
                                         ref={imgRef}
                                         src={imageUrl}
                                         alt={activeFile.name}
                                         crossOrigin="anonymous"
-                                        style={{ ...imageStyle, transform: 'none' }}
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: imageStyle.maxHeight,
+                                            display: 'block',
+                                            transform: 'none',
+                                        }}
                                     />
                                 </ReactCrop>
                             ) : (
