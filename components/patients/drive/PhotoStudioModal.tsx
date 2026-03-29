@@ -4033,6 +4033,7 @@ export default function PhotoStudioModal({
                             selectedShapeIsGroup={!!(selectedShapeId && drawShapes.find(s => s.id === selectedShapeId)?.children)}
                             onUngroupShape={handleUngroupShape}
                             canvasActive={canvasActive}
+                            canvasSelectedId={canvasSelectedId}
                             canvasRatio={canvasRatio}
                             onCanvasRatioChange={handleCanvasRatioChange}
                             canvasLayerCount={canvasLayers.length}
@@ -4680,6 +4681,7 @@ interface ToolsPanelProps {
     selectedShapeIsGroup: boolean;
     onUngroupShape: () => void;
     canvasActive: boolean;
+    canvasSelectedId: string | null;
     canvasRatio: CanvasRatio;
     onCanvasRatioChange: (r: CanvasRatio) => void;
     canvasLayerCount: number;
@@ -4722,7 +4724,7 @@ function ToolsPanel({
     strokeStyle, onSetStrokeStyle,
     multiSelectedCount, onGroupShapes,
     selectedShapeIsGroup, onUngroupShape,
-    canvasActive, canvasRatio, onCanvasRatioChange,
+    canvasActive, canvasSelectedId, canvasRatio, onCanvasRatioChange,
     canvasLayerCount, onClearCanvasLayers,
 }: ToolsPanelProps) {
     return (
@@ -4833,10 +4835,24 @@ function ToolsPanel({
                 <p className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
                     <CropIcon size={13} /> Recortar
                 </p>
-                {cropActive ? (
+                {canvasActive ? (
+                    // Canvas mode: crop operates on the selected layer, not the main photo
+                    canvasSelectedId ? (
+                        <button
+                            onClick={onEnterCropMode}
+                            className="w-full py-2 rounded-lg bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                            <CropIcon size={13} /> Recortar capa seleccionada
+                        </button>
+                    ) : (
+                        <p className="text-white/30 text-xs text-center py-1">
+                            Seleccioná una foto del lienzo para recortarla
+                        </p>
+                    )
+                ) : cropActive ? (
                     <>
                         <p className="text-white/30 text-xs">
-                            Seleccioná el área a conservar. El recorte se aplica al guardar.
+                            Seleccioná el área a conservar.
                         </p>
                         <button
                             onClick={onConfirmCrop}
