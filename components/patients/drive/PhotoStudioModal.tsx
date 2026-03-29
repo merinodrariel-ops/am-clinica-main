@@ -7,7 +7,7 @@ import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
-    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap
+    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -17,6 +17,7 @@ import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAc
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
+import { useSmileMotion } from '@/hooks/useSmileMotion';
 import SmileDesignPanel from './SmileDesignPanel';
 import WarpBrush from './WarpBrush';
 import BeforeAfterSlider from './BeforeAfterSlider';
@@ -593,6 +594,39 @@ export default function PhotoStudioModal({
     const [canvasActive, setCanvasActive] = useState(false);
     const [canvasLayers, setCanvasLayers] = useState<CanvasLayer[]>([]);
     const [canvasRatio, setCanvasRatio] = useState<CanvasRatio>('1:1');
+
+    // ── Persistence: Save/Restore Canvas (by patientId) ────────────────────────
+    useEffect(() => {
+        if (!patientId) return;
+        const key = `am-clinica-canvas-${patientId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                // Hydrate only if state is currently empty to avoid overwriting recent changes
+                if (canvasLayers.length === 0 && data.layers && data.layers.length > 0) {
+                    setCanvasLayers(data.layers);
+                    if (data.ratio) setCanvasRatio(data.ratio);
+                    setHasCanvas(true);
+                }
+            } catch (e) {
+                console.error("Canvas persistence load error", e);
+            }
+        }
+    }, [patientId]);
+
+    useEffect(() => {
+        if (!patientId) return;
+        const key = `am-clinica-canvas-${patientId}`;
+        if (canvasLayers.length > 0) {
+            localStorage.setItem(key, JSON.stringify({
+                layers: canvasLayers,
+                ratio: canvasRatio,
+                timestamp: Date.now()
+            }));
+        }
+    }, [patientId, canvasLayers, canvasRatio]);
+
     const [canvasSelectedId, setCanvasSelectedId] = useState<string | null>(null);
     const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
     const [canvasLayerCropId, setCanvasLayerCropId] = useState<string | null>(null);
@@ -700,6 +734,7 @@ export default function PhotoStudioModal({
 
     // ── Smile Design ──────────────────────────────────────────────────────────
     const smileDesign = useSmileDesign();
+    const smileMotion = useSmileMotion();
     const [smileMode, setSmileMode] = useState(false);
     const [showSmileGrid, setShowSmileGrid] = useState(false);
     const [smileSaved, setSmileSaved] = useState(false);
@@ -1003,27 +1038,12 @@ export default function PhotoStudioModal({
                 setMousePos(null);
                 return;
             }
-            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+            if (e.key !== 'Delete' && e.key !== 'Backspace' && e.keyCode !== 8 && e.keyCode !== 46) return;
             if (editingTextId) return;
-            // Canvas layer takes priority when canvas is active and a layer is selected
-            if (canvasActive && canvasSelectedId) {
-                e.preventDefault();
-                setCanvasLayers(prev => prev.filter(l => l.id !== canvasSelectedId));
-                setCanvasSelectedId(null);
-                return;
-            }
-            if (selectedShapeId && (drawMode === 'selected' || drawMode === 'editing')) {
-                e.preventDefault();
-                setDrawShapes(prev => prev.filter(s => s.id !== selectedShapeId));
-                setSelectedShapeId(null);
-                setDrawMode('idle');
-                return;
-            }
-            if (selectedTextId) {
-                e.preventDefault();
-                setTextAnnotations(prev => prev.filter(t => t.id !== selectedTextId));
-                setSelectedTextId(null);
-            }
+
+            // Use the centralized delete handler
+            handleDeleteSelection();
+            e.preventDefault();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -1682,9 +1702,30 @@ export default function PhotoStudioModal({
         return [(e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height];
     }
 
+    const handleDeleteSelection = useCallback(() => {
+        if (canvasActive && canvasSelectedId) {
+            setCanvasLayers(prev => prev.filter(l => l.id !== canvasSelectedId));
+            setCanvasSelectedId(null);
+        } else if (multiSelectedIds.length > 0) {
+            setDrawShapes(prev => prev.filter(s => !multiSelectedIds.includes(s.id)));
+            setMultiSelectedIds([]);
+        } else if (selectedShapeId) {
+            setDrawShapes(prev => prev.filter(s => s.id !== selectedShapeId));
+            setSelectedShapeId(null);
+            setDrawMode('idle');
+        } else if (selectedTextId) {
+            setTextAnnotations(prev => prev.filter(t => t.id !== selectedTextId));
+            setSelectedTextId(null);
+        }
+    }, [canvasActive, canvasSelectedId, multiSelectedIds, selectedShapeId, selectedTextId]);
+
     function handleCanvasLayerPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
         const [nx, ny] = getCanvasLayerNorm(e);
         const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
+        
+        // Ensure the canvas gets focus so keyboard events always fire
+        e.currentTarget.focus();
+
         for (let i = canvasLayers.length - 1; i >= 0; i--) {
             const layer = canvasLayers[i];
             const ci = hitTestLayerCorner(layer, nx, ny, W, H);
@@ -1724,7 +1765,7 @@ export default function PhotoStudioModal({
                 const angle = Math.atan2(ny - origLayer.y, nx - origLayer.x)
                             - Math.atan2(startY - origLayer.y, startX - origLayer.x);
                 let deg = origLayer.rotation + angle * 180 / Math.PI;
-                // Shift held → snap to nearest 45°
+                // Shift held -> snap to 45° for better precision (0, 45, 90, etc.)
                 if (e.shiftKey) {
                     deg = Math.round(deg / 45) * 45;
                 }
@@ -1763,10 +1804,11 @@ export default function PhotoStudioModal({
             return;
         }
         const img = canvasLayerCropImgRef.current;
-        // Without objectFit:contain the element size == rendered image size,
-        // so img.width and img.height give the correct rendered dimensions.
-        const scaleX = img.naturalWidth / (img.width || 1);
-        const scaleY = img.naturalHeight / (img.height || 1);
+        const isPercent = (canvasLayerCompletedCrop.unit as string) === '%';
+
+        const scaleX = isPercent ? (img.naturalWidth / 100) : (img.naturalWidth / (img.width || 1));
+        const scaleY = isPercent ? (img.naturalHeight / 100) : (img.naturalHeight / (img.height || 1));
+        
         const srcX = Math.round(canvasLayerCompletedCrop.x * scaleX);
         const srcY = Math.round(canvasLayerCompletedCrop.y * scaleY);
         const srcW = Math.round(canvasLayerCompletedCrop.width * scaleX);
@@ -1833,7 +1875,9 @@ export default function PhotoStudioModal({
     function handleActivateCanvas() {
         setCanvasActive(true);
         setHasCanvas(true);
-        setCanvasLayers([]);
+        // Do NOT setCanvasLayers([]) here; we want to preserve work.
+        // If the user wants a new one, they can clear it or it's empty to start.
+
         // Reset zoom/pan so the canvas background can't be accidentally panned
         setZoom(1);
         setPanX(0);
@@ -2489,7 +2533,13 @@ export default function PhotoStudioModal({
             didDragRef.current = true;
             const [nx, ny] = getPointerNormXY(e);
             const { shapeId, centerNx, centerNy, startAngle, origPoints } = rotationDragRef.current;
-            const delta = Math.atan2(ny - centerNy, nx - centerNx) - startAngle;
+            let delta = Math.atan2(ny - centerNy, nx - centerNx) - startAngle;
+            
+            // Shift held -> snap to nearest 15°
+            if (e.shiftKey) {
+                delta = Math.round((delta * 180 / Math.PI) / 15) * (15 * Math.PI / 180);
+            }
+            
             const cos = Math.cos(delta), sin = Math.sin(delta);
             setDrawShapes(shapes => shapes.map(s =>
                 s.id === shapeId
@@ -3184,8 +3234,16 @@ export default function PhotoStudioModal({
                 }
                 toast.success('Copia guardada en Drive');
             }
-
+            
             setSaveDialogOpen(false);
+            
+            // For copies, wait a moment for Drive consistency before refreshing the list
+            if (mode === 'copy') {
+                const toastId = toast.loading('Sincronizando con Google Drive...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                toast.dismiss(toastId);
+            }
+            
             onSaved(); // refresca la carpeta, pero nos quedamos en el estudio
         } catch (err) {
             toast.error('Error inesperado al guardar');
@@ -3262,17 +3320,17 @@ export default function PhotoStudioModal({
                         {/* Canvas toggle */}
                         {canvasActive ? (
                             <button
-                                onClick={() => { setCanvasActive(false); setHasCanvas(false); setCanvasLayers([]); setCanvasSelectedId(null); }}
+                                onClick={() => setCanvasActive(false)}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E]/20 text-[#C9A96E] text-sm border border-[#C9A96E]/40 hover:bg-[#C9A96E]/30 transition-colors"
                             >
-                                ✕ Cerrar lienzo
+                                ✕ Ver fotos
                             </button>
                         ) : (
                             <button
                                 onClick={handleActivateCanvas}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white/70 text-sm border border-white/10 hover:bg-white/15 hover:text-white transition-colors"
                             >
-                                + Lienzo
+                                {canvasLayers.length > 0 ? '⊞ Ver Lienzo' : '+ Lienzo'}
                             </button>
                         )}
                         {selectedIds.size > 0 && (
@@ -3614,7 +3672,11 @@ export default function PhotoStudioModal({
                                         <>
                                         <canvas
                                             ref={canvasLayersRef}
-                                            style={getCanvasRatioStyle()}
+                                            tabIndex={0}
+                                            style={{
+                                                ...getCanvasRatioStyle(),
+                                                outline: 'none', // avoid focus ring on canvas
+                                            }}
                                             onPointerDown={handleCanvasLayerPointerDown}
                                             onPointerMove={handleCanvasLayerPointerMove}
                                             onPointerUp={handleCanvasLayerPointerUp}
@@ -3870,6 +3932,7 @@ export default function PhotoStudioModal({
                                 onSettingsChange={smileDesign.setSettings}
                                 onRegenerate={async () => {
                                     smileStartTimeRef.current = Date.now();
+                                    smileMotion.reset();
                                     await smileDesign.regenerate();
                                     if (smileStartTimeRef.current) {
                                         setSmileProcessingTime((Date.now() - smileStartTimeRef.current) / 1000);
@@ -3890,58 +3953,97 @@ export default function PhotoStudioModal({
                                             generateSliceBase64(
                                                 smileDesign.result.beforeDataUrl,
                                                 smileDesign.result.afterDataUrl,
-                                                slicePosRef.current
-                                            ),
+                                                50
+                                            )
                                         ]);
+                                        
+                                        if (comparisonBase64 && sliceBase64) {
+                                            const cleanPatientName = patientName.replace(/\s+/g, '_');
+                                            const baseName = activeFile.name.substring(0, activeFile.name.lastIndexOf('.'));
+                                            
+                                            // 1. Comparison image
+                                            const compName = `${cleanPatientName}_${baseName}_smile_design_comparativa.jpg`;
+                                            const compFormData = new FormData();
+                                            compFormData.append('file', new File([
+                                                Uint8Array.from(atob(comparisonBase64), c => c.charCodeAt(0))
+                                            ], compName, { type: 'image/jpeg' }));
+                                            await uploadEditedPhotoAction(folderId, compName, compFormData);
 
-                                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-                                        const sanitizedPatient = patientName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-
-                                        const res = await saveSmileDesignResult({
-                                            patientId,
-                                            folderId,
-                                            beforeDataUrl: smileDesign.result.beforeDataUrl,
-                                            afterBase64: smileDesign.result.afterBase64,
-                                            afterMime: smileDesign.result.afterMime,
-                                            comparisonBase64: comparisonBase64 || undefined,
-                                            sliceBase64: sliceBase64 || undefined,
-                                            slicePos: slicePosRef.current,
-                                            settings: smileDesign.settings,
-                                            customFilename: `DisenoSonrisa_${sanitizedPatient}_${timestamp}`,
-                                        });
-
-                                        if (res.success) {
-                                            setSmileSaved(true);
-                                            toast.success("✨ Smile design guardado exitosamente", { id: saveToastId });
+                                            // 2. Slice image
+                                            const sliceName = `${cleanPatientName}_${baseName}_smile_design_slice.jpg`;
+                                            const sliceFormData = new FormData();
+                                            sliceFormData.append('file', new File([
+                                                Uint8Array.from(atob(sliceBase64), c => c.charCodeAt(0))
+                                            ], sliceName, { type: 'image/jpeg' }));
+                                            await uploadEditedPhotoAction(folderId, sliceName, sliceFormData);
+                                            
+                                            // 3. Update database
+                                            await saveSmileDesignResult({
+                                                patientId: patientId || '',
+                                                folderId,
+                                                beforeDataUrl: smileDesign.result.beforeDataUrl,
+                                                afterBase64: smileDesign.result.afterBase64,
+                                                afterMime: smileDesign.result.afterMime,
+                                                comparisonBase64: comparisonBase64 || undefined,
+                                                sliceBase64: sliceBase64 || undefined,
+                                                settings: smileDesign.settings,
+                                            });
+                                            
+                                            toast.success("Smile Design guardado exitosamente", { id: saveToastId });
                                             onSaved();
-                                        } else {
-                                            toast.error(res.error || "Error al guardar", { id: saveToastId });
                                         }
                                     } catch (err) {
-                                        console.error("[SmileSave]", err);
-                                        toast.error("Ocurrió un error inesperado al guardar", { id: saveToastId });
+                                        toast.error("Error al guardar Smile Design", { id: saveToastId });
                                     }
                                 }}
-                                onShareLink={async () => {
-                                    const res = await getSmileShareUrl(patientId);
-                                    if (res.success && res.url) {
-                                        await navigator.clipboard.writeText(res.url);
-                                        toast.success('Link copiado. Compartí con el paciente.');
-                                    } else {
-                                        toast.error(res.error || 'Error al generar link');
+                                onGenerateMotion={async () => {
+                                    if (!smileDesign.result) return;
+                                    const cleanPatientName = patientName.replace(/\s+/g, '_');
+                                    const baseName = activeFile.name.substring(0, activeFile.name.lastIndexOf('.'));
+                                    
+                                    await smileMotion.generate(
+                                        smileDesign.result.beforeDataUrl.split(',')[1],
+                                        smileDesign.result.afterDataUrl.split(',')[1],
+                                        'image/jpeg',
+                                        patientId || '',
+                                        `${cleanPatientName}_${baseName}`
+                                    );
+                                }}
+                                onSaveMotion={async () => {
+                                    if (!smileMotion.result) return;
+                                    const tId = toast.loading("Subiendo videos a Drive...");
+                                    try {
+                                        const cleanPatientName = patientName.replace(/\s+/g, '_');
+                                        const baseName = activeFile.name.substring(0, activeFile.name.lastIndexOf('.'));
+                                        
+                                        // Upload before video
+                                        const resB = await fetch(smileMotion.result.beforeVideoUrl);
+                                        const blobB = await resB.blob();
+                                        const fdB = new FormData();
+                                        fdB.append('file', blobB, `${cleanPatientName}_${baseName}_motion_antes.mp4`);
+                                        await uploadEditedPhotoAction(folderId, `${cleanPatientName}_${baseName}_motion_antes.mp4`, fdB);
+
+                                        // Upload after video
+                                        const resA = await fetch(smileMotion.result.afterVideoUrl);
+                                        const blobA = await resA.blob();
+                                        const fdA = new FormData();
+                                        fdA.append('file', blobA, `${cleanPatientName}_${baseName}_motion_despues.mp4`);
+                                        await uploadEditedPhotoAction(folderId, `${cleanPatientName}_${baseName}_motion_despues.mp4`, fdA);
+                                        
+                                        toast.success("Videos guardados en Drive", { id: tId });
+                                        onSaved();
+                                    } catch (err) {
+                                        toast.error("Error al guardar videos", { id: tId });
                                     }
                                 }}
-                                onExit={() => {
-                                    smileDesign.reset();
-                                    setSmileMode(false);
-                                    setShowSmileGrid(false);
-                                    setSmileSaved(false);
-                                }}
-                                onOpenWarpBrush={() => setShowWarpBrush(true)}
-                                showGrid={showSmileGrid}
-                                onToggleGrid={() => setShowSmileGrid(prev => !prev)}
-                                canShare={smileSaved}
-                                error={smileDesign.error}
+                                motionState={smileMotion.state}
+                                motionError={smileMotion.error}
+                                onShareLink={() => {}}
+                                onExit={() => setSmileMode(false)}
+                                showGrid={showGrid}
+                                onToggleGrid={() => setShowGrid(!showGrid)}
+                                canShare={!!smileDesign.result}
+                                error={smileDesign.state === 'error' ? 'Error en el procesamiento' : null}
                                 processingTime={smileProcessingTime}
                             />
                         ) : (
@@ -3977,8 +4079,11 @@ export default function PhotoStudioModal({
                                 // When a canvas layer is selected, crop that layer (not the main photo)
                                 ? () => {
                                     setCanvasLayerCropId(canvasSelectedId);
-                                    setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
-                                    setCanvasLayerCompletedCrop(null);
+                                    const initialCrop: Crop = { unit: '%', width: 100, height: 100, x: 0, y: 0 };
+                                    setCanvasLayerCropSel(initialCrop);
+                                    // Pre-set completed crop so "Apply" works even if user doesn't drag
+                                    // Use type assertion to bypass strict PixelCrop vs Crop check here
+                                    setCanvasLayerCompletedCrop(initialCrop as any);
                                     setCanvasSelectedId(null);
                                 }
                                 : handleEnterCropMode}
@@ -4049,7 +4154,12 @@ export default function PhotoStudioModal({
                             canvasRatio={canvasRatio}
                             onCanvasRatioChange={handleCanvasRatioChange}
                             canvasLayerCount={canvasLayers.length}
-                            onClearCanvasLayers={() => { setCanvasLayers([]); setCanvasSelectedId(null); }}
+                            onClearCanvasLayers={() => { 
+                                setCanvasLayers([]); 
+                                setCanvasSelectedId(null); 
+                                if (patientId) localStorage.removeItem(`am-clinica-canvas-${patientId}`);
+                            }}
+                            onDeleteSelection={handleDeleteSelection}
                         />
                         </div>
                         </>
@@ -4466,6 +4576,7 @@ export default function PhotoStudioModal({
                     className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-xl py-1.5 min-w-[160px]"
                     style={{ left: contextMenu.x, top: contextMenu.y }}
                 >
+
                     {/* Agrupar — when 2+ shapes selected */}
                     {(multiSelectedIds.length >= 2 || (multiSelectedIds.length >= 1 && selectedShapeId)) && (
                         <button
@@ -4698,6 +4809,7 @@ interface ToolsPanelProps {
     onCanvasRatioChange: (r: CanvasRatio) => void;
     canvasLayerCount: number;
     onClearCanvasLayers: () => void;
+    onDeleteSelection: () => void;
 }
 
 function ToolsPanel({
@@ -4738,10 +4850,22 @@ function ToolsPanel({
     selectedShapeIsGroup, onUngroupShape,
     canvasActive, canvasSelectedId, canvasRatio, onCanvasRatioChange,
     canvasLayerCount, onClearCanvasLayers,
+    onDeleteSelection,
 }: ToolsPanelProps) {
     return (
         <>
-            <p className="text-white/30 text-xs font-semibold uppercase tracking-widest">Herramientas</p>
+            <div className="flex items-center justify-between mb-1">
+                <p className="text-white/30 text-[10px] font-bold uppercase tracking-widest translate-y-0.5">Herramientas</p>
+                {(canvasSelectedId || drawMode === 'selected' || drawMode === 'editing' || multiSelectedCount > 0) && (
+                    <button
+                        onClick={onDeleteSelection}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all text-[10px] font-bold uppercase"
+                        title="Eliminar selección"
+                    >
+                        <Trash2 size={12} /> Eliminar
+                    </button>
+                )}
+            </div>
 
             {/* Rotate */}
             <div className="space-y-3">

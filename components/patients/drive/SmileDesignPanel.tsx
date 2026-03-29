@@ -8,6 +8,7 @@ import type {
   CentralLength,
 } from '@/hooks/useSmileDesign';
 import { DEFAULT_SMILE_SETTINGS } from '@/hooks/useSmileDesign';
+import type { MotionState } from '@/hooks/useSmileMotion';
 import BeforeAfterSlider from './BeforeAfterSlider';
 
 interface SmileDesignPanelProps {
@@ -26,6 +27,10 @@ interface SmileDesignPanelProps {
   canShare: boolean;
   error: string | null;
   processingTime?: number | null;
+  onGenerateMotion: () => void;
+  onSaveMotion: () => void;
+  motionState: MotionState;
+  motionError: string | null;
 }
 
 const LEVEL_OPTIONS = ['Natural', 'Natural White', 'Natural Ultra White'] as const;
@@ -53,6 +58,10 @@ export default function SmileDesignPanel({
   canShare,
   error,
   processingTime,
+  onGenerateMotion,
+  onSaveMotion,
+  motionState,
+  motionError,
 }: SmileDesignPanelProps) {
   const isProcessing = state === 'aligning' || state === 'enhancing';
   const isReady = state === 'ready';
@@ -256,6 +265,48 @@ export default function SmileDesignPanel({
             🔗 Link para paciente
           </button>
         </div>
+
+        {/* ── Smile Motion ─────────────────────────────────────────── */}
+        {state === 'ready' && (
+          <div className="mt-4 border-t border-white/10 pt-4 flex flex-col gap-3">
+            {(motionState === 'idle' || motionState === 'error') && (
+              <button
+                onClick={onGenerateMotion}
+                className="w-full py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-sm font-medium transition-all flex items-center justify-center gap-2"
+              >
+                🎬 Generar Smile Motion
+              </button>
+            )}
+            {motionState === 'error' && motionError && (
+              <p className="text-xs text-red-400 text-center">{motionError}</p>
+            )}
+            {motionState === 'generating' && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-slate-400 text-center">⟳ Generando video... (~60s)</p>
+                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full animate-pulse" style={{ width: '60%' }} />
+                </div>
+              </div>
+            )}
+            {motionState === 'ready' && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-emerald-400 text-center">✓ Video listo</p>
+                <button
+                  onClick={onSaveMotion}
+                  className="w-full py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-sm font-medium transition-all flex items-center justify-center gap-2"
+                >
+                  💾 Guardar videos en Drive
+                </button>
+                <button
+                  onClick={onShareLink}
+                  className="w-full py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 text-sky-300 text-sm font-medium transition-all flex items-center justify-center gap-2"
+                >
+                  📲 Incluir en link del paciente
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Status */}
         {isReady && processingTime != null && (
