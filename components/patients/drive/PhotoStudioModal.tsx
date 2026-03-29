@@ -2743,9 +2743,16 @@ export default function PhotoStudioModal({
     async function handleEnterCropMode() {
         setDrawMode('idle');
         setMousePos(null);
-        if (preCropImageRef.current) {
-            // Already have a full pre-crop reference → restore it so user crops from full image
-            prevCroppedUrlRef.current = imageUrl; // save current (may be cropped) for cancel
+
+        // If the user has rotated the image since the last crop reference was taken,
+        // the preCropImageRef is now stale (points to the old, unrotated image).
+        // In that case, skip the restore branch and bake the current rotation below.
+        const hasStaleRef = preCropImageRef.current !== null && rotation !== 0;
+
+        if (preCropImageRef.current && !hasStaleRef) {
+            // Already have a valid, up-to-date full image reference → restore it
+            // so the user crops from the full (pre-any-crop) image again.
+            prevCroppedUrlRef.current = imageUrl; // save current for cancel
             setImageUrl(preCropImageRef.current);
             objectUrlRef.current = preCropImageRef.current.startsWith('blob:') ? preCropImageRef.current : null;
             setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
@@ -2791,9 +2798,9 @@ export default function PhotoStudioModal({
             const newUrl = URL.createObjectURL(blob);
             if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
             objectUrlRef.current = newUrl;
-            preCropImageRef.current = newUrl; // this is the full image source for all future crops
+            preCropImageRef.current = newUrl; // full baked image for all future crops
             setImageUrl(newUrl);
-            setRotation(0); // baked
+            setRotation(0); // baked into pixel data
         } catch {
             preCropImageRef.current = imageUrl; // fallback: bake failed
         }
@@ -2826,8 +2833,14 @@ export default function PhotoStudioModal({
                 i.onerror = () => rej(new Error('load failed'));
                 i.src = sourceUrl;
             });
-            const dispW = imgRef.current?.width ?? img.naturalWidth;
-            const dispH = imgRef.current?.height ?? img.naturalHeight;
+            // Use getBoundingClientRect() for the actual rendered size of the image element.
+            // imgRef.current.width gives the CSS element width (which may differ from the
+            // rendered image width when objectFit:contain is active and the container is
+            // wider/taller than the image). getBoundingClientRect() gives the correct
+            // rendered pixel dimensions that ReactCrop uses to compute its coordinates.
+            const rect = imgRef.current?.getBoundingClientRect();
+            const dispW = rect?.width ?? img.naturalWidth;
+            const dispH = rect?.height ?? img.naturalHeight;
             const scaleX = img.naturalWidth / dispW;
             const scaleY = img.naturalHeight / dispH;
             const srcX = Math.round(completedCrop.x * scaleX);
