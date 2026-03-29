@@ -36,6 +36,7 @@ export type SmileState = 'idle' | 'aligning' | 'enhancing' | 'ready' | 'error';
 
 export interface SmileResult {
   beforeDataUrl: string;
+  beforeBase64: string;   // raw base64, no data: prefix
   afterDataUrl: string;
   afterBase64: string;
   afterMime: string;
@@ -217,7 +218,7 @@ export function useSmileDesign(): UseSmileDesignReturn {
         settings
       );
 
-      setResult({ beforeDataUrl, afterDataUrl, afterBase64, afterMime });
+      setResult({ beforeDataUrl, beforeBase64: processedBase64, afterDataUrl, afterBase64, afterMime });
       setSmileState('ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al procesar la imagen');
@@ -238,6 +239,7 @@ export function useSmileDesign(): UseSmileDesignReturn {
       );
       setResult(prev => prev ? { ...prev, afterDataUrl, afterBase64, afterMime } : {
         beforeDataUrl,
+        beforeBase64: alignedBase64 as string,   // narrowed by early return guard above
         afterDataUrl,
         afterBase64,
         afterMime,
