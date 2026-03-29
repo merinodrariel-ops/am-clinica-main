@@ -4314,21 +4314,7 @@ export default function PhotoStudioModal({
                     className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-xl py-1.5 min-w-[160px]"
                     style={{ left: canvasContextMenu.x, top: canvasContextMenu.y }}
                 >
-                    <button
-                        onClick={() => {
-                            setCanvasLayers(prev => {
-                                const idx = prev.findIndex(l => l.id === canvasContextMenu.layerId);
-                                if (idx <= 0) return prev;
-                                const next = [...prev];
-                                [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                                return next;
-                            });
-                            setCanvasContextMenu(null);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
-                    >
-                        <span className="text-[#C9A96E]">↑</span> Traer al frente
-                    </button>
+                    {/* Traer al frente (index +1, hacia el final del array = encima) */}
                     <button
                         onClick={() => {
                             setCanvasLayers(prev => {
@@ -4342,7 +4328,57 @@ export default function PhotoStudioModal({
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
                     >
+                        <span className="text-[#C9A96E]">↑</span> Traer al frente
+                    </button>
+                    {/* Traer completamente al frente */}
+                    <button
+                        onClick={() => {
+                            setCanvasLayers(prev => {
+                                const idx = prev.findIndex(l => l.id === canvasContextMenu.layerId);
+                                if (idx < 0 || idx >= prev.length - 1) return prev;
+                                const next = [...prev];
+                                const [item] = next.splice(idx, 1);
+                                next.push(item);
+                                return next;
+                            });
+                            setCanvasContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                        <span className="text-[#C9A96E]">⇑</span> Al frente del todo
+                    </button>
+                    {/* Enviar atrás (index -1, hacia el inicio del array = debajo) */}
+                    <button
+                        onClick={() => {
+                            setCanvasLayers(prev => {
+                                const idx = prev.findIndex(l => l.id === canvasContextMenu.layerId);
+                                if (idx <= 0) return prev;
+                                const next = [...prev];
+                                [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                return next;
+                            });
+                            setCanvasContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
                         <span className="text-white/50">↓</span> Enviar atrás
+                    </button>
+                    {/* Enviar completamente al fondo */}
+                    <button
+                        onClick={() => {
+                            setCanvasLayers(prev => {
+                                const idx = prev.findIndex(l => l.id === canvasContextMenu.layerId);
+                                if (idx <= 0) return prev;
+                                const next = [...prev];
+                                const [item] = next.splice(idx, 1);
+                                next.unshift(item);
+                                return next;
+                            });
+                            setCanvasContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                        <span className="text-white/50">⇓</span> Al fondo del todo
                     </button>
                     <button
                         onClick={() => {
@@ -4357,6 +4393,7 @@ export default function PhotoStudioModal({
                 </div>
             </>
         )}
+
 
         {/* ── Draw Context Menu ────────────────────────────────────────────── */}
         {contextMenu && (
