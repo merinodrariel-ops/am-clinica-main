@@ -3584,33 +3584,30 @@ export default function PhotoStudioModal({
                                     onPointerLeave={handleBrushUp}
                                 />
                             ) : cropActive ? (
-                                <ReactCrop
-                                    crop={crop}
-                                    onChange={c => setCrop(c)}
-                                    onComplete={c => setCompletedCrop(c)}
-                                >
-                                    {/*
-                                      IMPORTANT: do NOT use objectFit:contain here.
-                                      With objectFit:contain the <img> CSS box is larger than the
-                                      rendered image content (letterboxing). ReactCrop measures
-                                      coordinates against the full element box, so the crop selection
-                                      would be offset/wrong. Without it, the element size exactly
-                                      matches the rendered image size (maxWidth/maxHeight scale it
-                                      proportionally), making img.naturalWidth/img.width correct.
-                                    */}
-                                    <img
-                                        ref={imgRef}
-                                        src={imageUrl}
-                                        alt={activeFile.name}
-                                        crossOrigin="anonymous"
-                                        style={{
-                                            maxWidth: '100%',
-                                            maxHeight: imageStyle.maxHeight,
-                                            display: 'block',
-                                            transform: 'none',
-                                        }}
-                                    />
-                                </ReactCrop>
+                                <div style={{ display: 'inline-block', lineHeight: 0 }}>
+                                    <ReactCrop
+                                        crop={crop}
+                                        onChange={c => setCrop(c)}
+                                        onComplete={c => setCompletedCrop(c)}
+                                    >
+                                        {/*
+                                          No objectFit:contain — the element must equal the rendered image size.
+                                          No inline-block on img needed; the wrapper div handles containment.
+                                        */}
+                                        <img
+                                            ref={imgRef}
+                                            src={imageUrl}
+                                            alt={activeFile.name}
+                                            crossOrigin="anonymous"
+                                            style={{
+                                                display: 'block',
+                                                maxWidth: '100%',
+                                                maxHeight: imageStyle.maxHeight,
+                                                transform: 'none',
+                                            }}
+                                        />
+                                    </ReactCrop>
+                                </div>
                             ) : (
                                 <div className="relative inline-block">
                                     {canvasActive ? (
@@ -3651,19 +3648,34 @@ export default function PhotoStudioModal({
                                                         </div>
                                                     </div>
                                                     <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-                                                        <ReactCrop
-                                                            crop={canvasLayerCropSel}
-                                                            onChange={c => setCanvasLayerCropSel(c)}
-                                                            onComplete={c => setCanvasLayerCompletedCrop(c)}
-                                                        >
-                                                            <img
-                                                                ref={canvasLayerCropImgRef}
-                                                                src={layer.src}
-                                                                alt="recorte"
-                                                                style={{ maxWidth: '100%', maxHeight: 'calc(70vh - 80px)', display: 'block' }}
-                                                                crossOrigin="anonymous"
-                                                            />
-                                                        </ReactCrop>
+                                                        {/*
+                                                          CRITICAL: wrap ReactCrop in inline-block so its container
+                                                          collapses to the image's actual rendered size.
+                                                          Without this, ReactCrop's wrapper div stretches to fill
+                                                          the flex parent width. The crop selection (100% width)
+                                                          would then calculate against the CONTAINER width (e.g. 600px)
+                                                          rather than the IMAGE width (e.g. 350px), causing crop
+                                                          handles to fly off screen.
+                                                        */}
+                                                        <div style={{ display: 'inline-block', lineHeight: 0 }}>
+                                                            <ReactCrop
+                                                                crop={canvasLayerCropSel}
+                                                                onChange={c => setCanvasLayerCropSel(c)}
+                                                                onComplete={c => setCanvasLayerCompletedCrop(c)}
+                                                            >
+                                                                <img
+                                                                    ref={canvasLayerCropImgRef}
+                                                                    src={layer.src}
+                                                                    alt="recorte"
+                                                                    style={{
+                                                                        display: 'block',
+                                                                        maxWidth: 'min(100%, calc(100vw - 100px))',
+                                                                        maxHeight: 'calc(70vh - 120px)',
+                                                                    }}
+                                                                    crossOrigin="anonymous"
+                                                                />
+                                                            </ReactCrop>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
