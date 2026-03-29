@@ -21,7 +21,7 @@ import { useSmileMotion } from '@/hooks/useSmileMotion';
 import SmileDesignPanel from './SmileDesignPanel';
 import WarpBrush from './WarpBrush';
 import BeforeAfterSlider from './BeforeAfterSlider';
-import { saveSmileDesignResult, getSmileShareUrl } from '@/app/actions/smile-design';
+import { saveSmileDesignResult, getSmileShareUrl, saveSmileMotionVideos } from '@/app/actions/smile-design';
 
 /**
  * Generates a side-by-side (before/after) base64 string for saving.
@@ -4015,22 +4015,36 @@ export default function PhotoStudioModal({
                                     try {
                                         const cleanPatientName = patientName.replace(/\s+/g, '_');
                                         const baseName = activeFile.name.substring(0, activeFile.name.lastIndexOf('.'));
-                                        
-                                        // Upload before video
+                                        const motionBaseName = `${cleanPatientName}_${baseName}`;
+
+                                        // Upload before video to Drive
                                         const resB = await fetch(smileMotion.result.beforeVideoUrl);
                                         const blobB = await resB.blob();
                                         const fdB = new FormData();
-                                        fdB.append('file', blobB, `${cleanPatientName}_${baseName}_motion_antes.mp4`);
-                                        await uploadEditedPhotoAction(folderId, `${cleanPatientName}_${baseName}_motion_antes.mp4`, fdB);
+                                        fdB.append('file', blobB, `${motionBaseName}_motion_antes.mp4`);
+                                        await uploadEditedPhotoAction(folderId, `${motionBaseName}_motion_antes.mp4`, fdB);
 
-                                        // Upload after video
+                                        // Upload after video to Drive
                                         const resA = await fetch(smileMotion.result.afterVideoUrl);
                                         const blobA = await resA.blob();
                                         const fdA = new FormData();
-                                        fdA.append('file', blobA, `${cleanPatientName}_${baseName}_motion_despues.mp4`);
-                                        await uploadEditedPhotoAction(folderId, `${cleanPatientName}_${baseName}_motion_despues.mp4`, fdA);
-                                        
-                                        toast.success("Videos guardados en Drive", { id: tId });
+                                        fdA.append('file', blobA, `${motionBaseName}_motion_despues.mp4`);
+                                        await uploadEditedPhotoAction(folderId, `${motionBaseName}_motion_despues.mp4`, fdA);
+
+                                        // Save records to patient_files for portal visibility
+                                        if (patientId) {
+                                            const saveResult = await saveSmileMotionVideos({
+                                                patientId,
+                                                beforeVideoUrl: smileMotion.result.beforeVideoUrl,
+                                                afterVideoUrl: smileMotion.result.afterVideoUrl,
+                                                baseName: motionBaseName,
+                                            });
+                                            if (saveResult.error) {
+                                                console.error('[onSaveMotion] patient_files insert:', saveResult.error);
+                                            }
+                                        }
+
+                                        toast.success("Videos guardados en Drive y portal", { id: tId });
                                         onSaved();
                                     } catch (err) {
                                         toast.error("Error al guardar videos", { id: tId });

@@ -241,6 +241,47 @@ export async function saveSmileDesignResult(
   }
 }
 
+export async function saveSmileMotionVideos(params: {
+  patientId: string;
+  beforeVideoUrl: string;
+  afterVideoUrl: string;
+  baseName: string;
+}): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'No autenticado' };
+
+  const adminClient = createAdminClient();
+  const { patientId, beforeVideoUrl, afterVideoUrl, baseName } = params;
+
+  const records = [
+    {
+      patient_id: patientId,
+      file_type: 'smile_motion',
+      label: `${baseName}_Antes_Motion`,
+      file_url: beforeVideoUrl,
+      is_visible_to_patient: true,
+    },
+    {
+      patient_id: patientId,
+      file_type: 'smile_motion',
+      label: `${baseName}_Despues_Motion`,
+      file_url: afterVideoUrl,
+      is_visible_to_patient: true,
+    },
+  ];
+
+  const { error } = await adminClient
+    .from('patient_files')
+    .insert(records);
+
+  if (error) {
+    console.error('[saveSmileMotionVideos]', error);
+    return { error: error.message };
+  }
+  return {};
+}
+
 
 export interface GetSmileShareUrlResult {
   success: boolean;

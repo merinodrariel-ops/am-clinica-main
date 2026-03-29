@@ -252,6 +252,7 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
     const beforePhotos = files.filter(f => f.file_type === 'photo_before');
     const afterPhotos = files.filter(f => f.file_type === 'photo_after');
     const comparisonPhotos = files.filter(f => f.file_type === 'photo_comparison');
+    const smileMotionFiles = files.filter(f => f.file_type === 'smile_motion');
     const docFiles = files.filter(f => f.file_type === 'document' || f.file_type === 'comprobante');
 
     const paidCuotas = payments.filter(p => p.cuota_nro !== null && p.cuota_nro > 0).length;
@@ -544,6 +545,34 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                 <FadeIn delay={0.2}>
                     <STLSection stlFiles={stlFiles} />
                 </FadeIn>
+
+                {/* ── Smile Motion Videos ── */}
+                {smileMotionFiles.length > 0 && (
+                    <FadeIn delay={0.22}>
+                        <div className="rounded-3xl bg-[#14141A] border border-white/5 p-6 space-y-4">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[#C9A96E] text-base">🎬</span>
+                                <h2 className="text-white font-bold text-lg">Smile Motion</h2>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {smileMotionFiles.map(f => (
+                                    <div key={f.id} className="flex flex-col gap-1">
+                                        <video
+                                            src={f.file_url}
+                                            controls
+                                            muted
+                                            playsInline
+                                            className="w-full rounded-lg"
+                                        />
+                                        {f.label && (
+                                            <p className="text-white/40 text-xs text-center truncate">{f.label}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </FadeIn>
+                )}
 
                 {/* ── Payment tracker ── */}
                 {(plan || payments.length > 0) && (
