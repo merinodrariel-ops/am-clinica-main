@@ -13,7 +13,7 @@ interface NuevaPresentacionModalProps {
     onClose: () => void;
 }
 
-export default function NuevaPresentacionModal({ patientId, profesional, onSaved, onClose }: NuevaPresentacionModalProps) {
+export default function NuevaPrestacionModal({ patientId, profesional, onSaved, onClose }: NuevaPresentacionModalProps) {
     const todayIso = new Date().toISOString().split('T')[0];
 
     const [fecha, setFecha] = useState(todayIso);

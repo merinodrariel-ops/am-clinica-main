@@ -27,6 +27,7 @@ import {
     Loader2,
     FolderOpen,
     Package,
+    Images,
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
@@ -35,6 +36,7 @@ import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
 const PatientDriveTab = dynamic(() => import('@/components/patients/drive/PatientDriveTab'), { ssr: false });
 const DesignReviewTab = dynamic(() => import('@/components/patients/DesignReviewTab'), { ssr: false });
+const ClinicalPresentationGridWrapper = dynamic(() => import('@/components/patients/ClinicalPresentationGridWrapper'), { ssr: false });
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -44,7 +46,7 @@ import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import type { PlanFinanciacion } from '@/lib/financiacion';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
-import NuevaPresentacionModal from './NuevaPresentacionModal';
+import NuevaPrestacionModal from './NuevaPrestacionModal';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
 import { getPatientInventoryMaterials, type PatientMaterialRecord } from '@/app/actions/inventory-stock';
 import { calculateFinancingBreakdown, DEFAULT_MONTHLY_INTEREST_PCT } from '@/lib/financial-engine';
@@ -108,7 +110,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
 
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
-    const [showPresentacionModal, setShowPresentacionModal] = useState(false);
+    const [showPrestacionModal, setShowPrestacionModal] = useState(false);
 
     // Materiales state
     const [materiales, setMateriales] = useState<PatientMaterialRecord[]>([]);
@@ -359,8 +361,17 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
             <div className="max-w-5xl mx-auto p-6">
                 <div className="space-y-4">
 
-                    {/* 1. Archivos — expanded by default */}
-                    <PatientSection id="archivos" title="Documentación" icon={FolderOpen} defaultOpen>
+                    {/* 1. Presentación Clínica — expanded by default */}
+                    <PatientSection id="presentacion" title="Presentación Clínica" icon={Images} defaultOpen>
+                        <ClinicalPresentationGridWrapper 
+                            patientId={patient.id_paciente}
+                            patientName={`${patient.apellido}, ${patient.nombre}`}
+                            motherFolderUrl={patient.link_historia_clinica}
+                        />
+                    </PatientSection>
+
+                    {/* 2. Archivos */}
+                    <PatientSection id="archivos" title="Documentación" icon={FolderOpen}>
                         <PatientDriveTab
                             patientId={patient.id_paciente}
                             patientName={`${patient.apellido}, ${patient.nombre}`}
@@ -456,11 +467,11 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                         <div className="border-b border-gray-100 dark:border-gray-800 flex justify-between items-center pb-4 mb-4">
                             <h2 className="text-lg font-semibold">Historia Clínica</h2>
                             <button
-                                onClick={() => setShowPresentacionModal(true)}
+                                onClick={() => setShowPrestacionModal(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
                             >
-                                <Plus size={16} />
-                                Nueva Prestación
+                                <Plus className="w-4 h-4" />
+                                Nueva Evolución
                             </button>
                         </div>
 
@@ -568,7 +579,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                             Slides
                                                         </a>
                                                     ) : (
-                                                        <span className="text-xs px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                                                        <span className="text-xs px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:amber-400 border border-amber-200 dark:border-amber-500/30">
                                                             Sin slides
                                                         </span>
                                                     )}
@@ -1205,16 +1216,16 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
             )}
         </div>
 
-        {/* Nueva Presentación modal */}
-        {showPresentacionModal && (
-            <NuevaPresentacionModal
+        {/* Nueva Prestación modal */}
+        {showPrestacionModal && (
+            <NuevaPrestacionModal
                 patientId={patient.id_paciente}
                 profesional={profile?.full_name || role || 'Profesional'}
                 onSaved={(entry) => {
                     setLocalHistoria(prev => [entry as HistoriaClinica, ...prev]);
-                    setShowPresentacionModal(false);
+                    setShowPrestacionModal(false);
                 }}
-                onClose={() => setShowPresentacionModal(false)}
+                onClose={() => setShowPrestacionModal(false)}
             />
         )}
         </>
