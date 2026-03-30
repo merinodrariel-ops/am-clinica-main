@@ -1657,8 +1657,16 @@ export default function PhotoStudioModal({
 
         // Draw in render-space (renderW × renderH), using normalized layer coords
         const ctx = canvas.getContext('2d')!;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, renderW, renderH);
+        const isTransparent = bgDone && bgColor === 'transparent';
+        if (isTransparent) {
+            ctx.clearRect(0, 0, renderW, renderH);
+        } else {
+            const fillCol = bgDone 
+                ? (bgColor === 'white' ? '#ffffff' : bgColor === 'black' ? '#111111' : '#ffffff')
+                : '#ffffff';
+            ctx.fillStyle = fillCol;
+            ctx.fillRect(0, 0, renderW, renderH);
+        }
         for (const layer of canvasLayers) {
             const px = layer.x * renderW, py = layer.y * renderH;
             const pw = layer.w * renderW, ph = layer.h * renderH;
@@ -2029,8 +2037,16 @@ export default function PhotoStudioModal({
         const off = document.createElement('canvas');
         off.width = expW; off.height = expH;
         const ctx = off.getContext('2d')!;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, expW, expH);
+        const isTransparent = bgDone && bgColor === 'transparent';
+        if (isTransparent) {
+            ctx.clearRect(0, 0, expW, expH);
+        } else {
+            const fillCol = bgDone
+                ? (bgColor === 'white' ? '#ffffff' : bgColor === 'black' ? '#111111' : '#ffffff')
+                : '#ffffff';
+            ctx.fillStyle = fillCol;
+            ctx.fillRect(0, 0, expW, expH);
+        }
         for (const layer of canvasLayers) {
             ctx.save();
             ctx.translate(layer.x * expW, layer.y * expH);
@@ -3619,7 +3635,7 @@ export default function PhotoStudioModal({
                     {/* Canvas area */}
                     <div
                         ref={canvasContainerRef}
-                        className={`relative flex-1 flex items-center justify-center overflow-hidden p-4 ${canvasBg}`}
+                        className="relative flex-1 flex items-center justify-center overflow-hidden p-4 bg-[#0D0D12]"
                         onMouseDown={canvasActive ? undefined : handleMouseDown}
                         onMouseMove={canvasActive ? undefined : handleMouseMove}
                         onMouseUp={canvasActive ? undefined : handleMouseUp}
@@ -3635,6 +3651,7 @@ export default function PhotoStudioModal({
                             {brushMode !== null ? (
                                 <canvas
                                     ref={brushCanvasRef}
+                                    className={canvasBg}
                                     style={{ ...imageStyle, cursor: 'crosshair' }}
                                     onPointerDown={handleBrushDown}
                                     onPointerMove={handleBrushMove}
@@ -3642,7 +3659,7 @@ export default function PhotoStudioModal({
                                     onPointerLeave={handleBrushUp}
                                 />
                             ) : cropActive ? (
-                                <div style={{ display: 'inline-block', lineHeight: 0 }}>
+                                <div className={canvasBg} style={{ display: 'inline-block', lineHeight: 0 }}>
                                     <ReactCrop
                                         crop={crop}
                                         onChange={c => setCrop(c)}
@@ -3667,7 +3684,7 @@ export default function PhotoStudioModal({
                                     </ReactCrop>
                                 </div>
                             ) : (
-                                <div className="relative inline-block">
+                                <div className={`relative inline-block ${canvasBg}`}>
                                     {canvasActive ? (
                                         <>
                                         <canvas
@@ -3940,8 +3957,8 @@ export default function PhotoStudioModal({
                                 }}
                                 onSave={async () => {
                                     if (!smileDesign.result) return;
-                                    const saveToastId = toast.loading("Guardando Smile Design y generando imágenes...", {
-                                        description: "Esto puede tardar unos segundos"
+                                    const saveToastId = toast.loading("Guardando Smile Design...", {
+                                        description: "Generando imágenes comparativas..."
                                     });
                                     
                                     try {
@@ -3957,43 +3974,28 @@ export default function PhotoStudioModal({
                                             )
                                         ]);
                                         
-                                        if (comparisonBase64 && sliceBase64) {
-                                            const cleanPatientName = patientName.replace(/\s+/g, '_');
-                                            const baseName = activeFile.name.substring(0, activeFile.name.lastIndexOf('.'));
-                                            
-                                            // 1. Comparison image
-                                            const compName = `${cleanPatientName}_${baseName}_smile_design_comparativa.jpg`;
-                                            const compFormData = new FormData();
-                                            compFormData.append('file', new File([
-                                                Uint8Array.from(atob(comparisonBase64), c => c.charCodeAt(0))
-                                            ], compName, { type: 'image/jpeg' }));
-                                            await uploadEditedPhotoAction(folderId, compName, compFormData);
-
-                                            // 2. Slice image
-                                            const sliceName = `${cleanPatientName}_${baseName}_smile_design_slice.jpg`;
-                                            const sliceFormData = new FormData();
-                                            sliceFormData.append('file', new File([
-                                                Uint8Array.from(atob(sliceBase64), c => c.charCodeAt(0))
-                                            ], sliceName, { type: 'image/jpeg' }));
-                                            await uploadEditedPhotoAction(folderId, sliceName, sliceFormData);
-                                            
-                                            // 3. Update database
-                                            await saveSmileDesignResult({
-                                                patientId: patientId || '',
-                                                folderId,
-                                                beforeDataUrl: smileDesign.result.beforeDataUrl,
-                                                afterBase64: smileDesign.result.afterBase64,
-                                                afterMime: smileDesign.result.afterMime,
-                                                comparisonBase64: comparisonBase64 || undefined,
-                                                sliceBase64: sliceBase64 || undefined,
-                                                settings: smileDesign.settings,
-                                            });
-                                            
+                                        // saveSmileDesignResult handles uploads to Drive AND DB records
+                                        const saveResult = await saveSmileDesignResult({
+                                            patientId: patientId || '',
+                                            folderId: folderId || '',
+                                            beforeDataUrl: smileDesign.result.beforeDataUrl,
+                                            afterBase64: smileDesign.result.afterBase64,
+                                            afterMime: smileDesign.result.afterMime,
+                                            comparisonBase64: comparisonBase64 || undefined,
+                                            sliceBase64: sliceBase64 || undefined,
+                                            settings: smileDesign.settings,
+                                        });
+                                        
+                                        if (saveResult.success) {
                                             toast.success("Smile Design guardado exitosamente", { id: saveToastId });
-                                            onSaved();
+                                            // Delay slightly to ensure Drive indexing is done before UI reloads
+                                            setTimeout(() => onSaved(), 2000);
+                                        } else {
+                                            toast.error(saveResult.error || "Error al persistir cambios", { id: saveToastId });
                                         }
                                     } catch (err) {
-                                        toast.error("Error al guardar Smile Design", { id: saveToastId });
+                                        console.error("[onSave] Smile Design error:", err);
+                                        toast.error("Error al generar imágenes del Smile Design", { id: saveToastId });
                                     }
                                 }}
                                 onGenerateMotion={async () => {
