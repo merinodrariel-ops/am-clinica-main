@@ -590,42 +590,102 @@ export default function PhotoStudioModal({
     const [mousePos, setMousePos] = useState<[number, number] | null>(null);
     const [drawClipboard, setDrawClipboard] = useState<DrawShape | null>(null);
 
-    // ── Canvas compositor state ────────────────────────────────────────────────
+    // ── Multi-canvas state ─────────────────────────────────────────────────────
+    type CanvasDoc = { id: string; name: string; ratio: CanvasRatio; layers: CanvasLayer[]; bgColor: string };
+    const [canvases, setCanvases] = useState<CanvasDoc[]>([]);
+    const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
     const [canvasActive, setCanvasActive] = useState(false);
-    const [canvasLayers, setCanvasLayers] = useState<CanvasLayer[]>([]);
-    const [canvasRatio, setCanvasRatio] = useState<CanvasRatio>('1:1');
+    const [canvasSaving, setCanvasSaving] = useState(false);
 
-    // ── Persistence: Save/Restore Canvas (by patientId) ────────────────────────
+    // Derived — keep backward compat with all existing code referencing these
+    const activeCanvas = canvases.find(c => c.id === activeCanvasId) ?? null;
+    const canvasLayers: CanvasLayer[] = activeCanvas?.layers ?? [];
+    const canvasRatio: CanvasRatio = (activeCanvas?.ratio as CanvasRatio) ?? '1:1';
+
+    // Setters that update the active canvas inside canvases[]
+    const setCanvasLayers = useCallback((updater: CanvasLayer[] | ((prev: CanvasLayer[]) => CanvasLayer[])) => {
+        setCanvases(prev => prev.map(c => {
+            if (c.id !== activeCanvasId) return c;
+            const newLayers = typeof updater === 'function' ? updater(c.layers) : updater;
+            return { ...c, layers: newLayers };
+        }));
+    }, [activeCanvasId]);
+
+    const setCanvasRatio = useCallback((ratio: CanvasRatio) => {
+        setCanvases(prev => prev.map(c => c.id === activeCanvasId ? { ...c, ratio } : c));
+    }, [activeCanvasId]);
+
+    // ── Load canvases from DB on mount ─────────────────────────────────────────
     useEffect(() => {
         if (!patientId) return;
-        const key = `am-clinica-canvas-${patientId}`;
-        const saved = localStorage.getItem(key);
-        if (saved) {
-            try {
-                const data = JSON.parse(saved);
-                // Hydrate only if state is currently empty to avoid overwriting recent changes
-                if (canvasLayers.length === 0 && data.layers && data.layers.length > 0) {
-                    setCanvasLayers(data.layers);
-                    if (data.ratio) setCanvasRatio(data.ratio);
-                    setHasCanvas(true);
+        import('@/app/actions/patient-canvases').then(async ({ listPatientCanvasesAction }) => {
+            const { data, error } = await listPatientCanvasesAction(patientId);
+            if (error || !data || data.length === 0) {
+                // Try legacy localStorage fallback
+                const key = `am-clinica-canvas-${patientId}`;
+                const saved = localStorage.getItem(key);
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.layers && parsed.layers.length > 0) {
+                            const legacyId = 'legacy-' + patientId;
+                            Promise.all((parsed.layers as any[]).map(async (l: any) => {
+                                if (l.src?.startsWith('blob:')) return null;
+                                try { const img = await loadCanvasImage(l.src); return { ...l, img }; }
+                                catch { return null; }
+                            })).then(results => {
+                                const layers = results.filter(Boolean) as CanvasLayer[];
+                                if (layers.length > 0) {
+                                    setCanvases([{ id: legacyId, name: 'Lienzo 1', ratio: parsed.ratio ?? '1:1', layers, bgColor: '#ffffff' }]);
+                                    setActiveCanvasId(legacyId);
+                                    setHasCanvas(true);
+                                }
+                            });
+                        }
+                    } catch {}
                 }
-            } catch (e) {
-                console.error("Canvas persistence load error", e);
+                return;
             }
-        }
+            // Hydrate all canvases from DB
+            const hydrated = await Promise.all(data.map(async (row) => {
+                const layers = await Promise.all((row.layers as any[]).map(async (l: any) => {
+                    if (l.src?.startsWith('blob:')) return null;
+                    try { const img = await loadCanvasImage(l.src); return { ...l, img }; }
+                    catch { return null; }
+                }));
+                return {
+                    id: row.id,
+                    name: row.name,
+                    ratio: (row.ratio as CanvasRatio) ?? '1:1',
+                    layers: layers.filter(Boolean) as CanvasLayer[],
+                    bgColor: row.bg_color ?? '#ffffff',
+                };
+            }));
+            setCanvases(hydrated);
+            setActiveCanvasId(hydrated[0]?.id ?? null);
+            if (hydrated.length > 0) setHasCanvas(true);
+        });
     }, [patientId]);
 
+    // ── Auto-save active canvas to DB (debounced) ──────────────────────────────
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
-        if (!patientId) return;
-        const key = `am-clinica-canvas-${patientId}`;
-        if (canvasLayers.length > 0) {
-            localStorage.setItem(key, JSON.stringify({
-                layers: canvasLayers,
-                ratio: canvasRatio,
-                timestamp: Date.now()
-            }));
-        }
-    }, [patientId, canvasLayers, canvasRatio]);
+        if (!activeCanvasId || activeCanvasId.startsWith('legacy-')) return;
+        if (!activeCanvas) return;
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(async () => {
+            setCanvasSaving(true);
+            const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+            await savePatientCanvasAction({
+                id: activeCanvasId,
+                layers: activeCanvas.layers.map(l => ({ ...l, img: undefined })),
+                ratio: activeCanvas.ratio,
+                bgColor: activeCanvas.bgColor,
+            });
+            setCanvasSaving(false);
+        }, 2000);
+        return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+    }, [activeCanvasId, activeCanvas]);
 
     const [canvasSelectedId, setCanvasSelectedId] = useState<string | null>(null);
     const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
@@ -682,9 +742,58 @@ export default function PhotoStudioModal({
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
 
-    // Undo history — each entry is a snapshot before a destructive op
     type Snapshot = { imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor };
     const [history, setHistory] = useState<Snapshot[]>([]);
+
+    // ── Persistence: Save/Restore individual file states (drawings, etc.) ────────
+    useEffect(() => {
+        if (!patientId) return;
+        const key = `am-clinica-states-${patientId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                Object.entries(parsed).forEach(([id, state]: [string, any]) => {
+                    fileStatesRef.current.set(id, state);
+                });
+                // If we already have an active file and it has saved state, load it
+                const currentFileId = activeFile?.id;
+                if (currentFileId) {
+                    const currentSaved = fileStatesRef.current.get(currentFileId);
+                    if (currentSaved) {
+                        setRotation(currentSaved.rotation);
+                        setBrightness(currentSaved.brightness);
+                        setDrawShapes(currentSaved.drawShapes || []);
+                        setTextAnnotations(currentSaved.textAnnotations || []);
+                    }
+                }
+            } catch (e) {
+                console.error("File states persistence load error", e);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [patientId]);
+
+    useEffect(() => {
+        if (!patientId) return;
+        const key = `am-clinica-states-${patientId}`;
+        
+        // Capture current state into ref before saving
+        if (activeFile) {
+            fileStatesRef.current.set(activeFile.id, {
+                rotation, brightness, drawShapes, textAnnotations
+            });
+        }
+
+        const data: Record<string, any> = {};
+        fileStatesRef.current.forEach((val, id) => {
+            data[id] = val;
+        });
+
+        if (Object.keys(data).length > 0) {
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations]);
 
     // UI state
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -1674,7 +1783,10 @@ export default function PhotoStudioModal({
             ctx.filter = `brightness(${layer.brightness ?? 100}%)`;
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
-            ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
+            // Safety check: Ensure img is a valid, loaded HTMLImageElement
+            if (layer.img instanceof HTMLImageElement && layer.img.complete && layer.img.naturalWidth > 0) {
+                ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
+            }
             ctx.restore();
         }
 
@@ -1880,21 +1992,58 @@ export default function PhotoStudioModal({
         }
     }
 
-    function handleActivateCanvas() {
+    function handleActivateCanvas(canvasId?: string) {
+        if (canvasId) {
+            setActiveCanvasId(canvasId);
+        } else if (canvases.length > 0) {
+            setActiveCanvasId(canvases[0].id);
+        }
         setCanvasActive(true);
         setHasCanvas(true);
-        // Do NOT setCanvasLayers([]) here; we want to preserve work.
-        // If the user wants a new one, they can clear it or it's empty to start.
-
-        // Reset zoom/pan so the canvas background can't be accidentally panned
         setZoom(1);
         setPanX(0);
         setPanY(0);
         setCanvasSelectedId(null);
-        // Reset editor-specific state
         setDrawMode('idle');
         setCropActive(false);
         setBrushMode(null);
+    }
+
+    async function handleNewCanvas() {
+        const name = `Lienzo ${canvases.length + 1}`;
+        const { createPatientCanvasAction } = await import('@/app/actions/patient-canvases');
+        const { data, error } = await createPatientCanvasAction({ patientId, name, ratio: '1:1' });
+        if (error || !data) {
+            // Fallback: create locally with temp ID
+            const tempId = 'temp-' + Date.now();
+            const newCanvas: CanvasDoc = { id: tempId, name, ratio: '1:1', layers: [], bgColor: '#ffffff' };
+            setCanvases(prev => [...prev, newCanvas]);
+            setActiveCanvasId(tempId);
+        } else {
+            const newCanvas: CanvasDoc = { id: data.id, name: data.name, ratio: data.ratio as CanvasRatio, layers: [], bgColor: data.bg_color };
+            setCanvases(prev => [...prev, newCanvas]);
+            setActiveCanvasId(data.id);
+        }
+        setCanvasActive(true);
+        setHasCanvas(true);
+        setZoom(1); setPanX(0); setPanY(0);
+        setCanvasSelectedId(null);
+        setDrawMode('idle');
+        setCropActive(false);
+        setBrushMode(null);
+    }
+
+    async function handleDeleteCanvas(canvasId: string) {
+        const { deletePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+        await deletePatientCanvasAction(canvasId);
+        setCanvases(prev => {
+            const next = prev.filter(c => c.id !== canvasId);
+            if (activeCanvasId === canvasId) {
+                setActiveCanvasId(next[0]?.id ?? null);
+                if (next.length === 0) { setCanvasActive(false); setHasCanvas(false); }
+            }
+            return next;
+        });
     }
 
     async function handleCategorizeFile(file: DriveFile, category: string) {
@@ -2051,7 +2200,10 @@ export default function PhotoStudioModal({
             ctx.save();
             ctx.translate(layer.x * expW, layer.y * expH);
             ctx.rotate(layer.rotation * Math.PI / 180);
-            ctx.drawImage(layer.img, -layer.w * expW / 2, -layer.h * expH / 2, layer.w * expW, layer.h * expH);
+            // Safety check for export
+            if (layer.img instanceof HTMLImageElement && layer.img.complete && layer.img.naturalWidth > 0) {
+                ctx.drawImage(layer.img, -layer.w * expW / 2, -layer.h * expH / 2, layer.w * expW, layer.h * expH);
+            }
             ctx.restore();
         }
         // Bake draw annotations on top if visible
@@ -3330,6 +3482,11 @@ export default function PhotoStudioModal({
                             <span>SMILE DESIGN STUDIO</span>
                             <span className="w-1 h-1 bg-white/10 rounded-full" />
                             <span className="text-[#C9A96E]/50">{canvasActive ? `Lienzo ${canvasRatio}` : activeFile.name}</span>
+                            {canvasSaving && (
+                                <span className="text-[10px] text-white/30 flex items-center gap-1">
+                                    <Loader2 size={10} className="animate-spin" /> guardando…
+                                </span>
+                            )}
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -3343,10 +3500,10 @@ export default function PhotoStudioModal({
                             </button>
                         ) : (
                             <button
-                                onClick={handleActivateCanvas}
+                                onClick={() => canvases.length > 0 ? handleActivateCanvas() : handleNewCanvas()}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white/70 text-sm border border-white/10 hover:bg-white/15 hover:text-white transition-colors"
                             >
-                                {canvasLayers.length > 0 ? '⊞ Ver Lienzo' : '+ Lienzo'}
+                                {canvases.length > 0 ? `⊞ Lienzos (${canvases.length})` : '+ Lienzo'}
                             </button>
                         )}
                         {selectedIds.size > 0 && (
@@ -3606,29 +3763,54 @@ export default function PhotoStudioModal({
                                 );
                             })}
 
-                            {/* Canvas as Thumbnail (Blank Slide) */}
-                            {hasCanvas && (
-                                <button
-                                    onClick={() => {
-                                        setCanvasActive(true);
-                                        clearMultiSelection();
-                                    }}
-                                    className={`relative aspect-square rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all flex flex-col items-center justify-center p-1 ${
-                                        canvasActive 
-                                            ? 'border-[#C9A96E] bg-white shadow-[0_0_15px_rgba(201,169,110,0.3)]' 
-                                            : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
-                                    }`}
-                                >
-                                    <div className={`flex flex-col items-center gap-1 transition-opacity ${canvasActive ? 'opacity-100' : 'opacity-40'}`}>
-                                        <div className={`w-8 h-8 rounded border-2 border-dashed flex items-center justify-center ${canvasActive ? 'border-[#C9A96E]' : 'border-white/20'}`}>
-                                            <Plus size={16} className={canvasActive ? 'text-[#C9A96E]' : 'text-white'} />
+                            {/* Multi-canvas thumbnails */}
+                            {canvases.map((cv) => (
+                                <div key={cv.id} className="relative flex-shrink-0 group">
+                                    <button
+                                        onClick={() => { handleActivateCanvas(cv.id); clearMultiSelection(); }}
+                                        className={`relative aspect-square w-[56px] rounded-lg overflow-hidden border-2 transition-all flex flex-col items-center justify-center p-1 ${
+                                            canvasActive && activeCanvasId === cv.id
+                                                ? 'border-[#C9A96E] bg-white shadow-[0_0_15px_rgba(201,169,110,0.3)]'
+                                                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
+                                        }`}
+                                        title={cv.name}
+                                    >
+                                        <div className={`flex flex-col items-center gap-0.5 ${canvasActive && activeCanvasId === cv.id ? 'opacity-100' : 'opacity-50'}`}>
+                                            <div className={`w-7 h-7 rounded border-2 border-dashed flex items-center justify-center ${canvasActive && activeCanvasId === cv.id ? 'border-[#C9A96E]' : 'border-white/30'}`}>
+                                                <Grid size={12} className={canvasActive && activeCanvasId === cv.id ? 'text-[#C9A96E]' : 'text-white'} />
+                                            </div>
+                                            <span className={`text-[8px] font-bold uppercase tracking-wider truncate max-w-[48px] ${canvasActive && activeCanvasId === cv.id ? 'text-black' : 'text-white/50'}`}>
+                                                {cv.name}
+                                            </span>
                                         </div>
-                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${canvasActive ? 'text-black' : 'text-white/60'}`}>
-                                            Lienzo
-                                        </span>
-                                    </div>
-                                </button>
-                            )}
+                                        {cv.layers.length > 0 && (
+                                            <span className="absolute top-0.5 right-0.5 text-[7px] bg-[#C9A96E]/80 text-black rounded px-0.5 font-bold">
+                                                {cv.layers.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    {/* Delete button on hover */}
+                                    {canvases.length > 1 && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteCanvas(cv.id); }}
+                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white hidden group-hover:flex items-center justify-center z-10"
+                                            title="Eliminar lienzo"
+                                        >
+                                            <X size={8} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+
+                            {/* Add new canvas button */}
+                            <button
+                                onClick={handleNewCanvas}
+                                className="flex-shrink-0 aspect-square w-[56px] rounded-lg border-2 border-dashed border-white/20 hover:border-[#C9A96E]/60 hover:bg-white/5 transition-all flex flex-col items-center justify-center gap-0.5"
+                                title="Nuevo lienzo"
+                            >
+                                <Plus size={14} className="text-white/40 group-hover:text-[#C9A96E]" />
+                                <span className="text-[8px] text-white/30 uppercase tracking-wider">Nuevo</span>
+                            </button>
                         </div>
                     </div>
 
