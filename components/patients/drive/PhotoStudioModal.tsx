@@ -520,6 +520,53 @@ const ROTATION_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
     '</svg>'
 )}") 10 10, crosshair`;
 
+function CanvasThumbnailPreview({ layers, bgColor, ratio }: {
+    layers: CanvasLayer[];
+    bgColor: string;
+    ratio: string;
+}) {
+    const ref = useRef<HTMLCanvasElement>(null);
+    useEffect(() => {
+        const canvas = ref.current;
+        if (!canvas) return;
+        const SIZE = 56;
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        // Background
+        if (bgColor === 'transparent') {
+            // Checkerboard pattern for transparent
+            const sq = 7;
+            for (let r = 0; r < SIZE / sq; r++) {
+                for (let c = 0; c < SIZE / sq; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? '#888' : '#555';
+                    ctx.fillRect(c * sq, r * sq, sq, sq);
+                }
+            }
+        } else {
+            ctx.fillStyle = bgColor === 'black' ? '#111111' : '#ffffff';
+            ctx.fillRect(0, 0, SIZE, SIZE);
+        }
+        if (layers.length === 0) return;
+        // Draw layers scaled to thumbnail
+        layers.forEach(layer => {
+            if (!(layer.img instanceof HTMLImageElement) || !layer.img.complete || layer.img.naturalWidth === 0) return;
+            const cx = layer.x * SIZE;
+            const cy = layer.y * SIZE;
+            const w = layer.w * SIZE;
+            const h = layer.h * SIZE;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((layer.rotation ?? 0) * Math.PI / 180);
+            ctx.globalAlpha = 1;
+            ctx.drawImage(layer.img, -w / 2, -h / 2, w, h);
+            ctx.restore();
+        });
+    }, [layers, bgColor, ratio]);
+    return <canvas ref={ref} width={56} height={56} className="w-full h-full object-cover" />;
+}
+
 export default function PhotoStudioModal({
     file,
     folderId,
@@ -613,6 +660,10 @@ export default function PhotoStudioModal({
 
     const setCanvasRatio = useCallback((ratio: CanvasRatio) => {
         setCanvases(prev => prev.map(c => c.id === activeCanvasId ? { ...c, ratio } : c));
+    }, [activeCanvasId]);
+
+    const setActiveCanvasBgColor = useCallback((color: string) => {
+        setCanvases(prev => prev.map(c => c.id === activeCanvasId ? { ...c, bgColor: color } : c));
     }, [activeCanvasId]);
 
     // ── Load canvases from DB on mount ─────────────────────────────────────────
@@ -1766,14 +1817,12 @@ export default function PhotoStudioModal({
 
         // Draw in render-space (renderW × renderH), using normalized layer coords
         const ctx = canvas.getContext('2d')!;
-        const isTransparent = bgDone && bgColor === 'transparent';
+        const effectiveBg = canvasActive ? (activeCanvas?.bgColor ?? '#ffffff') : (bgDone ? bgColor : '#ffffff');
+        const isTransparent = effectiveBg === 'transparent';
         if (isTransparent) {
             ctx.clearRect(0, 0, renderW, renderH);
         } else {
-            const fillCol = bgDone 
-                ? (bgColor === 'white' ? '#ffffff' : bgColor === 'black' ? '#111111' : '#ffffff')
-                : '#ffffff';
-            ctx.fillStyle = fillCol;
+            ctx.fillStyle = effectiveBg === 'black' ? '#111111' : '#ffffff';
             ctx.fillRect(0, 0, renderW, renderH);
         }
         for (const layer of canvasLayers) {
@@ -2186,14 +2235,12 @@ export default function PhotoStudioModal({
         const off = document.createElement('canvas');
         off.width = expW; off.height = expH;
         const ctx = off.getContext('2d')!;
-        const isTransparent = bgDone && bgColor === 'transparent';
+        const effectiveBg = canvasActive ? (activeCanvas?.bgColor ?? '#ffffff') : (bgDone ? bgColor : '#ffffff');
+        const isTransparent = effectiveBg === 'transparent';
         if (isTransparent) {
             ctx.clearRect(0, 0, expW, expH);
         } else {
-            const fillCol = bgDone
-                ? (bgColor === 'white' ? '#ffffff' : bgColor === 'black' ? '#111111' : '#ffffff')
-                : '#ffffff';
-            ctx.fillStyle = fillCol;
+            ctx.fillStyle = effectiveBg === 'black' ? '#111111' : '#ffffff';
             ctx.fillRect(0, 0, expW, expH);
         }
         for (const layer of canvasLayers) {
@@ -2211,7 +2258,7 @@ export default function PhotoStudioModal({
             ctx.drawImage(drawCanvasRef.current, 0, 0, expW, expH);
         }
         return new Promise<Blob>((res, rej) =>
-            off.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/jpeg', 0.92)
+            off.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isTransparent ? 'image/png' : 'image/jpeg', 0.92)
         );
     }
 
@@ -3775,14 +3822,11 @@ export default function PhotoStudioModal({
                                         }`}
                                         title={cv.name}
                                     >
-                                        <div className={`flex flex-col items-center gap-0.5 ${canvasActive && activeCanvasId === cv.id ? 'opacity-100' : 'opacity-50'}`}>
-                                            <div className={`w-7 h-7 rounded border-2 border-dashed flex items-center justify-center ${canvasActive && activeCanvasId === cv.id ? 'border-[#C9A96E]' : 'border-white/30'}`}>
-                                                <Grid size={12} className={canvasActive && activeCanvasId === cv.id ? 'text-[#C9A96E]' : 'text-white'} />
-                                            </div>
-                                            <span className={`text-[8px] font-bold uppercase tracking-wider truncate max-w-[48px] ${canvasActive && activeCanvasId === cv.id ? 'text-black' : 'text-white/50'}`}>
-                                                {cv.name}
-                                            </span>
-                                        </div>
+                                        <CanvasThumbnailPreview
+                                            layers={cv.layers}
+                                            bgColor={cv.bgColor}
+                                            ratio={cv.ratio}
+                                        />
                                         {cv.layers.length > 0 && (
                                             <span className="absolute top-0.5 right-0.5 text-[7px] bg-[#C9A96E]/80 text-black rounded px-0.5 font-bold">
                                                 {cv.layers.length}
@@ -4352,12 +4396,14 @@ export default function PhotoStudioModal({
                             canvasRatio={canvasRatio}
                             onCanvasRatioChange={handleCanvasRatioChange}
                             canvasLayerCount={canvasLayers.length}
-                            onClearCanvasLayers={() => { 
-                                setCanvasLayers([]); 
-                                setCanvasSelectedId(null); 
+                            onClearCanvasLayers={() => {
+                                setCanvasLayers([]);
+                                setCanvasSelectedId(null);
                                 if (patientId) localStorage.removeItem(`am-clinica-canvas-${patientId}`);
                             }}
                             onDeleteSelection={handleDeleteSelection}
+                            canvasBgColor={activeCanvas?.bgColor}
+                            onSetCanvasBgColor={setActiveCanvasBgColor}
                         />
                         </div>
                         </>
@@ -5008,6 +5054,8 @@ interface ToolsPanelProps {
     canvasLayerCount: number;
     onClearCanvasLayers: () => void;
     onDeleteSelection: () => void;
+    canvasBgColor?: string;
+    onSetCanvasBgColor?: (color: string) => void;
 }
 
 function ToolsPanel({
@@ -5049,6 +5097,7 @@ function ToolsPanel({
     canvasActive, canvasSelectedId, canvasRatio, onCanvasRatioChange,
     canvasLayerCount, onClearCanvasLayers,
     onDeleteSelection,
+    canvasBgColor, onSetCanvasBgColor,
 }: ToolsPanelProps) {
     return (
         <>
@@ -5548,6 +5597,32 @@ function ToolsPanel({
                             >
                                 Limpiar
                             </button>
+                        </div>
+                    )}
+                    {/* Canvas background color */}
+                    {onSetCanvasBgColor && (
+                        <div className="mb-3">
+                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1.5">Fondo</p>
+                            <div className="flex gap-1.5">
+                                {[
+                                    { value: '#ffffff', label: '⬜', title: 'Blanco' },
+                                    { value: 'black', label: '⬛', title: 'Negro' },
+                                    { value: 'transparent', label: '◻', title: 'Transparente' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => onSetCanvasBgColor(opt.value)}
+                                        title={opt.title}
+                                        className={`flex-1 py-1.5 rounded text-sm border transition-all ${
+                                            (canvasBgColor ?? '#ffffff') === opt.value
+                                                ? 'border-[#C9A96E] bg-white/10'
+                                                : 'border-white/10 hover:border-white/30'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
                     <p className="text-white/20 text-[10px]">Arrastrá fotos al lienzo · clic derecho en capa para opciones</p>
