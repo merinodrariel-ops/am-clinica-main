@@ -139,32 +139,42 @@ export default function PrestacionesDetallePanel({
     const inputCls = 'bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-violet-500 w-full';
 
     function InlineForm({ onSave }: { onSave: () => void }) {
+        function onKey(e: React.KeyboardEvent) {
+            if (e.key === 'Enter') { e.preventDefault(); onSave(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+        }
         return (
             <tr className="bg-slate-800/60">
                 <td className="px-3 py-2">
                     <input className={inputCls} placeholder="Nombre prestación" value={form.nombre}
-                        onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} autoFocus />
+                        onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                        onKeyDown={onKey} autoFocus />
                 </td>
                 <td className="px-3 py-2">
                     <input type="date" className={inputCls} value={form.fecha}
-                        onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} />
+                        onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
+                        onKeyDown={onKey} />
                 </td>
                 <td className="px-3 py-2">
                     <input type="number" className={inputCls} placeholder="0.00" min="0" step="0.01"
-                        value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} />
+                        value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
+                        onKeyDown={onKey} />
                 </td>
                 <td className="px-3 py-2">
                     <input className={inputCls} placeholder="URL slides (opcional)" value={form.slides_url}
-                        onChange={e => setForm(f => ({ ...f, slides_url: e.target.value }))} />
+                        onChange={e => setForm(f => ({ ...f, slides_url: e.target.value }))}
+                        onKeyDown={onKey} />
                 </td>
                 <td className="px-3 py-2">
                     <div className="flex gap-1">
                         <button onClick={onSave} disabled={saving}
-                            className="p-1.5 bg-emerald-700 hover:bg-emerald-600 rounded text-white disabled:opacity-50">
+                            className="p-1.5 bg-emerald-700 hover:bg-emerald-600 rounded text-white disabled:opacity-50"
+                            title="Guardar (Enter)">
                             <Check size={12} />
                         </button>
                         <button onClick={cancelEdit}
-                            className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-300">
+                            className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                            title="Cancelar (Escape)">
                             <X size={12} />
                         </button>
                     </div>

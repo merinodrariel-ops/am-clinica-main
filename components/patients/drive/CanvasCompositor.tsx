@@ -187,7 +187,9 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
-            ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
+            if (layer.img instanceof HTMLImageElement && layer.img.complete && layer.img.naturalWidth > 0) {
+                ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
+            }
             ctx.restore();
         }
 
@@ -249,7 +251,9 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
-            ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
+            if (layer.img instanceof HTMLImageElement && layer.img.complete && layer.img.naturalWidth > 0) {
+                ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
+            }
             ctx.restore();
         }
         return new Promise<Blob>((res, rej) =>

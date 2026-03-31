@@ -745,6 +745,11 @@ export default function PhotoStudioModal({
     const [canvasLayerCompletedCrop, setCanvasLayerCompletedCrop] = useState<PixelCrop | null>(null);
     const canvasLayerCropImgRef = useRef<HTMLImageElement>(null);
     const canvasLayersRef = useRef<HTMLCanvasElement>(null);
+    const canvasHealPreviewRef = useRef<{ layerId: string; canvas: HTMLCanvasElement } | null>(null);
+    const canvasHealSessionRef = useRef<{ layerId: string; prevSrc: string; canvas: HTMLCanvasElement } | null>(null);
+    const openCvRef = useRef<any>(null);
+    const openCvLoadingRef = useRef<Promise<any> | null>(null);
+    const healLastPointRef = useRef<{ x: number; y: number; target: string } | null>(null);
     const canvasLayerDragRef = useRef<{
         layerId: string;
         mode: 'move' | 'resize' | 'rotate';
@@ -792,8 +797,14 @@ export default function PhotoStudioModal({
 
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
+    const [healMode, setHealMode] = useState(false);
+    const [healSize, setHealSize] = useState(28);
+    const [healPreviewNonce, setHealPreviewNonce] = useState(0);
+    const [healCursor, setHealCursor] = useState<{ x: number; y: number; size: number; visible: boolean }>({ x: 0, y: 0, size: 28, visible: false });
 
-    type Snapshot = { imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor };
+    type PhotoSnapshot = { kind: 'photo'; imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor };
+    type CanvasLayerSnapshot = { kind: 'canvas-layer'; canvasId: string; layerId: string; layerSrc: string };
+    type Snapshot = PhotoSnapshot | CanvasLayerSnapshot;
     const [history, setHistory] = useState<Snapshot[]>([]);
 
     // ── Persistence: Save/Restore individual file states (drawings, etc.) ────────
@@ -1017,8 +1028,13 @@ export default function PhotoStudioModal({
         setPanY(0);
         setShowGrid(false);
         setBrushMode(null);
+        setHealMode(false);
+        hideHealCursor();
         offscreenCanvasRef.current = null;
         originalImgForRestoreRef.current = null;
+        canvasHealPreviewRef.current = null;
+        canvasHealSessionRef.current = null;
+        healLastPointRef.current = null;
         preCropImageRef.current = null;
         prevCroppedUrlRef.current = null;
         setHistory([]);
@@ -1359,27 +1375,50 @@ export default function PhotoStudioModal({
     }
 
     function pushHistory(snap?: Snapshot) {
-        const entry = snap ?? { imageUrl, rotation, brightness, bgDone, bgColor };
+        const entry: Snapshot = snap ?? { kind: 'photo', imageUrl, rotation, brightness, bgDone, bgColor };
         setHistory(prev => [...prev.slice(-19), entry]);
     }
 
     function handleUndo() {
-        setHistory(prev => {
-            if (prev.length === 0) return prev;
-            const snap = prev[prev.length - 1];
-            objectUrlRef.current = snap.imageUrl.startsWith('blob:') ? snap.imageUrl : null;
-            setImageUrl(snap.imageUrl);
-            setRotation(snap.rotation);
-            setBrightness(snap.brightness);
-            setBgDone(snap.bgDone);
-            setBgColor(snap.bgColor);
-            setCropActive(false);
-            setCompletedCrop(null);
-            setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
-            setBrushMode(null);
-            // preCropImageRef stays valid — user can still re-crop from full image after undo
-            return prev.slice(0, -1);
-        });
+        const snap = history[history.length - 1];
+        if (!snap) return;
+        setHistory(prev => prev.slice(0, -1));
+
+        if (snap.kind === 'canvas-layer') {
+            void loadCanvasImage(snap.layerSrc).then(img => {
+                setCanvases(prev => prev.map(canvas => {
+                    if (canvas.id !== snap.canvasId) return canvas;
+                    return {
+                        ...canvas,
+                        layers: canvas.layers.map(layer =>
+                            layer.id === snap.layerId
+                                ? { ...layer, src: snap.layerSrc, img }
+                                : layer
+                        ),
+                    };
+                }));
+            }).catch(() => {
+                toast.error('No se pudo deshacer la corrección');
+            });
+            return;
+        }
+
+        objectUrlRef.current = snap.imageUrl.startsWith('blob:') ? snap.imageUrl : null;
+        setImageUrl(snap.imageUrl);
+        setRotation(snap.rotation);
+        setBrightness(snap.brightness);
+        setBgDone(snap.bgDone);
+        setBgColor(snap.bgColor);
+        setCropActive(false);
+        setCompletedCrop(null);
+        setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+        setBrushMode(null);
+        setHealMode(false);
+        hideHealCursor();
+        canvasHealPreviewRef.current = null;
+        canvasHealSessionRef.current = null;
+        healLastPointRef.current = null;
+        // preCropImageRef stays valid — user can still re-crop from full image after undo
     }
 
     async function handleRemoveBackground() {
@@ -1439,10 +1478,170 @@ export default function PhotoStudioModal({
         originalImgForRestoreRef.current = origImg;
     }
 
+    async function createEditableCanvasFromSource(src: string) {
+        const img = await loadCanvasImage(src);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d')!.drawImage(img, 0, 0);
+        return canvas;
+    }
+
+    async function getOpenCv() {
+        if (openCvRef.current) return openCvRef.current;
+        if (!openCvLoadingRef.current) {
+            openCvLoadingRef.current = new Promise((resolve, reject) => {
+                const win = window as any;
+                if (win.cv?.Mat) {
+                    openCvRef.current = win.cv;
+                    resolve(win.cv);
+                    return;
+                }
+
+                const attachRuntimeReady = () => {
+                    const cv = (window as any).cv;
+                    if (!cv) {
+                        reject(new Error('OpenCV no disponible en window'));
+                        return;
+                    }
+                    if (cv.Mat) {
+                        openCvRef.current = cv;
+                        resolve(cv);
+                        return;
+                    }
+                    cv.onRuntimeInitialized = () => {
+                        openCvRef.current = cv;
+                        resolve(cv);
+                    };
+                };
+
+                const existing = document.querySelector('script[data-opencv-runtime="true"]') as HTMLScriptElement | null;
+                if (existing) {
+                    attachRuntimeReady();
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = 'https://docs.opencv.org/4.x/opencv.js';
+                script.async = true;
+                script.dataset.opencvRuntime = 'true';
+                script.onload = attachRuntimeReady;
+                script.onerror = () => reject(new Error('No se pudo cargar OpenCV.js'));
+                document.body.appendChild(script);
+            });
+        }
+        return openCvLoadingRef.current;
+    }
+
+    function updateHealCursor(clientX: number, clientY: number) {
+        const rect = canvasContainerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        setHealCursor({
+            x: clientX - rect.left,
+            y: clientY - rect.top,
+            size: healSize * 2,
+            visible: true,
+        });
+    }
+
+    function hideHealCursor() {
+        setHealCursor(prev => ({ ...prev, visible: false }));
+    }
+
+    function shouldApplyHealPoint(x: number, y: number, radius: number, target: string) {
+        const last = healLastPointRef.current;
+        if (!last || last.target !== target) {
+            healLastPointRef.current = { x, y, target };
+            return true;
+        }
+        const minDist = Math.max(2, radius * 0.35);
+        const moved = Math.hypot(x - last.x, y - last.y);
+        if (moved < minDist) return false;
+        healLastPointRef.current = { x, y, target };
+        return true;
+    }
+
+    function applySpotHealAt(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+        const cv = openCvRef.current;
+        if (!cv) return false;
+
+        const margin = Math.max(16, Math.ceil(radius * 2.5));
+        const sx = Math.max(0, Math.floor(x - margin));
+        const sy = Math.max(0, Math.floor(y - margin));
+        const sw = Math.min(ctx.canvas.width - sx, Math.ceil(margin * 2));
+        const sh = Math.min(ctx.canvas.height - sy, Math.ceil(margin * 2));
+        if (sw <= 4 || sh <= 4) return false;
+
+        const sourceCanvas = document.createElement('canvas');
+        sourceCanvas.width = sw;
+        sourceCanvas.height = sh;
+        sourceCanvas.getContext('2d')!.drawImage(ctx.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = sw;
+        maskCanvas.height = sh;
+        const maskCtx = maskCanvas.getContext('2d')!;
+        maskCtx.fillStyle = '#000';
+        maskCtx.fillRect(0, 0, sw, sh);
+        maskCtx.fillStyle = '#fff';
+        maskCtx.beginPath();
+        maskCtx.arc(x - sx, y - sy, radius, 0, Math.PI * 2);
+        maskCtx.fill();
+
+        const src = cv.imread(sourceCanvas);
+        const maskRgba = cv.imread(maskCanvas);
+        const mask = new cv.Mat();
+        const dst = new cv.Mat();
+
+        try {
+            cv.cvtColor(maskRgba, mask, cv.COLOR_RGBA2GRAY, 0);
+            cv.threshold(mask, mask, 1, 255, cv.THRESH_BINARY);
+            cv.inpaint(src, mask, dst, Math.max(3, Math.round(radius * 0.45)), cv.INPAINT_TELEA);
+
+            const outCanvas = document.createElement('canvas');
+            outCanvas.width = sw;
+            outCanvas.height = sh;
+            cv.imshow(outCanvas, dst);
+            ctx.clearRect(sx, sy, sw, sh);
+            ctx.drawImage(outCanvas, sx, sy);
+            return true;
+        } finally {
+            src.delete();
+            maskRgba.delete();
+            mask.delete();
+            dst.delete();
+        }
+    }
+
+    function mapCanvasPointToLayerPixel(layer: CanvasLayer, nx: number, ny: number, canvasW: number, canvasH: number, sizeCss: number) {
+        const cx = layer.x * canvasW;
+        const cy = layer.y * canvasH;
+        const px = nx * canvasW - cx;
+        const py = ny * canvasH - cy;
+        const rad = -layer.rotation * Math.PI / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const localX = px * cos - py * sin;
+        const localY = px * sin + py * cos;
+        const layerW = layer.w * canvasW;
+        const layerH = layer.h * canvasH;
+        const u = (localX + layerW / 2) / layerW;
+        const v = (localY + layerH / 2) / layerH;
+        if (u < 0 || u > 1 || v < 0 || v > 1) return null;
+        const scaleX = layer.img.naturalWidth / layerW;
+        const scaleY = layer.img.naturalHeight / layerH;
+        return {
+            x: u * layer.img.naturalWidth,
+            y: v * layer.img.naturalHeight,
+            radius: Math.max(4, sizeCss * ((scaleX + scaleY) / 2)),
+        };
+    }
+
     async function handleConfirmBg() {
         // Push history pointing to the PRE-bg-removal URL so Undo cleanly
         // restores the original image (the bg-removed blob gets revoked below).
         pushHistory({
+            kind: 'photo',
             imageUrl: preBgUrlRef.current ?? imageUrl,
             rotation, brightness,
             bgDone: false, bgColor: 'transparent',
@@ -1498,7 +1697,8 @@ export default function PhotoStudioModal({
     }
 
     useEffect(() => {
-        if (!brushMode) return;
+        if (!brushMode && !healMode) return;
+        if (canvasActive) return;
         const oc = offscreenCanvasRef.current;
         const vc = brushCanvasRef.current;
         if (!oc || !vc) return;
@@ -1509,7 +1709,25 @@ export default function PhotoStudioModal({
             vc.getContext('2d')!.drawImage(oc, 0, 0);
         };
         sync();
-    }, [brushMode]);
+    }, [brushMode, healMode, canvasActive]);
+
+    useEffect(() => {
+        if (!healMode || canvasActive) return;
+        let cancelled = false;
+        void Promise.all([getOpenCv(), createEditableCanvasFromSource(imageUrl)]).then(([, canvas]) => {
+            if (cancelled) return;
+            offscreenCanvasRef.current = canvas;
+            const vc = brushCanvasRef.current;
+            if (!vc) return;
+            vc.width = canvas.width;
+            vc.height = canvas.height;
+            vc.getContext('2d')!.drawImage(canvas, 0, 0);
+        }).catch(() => {
+            toast.error('No se pudo preparar el corrector');
+            setHealMode(false);
+        });
+        return () => { cancelled = true; };
+    }, [healMode, canvasActive, imageUrl]);
 
     // Redraw annotation layer whenever shapes or visibility change
     useEffect(() => {
@@ -1828,12 +2046,16 @@ export default function PhotoStudioModal({
         for (const layer of canvasLayers) {
             const px = layer.x * renderW, py = layer.y * renderH;
             const pw = layer.w * renderW, ph = layer.h * renderH;
+            const previewCanvas = canvasHealPreviewRef.current?.layerId === layer.id
+                ? canvasHealPreviewRef.current.canvas
+                : null;
             ctx.save();
             ctx.filter = `brightness(${layer.brightness ?? 100}%)`;
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
-            // Safety check: Ensure img is a valid, loaded HTMLImageElement
-            if (layer.img instanceof HTMLImageElement && layer.img.complete && layer.img.naturalWidth > 0) {
+            if (previewCanvas) {
+                ctx.drawImage(previewCanvas, -pw / 2, -ph / 2, pw, ph);
+            } else if (layer.img instanceof HTMLImageElement && layer.img.complete && layer.img.naturalWidth > 0) {
                 ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
             }
             ctx.restore();
@@ -1863,7 +2085,7 @@ export default function PhotoStudioModal({
                 ctx.restore();
             }
         }
-    }, [canvasActive, canvasLayers, canvasSelectedId, canvasRatio]);
+    }, [canvasActive, canvasLayers, canvasSelectedId, canvasRatio, activeCanvas?.bgColor, healPreviewNonce]);
 
     // ── Canvas layer interaction ──────────────────────────────────────────────
     function getCanvasLayerNorm(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
@@ -1889,6 +2111,34 @@ export default function PhotoStudioModal({
     }, [canvasActive, canvasSelectedId, multiSelectedIds, selectedShapeId, selectedTextId]);
 
     function handleCanvasLayerPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (healMode) {
+            updateHealCursor(e.clientX, e.clientY);
+            if (!canvasSelectedId) {
+                toast.error('Seleccioná una foto del lienzo para usar el corrector');
+                return;
+            }
+            const layer = canvasLayers.find(item => item.id === canvasSelectedId);
+            if (!layer) return;
+            const [nx, ny] = getCanvasLayerNorm(e);
+            const W = e.currentTarget.clientWidth;
+            const H = e.currentTarget.clientHeight;
+            const mapped = mapCanvasPointToLayerPixel(layer, nx, ny, W, H, healSize);
+            if (!mapped) return;
+            const editCanvas = document.createElement('canvas');
+            editCanvas.width = layer.img.naturalWidth;
+            editCanvas.height = layer.img.naturalHeight;
+            editCanvas.getContext('2d')!.drawImage(layer.img, 0, 0);
+            canvasHealSessionRef.current = { layerId: layer.id, prevSrc: layer.src, canvas: editCanvas };
+            canvasHealPreviewRef.current = { layerId: layer.id, canvas: editCanvas };
+            brushDrawingRef.current = true;
+            healLastPointRef.current = null;
+            if (applySpotHealAt(editCanvas.getContext('2d')!, mapped.x, mapped.y, mapped.radius)) {
+                shouldApplyHealPoint(mapped.x, mapped.y, mapped.radius, layer.id);
+            }
+            setHealPreviewNonce(v => v + 1);
+            e.currentTarget.setPointerCapture(e.pointerId);
+            return;
+        }
         const [nx, ny] = getCanvasLayerNorm(e);
         const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
         
@@ -1919,6 +2169,19 @@ export default function PhotoStudioModal({
     }
 
     function handleCanvasLayerPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (healMode) {
+            updateHealCursor(e.clientX, e.clientY);
+            if (!brushDrawingRef.current || !canvasHealSessionRef.current) return;
+            const layer = canvasLayers.find(item => item.id === canvasHealSessionRef.current?.layerId);
+            if (!layer) return;
+            const [nx, ny] = getCanvasLayerNorm(e);
+            const mapped = mapCanvasPointToLayerPixel(layer, nx, ny, e.currentTarget.clientWidth, e.currentTarget.clientHeight, healSize);
+            if (!mapped) return;
+            if (!shouldApplyHealPoint(mapped.x, mapped.y, mapped.radius, layer.id)) return;
+            if (!applySpotHealAt(canvasHealSessionRef.current.canvas.getContext('2d')!, mapped.x, mapped.y, mapped.radius)) return;
+            setHealPreviewNonce(v => v + 1);
+            return;
+        }
         if (!canvasLayerDragRef.current) return;
         const [nx, ny] = getCanvasLayerNorm(e);
         const { layerId, mode, startX, startY, origLayer } = canvasLayerDragRef.current;
@@ -1940,13 +2203,42 @@ export default function PhotoStudioModal({
                 }
                 return { ...l, rotation: deg };
             }
-            const dist = Math.sqrt(dx * dx + dy * dy) * (dx + dy >= 0 ? 1 : -1);
+            const dist = Math.sqrt(dx * dx + dy * dy) * (dx + dy >= 0 ? -1 : 1);
             const newW = Math.max(0.05, origLayer.w + dist * 1.5);
             return { ...l, w: newW, h: newW / (origLayer.w / (origLayer.h || 1)) };
         }));
     }
 
-    function handleCanvasLayerPointerUp() { canvasLayerDragRef.current = null; }
+    function handleCanvasLayerPointerUp() {
+        if (healMode) {
+            if (!brushDrawingRef.current || !canvasHealSessionRef.current || !activeCanvasId) return;
+            const session = canvasHealSessionRef.current;
+            brushDrawingRef.current = false;
+            healLastPointRef.current = null;
+            pushHistory({ kind: 'canvas-layer', canvasId: activeCanvasId, layerId: session.layerId, layerSrc: session.prevSrc });
+            session.canvas.toBlob(blob => {
+                if (!blob) return;
+                const nextUrl = URL.createObjectURL(blob);
+                void loadCanvasImage(nextUrl).then(img => {
+                    setCanvasLayers(prev => prev.map(layer =>
+                        layer.id === session.layerId
+                            ? { ...layer, src: nextUrl, img }
+                            : layer
+                    ));
+                    setHealMode(false);
+                }).catch(() => {
+                    toast.error('No se pudo aplicar el corrector');
+                }).finally(() => {
+                    hideHealCursor();
+                    canvasHealPreviewRef.current = null;
+                    canvasHealSessionRef.current = null;
+                    setHealPreviewNonce(v => v + 1);
+                });
+            }, 'image/png');
+            return;
+        }
+        canvasLayerDragRef.current = null;
+    }
 
     function handleCanvasLayerDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -2056,6 +2348,7 @@ export default function PhotoStudioModal({
         setDrawMode('idle');
         setCropActive(false);
         setBrushMode(null);
+        setHealMode(false);
     }
 
     async function handleNewCanvas() {
@@ -2080,6 +2373,7 @@ export default function PhotoStudioModal({
         setDrawMode('idle');
         setCropActive(false);
         setBrushMode(null);
+        setHealMode(false);
     }
 
     async function handleDeleteCanvas(canvasId: string) {
@@ -2327,22 +2621,48 @@ export default function PhotoStudioModal({
         vctx.drawImage(oc, 0, 0);
     }
 
+    function applyHealToPhoto(canvasEl: HTMLCanvasElement, x: number, y: number) {
+        const oc = offscreenCanvasRef.current;
+        if (!oc || oc.width === 0) return;
+        const scaleX = oc.width / canvasEl.getBoundingClientRect().width;
+        const radius = healSize * scaleX;
+        if (!shouldApplyHealPoint(x, y, radius, 'photo')) return;
+        const octx = oc.getContext('2d')!;
+        if (!applySpotHealAt(octx, x, y, radius)) return;
+        const vctx = canvasEl.getContext('2d')!;
+        vctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        vctx.drawImage(oc, 0, 0);
+    }
+
     function handleBrushDown(e: React.PointerEvent<HTMLCanvasElement>) {
+        updateHealCursor(e.clientX, e.clientY);
         e.currentTarget.setPointerCapture(e.pointerId);
         brushDrawingRef.current = true;
+        healLastPointRef.current = null;
         const { x, y } = getCanvasXY(e);
+        if (healMode) {
+            applyHealToPhoto(e.currentTarget, x, y);
+            return;
+        }
         applyBrushAt(e.currentTarget, x, y);
     }
 
     function handleBrushMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        updateHealCursor(e.clientX, e.clientY);
         if (!brushDrawingRef.current) return;
         const { x, y } = getCanvasXY(e);
+        if (healMode) {
+            applyHealToPhoto(e.currentTarget, x, y);
+            return;
+        }
         applyBrushAt(e.currentTarget, x, y);
     }
 
     function handleBrushUp(e: React.PointerEvent<HTMLCanvasElement>) {
         if (!brushDrawingRef.current) return;
         brushDrawingRef.current = false;
+        healLastPointRef.current = null;
+        hideHealCursor();
         pushHistory();
         preCropImageRef.current = null; // brush stroke changed the image — crop reference must be refreshed
         offscreenCanvasRef.current?.toBlob(blob => {
@@ -2351,6 +2671,7 @@ export default function PhotoStudioModal({
             const newUrl = URL.createObjectURL(blob);
             objectUrlRef.current = newUrl;
             setImageUrl(newUrl);
+            if (healMode) setHealMode(false);
         }, 'image/png');
     }
 
@@ -3874,7 +4195,7 @@ export default function PhotoStudioModal({
                     >
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
                         <div style={{ transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.05s ease-out' }}>
-                            {brushMode !== null ? (
+                            {!canvasActive && (brushMode !== null || healMode) ? (
                                 <canvas
                                     ref={brushCanvasRef}
                                     className={canvasBg}
@@ -3882,7 +4203,7 @@ export default function PhotoStudioModal({
                                     onPointerDown={handleBrushDown}
                                     onPointerMove={handleBrushMove}
                                     onPointerUp={handleBrushUp}
-                                    onPointerLeave={handleBrushUp}
+                                    onPointerLeave={(e) => { handleBrushUp(e); hideHealCursor(); }}
                                 />
                             ) : cropActive ? (
                                 <div className={canvasBg} style={{ display: 'inline-block', lineHeight: 0 }}>
@@ -3919,11 +4240,12 @@ export default function PhotoStudioModal({
                                             style={{
                                                 ...getCanvasRatioStyle(),
                                                 outline: 'none', // avoid focus ring on canvas
+                                                cursor: healMode ? 'crosshair' : 'default',
                                             }}
                                             onPointerDown={handleCanvasLayerPointerDown}
                                             onPointerMove={handleCanvasLayerPointerMove}
                                             onPointerUp={handleCanvasLayerPointerUp}
-                                            onPointerLeave={handleCanvasLayerPointerUp}
+                                            onPointerLeave={() => { handleCanvasLayerPointerUp(); hideHealCursor(); }}
                                             onDoubleClick={handleCanvasLayerDoubleClick}
                                             onDragOver={e => e.preventDefault()}
                                             onDrop={handleCanvasLayerDrop}
@@ -4004,7 +4326,7 @@ export default function PhotoStudioModal({
                                                   : drawMode === 'selected' ? 'move'
                                                   : drawShapes.length > 0 ? 'pointer'
                                                   : 'default',
-                                            pointerEvents: (drawMode !== 'idle' || drawShapes.length > 0 || textToolActive || textAnnotations.length > 0) ? 'auto' : 'none',
+                                            pointerEvents: (!healMode && (drawMode !== 'idle' || drawShapes.length > 0 || textToolActive || textAnnotations.length > 0)) ? 'auto' : 'none',
                                         }}
                                         onClick={handleDrawClick}
                                         onDoubleClick={handleDrawDblClick}
@@ -4070,6 +4392,18 @@ export default function PhotoStudioModal({
                                 </div>
                             )}
                         </div>
+
+                        {healMode && healCursor.visible && (
+                            <div
+                                className="pointer-events-none absolute rounded-full border border-cyan-300/90 bg-cyan-200/10 shadow-[0_0_0_1px_rgba(0,0,0,0.45)] z-20"
+                                style={{
+                                    width: `${healCursor.size}px`,
+                                    height: `${healCursor.size}px`,
+                                    left: `${healCursor.x - healCursor.size / 2}px`,
+                                    top: `${healCursor.y - healCursor.size / 2}px`,
+                                }}
+                            />
+                        )}
 
                         {/* Smile Design before/after overlay */}
                         {smileMode && smileDesign.result && (
@@ -4339,10 +4673,37 @@ export default function PhotoStudioModal({
                             brushMode={brushMode}
                             onSetBrushMode={(mode) => {
                                 setBrushMode(mode);
-                                if (mode !== null) { setDrawMode('idle'); setMousePos(null); }
+                                if (mode !== null) {
+                                    setHealMode(false);
+                                    setDrawMode('idle');
+                                    setMousePos(null);
+                                }
                             }}
                             brushSize={brushSize}
                             onSetBrushSize={setBrushSize}
+                            healMode={healMode}
+                            onSetHealMode={(next) => {
+                                if (next) {
+                                    void getOpenCv().catch(() => {
+                                        toast.error('No se pudo cargar el corrector');
+                                        setHealMode(false);
+                                    });
+                                }
+                                setHealMode(next);
+                                if (next) {
+                                    setBrushMode(null);
+                                    setDrawMode('idle');
+                                    setMousePos(null);
+                                } else {
+                                    hideHealCursor();
+                                    healLastPointRef.current = null;
+                                    canvasHealPreviewRef.current = null;
+                                    canvasHealSessionRef.current = null;
+                                    setHealPreviewNonce(v => v + 1);
+                                }
+                            }}
+                            healSize={healSize}
+                            onSetHealSize={setHealSize}
                             onReset={() => {
                                 resetEdits();
                                 setImageUrl(`/api/drive/file/${activeFile.id}`);
@@ -5019,6 +5380,10 @@ interface ToolsPanelProps {
     onSetBrushMode: (mode: 'restore' | 'erase' | null) => void;
     brushSize: number;
     onSetBrushSize: (v: number) => void;
+    healMode: boolean;
+    onSetHealMode: (v: boolean) => void;
+    healSize: number;
+    onSetHealSize: (v: number) => void;
     onReset: () => void;
     onUndo: () => void;
     onPushHistory: () => void;
@@ -5075,6 +5440,10 @@ function ToolsPanel({
     onSetBrushMode,
     brushSize,
     onSetBrushSize,
+    healMode,
+    onSetHealMode,
+    healSize,
+    onSetHealSize,
     onReset,
     onUndo,
     onPushHistory,
@@ -5261,6 +5630,46 @@ function ToolsPanel({
                 )}
             </div>
 
+            {/* Spot healing */}
+            <div className="space-y-2">
+                <p className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
+                    <Zap size={13} className="text-cyan-300" /> Corrector
+                </p>
+                <button
+                    onClick={() => onSetHealMode(!healMode)}
+                    disabled={canvasActive && !canvasSelectedId}
+                    className={`w-full py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                        healMode
+                            ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-300/30'
+                            : 'bg-white/10 text-white/70 hover:bg-white/15'
+                    }`}
+                >
+                    <Zap size={14} /> {healMode ? 'Corrector activo' : 'Activar corrector'}
+                </button>
+                {canvasActive && !canvasSelectedId && (
+                    <p className="text-white/30 text-xs text-center py-1">
+                        Seleccioná una foto del lienzo para corregirla
+                    </p>
+                )}
+                {healMode && (
+                    <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
+                        <p className="text-white/35 text-[10px] uppercase tracking-wider">Tamaño</p>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="range" min={6} max={90} step={2}
+                                value={healSize}
+                                onChange={e => onSetHealSize(Number(e.target.value))}
+                                className="flex-1 accent-cyan-300"
+                            />
+                            <span className="text-white/40 text-xs w-7">{healSize}</span>
+                        </div>
+                        <p className="text-white/25 text-[10px]">
+                            Pintá sobre lunares, bordes o manchas para mimetizar con el entorno.
+                        </p>
+                    </div>
+                )}
+            </div>
+
             {/* Background removal */}
             <div className="space-y-2">
                 <p className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
@@ -5281,12 +5690,14 @@ function ToolsPanel({
                 ) : (
                     <button
                         onClick={onRemoveBg}
-                        disabled={bgDone}
+                        disabled={canvasActive ? !canvasSelectedId : bgDone}
                         className="w-full py-2 rounded-lg bg-violet-600/30 text-violet-300 text-sm hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        {bgDone
-                            ? <><Check size={14} /> Fondo removido</>
-                            : <><Wand2 size={14} /> Remover fondo</>
+                        {canvasActive
+                            ? <><Wand2 size={14} /> Remover fondo de capa</>
+                            : bgDone
+                                ? <><Check size={14} /> Fondo removido</>
+                                : <><Wand2 size={14} /> Remover fondo</>
                         }
                     </button>
                 )}

@@ -82,6 +82,10 @@ export default function CajaAdminLiquidacionesPage() {
 
     const [busyId, setBusyId] = useState<string | null>(null);
 
+    // Per-provider inline add state
+    const [addingForProvider, setAddingForProvider] = useState<string | null>(null);
+    const [inlineDraft, setInlineDraft] = useState({ serviceId: '', performedDate: todayDate() });
+
     const activeServices = useMemo(
         () => services.filter((service) => service.active),
         [services]
@@ -278,6 +282,29 @@ export default function CajaAdminLiquidacionesPage() {
                 ...prev,
                 serviceId: '',
             }));
+            await loadPageData(mes);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo registrar la prestación');
+        } finally {
+            setBusyId(null);
+        }
+    }
+
+    async function handleInlineAdd(providerId: string) {
+        if (!inlineDraft.serviceId || !inlineDraft.performedDate) {
+            toast.error('Seleccioná prestación y fecha');
+            return;
+        }
+        setBusyId(`inline-${providerId}`);
+        try {
+            await createProviderServiceRecord({
+                providerId,
+                serviceId: inlineDraft.serviceId,
+                performedDate: inlineDraft.performedDate,
+            });
+            toast.success('Prestación registrada');
+            setAddingForProvider(null);
+            setInlineDraft({ serviceId: '', performedDate: todayDate() });
             await loadPageData(mes);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'No se pudo registrar la prestación');
@@ -576,109 +603,133 @@ export default function CajaAdminLiquidacionesPage() {
                     )}
 
                     {activeTab === 'services' && (
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-                            <div className="xl:col-span-1 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
-                                <h2 className="font-semibold text-sm text-slate-200">Registrar prestación</h2>
-
-                                <form onSubmit={handleCreateServiceRecord} className="space-y-3">
-                                    <label className="block text-xs text-slate-400 space-y-1">
-                                        <span>Odontólogo</span>
-                                        <select
-                                            value={newServiceRecord.providerId}
-                                            onChange={(event) => setNewServiceRecord((prev) => ({
-                                                ...prev,
-                                                providerId: event.target.value,
-                                                serviceId: '',
-                                            }))}
-                                            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-                                        >
-                                            <option value="">Seleccionar...</option>
-                                            {providersForServices.map((provider) => (
-                                                <option key={provider.id} value={provider.id}>
-                                                    {provider.fullName} ({provider.group})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-
-                                    <label className="block text-xs text-slate-400 space-y-1">
-                                        <span>Prestación</span>
-                                        <select
-                                            value={newServiceRecord.serviceId}
-                                            onChange={(event) => setNewServiceRecord((prev) => ({ ...prev, serviceId: event.target.value }))}
-                                            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-                                        >
-                                            <option value="">Seleccionar...</option>
-                                            {availableServicesForProvider.map((service) => (
-                                                <option key={service.id} value={service.id}>
-                                                    {service.area} · {service.name} ({formatArs(service.internalPrice)})
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {selectedServiceProvider && availableServicesForProvider.length === 0 && (
-                                            <p className="pt-1 text-[11px] text-amber-400">
-                                                No hay prestaciones activas para el grupo {selectedServiceProvider.group}.
-                                            </p>
-                                        )}
-                                    </label>
-
-                                    <label className="block text-xs text-slate-400 space-y-1">
-                                        <span>Fecha de realización</span>
-                                        <input
-                                            type="date"
-                                            value={newServiceRecord.performedDate}
-                                            onChange={(event) => setNewServiceRecord((prev) => ({ ...prev, performedDate: event.target.value }))}
-                                            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-                                        />
-                                    </label>
-
-                                    <button
-                                        type="submit"
-                                        disabled={busyId === 'new-service-record' || !canCreateServiceRecord}
-                                        className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 hover:bg-violet-500 px-3 py-2 text-sm font-medium disabled:opacity-60"
-                                    >
-                                        {busyId === 'new-service-record' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                        Guardar prestación
-                                    </button>
-                                </form>
+                        <div className="space-y-4">
+                            {/* Summary header */}
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-slate-400">
+                                    <span className="text-white font-semibold">{serviceRecords.length}</span> prestaciones registradas en {mes}
+                                </p>
+                                <p className="text-sm text-slate-400">
+                                    Total: <span className="text-white font-semibold">{formatArs(serviceRecords.reduce((s, r) => s + Number(r.internalPrice || 0), 0))}</span>
+                                </p>
                             </div>
 
-                            <div className="xl:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
-                                <h2 className="font-semibold text-sm text-slate-200">Prestaciones registradas en {mes}</h2>
-
-                                <div className="rounded-xl border border-slate-800 overflow-hidden">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-slate-950/80">
-                                            <tr className="text-left text-slate-400">
-                                                <th className="px-3 py-2">Fecha</th>
-                                                <th className="px-3 py-2">Odontólogo</th>
-                                                <th className="px-3 py-2">Prestación</th>
-                                                <th className="px-3 py-2">Área</th>
-                                                <th className="px-3 py-2 text-right">Valor interno</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {serviceRecords.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
-                                                        No hay prestaciones cargadas para este mes.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                serviceRecords.map((record) => (
-                                                    <tr key={record.id} className="border-t border-slate-800">
-                                                        <td className="px-3 py-2 text-slate-400">{record.performedDate}</td>
-                                                        <td className="px-3 py-2 text-slate-100">{record.providerName}</td>
-                                                        <td className="px-3 py-2 text-slate-200">{record.serviceName}</td>
-                                                        <td className="px-3 py-2 text-slate-400">{record.serviceArea}</td>
-                                                        <td className="px-3 py-2 text-right text-slate-100 font-medium">{formatArs(record.internalPrice)}</td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
+                            {providersForServices.length === 0 ? (
+                                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-8 text-center text-slate-500 text-sm">
+                                    No hay odontólogos o laboratorio configurados.
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    {providersForServices.map((provider) => {
+                                        const providerRecords = serviceRecords.filter(r => r.providerId === provider.id);
+                                        const providerTotal = providerRecords.reduce((s, r) => s + Number(r.internalPrice || 0), 0);
+                                        const isAdding = addingForProvider === provider.id;
+                                        const isBusy = busyId === `inline-${provider.id}`;
+                                        const providerArea = provider.group === 'Laboratorio' ? 'Laboratorio' : 'Odontología';
+                                        const availableForThis = activeServices.filter(s => s.area === providerArea);
+
+                                        return (
+                                            <div key={provider.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 overflow-hidden">
+                                                {/* Card header */}
+                                                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-950/40">
+                                                    <div>
+                                                        <p className="font-medium text-white text-sm">{provider.fullName}</p>
+                                                        <p className="text-xs text-slate-500">{provider.group} · {providerRecords.length} prestación(es)</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        {providerTotal > 0 && (
+                                                            <span className="text-sm font-semibold text-emerald-300">{formatArs(providerTotal)}</span>
+                                                        )}
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isAdding) {
+                                                                    setAddingForProvider(null);
+                                                                } else {
+                                                                    setInlineDraft({ serviceId: '', performedDate: todayDate() });
+                                                                    setAddingForProvider(provider.id);
+                                                                }
+                                                            }}
+                                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                                                isAdding
+                                                                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                                                    : 'bg-violet-700 hover:bg-violet-600 text-white'
+                                                            }`}
+                                                        >
+                                                            <Plus className="w-3 h-3" />
+                                                            {isAdding ? 'Cancelar' : 'Agregar'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Inline add form */}
+                                                {isAdding && (
+                                                    <div className="px-4 py-3 bg-violet-900/10 border-b border-violet-800/30">
+                                                        <div className="flex flex-col sm:flex-row gap-2">
+                                                            <select
+                                                                value={inlineDraft.serviceId}
+                                                                onChange={e => setInlineDraft(d => ({ ...d, serviceId: e.target.value }))}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') { e.preventDefault(); void handleInlineAdd(provider.id); }
+                                                                    if (e.key === 'Escape') { setAddingForProvider(null); }
+                                                                }}
+                                                                className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                                                                autoFocus
+                                                            >
+                                                                <option value="">Seleccioná prestación...</option>
+                                                                {availableForThis.map(s => (
+                                                                    <option key={s.id} value={s.id}>
+                                                                        {s.name} — {formatArs(s.internalPrice)}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <input
+                                                                type="date"
+                                                                value={inlineDraft.performedDate}
+                                                                onChange={e => setInlineDraft(d => ({ ...d, performedDate: e.target.value }))}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') { e.preventDefault(); void handleInlineAdd(provider.id); }
+                                                                    if (e.key === 'Escape') { setAddingForProvider(null); }
+                                                                }}
+                                                                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                                                            />
+                                                            <button
+                                                                onClick={() => void handleInlineAdd(provider.id)}
+                                                                disabled={isBusy || !inlineDraft.serviceId}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium disabled:opacity-50 transition-colors flex-shrink-0"
+                                                            >
+                                                                {isBusy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                                                Guardar
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-500 mt-1.5">↵ Enter para guardar · Esc para cancelar</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Records list */}
+                                                {providerRecords.length === 0 ? (
+                                                    <div className="px-4 py-5 text-center text-xs text-slate-600">
+                                                        Sin prestaciones este mes. Usá "Agregar" para cargar.
+                                                    </div>
+                                                ) : (
+                                                    <div className="divide-y divide-slate-800/60">
+                                                        {providerRecords.map(record => (
+                                                            <div key={record.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-800/30 transition-colors">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm text-slate-200 truncate">{record.serviceName}</p>
+                                                                    <p className="text-xs text-slate-500">{record.serviceArea} · {record.performedDate}</p>
+                                                                </div>
+                                                                <span className="text-sm font-medium text-white ml-3 flex-shrink-0">
+                                                                    {formatArs(record.internalPrice)}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 

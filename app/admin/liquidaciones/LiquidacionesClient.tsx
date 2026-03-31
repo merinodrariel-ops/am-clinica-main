@@ -38,6 +38,7 @@ import { getRegistrosHorasMes, RegistroHoras } from '@/app/actions/registro-hora
 
 const ProsoftImporter = dynamic(() => import('@/components/portal/ProsoftImporter'), { ssr: false });
 const RegistroHorasDashboard = dynamic(() => import('@/components/admin/RegistroHorasDashboard'), { ssr: false });
+const LiquidacionDashboard = dynamic(() => import('@/components/admin/liquidaciones/LiquidacionDashboard'), { ssr: false });
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -1398,6 +1399,7 @@ export default function LiquidacionesPage() {
     const [generating, setGenerating] = useState<string | null>(null);
     const [payModal, setPayModal] = useState<string | null>(null); // liq id
     const [editing, setEditing] = useState<{ row: LiquidacionAdminRow; liq: LiquidacionResult } | null>(null);
+    const [dashboardTarget, setDashboardTarget] = useState<{ row: LiquidacionAdminRow; liq: LiquidacionResult } | null>(null);
     const [savingEdit, setSavingEdit] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [prestacionesData, setPrestacionesData] = useState<Record<string, PrestacionRealizada[]>>({});
@@ -1430,6 +1432,14 @@ export default function LiquidacionesPage() {
             getPrestacionesCatalogoCompleto().then(setPrestacionesCatalogo);
         }
     }, [tab, prestacionesCatalogo.length]);
+
+    async function openDashboard(row: LiquidacionAdminRow, liq: LiquidacionResult) {
+        // Ensure catalog is loaded before opening
+        if (prestacionesCatalogo.length === 0) {
+            getPrestacionesCatalogoCompleto().then(setPrestacionesCatalogo);
+        }
+        setDashboardTarget({ row, liq });
+    }
 
     // ── Stats ────────────────────────────────────────────────────────────────
     const totalArs = rows.reduce((s, r) => s + Number(r.liquidacion?.total_ars || 0), 0);
@@ -1942,6 +1952,17 @@ export default function LiquidacionesPage() {
                 />
             )}
 
+            {dashboardTarget && (
+                <LiquidacionDashboard
+                    row={dashboardTarget.row}
+                    liq={dashboardTarget.liq}
+                    mes={mes}
+                    catalogo={prestacionesCatalogo}
+                    onClose={() => setDashboardTarget(null)}
+                    onRefresh={() => { setDashboardTarget(null); load(); }}
+                />
+            )}
+
             {detalleHorasTarget && (
                 <HorasDetalleModal
                     worker={detalleHorasTarget}
@@ -2408,16 +2429,20 @@ export default function LiquidacionesPage() {
                                                         {liq ? (
                                                             <button
                                                                 onClick={() => {
-                                                                    const next = isExpanded ? null : row.personal_id;
-                                                                    setExpandedRow(next);
-                                                                    if (next && liq && (liq.modelo_pago || row.modelo_pago) === 'prestacion_usd') {
-                                                                        loadPrestacionesForRow(row.personal_id, mes);
+                                                                    if ((liq.modelo_pago || row.modelo_pago) === 'prestacion_usd') {
+                                                                        openDashboard(row, liq);
+                                                                    } else {
+                                                                        const next = isExpanded ? null : row.personal_id;
+                                                                        setExpandedRow(next);
                                                                     }
                                                                 }}
                                                                 className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
-                                                                title={isExpanded ? 'Ocultar detalle' : 'Ver detalle'}
+                                                                title={(liq.modelo_pago || row.modelo_pago) === 'prestacion_usd' ? 'Ver prestaciones del mes' : (isExpanded ? 'Ocultar detalle' : 'Ver detalle')}
                                                             >
-                                                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                                {(liq.modelo_pago || row.modelo_pago) === 'prestacion_usd'
+                                                                    ? <ListChecks size={12} />
+                                                                    : isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                                }
                                                             </button>
                                                         ) : (
                                                             <span className="text-slate-700">•</span>
@@ -2582,45 +2607,29 @@ export default function LiquidacionesPage() {
                                                     </td>
                                                 </tr>
 
-                                                {liq && isExpanded && (
+                                                {liq && isExpanded && (liq.modelo_pago || row.modelo_pago) !== 'prestacion_usd' && (
                                                     <tr className="bg-slate-950/60">
                                                         <td colSpan={6} className="px-4 py-4">
-                                                            {(liq.modelo_pago || row.modelo_pago) === 'prestacion_usd' ? (
-                                                                prestacionesLoading === row.personal_id ? (
-                                                                    <p className="text-xs text-slate-500 animate-pulse py-2">Cargando prestaciones...</p>
-                                                                ) : (
-                                                                    <PrestacionesDetallePanel
-                                                                        liquidacionId={liq.id}
-                                                                        personalId={row.personal_id}
-                                                                        mes={mes}
-                                                                        prestaciones={prestacionesData[row.personal_id] || []}
-                                                                        liquidacionEstado={liq.estado}
-                                                                        tc={Number(liq.tc_liquidacion || 1050)}
-                                                                        onRefresh={() => refreshPrestacionesForRow(row.personal_id, mes)}
-                                                                    />
-                                                                )
-                                                            ) : (
-                                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">TC</p>
-                                                                        <p className="text-sm text-white font-semibold">{Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
-                                                                    </div>
-                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Precio</p>
-                                                                        <p className="text-sm text-white font-semibold">
-                                                                            {manualOverride?.moneda === 'USD' ? 'USD' : 'ARS'} {Number(manualOverride?.precio_unitario || liq.valor_hora_snapshot || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
-                                                                        </p>
-                                                                    </div>
-                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Cantidad</p>
-                                                                        <p className="text-sm text-white font-semibold">{Number(manualOverride?.cantidad || liq.total_horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
-                                                                    </div>
-                                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
-                                                                        <p className="text-[10px] uppercase tracking-widest text-slate-500">Observaciones</p>
-                                                                        <p className="text-sm text-slate-200 truncate">{liq.observaciones || 'Sin notas'}</p>
-                                                                    </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">TC</p>
+                                                                    <p className="text-sm text-white font-semibold">{Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
                                                                 </div>
-                                                            )}
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Precio</p>
+                                                                    <p className="text-sm text-white font-semibold">
+                                                                        {manualOverride?.moneda === 'USD' ? 'USD' : 'ARS'} {Number(manualOverride?.precio_unitario || liq.valor_hora_snapshot || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Cantidad</p>
+                                                                    <p className="text-sm text-white font-semibold">{Number(manualOverride?.cantidad || liq.total_horas || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
+                                                                </div>
+                                                                <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                                                                    <p className="text-[10px] uppercase tracking-widest text-slate-500">Observaciones</p>
+                                                                    <p className="text-sm text-slate-200 truncate">{liq.observaciones || 'Sin notas'}</p>
+                                                                </div>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 )}

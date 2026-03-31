@@ -139,6 +139,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [prestacionesLista, setPrestacionesLista] = useState<PrestacionLista[]>([]);
     const [prestacionesMes, setPrestacionesMes] = useState<PrestacionRealizada[]>([]);
     const [showPrestacionForm, setShowPrestacionForm] = useState(false);
+    const [modalPrestaciones, setModalPrestaciones] = useState<PrestacionRealizada[]>([]);
+    const [panelMes, setPanelMes] = useState(mesActual);
     const [selectedProfesionalId, setSelectedProfesionalId] = useState<string | null>(null);
     const [prestacionForm, setPrestacionForm] = useState({
         prestacion_id: '',
@@ -238,8 +240,35 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             notas: editPrestacionForm.notas || undefined,
         });
         setSavingPrestacion(false);
-        if (res.success) { toast.success('Prestación actualizada'); setEditingPrestacion(null); loadData(); }
+        if (res.success) {
+            toast.success('Prestación actualizada');
+            setEditingPrestacion(null);
+            loadData();
+            if (selectedProfesionalId) {
+                getPrestacionesRealizadas({ profesionalId: selectedProfesionalId }).then(data => setModalPrestaciones(data));
+            }
+        }
         else toast.error(res.error || 'Error al guardar');
+    };
+
+    const handleDeletePrestacion = async (id: string, nombre: string) => {
+        if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+        setConfirmDeletePrestacionId(id);
+        setModalPrestaciones(prev => prev.filter(p => p.id !== id));
+        const res = await eliminarPrestacion(id);
+        setConfirmDeletePrestacionId(null);
+        if (res.success) {
+            toast.success('Prestación eliminada');
+            loadData();
+            if (selectedProfesionalId) {
+                getPrestacionesRealizadas({ profesionalId: selectedProfesionalId }).then(data => setModalPrestaciones(data));
+            }
+        } else {
+            toast.error(res.error || 'No se pudo eliminar');
+            if (selectedProfesionalId) {
+                getPrestacionesRealizadas({ profesionalId: selectedProfesionalId }).then(data => setModalPrestaciones(data));
+            }
+        }
     };
 
     const handleActivatePrestadorConfirm = async () => {
@@ -262,6 +291,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     useModalKeyboard(!!editingPrestacion, () => setEditingPrestacion(null), () => void handleSavePrestacionEdit(), { disabled: savingPrestacion });
     useModalKeyboard(!!activatingPrestador, () => setActivatingPrestador(null), () => void handleActivatePrestadorConfirm(), { disabled: activating || !activationData.area });
+    useModalKeyboard(showPrestacionForm, () => setShowPrestacionForm(false), () => void handleRegistrarPrestacion(), { disabled: submitting });
 
     function normalizeText(value?: string | null) {
         return (value || '')
@@ -516,6 +546,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setPacienteQuery('');
         setPacienteOptions([]);
         setShowPacienteDropdown(false);
+        setPanelMes(mesActual);
+        setModalPrestaciones([]);
+        getPrestacionesRealizadas({ profesionalId }).then(data => setModalPrestaciones(data));
         setShowPrestacionForm(true);
     }
 
@@ -724,7 +757,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 }
             }
 
-            setShowPrestacionForm(false);
+            toast.success('Prestación registrada');
             setPrestacionForm({
                 paciente_nombre: '',
                 prestacion_id: '',
@@ -739,6 +772,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             });
             setPacienteQuery('');
             setPacienteOptions([]);
+            if (selectedProfesionalId) {
+                getPrestacionesRealizadas({ profesionalId: selectedProfesionalId }).then(data => setModalPrestaciones(data));
+            }
             loadData();
         }
         setSubmitting(false);
@@ -840,8 +876,19 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             'recepcion',
         ];
 
+        const hasOperationalData = Boolean(
+            p.documento
+            || p.whatsapp
+            || p.direccion
+            || p.barrio_localidad
+            || p.condicion_afip
+            || p.foto_url
+            || p.empresa_prestadora_id
+            || p.descripcion
+        );
+
         const isObviousTest = obviousTestTokens.some((token) => fullName.includes(token));
-        if (isObviousTest) return true;
+        if (isObviousTest && !hasOperationalData) return true;
 
         const isProviderLikeArea =
             area.includes('limpieza')
@@ -870,17 +917,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             || area.includes('asistente dental')
             || rol.includes('recepcion')
             || rol.includes('asistente');
-
-        const hasOperationalData = Boolean(
-            p.documento
-            || p.whatsapp
-            || p.direccion
-            || p.barrio_localidad
-            || p.condicion_afip
-            || p.foto_url
-            || p.empresa_prestadora_id
-            || p.descripcion
-        );
 
         return Boolean(p.user_id)
             && Number(p.valor_hora_ars || 0) === 0
@@ -1807,22 +1843,42 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                         onClick={() => setShowPrestacionForm(false)}
                     >
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
+                            initial={{ opacity: 0, scale: 0.97 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4"
+                            exit={{ opacity: 0, scale: 0.97 }}
+                            className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
                             onClick={e => e.stopPropagation()}
                         >
-                            <h3 className="text-xl font-bold flex items-center gap-2">
-                                <Stethoscope className="w-6 h-6 text-emerald-600" />
-                                Registrar Prestación
-                            </h3>
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
+                                        <Stethoscope className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-slate-900 dark:text-white">Cargar Prestaciones</h3>
+                                        {selectedProfesional && (
+                                            <p className="text-xs text-slate-500">{selectedProfesional.nombre} {selectedProfesional.apellido} · {mesActual}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowPrestacionForm(false)}
+                                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
 
-                            <div className="space-y-4">
+                            {/* Two-panel body */}
+                            <div className="flex flex-1 min-h-0 overflow-hidden">
+                                {/* Left: form */}
+                                <div className="flex flex-col w-full md:w-1/2 border-r border-slate-200 dark:border-slate-700">
+                                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
                                 {/* Paciente — autocomplete desde DB */}
                                 <div className="relative">
                                     <label className="block text-sm font-medium mb-1">Paciente</label>
@@ -1914,44 +1970,86 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium mb-1">Prestación</label>
-                                    <select
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900"
-                                        value={prestacionForm.prestacion_id}
-                                        onChange={e => {
-                                            const p = prestacionesLista.find(pl => pl.id === e.target.value);
-                                            if (p) {
-                                                setPrestacionForm({
-                                                    ...prestacionForm,
-                                                    prestacion_id: p.id,
-                                                    prestacion_nombre_manual: p.nombre,
-                                                    valor_cobrado: p.precio_base,
-                                                    moneda: p.moneda
-                                                });
-                                            } else {
-                                                setPrestacionForm({
-                                                    ...prestacionForm,
-                                                    prestacion_id: '',
-                                                });
-                                            }
-                                        }}
-                                    >
-                                        <option value="">Seleccionar prestación...</option>
-                                        {prestacionesLista.map(p => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.area_nombre} - {p.nombre} ({p.moneda} {p.precio_base})
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {prestacionesLista.length === 0 && (
-                                        <p className="text-xs text-amber-500 mt-1">
-                                            No hay tarifario cargado. Podés registrar prestación manual abajo.
-                                        </p>
-                                    )}
+                                    <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Prestación</label>
+                                    {(() => {
+                                        const profArea = (selectedProfesional?.area || '').toLowerCase().trim();
+                                        const areaGroups = prestacionesLista.reduce<Record<string, typeof prestacionesLista>>((acc, p) => {
+                                            const key = p.area_nombre || 'General';
+                                            if (!acc[key]) acc[key] = [];
+                                            acc[key].push(p);
+                                            return acc;
+                                        }, {});
+                                        const areaKeys = Object.keys(areaGroups).sort();
+                                        const defaultArea = areaKeys.find(k => k.toLowerCase().trim() === profArea) || areaKeys[0] || '';
+                                        const [selectedArea, setSelectedArea] = [
+                                            (prestacionForm as typeof prestacionForm & { _area?: string })._area ?? defaultArea,
+                                            (area: string) => setPrestacionForm(f => ({ ...f, _area: area } as typeof f)),
+                                        ] as const;
+                                        const visiblePrests = areaGroups[selectedArea] || [];
+                                        function selectPreset(p: typeof prestacionesLista[0]) {
+                                            setPrestacionForm(f => ({
+                                                ...f,
+                                                prestacion_id: p.id,
+                                                prestacion_nombre_manual: p.nombre,
+                                                valor_cobrado: p.precio_base,
+                                                moneda: p.moneda,
+                                            }));
+                                        }
+                                        return (
+                                            <>
+                                                {areaKeys.length > 1 && (
+                                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                                        {areaKeys.map(area => (
+                                                            <button
+                                                                key={area}
+                                                                type="button"
+                                                                onClick={() => setSelectedArea(area)}
+                                                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${selectedArea === area ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                                            >
+                                                                {area}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {visiblePrests.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                                        {visiblePrests.map(p => (
+                                                            <button
+                                                                key={p.id}
+                                                                type="button"
+                                                                onClick={() => selectPreset(p)}
+                                                                className={`px-2.5 py-1 rounded-lg text-xs transition-colors border ${prestacionForm.prestacion_id === p.id ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-400 text-emerald-700 dark:text-emerald-300 font-medium' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-400 hover:text-emerald-700'}`}
+                                                            >
+                                                                {p.nombre}
+                                                                <span className="ml-1 opacity-60 text-[10px]">{p.moneda} {p.precio_base.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <select
+                                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 text-sm text-slate-500"
+                                                    value={prestacionForm.prestacion_id}
+                                                    onChange={e => {
+                                                        const p = prestacionesLista.find(pl => pl.id === e.target.value);
+                                                        if (p) selectPreset(p);
+                                                        else setPrestacionForm(f => ({ ...f, prestacion_id: '' }));
+                                                    }}
+                                                >
+                                                    <option value="">— o elegir de todo el tarifario —</option>
+                                                    {prestacionesLista.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.area_nombre} · {p.nombre} ({p.moneda} {p.precio_base})</option>
+                                                    ))}
+                                                </select>
+                                                {prestacionesLista.length === 0 && (
+                                                    <p className="text-xs text-amber-500 mt-1">No hay tarifario cargado. Podés registrar prestación manual abajo.</p>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium mb-1">Nombre de prestación (manual)</label>
+                                    <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Nombre de prestación</label>
                                     <Input
                                         type="text"
                                         className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900"
@@ -2026,23 +2124,140 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     />
                                     Recalcular liquidación del odontólogo automáticamente
                                 </label>
-                            </div>
+                                    </div>
 
-                            <div className="flex justify-end gap-3 pt-4">
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => setShowPrestacionForm(false)}
-                                    className="px-4 py-2 text-slate-500 hover:text-slate-700"
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    onClick={handleRegistrarPrestacion}
-                                    disabled={submitting}
-                                    className="bg-emerald-600 text-white px-6 py-2 rounded-xl hover:bg-emerald-700 disabled:opacity-50"
-                                >
-                                    {submitting ? 'Guardando...' : 'Registrar'}
-                                </Button>
+                                    {/* Save */}
+                                    <div className="flex-shrink-0 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                        <Button
+                                            onClick={handleRegistrarPrestacion}
+                                            disabled={submitting}
+                                            className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 py-2.5 rounded-xl font-semibold"
+                                        >
+                                            {submitting ? 'Guardando...' : 'Registrar prestación'}
+                                        </Button>
+                                        <p className="text-center text-[11px] text-slate-400 mt-2">↵ Enter para guardar · Esc para cerrar</p>
+                                    </div>
+                                </div>
+
+                                {/* Right: prestaciones por mes */}
+                                <div className="hidden md:flex flex-col w-1/2">
+                                    {(() => {
+                                        const allMonths = Array.from(new Set(
+                                            modalPrestaciones.map(pr => new Date(pr.fecha_realizacion).toISOString().slice(0, 7))
+                                        )).sort((a, b) => b.localeCompare(a));
+                                        if (!allMonths.includes(mesActual)) allMonths.unshift(mesActual);
+                                        const filtered = modalPrestaciones
+                                            .filter(pr => new Date(pr.fecha_realizacion).toISOString().slice(0, 7) === panelMes)
+                                            .sort((a, b) => new Date(b.fecha_realizacion).getTime() - new Date(a.fecha_realizacion).getTime());
+                                        return (
+                                            <>
+                                                {/* Month tabs */}
+                                                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {allMonths.map(m => {
+                                                            const [y, mo] = m.split('-');
+                                                            const label = new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
+                                                            const count = modalPrestaciones.filter(pr => new Date(pr.fecha_realizacion).toISOString().slice(0, 7) === m).length;
+                                                            return (
+                                                                <button
+                                                                    key={m}
+                                                                    onClick={() => setPanelMes(m)}
+                                                                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${panelMes === m
+                                                                        ? 'bg-violet-600 text-white'
+                                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                                                    }`}
+                                                                >
+                                                                    {label} {count > 0 && <span className="opacity-70">({count})</span>}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                {/* List */}
+                                                <div className="flex-1 overflow-y-auto">
+                                                    {filtered.length === 0 ? (
+                                                        <div className="flex flex-col items-center justify-center h-full text-slate-400 py-16">
+                                                            <Stethoscope className="w-10 h-10 mb-3 opacity-20" />
+                                                            <p className="text-sm">Sin prestaciones en {panelMes}</p>
+                                                            <p className="text-xs mt-1 opacity-60">Las que cargues aparecen aquí</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                            {filtered.map(pr => (
+                                                                <div key={pr.id} className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{pr.prestacion_nombre}</p>
+                                                                            <p className="text-xs text-slate-400 mt-0.5">
+                                                                                {pr.paciente_nombre && <span>{pr.paciente_nombre} · </span>}
+                                                                                {new Date(pr.fecha_realizacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                                                            <div className="text-right">
+                                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                                    {pr.moneda_cobro} {Number(pr.valor_cobrado || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                                                                                </p>
+                                                                                {pr.slides_url && (
+                                                                                    <a href={pr.slides_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-500 hover:underline">HC ↗</a>
+                                                                                )}
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const fecha = new Date(pr.fecha_realizacion);
+                                                                                    const y = fecha.getFullYear();
+                                                                                    const m = String(fecha.getMonth() + 1).padStart(2, '0');
+                                                                                    const d = String(fecha.getDate()).padStart(2, '0');
+                                                                                    setEditingPrestacion(pr);
+                                                                                    setEditPrestacionForm({
+                                                                                        prestacion_nombre: pr.prestacion_nombre,
+                                                                                        fecha_realizacion: `${y}-${m}-${d}`,
+                                                                                        paciente_nombre: pr.paciente_nombre || '',
+                                                                                        valor_cobrado: Number(pr.valor_cobrado || 0),
+                                                                                        monto_honorarios: Number(pr.monto_honorarios || pr.valor_cobrado || 0),
+                                                                                        moneda_cobro: pr.moneda_cobro as 'ARS' | 'USD',
+                                                                                        slides_url: pr.slides_url || '',
+                                                                                        notas: pr.notas || '',
+                                                                                    });
+                                                                                }}
+                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
+                                                                                title="Editar"
+                                                                            >
+                                                                                <Pencil className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => void handleDeletePrestacion(pr.id, pr.prestacion_nombre)}
+                                                                                disabled={confirmDeletePrestacionId === pr.id}
+                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-50"
+                                                                                title="Eliminar"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {/* Total */}
+                                                {filtered.length > 0 && (
+                                                    <div className="flex-shrink-0 px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                                        <div className="flex items-center justify-between text-sm">
+                                                            <span className="text-slate-500">Total ARS · {panelMes}</span>
+                                                            <span className="font-bold text-slate-900 dark:text-white">
+                                                                {filtered
+                                                                    .filter(pr => pr.moneda_cobro === 'ARS')
+                                                                    .reduce((s, pr) => s + Number(pr.valor_cobrado || 0), 0)
+                                                                    .toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>
