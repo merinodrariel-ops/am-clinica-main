@@ -474,11 +474,22 @@ export async function eliminarPrestacion(
     prestacionId: string
 ): Promise<{ success: boolean; error?: string }> {
     const admin = getAdminClient();
+
+    // Verificar que no esté pagada antes de borrar
+    const { data: row } = await admin
+        .from('prestaciones_realizadas')
+        .select('estado_pago')
+        .eq('id', prestacionId)
+        .single();
+
+    if (row?.estado_pago === 'pagado') {
+        return { success: false, error: 'No se puede eliminar una prestación ya pagada' };
+    }
+
     const { error } = await admin
         .from('prestaciones_realizadas')
         .delete()
-        .eq('id', prestacionId)
-        .eq('estado_pago', 'pendiente'); // solo se puede borrar si no está liquidado
+        .eq('id', prestacionId);
 
     if (error) return { success: false, error: error.message };
 
