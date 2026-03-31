@@ -1902,6 +1902,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 .from('pacientes')
                                                 .select('id_paciente, nombre, apellido, link_historia_clinica, documento')
                                                 .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%`)
+                                                .eq('is_deleted', false)
                                                 .limit(8);
                                             setPacienteOptions((data || []).map((p: { id_paciente: string; nombre: string; apellido: string; link_historia_clinica: string | null; documento?: string | null }) => ({ id: p.id_paciente, nombre: p.nombre, apellido: p.apellido, link_historia_clinica: p.link_historia_clinica, documento: p.documento })));
                                             setShowPacienteDropdown(true);
