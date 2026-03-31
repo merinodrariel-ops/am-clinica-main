@@ -2318,20 +2318,44 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         </div>
                                                     )}
                                                 </div>
-                                                {/* Total */}
-                                                {filtered.length > 0 && (
-                                                    <div className="flex-shrink-0 px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                                        <div className="flex items-center justify-between text-sm">
-                                                            <span className="text-slate-500">Total ARS · {panelMes}</span>
-                                                            <span className="font-bold text-slate-900 dark:text-white">
-                                                                {filtered
-                                                                    .filter(pr => pr.moneda_cobro === 'ARS')
-                                                                    .reduce((s, pr) => s + Number(pr.valor_cobrado || 0), 0)
-                                                                    .toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}
-                                                            </span>
+                                                {/* Totals per currency */}
+                                                {filtered.length > 0 && (() => {
+                                                    const totalARS = filtered
+                                                        .filter(pr => (pr.moneda_cobro || 'ARS') === 'ARS')
+                                                        .reduce((s, pr) => s + Number(pr.valor_cobrado || 0), 0);
+                                                    const totalUSD = filtered
+                                                        .filter(pr => pr.moneda_cobro === 'USD')
+                                                        .reduce((s, pr) => s + Number(pr.valor_cobrado || 0), 0);
+                                                    const hasBoth = totalARS > 0 && totalUSD > 0;
+                                                    return (
+                                                        <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                                            <div className={`flex ${hasBoth ? 'gap-3' : ''} items-stretch`}>
+                                                                {totalARS > 0 && (
+                                                                    <div className={`flex items-center justify-between gap-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2 ${hasBoth ? 'flex-1' : 'w-full'}`}>
+                                                                        <div>
+                                                                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Total ARS</p>
+                                                                            <p className="text-base font-bold text-slate-900 dark:text-white tabular-nums">
+                                                                                {totalARS.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}
+                                                                            </p>
+                                                                        </div>
+                                                                        <span className="text-xs text-slate-400">{filtered.filter(pr => (pr.moneda_cobro || 'ARS') === 'ARS').length} prest.</span>
+                                                                    </div>
+                                                                )}
+                                                                {totalUSD > 0 && (
+                                                                    <div className={`flex items-center justify-between gap-4 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 px-4 py-2 ${hasBoth ? 'flex-1' : 'w-full'}`}>
+                                                                        <div>
+                                                                            <p className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold">Total USD</p>
+                                                                            <p className="text-base font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                                                                                USD {totalUSD.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                                            </p>
+                                                                        </div>
+                                                                        <span className="text-xs text-slate-400">{filtered.filter(pr => pr.moneda_cobro === 'USD').length} prest.</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    );
+                                                })()}
                                             </>
                                         );
                                     })()}
