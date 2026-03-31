@@ -142,6 +142,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [modalPrestaciones, setModalPrestaciones] = useState<PrestacionRealizada[]>([]);
     const [panelMes, setPanelMes] = useState(mesActual);
     const [selectedProfesionalId, setSelectedProfesionalId] = useState<string | null>(null);
+    const [quickAccessArea, setQuickAccessArea] = useState<string>('');
     const [prestacionForm, setPrestacionForm] = useState({
         prestacion_id: '',
         prestacion_nombre_manual: '',
@@ -548,6 +549,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setShowPacienteDropdown(false);
         setPanelMes(mesActual);
         setModalPrestaciones([]);
+        // Restore saved area preference for this professional
+        const saved = typeof window !== 'undefined'
+            ? localStorage.getItem(`prestacion-area-${profesionalId}`) || ''
+            : '';
+        setQuickAccessArea(saved);
         getPrestacionesRealizadas({ profesionalId }).then(data => setModalPrestaciones(data));
         setShowPrestacionForm(true);
     }
@@ -1980,12 +1986,18 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             return acc;
                                         }, {});
                                         const areaKeys = Object.keys(areaGroups).sort();
+                                        // Priority: 1) saved preference, 2) match prof area, 3) first key
                                         const defaultArea = areaKeys.find(k => k.toLowerCase().trim() === profArea) || areaKeys[0] || '';
-                                        const [selectedArea, setSelectedArea] = [
-                                            (prestacionForm as typeof prestacionForm & { _area?: string })._area ?? defaultArea,
-                                            (area: string) => setPrestacionForm(f => ({ ...f, _area: area } as typeof f)),
-                                        ] as const;
-                                        const visiblePrests = areaGroups[selectedArea] || [];
+                                        const activeArea = (quickAccessArea && areaKeys.includes(quickAccessArea))
+                                            ? quickAccessArea
+                                            : defaultArea;
+
+                                        function handleAreaSelect(area: string) {
+                                            setQuickAccessArea(area);
+                                            if (selectedProfesionalId) {
+                                                localStorage.setItem(`prestacion-area-${selectedProfesionalId}`, area);
+                                            }
+                                        }
                                         function selectPreset(p: typeof prestacionesLista[0]) {
                                             setPrestacionForm(f => ({
                                                 ...f,
@@ -1995,6 +2007,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 moneda: p.moneda,
                                             }));
                                         }
+                                        const visiblePrests = areaGroups[activeArea] || [];
                                         return (
                                             <>
                                                 {areaKeys.length > 1 && (
@@ -2003,10 +2016,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                             <button
                                                                 key={area}
                                                                 type="button"
-                                                                onClick={() => setSelectedArea(area)}
-                                                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${selectedArea === area ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                                                onClick={() => handleAreaSelect(area)}
+                                                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${activeArea === area ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                                                             >
                                                                 {area}
+                                                                {activeArea === area && areaKeys.length > 1 && (
+                                                                    <span className="ml-1 opacity-60 text-[9px]">★</span>
+                                                                )}
                                                             </button>
                                                         ))}
                                                     </div>
@@ -2031,7 +2047,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     value={prestacionForm.prestacion_id}
                                                     onChange={e => {
                                                         const p = prestacionesLista.find(pl => pl.id === e.target.value);
-                                                        if (p) selectPreset(p);
+                                                        if (p) { selectPreset(p); handleAreaSelect(p.area_nombre || 'General'); }
                                                         else setPrestacionForm(f => ({ ...f, prestacion_id: '' }));
                                                     }}
                                                 >
