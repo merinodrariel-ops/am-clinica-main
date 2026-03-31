@@ -27,7 +27,6 @@ import {
     Loader2,
     FolderOpen,
     Package,
-    Images,
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
@@ -36,7 +35,6 @@ import dynamic from 'next/dynamic';
 const SmileDesign = dynamic(() => import('@/components/smile-studio/SmileDesign'), { ssr: false });
 const PatientDriveTab = dynamic(() => import('@/components/patients/drive/PatientDriveTab'), { ssr: false });
 const DesignReviewTab = dynamic(() => import('@/components/patients/DesignReviewTab'), { ssr: false });
-const ClinicalPresentationGridWrapper = dynamic(() => import('@/components/patients/ClinicalPresentationGridWrapper'), { ssr: false });
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -106,7 +104,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const { categoria: role, profile } = useAuth();
     const isOdontologo = role === 'odontologo';
     const isRecaptacion = role === 'recaptacion';
-    const hidePaymentTabs = isOdontologo || isRecaptacion;
+    const hidePaymentTabs = role !== 'admin' && role !== 'owner';
 
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
@@ -361,17 +359,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
             <div className="max-w-5xl mx-auto p-6">
                 <div className="space-y-4">
 
-                    {/* 1. Presentación Clínica — expanded by default */}
-                    <PatientSection id="presentacion" title="Presentación Clínica" icon={Images} defaultOpen>
-                        <ClinicalPresentationGridWrapper 
-                            patientId={patient.id_paciente}
-                            patientName={`${patient.apellido}, ${patient.nombre}`}
-                            motherFolderUrl={patient.link_historia_clinica}
-                        />
-                    </PatientSection>
-
-                    {/* 2. Archivos */}
-                    <PatientSection id="archivos" title="Documentación" icon={FolderOpen}>
+                    {/* 1. Archivos — expanded by default */}
+                    <PatientSection id="archivos" title="Documentación" icon={FolderOpen} defaultOpen>
                         <PatientDriveTab
                             patientId={patient.id_paciente}
                             patientName={`${patient.apellido}, ${patient.nombre}`}
@@ -524,8 +513,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             </div>
                         )}
 
-                        {/* Prestaciones Realizadas */}
-                        {prestaciones.length > 0 && (
+                        {/* Prestaciones Realizadas — solo admin/owner */}
+                        {!hidePaymentTabs && prestaciones.length > 0 && (
                             <div className="mt-6 border-t border-gray-100 dark:border-gray-800 pt-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <div>
