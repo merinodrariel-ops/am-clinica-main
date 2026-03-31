@@ -2564,9 +2564,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     >
                                                         <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
                                                             <Clock className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                                            Cargar Horas
+                                                            Chequeo de Horas
                                                         </div>
-                                                        <span className="text-[10px] opacity-70 font-medium">Ingreso de tiempo</span>
+                                                        <span className="text-[10px] opacity-70 font-medium">Ver / editar horas</span>
                                                     </Button>
                                                 );
                                             }
