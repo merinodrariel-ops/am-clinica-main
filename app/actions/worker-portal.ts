@@ -5,6 +5,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { WorkerProfile, WorkLog, Achievement, WorkerAchievement, ProviderGoal, GoalProgress, Liquidation, EmpresaPrestadora } from '@/types/worker-portal';
 import { revalidatePath } from 'next/cache';
 import { EmailService } from '@/lib/email-service';
+import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
 
 // Service-role client for admin operations that bypass RLS
 function getAdminClient() {
@@ -15,6 +16,18 @@ function getAdminClient() {
 }
 
 const LOCKED_FIELDS = ['documento', 'matricula_provincial', 'poliza_url'] as const;
+
+function resolveWorkerAppCategory(rawCategory?: string | null, tipo?: string | null): string {
+    const normalized = normalizeCategoriaAlias(rawCategory);
+
+    if (normalized === 'recepcion') return 'reception';
+    if (normalized === 'assistant') return 'asistente';
+    if (normalized === 'dentist') return 'odontologo';
+    if (normalized === 'lab') return 'laboratorio';
+    if (normalized) return normalized;
+
+    return tipo === 'odontologo' || tipo === 'profesional' ? 'odontologo' : 'asistente';
+}
 
 const TableNames = {
     Profiles: 'personal',
@@ -499,7 +512,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
 
     // Map business tipo → auth role and DB tipo
     const isOdontologo = data.tipo === 'odontologo' || data.tipo === 'profesional';
-    const authRole = isOdontologo ? 'odontologo' : 'asistente';
+    const authRole = resolveWorkerAppCategory(data.categoria, data.tipo);
     const dbTipo = isOdontologo ? 'odontologo' : 'prestador';
 
     // 1. Generate invite link via Supabase Auth admin
@@ -640,7 +653,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
     if (fetchError || !worker) throw new Error('Prestador no encontrado');
     if (!worker.email) throw new Error('El prestador no tiene email registrado');
 
-    const authRole = worker.tipo === 'odontologo' || worker.tipo === 'profesional' ? 'odontologo' : 'asistente';
+    const authRole = resolveWorkerAppCategory(worker.categoria, worker.tipo);
 
     const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
         type: 'invite',
@@ -834,12 +847,47 @@ export async function activatePrestadorPendiente(
     if (!user) return { error: 'No autorizado' };
 
     const adminSupabase = getAdminClient();
+    const { data: pendingWorker, error: fetchError } = await adminSupabase
+        .from('personal')
+        .select('id, user_id, nombre, apellido, categoria, tipo, email')
+        .eq('id', id)
+        .single();
+
+    if (fetchError || !pendingWorker) return { error: fetchError?.message || 'Prestador no encontrado' };
+
+    const categoria = resolveWorkerAppCategory(pendingWorker.categoria, pendingWorker.tipo);
+
     const { error } = await adminSupabase
         .from('personal')
-        .update({ activo: true, area, modelo_pago })
+        .update({ activo: true, area, modelo_pago, categoria })
         .eq('id', id);
 
     if (error) return { error: error.message };
+
+    if (pendingWorker.user_id) {
+        const fullName = `${pendingWorker.nombre} ${pendingWorker.apellido || ''}`.trim();
+
+        const { error: profileError } = await adminSupabase
+            .from('profiles')
+            .update({ categoria, full_name: fullName || pendingWorker.email || null })
+            .eq('id', pendingWorker.user_id);
+
+        if (profileError) return { error: profileError.message };
+
+        const { data: authUserData, error: authUserError } = await adminSupabase.auth.admin.getUserById(pendingWorker.user_id);
+        if (authUserError) return { error: authUserError.message };
+
+        const { error: authUpdateError } = await adminSupabase.auth.admin.updateUserById(pendingWorker.user_id, {
+            user_metadata: {
+                ...(authUserData.user?.user_metadata || {}),
+                full_name: fullName,
+                categoria,
+            },
+        });
+
+        if (authUpdateError) return { error: authUpdateError.message };
+    }
+
     revalidatePath('/caja-admin/personal');
     return {};
 }

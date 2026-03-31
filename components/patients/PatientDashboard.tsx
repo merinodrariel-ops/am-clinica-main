@@ -104,7 +104,9 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const { categoria: role, profile } = useAuth();
     const isOdontologo = role === 'odontologo';
     const isRecaptacion = role === 'recaptacion';
+    const isAsistente = role === 'asistente';
     const hidePaymentTabs = role !== 'admin' && role !== 'owner';
+    const hideContactData = isAsistente;
 
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
@@ -304,9 +306,9 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             </div>
                         </div>
 
-                        {/* Quick Actions */}
+                        {/* Quick Actions — oculto para asistentes */}
                         <div className="flex items-center gap-2">
-                            {whatsappNumber && (
+                            {!hideContactData && whatsappNumber && (
                                 <a
                                     href={formatWhatsAppLink(whatsappNumber)}
                                     target="_blank"
@@ -317,7 +319,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     <MessageCircle size={20} />
                                 </a>
                             )}
-                            {patient.email && (
+                            {!hideContactData && patient.email && (
                                 <a
                                     href={formatMailtoLink(patient.email)}
                                     className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
@@ -326,7 +328,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     <Mail size={20} />
                                 </a>
                             )}
-                            {patient.email && (
+                            {!hideContactData && patient.email && (
                                 <button
                                     onClick={handleSendPortalLink}
                                     disabled={sendingPortalLink || portalLinkSent}
@@ -368,8 +370,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                         />
                     </PatientSection>
 
-                    {/* 2. Datos Personales — expanded by default */}
-                    <PatientSection id="datos" title="Datos Personales" icon={User} defaultOpen>
+                    {/* 2. Datos Personales — solo roles con acceso a contacto */}
+                    {!hideContactData && <PatientSection id="datos" title="Datos Personales" icon={User} defaultOpen>
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-lg font-semibold">Datos Personales</h2>
                             <Link
@@ -449,7 +451,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 <p className="font-mono text-xs">{patient.id_paciente.slice(0, 8)}...</p>
                             </div>
                         </div>
-                    </PatientSection>
+                    </PatientSection>}
 
                     {/* 3. Historia Clínica + Prestaciones + Materiales — expanded by default */}
                     <PatientSection id="historia" title="Historia Clínica" icon={FileText} defaultOpen>

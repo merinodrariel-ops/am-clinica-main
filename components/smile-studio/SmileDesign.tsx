@@ -8,7 +8,7 @@ import { createSmileReviewFollowupAction } from '@/app/actions/smile-followup';
 import {
     Loader2, Save, Sparkles, RotateCcw, Download, Video, RotateCcw as ResetIcon,
     ScanFace, Wand2, AlertCircle, Camera, CheckCircle2, ChevronRight, Share2, Link2, MessageCircle, Clipboard,
-    Play, X, Maximize2
+    Play, X, Maximize2, Plus
 } from 'lucide-react';
 import { ImageComparator } from '../patients/ImageComparator';
 import { IntensitySlider } from '../patients/IntensitySlider';
@@ -26,7 +26,7 @@ type Phase = 'drop' | 'aligning' | 'preview' | 'processing' | 'result';
 interface Props {
     patientId: string;
     patientName?: string;
-    onSaved?: () => void;
+    onSaved?: (fileUrl: string) => void;
 }
 
 const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
@@ -371,9 +371,49 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
     const [beforeBase64, setBeforeBase64] = useState<string | null>(null);       // for API calls
     const [beforeMime, setBeforeMime] = useState<string>('image/jpeg');
 
-    // Stored Supabase URLs (set after upload)
+    // Stored results history
+    interface SimulationResult {
+        id: string;
+        beforeUrl: string;
+        afterUrl: string;
+        intensity: number;
+        timestamp: number;
+        status: 'ready' | 'processing';
+    }
+    const [results, setResults] = useState<SimulationResult[]>([]);
+    const [selectedResultIndex, setSelectedResultIndex] = useState<number | null>(null);
+
+    // Stored Supabase URLs (for the CURRENT generation)
     const [beforeStoredUrl, setBeforeStoredUrl] = useState<string | null>(null);
     const [afterStoredUrl, setAfterStoredUrl] = useState<string | null>(null);
+
+    // Persistence: load results for this patient
+    useEffect(() => {
+        if (!patientId) return;
+        const key = `am-clinica-smile-${patientId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                if (data.results && Array.isArray(data.results)) {
+                    setResults(data.results);
+                    if (data.results.length > 0) {
+                        setPhase('result');
+                        setSelectedResultIndex(data.results.length - 1);
+                        setBeforeStoredUrl(data.results[data.results.length - 1].beforeUrl);
+                        setAfterStoredUrl(data.results[data.results.length - 1].afterUrl);
+                    }
+                }
+            } catch (e) { console.error("Smile persistence load error", e); }
+        }
+    }, [patientId]);
+
+    // Persistence: save results
+    useEffect(() => {
+        if (!patientId || results.length === 0) return;
+        const key = `am-clinica-smile-${patientId}`;
+        localStorage.setItem(key, JSON.stringify({ results, timestamp: Date.now() }));
+    }, [patientId, results]);
 
     // Before/After slider
     const [sliderPos, setSliderPos] = useState(50);
@@ -577,8 +617,18 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
             const { data: { publicUrl: aUrl } } = supabase.storage
                 .from('patient-portal-files').getPublicUrl(afterUpload.data.path);
 
-            setBeforeStoredUrl(bUrl + cacheBuster);
-            setAfterStoredUrl(aUrl + cacheBuster);
+            const newRes: SimulationResult = {
+                id: ts.toString(),
+                beforeUrl: bUrl + cacheBuster,
+                afterUrl: aUrl + cacheBuster,
+                intensity,
+                timestamp: ts,
+                status: 'ready'
+            };
+            setResults(prev => [...prev, newRes]);
+            setSelectedResultIndex(results.length);
+            setBeforeStoredUrl(newRes.beforeUrl);
+            setAfterStoredUrl(newRes.afterUrl);
             setSliderPos(50);
             setPhase('result');
         } catch (err) {
@@ -614,7 +664,7 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
             ]);
 
             toast.success('✨ Diseño guardado en la ficha del paciente');
-            onSaved?.();
+            onSaved?.(afterStoredUrl || '');
         } catch (err) {
             console.error('[SmileDesign] save error:', err);
             toast.error('Error al guardar');
@@ -710,6 +760,10 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
 
     const reset = () => {
         setPhase('drop');
+        const key = `am-clinica-smile-${patientId}`;
+        localStorage.removeItem(key);
+        setResults([]);
+        setSelectedResultIndex(null);
         setBeforeDataUrl(null); setAfterDataUrl(null);
         setBeforeBase64(null); setBeforeStoredUrl(null); setAfterStoredUrl(null);
         setIntensity(5); setErrorMsg(null);
@@ -1035,13 +1089,52 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
                             </div>
                         </div>
 
+                        {/* Results gallery */}
+                        {results.length > 0 && (
+                            <div className="flex flex-col gap-4">
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-2">Historial de Simulaciones ({results.length})</h4>
+                                <div className="flex gap-4 overflow-x-auto pb-4 px-2 no-scrollbar">
+                                    {results.map((res, idx) => (
+                                        <button
+                                            key={res.id}
+                                            onClick={() => {
+                                                setSelectedResultIndex(idx);
+                                                setBeforeStoredUrl(res.beforeUrl);
+                                                setAfterStoredUrl(res.afterUrl);
+                                                setIntensity(res.intensity);
+                                                setSliderPos(50);
+                                            }}
+                                            className={`relative shrink-0 w-32 aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${
+                                                selectedResultIndex === idx 
+                                                    ? 'border-teal-500 ring-4 ring-teal-500/20 scale-105 shadow-xl' 
+                                                    : 'border-white/5 opacity-50 hover:opacity-100'
+                                            }`}
+                                        >
+                                            <img src={res.afterUrl} alt={`Result ${idx}`} className="w-full h-full object-cover" />
+                                            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-[8px] font-bold text-white">
+                                                v{idx + 1}
+                                            </div>
+                                        </button>
+                                    ))}
+                                    <button
+                                        onClick={() => setPhase('preview')}
+                                        className="shrink-0 w-32 aspect-[3/4] rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-teal-400 hover:border-teal-500/30 hover:bg-teal-500/5 transition-all"
+                                    >
+                                        <Plus size={24} />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Nuevo</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Premium Action Bar */}
                         <div className="flex flex-col sm:flex-row gap-4">
                             <button
                                 onClick={() => setPhase('preview')}
-                                className="flex-1 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                                className="flex-1 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-400 hover:text-white hover:bg-white/5 transition-all flex items-center justify-center gap-2"
                             >
-                                Ajustar Nivel
+                                <Sparkles size={14} />
+                                Nueva Simulación
                             </button>
 
                             <button

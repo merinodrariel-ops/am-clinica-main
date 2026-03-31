@@ -25,11 +25,12 @@ type FormData = {
     whatsapp: string;
     direccion: string;
     barrio_localidad: string;
-    tipo_trabajo: string;
+    categoria: string;
     condicion_afip: '' | 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro';
     cbu: string;
     cbu_alias: string;
     cuit: string;
+    company: string;
 };
 
 const INITIAL_FORM: FormData = {
@@ -41,22 +42,23 @@ const INITIAL_FORM: FormData = {
     whatsapp: '',
     direccion: '',
     barrio_localidad: '',
-    tipo_trabajo: '',
+    categoria: '',
     condicion_afip: '',
     cbu: '',
     cbu_alias: '',
     cuit: '',
+    company: '',
 };
 
-const TIPO_TRABAJO_OPTIONS = [
-    'Odontología',
-    'Laboratorio Dental',
-    'Asistente Dental',
-    'Limpieza',
-    'Recepción / Administración',
-    'Kinesiología / Fisioterapia',
-    'Otro',
-];
+const CATEGORIA_OPTIONS = [
+    { value: 'odontologo', label: 'Odontologia' },
+    { value: 'asistente', label: 'Asistente' },
+    { value: 'reception', label: 'Recepcion' },
+    { value: 'laboratorio', label: 'Laboratorio' },
+    { value: 'limpieza', label: 'Limpieza' },
+    { value: 'recaptacion', label: 'Recaptacion' },
+    { value: 'other', label: 'Otro' },
+] as const;
 
 const CONDICION_AFIP_OPTIONS: { id: 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro'; label: string }[] = [
     { id: 'monotributista', label: 'Monotributista' },
@@ -87,6 +89,7 @@ export default function RegistroPrestadorForm() {
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [formStartedAt] = useState(() => Date.now());
 
     const set = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -109,7 +112,7 @@ export default function RegistroPrestadorForm() {
             if (!form.whatsapp.trim()) return 'El WhatsApp es requerido.';
         }
         if (step === 2) {
-            if (!form.tipo_trabajo) return 'Seleccioná el tipo de trabajo.';
+            if (!form.categoria) return 'Seleccioná la categoria.';
         }
         return '';
     };
@@ -147,11 +150,13 @@ export default function RegistroPrestadorForm() {
             whatsapp: '+54' + form.whatsapp,
             direccion: form.direccion || undefined,
             barrio_localidad: form.barrio_localidad || undefined,
-            tipo_trabajo: form.tipo_trabajo,
+            categoria: form.categoria,
             condicion_afip: form.condicion_afip || undefined,
             cbu: form.cbu || undefined,
             cbu_alias: form.cbu_alias || undefined,
             cuit: form.cuit || undefined,
+            company: form.company || undefined,
+            form_started_at: formStartedAt,
         };
 
         const result = await registerPrestadorPublico(payload);
@@ -217,6 +222,15 @@ export default function RegistroPrestadorForm() {
             case 0:
                 return (
                     <div className="flex flex-col gap-4">
+                        <input
+                            type="text"
+                            tabIndex={-1}
+                            autoComplete="off"
+                            value={form.company}
+                            onChange={set('company')}
+                            className="hidden"
+                            aria-hidden="true"
+                        />
                         <div className="grid grid-cols-2 gap-3">
                             <InputWrapper label="Nombre">
                                 <input
@@ -310,20 +324,20 @@ export default function RegistroPrestadorForm() {
                 return (
                     <div className="flex flex-col gap-6">
                         <div className="flex flex-col gap-2">
-                            <label className="text-xs text-white/50 uppercase tracking-wide">Tipo de trabajo</label>
+                            <label className="text-xs text-white/50 uppercase tracking-wide">Categoria</label>
                             <div className="grid grid-cols-2 gap-2">
-                                {TIPO_TRABAJO_OPTIONS.map((opt) => (
+                                {CATEGORIA_OPTIONS.map((opt) => (
                                     <button
-                                        key={opt}
+                                        key={opt.value}
                                         type="button"
-                                        onClick={() => setDirect('tipo_trabajo', opt)}
+                                        onClick={() => setDirect('categoria', opt.value)}
                                         className={`rounded-xl px-3 py-2.5 text-sm text-left transition-colors ${
-                                            form.tipo_trabajo === opt
+                                            form.categoria === opt.value
                                                 ? 'bg-white text-black font-medium'
                                                 : 'bg-white/5 border border-white/10 text-white/70 hover:bg-white/10'
                                         }`}
                                     >
-                                        {opt}
+                                        {opt.label}
                                     </button>
                                 ))}
                             </div>

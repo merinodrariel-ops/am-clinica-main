@@ -58,26 +58,24 @@ export default function PatientSection({ id, title, icon: Icon, defaultOpen = fa
             </button>
 
             {/* Body */}
-            <AnimatePresence initial={false}>
-                {open && (
-                    <motion.div
-                        key="body"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        style={{ overflow: 'hidden' }}
-                    >
-                        <div className="px-6 pb-6 pt-1">
-                            {mounted ? children : (
-                                <div className="h-32 flex items-center justify-center text-gray-300 dark:text-white/20 text-sm">
-                                    Cargando...
-                                </div>
-                            )}
+            <motion.div
+                initial={false}
+                animate={{ 
+                    height: open ? 'auto' : 0,
+                    opacity: open ? 1 : 0,
+                    visibility: open ? 'visible' : 'hidden'
+                }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                style={{ overflow: 'hidden' }}
+            >
+                <div className="px-6 pb-6 pt-1">
+                    {mounted ? children : (
+                        <div className="h-32 flex items-center justify-center text-gray-300 dark:text-white/20 text-sm italic">
+                            Cargando sección...
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
+                </div>
+            </motion.div>
         </div>
     );
 }
