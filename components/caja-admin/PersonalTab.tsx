@@ -157,7 +157,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     });
     // Patient autocomplete state
     const [pacienteQuery, setPacienteQuery] = useState('');
-    const [pacienteOptions, setPacienteOptions] = useState<{ id: string; nombre: string; apellido: string; link_historia_clinica: string | null }[]>([]);
+    const [pacienteOptions, setPacienteOptions] = useState<{ id: string; nombre: string; apellido: string; link_historia_clinica: string | null; documento?: string | null }[]>([]);
     const [showPacienteDropdown, setShowPacienteDropdown] = useState(false);
 
     // Prestaciones list per professional (expand/edit/delete)
@@ -1900,10 +1900,10 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             const supabase = (await import('@/utils/supabase/client')).createClient();
                                             const { data } = await supabase
                                                 .from('pacientes')
-                                                .select('id_paciente, nombre, apellido, link_historia_clinica')
+                                                .select('id_paciente, nombre, apellido, link_historia_clinica, documento')
                                                 .or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%`)
                                                 .limit(8);
-                                            setPacienteOptions((data || []).map((p: { id_paciente: string; nombre: string; apellido: string; link_historia_clinica: string | null }) => ({ id: p.id_paciente, nombre: p.nombre, apellido: p.apellido, link_historia_clinica: p.link_historia_clinica })));
+                                            setPacienteOptions((data || []).map((p: { id_paciente: string; nombre: string; apellido: string; link_historia_clinica: string | null; documento?: string | null }) => ({ id: p.id_paciente, nombre: p.nombre, apellido: p.apellido, link_historia_clinica: p.link_historia_clinica, documento: p.documento })));
                                             setShowPacienteDropdown(true);
                                         }}
                                         onBlur={() => setTimeout(() => setShowPacienteDropdown(false), 150)}
@@ -1928,6 +1928,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     }}
                                                 >
                                                     <span className="font-medium">{p.apellido}</span>, {p.nombre}
+                                                    {p.documento && <span className="ml-2 text-xs text-slate-400">DNI {p.documento}</span>}
                                                     {p.link_historia_clinica && (
                                                         <span className="ml-2 text-xs text-emerald-600">• con historia clínica</span>
                                                     )}
