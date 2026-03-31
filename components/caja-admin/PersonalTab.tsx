@@ -1288,6 +1288,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         <FileText className="w-4 h-4" />
                         Contratos
                     </Button>
+                    <a
+                        href="/admin/liquidaciones?tab=prosoft"
+                        className="flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 dark:hover:text-teal-300 rounded-b-none border-b-2 border-transparent hover:border-teal-400"
+                    >
+                        <ExternalLink className="w-4 h-4" />
+                        ProSoft ↗
+                    </a>
                 </div>
 
                 {/* Search and Actions */}
@@ -2193,15 +2200,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     {selectedProfesional?.area ? ` (${selectedProfesional.area})` : ''}
                                 </label>
 
-                                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                                    <input
-                                        type="checkbox"
-                                        checked={prestacionForm.recalcular_liquidacion}
-                                        onChange={(e) => setPrestacionForm({ ...prestacionForm, recalcular_liquidacion: e.target.checked })}
-                                        className="rounded border-slate-300 dark:border-slate-600"
-                                    />
-                                    Recalcular liquidación del odontólogo automáticamente
-                                </label>
                                     </div>
 
                                     {/* Save */}
@@ -2598,13 +2596,15 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
             {/* Hours Form — shown when showHorasForm is triggered */}
             {showHorasForm && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowHorasForm(false)}>
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6"
+                                className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 w-full max-w-2xl m-4"
+                                onClick={e => e.stopPropagation()}
                             >
                                 <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-lg font-semibold">Registrar Horas</h3>
+                                    <h3 className="text-lg font-semibold">Chequeo de Horas</h3>
                                     <Button variant="ghost" size="icon" onClick={() => setShowHorasForm(false)} className="text-slate-400 hover:text-slate-600 h-auto w-auto p-1">
                                         <X className="w-5 h-5" />
                                     </Button>
@@ -2745,6 +2745,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     </Button>
                                 </div>
                             </motion.div>
+                            </div>
             )}
             {/* Prestaciones Tab Content */}
             {
