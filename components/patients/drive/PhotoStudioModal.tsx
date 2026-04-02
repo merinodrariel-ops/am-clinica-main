@@ -651,6 +651,7 @@ export default function PhotoStudioModal({
     const photoStateDirtyRef = useRef(false);
     const photoStateLoadInProgressRef = useRef(false);
     const photoStateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [photoStateReady, setPhotoStateReady] = useState(false);
     // Stable refs for arrow-key handler (avoids stale closure)
     const drawModeRef = useRef<DrawMode>('idle');
     const selectedShapeIdRef = useRef<string | null>(null);
@@ -858,6 +859,7 @@ export default function PhotoStudioModal({
         if (!patientId) return;
 
         let cancelled = false;
+        setPhotoStateReady(false);
         photoStateLoadInProgressRef.current = true;
 
         const loadPhotoStates = async () => {
@@ -914,12 +916,48 @@ export default function PhotoStudioModal({
         };
 
         void loadPhotoStates().finally(() => {
-            if (!cancelled) photoStateLoadInProgressRef.current = false;
+            if (!cancelled) {
+                photoStateLoadInProgressRef.current = false;
+                setPhotoStateReady(true);
+            }
         });
 
         return () => {
             cancelled = true;
         };
+    }, [patientId]);
+
+    const flushPhotoStateSave = useCallback(async (overrides?: { fileId?: string | null; state?: FileEditState }) => {
+        const fileId = overrides?.fileId ?? activeFileIdRef.current;
+        const state = overrides?.state ?? latestPhotoStateRef.current;
+
+        if (!patientId || !fileId) return;
+
+        if (photoStateSaveTimerRef.current) {
+            clearTimeout(photoStateSaveTimerRef.current);
+            photoStateSaveTimerRef.current = null;
+        }
+
+        const { savePatientPhotoEditStateAction } = await import('@/app/actions/patient-photo-edit-states');
+        const { error } = await savePatientPhotoEditStateAction({
+            fileId,
+            patientId,
+            rotation: state.rotation,
+            brightness: state.brightness,
+            drawShapes: state.drawShapes,
+            textAnnotations: state.textAnnotations,
+        });
+
+        if (error) {
+            console.error('[PhotoStudioModal] flush photo state error:', error);
+            return;
+        }
+
+        fileStatesRef.current.set(fileId, state);
+        persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
+        if (fileId === activeFileIdRef.current && serializeFileEditState(state) === serializeFileEditState(latestPhotoStateRef.current)) {
+            photoStateDirtyRef.current = false;
+        }
     }, [patientId]);
 
     useEffect(() => {
@@ -982,7 +1020,7 @@ export default function PhotoStudioModal({
 
     useEffect(() => {
         if (!patientId || !activeFile) return;
-        if (photoStateLoadInProgressRef.current) return;
+        if (!photoStateReady || photoStateLoadInProgressRef.current) return;
 
         if (skipNextPhotoStateAutosaveRef.current) {
             skipNextPhotoStateAutosaveRef.current = false;
@@ -994,36 +1032,13 @@ export default function PhotoStudioModal({
 
         if (photoStateSaveTimerRef.current) clearTimeout(photoStateSaveTimerRef.current);
         photoStateSaveTimerRef.current = setTimeout(async () => {
-            const { savePatientPhotoEditStateAction } = await import('@/app/actions/patient-photo-edit-states');
-            const { error } = await savePatientPhotoEditStateAction({
-                fileId: activeFile.id,
-                patientId,
-                rotation: nextState.rotation,
-                brightness: nextState.brightness,
-                drawShapes: nextState.drawShapes,
-                textAnnotations: nextState.textAnnotations,
-            });
-
-            if (error) {
-                console.error('[PhotoStudioModal] autosave photo state error:', error);
-                return;
-            }
-
-            fileStatesRef.current.set(activeFile.id, nextState);
-            persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
-
-            if (
-                activeFileIdRef.current === activeFile.id &&
-                serializeFileEditState(nextState) === serializeFileEditState(latestPhotoStateRef.current)
-            ) {
-                photoStateDirtyRef.current = false;
-            }
+            await flushPhotoStateSave({ fileId: activeFile.id, state: nextState });
         }, 400);
 
         return () => {
             if (photoStateSaveTimerRef.current) clearTimeout(photoStateSaveTimerRef.current);
         };
-    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations]);
+    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations, photoStateReady, flushPhotoStateSave]);
 
     // UI state
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -1394,7 +1409,7 @@ export default function PhotoStudioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canvasActive, canvasSelectedId, selectedShapeId, drawMode, selectedTextId, editingTextId]);
 
-    function handleSwitchFile(newFile: DriveFile) {
+    async function handleSwitchFile(newFile: DriveFile) {
         if (newFile.id === activeFile?.id) {
             setCanvasActive(false);
             return;
@@ -1409,9 +1424,11 @@ export default function PhotoStudioModal({
         }
         // Save current photo's editable state before switching
         if (activeFile) {
-            fileStatesRef.current.set(activeFile.id, {
+            const currentState = normalizeFileEditState({
                 rotation, brightness, drawShapes, textAnnotations,
             });
+            fileStatesRef.current.set(activeFile.id, currentState);
+            await flushPhotoStateSave({ fileId: activeFile.id, state: currentState });
         }
         // Reset and restore saved state for the new file (if any)
         resetEdits();
@@ -4001,8 +4018,9 @@ export default function PhotoStudioModal({
                 {/* ── Header ─────────────────────────────────────────────── */}
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             if (isDirty && !confirm('Tenés cambios sin guardar. ¿Salir de todas formas?')) return;
+                            await flushPhotoStateSave();
                             onClose();
                         }}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10 text-white border border-white/10 hover:bg-white/15 transition-colors flex-shrink-0 text-sm"
