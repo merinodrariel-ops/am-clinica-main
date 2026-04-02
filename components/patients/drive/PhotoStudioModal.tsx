@@ -327,6 +327,24 @@ function wrapTextCanvas(ctx: CanvasRenderingContext2D, text: string, maxWidthPx:
     return result.length ? result : [''];
 }
 
+function measureTextAnnotationWidth(text: string, currentWidth: number, x: number, canvasWidthPx: number): number {
+    if (!canvasWidthPx) return currentWidth;
+
+    const measureCanvas = document.createElement('canvas');
+    const ctx = measureCanvas.getContext('2d');
+    if (!ctx) return currentWidth;
+
+    ctx.font = '600 24px Inter, sans-serif';
+    const longestLinePx = Math.max(
+        ...text.split('\n').map((line) => ctx.measureText(line || ' ').width),
+        ctx.measureText('Texto...').width,
+    );
+
+    const desiredWidth = (longestLinePx + 24) / canvasWidthPx;
+    const maxWidth = Math.max(0.18, 0.95 - x);
+    return Math.max(0.18, Math.min(maxWidth, Math.max(currentWidth, desiredWidth)));
+}
+
 function getDrawColorHex(color: DrawColor): string {
     switch (color) {
         case 'white':  return '#ffffff';
@@ -4532,6 +4550,8 @@ export default function PhotoStudioModal({
                                                     position: 'absolute',
                                                     left: `${ta.x * 100}%`,
                                                     top: `${ta.y * 100}%`,
+                                                    width: `${ta.width * 100}%`,
+                                                    maxWidth: `${Math.max(18, (0.95 - ta.x) * 100)}%`,
                                                     zIndex: 20,
                                                     pointerEvents: 'auto',
                                                 }}
@@ -4542,7 +4562,15 @@ export default function PhotoStudioModal({
                                                     placeholder="Texto..."
                                                     rows={1}
                                                     onChange={e => {
-                                                        setTextAnnotations(prev => prev.map(t => t.id === ta.id ? { ...t, text: e.target.value } : t));
+                                                        const canvasWidthPx = drawCanvasRef.current?.clientWidth ?? 0;
+                                                        setTextAnnotations(prev => prev.map(t => {
+                                                            if (t.id !== ta.id) return t;
+                                                            return {
+                                                                ...t,
+                                                                text: e.target.value,
+                                                                width: measureTextAnnotationWidth(e.target.value, t.width, t.x, canvasWidthPx),
+                                                            };
+                                                        }));
                                                         // auto-grow height
                                                         e.target.style.height = 'auto';
                                                         e.target.style.height = `${e.target.scrollHeight}px`;
@@ -4556,7 +4584,9 @@ export default function PhotoStudioModal({
                                                     }}
                                                     onBlur={() => finishTextEditing(ta.id)}
                                                     style={{
-                                                        width: `${ta.width * 100}%`,
+                                                        width: '100%',
+                                                        maxWidth: '100%',
+                                                        boxSizing: 'border-box',
                                                         background: 'transparent',
                                                         border: 'none',
                                                         outline: 'none',
