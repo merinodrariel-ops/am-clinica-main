@@ -14,6 +14,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction } from '@/app/actions/patient-files-drive';
+import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
@@ -248,6 +249,40 @@ interface TextAnnotation {
     text: string;
     color: DrawColor;
     width: number; // normalized 0–1 — controls the wrap box width
+}
+
+interface FileEditState {
+    rotation: number;
+    brightness: number;
+    drawShapes: DrawShape[];
+    textAnnotations: TextAnnotation[];
+}
+
+function normalizeFileEditState(state?: Partial<FileEditState> | null): FileEditState {
+    return {
+        rotation: state?.rotation ?? 0,
+        brightness: state?.brightness ?? 100,
+        drawShapes: state?.drawShapes ?? [],
+        textAnnotations: state?.textAnnotations ?? [],
+    };
+}
+
+function serializeFileEditState(state: FileEditState): string {
+    return JSON.stringify(state);
+}
+
+function persistFileStatesToLocalStorage(patientId: string, states: Map<string, FileEditState>) {
+    if (typeof window === 'undefined') return;
+
+    const key = `am-clinica-states-${patientId}`;
+    const data: Record<string, FileEditState> = {};
+    states.forEach((value, id) => {
+        data[id] = value;
+    });
+
+    if (Object.keys(data).length > 0) {
+        localStorage.setItem(key, JSON.stringify(data));
+    }
 }
 
 function AirDropIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
@@ -607,12 +642,15 @@ export default function PhotoStudioModal({
         origPoints: DrawPoint[];
     } | null>(null);
     const didDragRef = useRef(false);
+    const supabase = useMemo(() => createSupabaseClient(), []);
     // Per-file state cache — persists draws/rotation/brightness across photo navigation
-    type FileEditState = {
-        rotation: number; brightness: number;
-        drawShapes: DrawShape[]; textAnnotations: TextAnnotation[];
-    };
     const fileStatesRef = useRef<Map<string, FileEditState>>(new Map());
+    const activeFileIdRef = useRef<string | null>(file?.id ?? null);
+    const latestPhotoStateRef = useRef<FileEditState>(normalizeFileEditState());
+    const skipNextPhotoStateAutosaveRef = useRef(false);
+    const photoStateDirtyRef = useRef(false);
+    const photoStateLoadInProgressRef = useRef(false);
+    const photoStateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Stable refs for arrow-key handler (avoids stale closure)
     const drawModeRef = useRef<DrawMode>('idle');
     const selectedShapeIdRef = useRef<string | null>(null);
@@ -809,52 +847,182 @@ export default function PhotoStudioModal({
 
     // ── Persistence: Save/Restore individual file states (drawings, etc.) ────────
     useEffect(() => {
+        activeFileIdRef.current = activeFile?.id ?? null;
+    }, [activeFile]);
+
+    useEffect(() => {
+        latestPhotoStateRef.current = normalizeFileEditState({ rotation, brightness, drawShapes, textAnnotations });
+    }, [rotation, brightness, drawShapes, textAnnotations]);
+
+    useEffect(() => {
         if (!patientId) return;
-        const key = `am-clinica-states-${patientId}`;
-        const saved = localStorage.getItem(key);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                Object.entries(parsed).forEach(([id, state]: [string, any]) => {
-                    fileStatesRef.current.set(id, state);
-                });
-                // If we already have an active file and it has saved state, load it
-                const currentFileId = activeFile?.id;
-                if (currentFileId) {
-                    const currentSaved = fileStatesRef.current.get(currentFileId);
-                    if (currentSaved) {
-                        setRotation(currentSaved.rotation);
-                        setBrightness(currentSaved.brightness);
-                        setDrawShapes(currentSaved.drawShapes || []);
-                        setTextAnnotations(currentSaved.textAnnotations || []);
-                    }
+
+        let cancelled = false;
+        photoStateLoadInProgressRef.current = true;
+
+        const loadPhotoStates = async () => {
+            const key = `am-clinica-states-${patientId}`;
+            const localStates = new Map<string, FileEditState>();
+            const saved = localStorage.getItem(key);
+
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved) as Record<string, unknown>;
+                    Object.entries(parsed).forEach(([id, state]) => {
+                        localStates.set(id, normalizeFileEditState(state as Partial<FileEditState>));
+                    });
+                } catch (e) {
+                    console.error('File states persistence load error', e);
                 }
-            } catch (e) {
-                console.error("File states persistence load error", e);
             }
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+            const { listPatientPhotoEditStatesAction } = await import('@/app/actions/patient-photo-edit-states');
+            const { data, error } = await listPatientPhotoEditStatesAction(patientId);
+            if (cancelled) return;
+
+            const mergedStates = new Map<string, FileEditState>();
+
+            if (!error) {
+                data.forEach((row) => {
+                    mergedStates.set(row.file_id, normalizeFileEditState({
+                        rotation: row.rotation,
+                        brightness: row.brightness,
+                        drawShapes: Array.isArray(row.draw_shapes) ? row.draw_shapes as DrawShape[] : [],
+                        textAnnotations: Array.isArray(row.text_annotations) ? row.text_annotations as TextAnnotation[] : [],
+                    }));
+                });
+            }
+
+            localStates.forEach((state, id) => {
+                if (!mergedStates.has(id)) mergedStates.set(id, state);
+            });
+
+            fileStatesRef.current = mergedStates;
+            persistFileStatesToLocalStorage(patientId, mergedStates);
+
+            const currentFileId = activeFileIdRef.current;
+            if (!currentFileId) return;
+
+            const currentSaved = mergedStates.get(currentFileId);
+            if (currentSaved) {
+                skipNextPhotoStateAutosaveRef.current = true;
+                setRotation(currentSaved.rotation);
+                setBrightness(currentSaved.brightness);
+                setDrawShapes(currentSaved.drawShapes);
+                setTextAnnotations(currentSaved.textAnnotations);
+            }
+        };
+
+        void loadPhotoStates().finally(() => {
+            if (!cancelled) photoStateLoadInProgressRef.current = false;
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [patientId]);
 
     useEffect(() => {
         if (!patientId) return;
-        const key = `am-clinica-states-${patientId}`;
-        
+
+        const channel = supabase
+            .channel(`patient-photo-edit-states-${patientId}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'patient_photo_edit_states', filter: `patient_id=eq.${patientId}` },
+                (payload: { new: { file_id?: string; rotation?: number; brightness?: number; draw_shapes?: unknown; text_annotations?: unknown } | null }) => {
+                    const row = payload.new;
+                    if (!row?.file_id) return;
+
+                    const nextState = normalizeFileEditState({
+                        rotation: row.rotation,
+                        brightness: row.brightness,
+                        drawShapes: Array.isArray(row.draw_shapes) ? row.draw_shapes as DrawShape[] : [],
+                        textAnnotations: Array.isArray(row.text_annotations) ? row.text_annotations as TextAnnotation[] : [],
+                    });
+
+                    fileStatesRef.current.set(row.file_id, nextState);
+                    persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
+
+                    if (row.file_id !== activeFileIdRef.current) return;
+
+                    const localState = latestPhotoStateRef.current;
+                    if (photoStateDirtyRef.current && serializeFileEditState(nextState) !== serializeFileEditState(localState)) {
+                        return;
+                    }
+
+                    if (serializeFileEditState(nextState) === serializeFileEditState(localState)) return;
+
+                    skipNextPhotoStateAutosaveRef.current = true;
+                    setRotation(nextState.rotation);
+                    setBrightness(nextState.brightness);
+                    setDrawShapes(nextState.drawShapes);
+                    setTextAnnotations(nextState.textAnnotations);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [patientId, supabase]);
+
+    useEffect(() => {
+        if (!patientId) return;
+
         // Capture current state into ref before saving
         if (activeFile) {
-            fileStatesRef.current.set(activeFile.id, {
-                rotation, brightness, drawShapes, textAnnotations
+            fileStatesRef.current.set(activeFile.id, normalizeFileEditState({
+                rotation, brightness, drawShapes, textAnnotations,
+            }));
+        }
+
+        persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
+    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations]);
+
+    useEffect(() => {
+        if (!patientId || !activeFile) return;
+        if (photoStateLoadInProgressRef.current) return;
+
+        if (skipNextPhotoStateAutosaveRef.current) {
+            skipNextPhotoStateAutosaveRef.current = false;
+            return;
+        }
+
+        const nextState = normalizeFileEditState({ rotation, brightness, drawShapes, textAnnotations });
+        photoStateDirtyRef.current = true;
+
+        if (photoStateSaveTimerRef.current) clearTimeout(photoStateSaveTimerRef.current);
+        photoStateSaveTimerRef.current = setTimeout(async () => {
+            const { savePatientPhotoEditStateAction } = await import('@/app/actions/patient-photo-edit-states');
+            const { error } = await savePatientPhotoEditStateAction({
+                fileId: activeFile.id,
+                patientId,
+                rotation: nextState.rotation,
+                brightness: nextState.brightness,
+                drawShapes: nextState.drawShapes,
+                textAnnotations: nextState.textAnnotations,
             });
-        }
 
-        const data: Record<string, any> = {};
-        fileStatesRef.current.forEach((val, id) => {
-            data[id] = val;
-        });
+            if (error) {
+                console.error('[PhotoStudioModal] autosave photo state error:', error);
+                return;
+            }
 
-        if (Object.keys(data).length > 0) {
-            localStorage.setItem(key, JSON.stringify(data));
-        }
+            fileStatesRef.current.set(activeFile.id, nextState);
+            persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
+
+            if (
+                activeFileIdRef.current === activeFile.id &&
+                serializeFileEditState(nextState) === serializeFileEditState(latestPhotoStateRef.current)
+            ) {
+                photoStateDirtyRef.current = false;
+            }
+        }, 400);
+
+        return () => {
+            if (photoStateSaveTimerRef.current) clearTimeout(photoStateSaveTimerRef.current);
+        };
     }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations]);
 
     // UI state
