@@ -306,6 +306,7 @@ function AirDropIcon({ size = 16, className = '' }: { size?: number; className?:
 }
 
 const TEXT_LINE_HEIGHT = 1.35; // em — must match CSS in the textarea overlay
+const DEFAULT_TEXT_ANNOTATION_WIDTH = 0.5;
 
 function wrapTextCanvas(ctx: CanvasRenderingContext2D, text: string, maxWidthPx: number): string[] {
     const result: string[] = [];
@@ -343,6 +344,10 @@ function measureTextAnnotationWidth(text: string, currentWidth: number, x: numbe
     const desiredWidth = (longestLinePx + 24) / canvasWidthPx;
     const maxWidth = Math.max(0.18, 0.95 - x);
     return Math.max(0.18, Math.min(maxWidth, Math.max(currentWidth, desiredWidth)));
+}
+
+function getDefaultTextAnnotationWidth(x: number): number {
+    return Math.max(0.22, Math.min(DEFAULT_TEXT_ANNOTATION_WIDTH, 0.95 - x));
 }
 
 function getDrawColorHex(color: DrawColor): string {
@@ -2994,11 +2999,10 @@ export default function PhotoStudioModal({
             const hit = hitTestTextAnnotation(textAnnotations, nx, ny);
             if (hit) {
                 setSelectedTextId(hit.id);
-                setEditingTextId(hit.id);
             } else {
                 setSelectedTextId(null);
                 const newId = `text-${Date.now()}`;
-                const newTA: TextAnnotation = { id: newId, x: nx, y: ny, text: '', color: drawColor, width: 0.35 };
+                const newTA: TextAnnotation = { id: newId, x: nx, y: ny, text: '', color: drawColor, width: getDefaultTextAnnotationWidth(nx) };
                 setTextAnnotations(prev => [...prev, newTA]);
                 setSelectedTextId(newId);
                 setEditingTextId(newId);
@@ -3087,6 +3091,15 @@ export default function PhotoStudioModal({
             setMousePos(null);
             return;
         }
+        const [nx, ny] = getDrawNormXY(e);
+        const textHit = hitTestTextAnnotation(textAnnotations, nx, ny);
+        if (textHit) {
+            e.stopPropagation();
+            setTextToolActive(true);
+            setSelectedTextId(textHit.id);
+            setEditingTextId(textHit.id);
+            return;
+        }
         if (drawMode === 'selected' && selectedShapeId) {
             // Double-click on selected shape → enter edit mode (show handles)
             e.stopPropagation();
@@ -3096,7 +3109,6 @@ export default function PhotoStudioModal({
         if (drawMode === 'editing' && selectedShapeId) {
             // Double-click on a handle → toggle smooth/sharp
             const canvas = drawCanvasRef.current!;
-            const [nx, ny] = getDrawNormXY(e);
             const shape = drawShapes.find(s => s.id === selectedShapeId);
             if (!shape) return;
             const idx = hitTestPoint(shape, nx, ny, canvas);
