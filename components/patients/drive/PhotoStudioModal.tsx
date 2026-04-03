@@ -7,7 +7,8 @@ import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
-    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2
+    PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
+    AlignLeft, AlignCenter, AlignRight, Minus
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -249,6 +250,8 @@ interface TextAnnotation {
     text: string;
     color: DrawColor;
     width: number; // normalized 0–1 — controls the wrap box width
+    fontSize: number;
+    align: 'left' | 'center' | 'right';
 }
 
 interface FileEditState {
@@ -263,7 +266,7 @@ function normalizeFileEditState(state?: Partial<FileEditState> | null): FileEdit
         rotation: state?.rotation ?? 0,
         brightness: state?.brightness ?? 100,
         drawShapes: state?.drawShapes ?? [],
-        textAnnotations: state?.textAnnotations ?? [],
+        textAnnotations: (state?.textAnnotations ?? []).map(normalizeTextAnnotation),
     };
 }
 
@@ -307,6 +310,20 @@ function AirDropIcon({ size = 16, className = '' }: { size?: number; className?:
 
 const TEXT_LINE_HEIGHT = 1.35; // em — must match CSS in the textarea overlay
 const DEFAULT_TEXT_ANNOTATION_WIDTH = 0.5;
+const DEFAULT_TEXT_FONT_SIZE = 24;
+
+function normalizeTextAnnotation(annotation: Partial<TextAnnotation>): TextAnnotation {
+    return {
+        id: annotation.id ?? `text-${Date.now()}`,
+        x: annotation.x ?? 0,
+        y: annotation.y ?? 0,
+        text: annotation.text ?? '',
+        color: annotation.color ?? 'white',
+        width: annotation.width ?? DEFAULT_TEXT_ANNOTATION_WIDTH,
+        fontSize: annotation.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
+        align: annotation.align ?? 'left',
+    };
+}
 
 function wrapTextCanvas(ctx: CanvasRenderingContext2D, text: string, maxWidthPx: number): string[] {
     const result: string[] = [];
@@ -328,14 +345,14 @@ function wrapTextCanvas(ctx: CanvasRenderingContext2D, text: string, maxWidthPx:
     return result.length ? result : [''];
 }
 
-function measureTextAnnotationWidth(text: string, currentWidth: number, x: number, canvasWidthPx: number): number {
+function measureTextAnnotationWidth(text: string, currentWidth: number, x: number, canvasWidthPx: number, fontSize: number): number {
     if (!canvasWidthPx) return currentWidth;
 
     const measureCanvas = document.createElement('canvas');
     const ctx = measureCanvas.getContext('2d');
     if (!ctx) return currentWidth;
 
-    ctx.font = '600 24px Inter, sans-serif';
+    ctx.font = `600 ${fontSize}px Inter, sans-serif`;
     const longestLinePx = Math.max(
         ...text.split('\n').map((line) => ctx.measureText(line || ' ').width),
         ctx.measureText('Texto...').width,
@@ -348,6 +365,12 @@ function measureTextAnnotationWidth(text: string, currentWidth: number, x: numbe
 
 function getDefaultTextAnnotationWidth(x: number): number {
     return Math.max(0.22, Math.min(DEFAULT_TEXT_ANNOTATION_WIDTH, 0.95 - x));
+}
+
+function getAlignedTextX(baseX: number, boxWidth: number, align: TextAnnotation['align']): number {
+    if (align === 'center') return baseX + boxWidth / 2;
+    if (align === 'right') return baseX + boxWidth;
+    return baseX;
 }
 
 function getDrawColorHex(color: DrawColor): string {
@@ -832,6 +855,7 @@ export default function PhotoStudioModal({
     const textResizeDragRef = useRef<{ id: string; startNx: number; startWidth: number } | null>(null);
     const textMetricsRef = useRef<Map<string, { hNorm: number }>>(new Map());
     const justFinishedEditRef = useRef<string | null>(null); // guards against blur-then-click creating new text
+    const selectedText = useMemo(() => textAnnotations.find(t => t.id === selectedTextId) ?? null, [textAnnotations, selectedTextId]);
 
     const [zoom, setZoom] = useState(1);
     const zoomRef = useRef(1); // mirrors zoom for non-reactive wheel handler
@@ -2174,9 +2198,6 @@ export default function PhotoStudioModal({
 
         // ── Text annotations ─────────────────────────────────────────────────
         if (drawVisible) {
-            const fontSize = 24 * displayScale;
-            const lineH = fontSize * TEXT_LINE_HEIGHT;
-            ctx.font = `600 ${fontSize}px Inter, sans-serif`;
             ctx.textBaseline = 'top';
             textMetricsRef.current.clear();
             for (const ta of textAnnotations) {
@@ -2184,6 +2205,10 @@ export default function PhotoStudioModal({
                 const tx = ta.x * W;
                 const ty = ta.y * H;
                 const maxWidthPx = ta.width * W;
+                const fontSize = ta.fontSize * displayScale;
+                const lineH = fontSize * TEXT_LINE_HEIGHT;
+                ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+                ctx.textAlign = ta.align;
                 const lines = wrapTextCanvas(ctx, ta.text || '', maxWidthPx);
                 const totalH = lines.length * lineH;
                 textMetricsRef.current.set(ta.id, { hNorm: totalH / H });
@@ -2193,7 +2218,7 @@ export default function PhotoStudioModal({
                 ctx.shadowBlur = 5 * displayScale;
                 ctx.fillStyle = getDrawColorHex(ta.color);
                 for (let i = 0; i < lines.length; i++) {
-                    ctx.fillText(lines[i], tx, ty + i * lineH);
+                    ctx.fillText(lines[i], getAlignedTextX(tx, maxWidthPx, ta.align), ty + i * lineH);
                 }
                 const isSelected = ta.id === selectedTextId;
                 if (isSelected) {
@@ -3004,7 +3029,16 @@ export default function PhotoStudioModal({
             } else {
                 setSelectedTextId(null);
                 const newId = `text-${Date.now()}`;
-                const newTA: TextAnnotation = { id: newId, x: nx, y: ny, text: '', color: drawColor, width: getDefaultTextAnnotationWidth(nx) };
+                const newTA: TextAnnotation = {
+                    id: newId,
+                    x: nx,
+                    y: ny,
+                    text: '',
+                    color: drawColor,
+                    width: getDefaultTextAnnotationWidth(nx),
+                    fontSize: DEFAULT_TEXT_FONT_SIZE,
+                    align: 'left',
+                };
                 setTextAnnotations(prev => [...prev, newTA]);
                 setSelectedTextId(newId);
                 setEditingTextId(newId);
@@ -3534,22 +3568,23 @@ export default function PhotoStudioModal({
         // Bake text annotations with word-wrap (including any currently being edited)
         if (drawVisible && textAnnotations.length > 0) {
             const displayW = drawCanvasRef.current?.getBoundingClientRect().width || canvasW;
-            const fontSize = 24 * (canvasW / displayW);
-            const lineH = fontSize * TEXT_LINE_HEIGHT;
-            ctx.font = `600 ${fontSize}px Inter, sans-serif`;
             ctx.textBaseline = 'top';
             for (const ta of textAnnotations) {
                 if (!ta.text.trim()) continue;
                 const tx = ta.x * canvasW;
                 const ty = ta.y * canvasH;
                 const maxWidthPx = ta.width * canvasW;
+                const fontSize = ta.fontSize * (canvasW / displayW);
+                const lineH = fontSize * TEXT_LINE_HEIGHT;
+                ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+                ctx.textAlign = ta.align;
                 const lines = wrapTextCanvas(ctx, ta.text, maxWidthPx);
                 ctx.save();
                 ctx.shadowColor = 'rgba(0,0,0,0.7)';
                 ctx.shadowBlur = 5 * (canvasW / displayW);
                 ctx.fillStyle = getDrawColorHex(ta.color);
                 for (let i = 0; i < lines.length; i++) {
-                    ctx.fillText(lines[i], tx, ty + i * lineH);
+                    ctx.fillText(lines[i], getAlignedTextX(tx, maxWidthPx, ta.align), ty + i * lineH);
                 }
                 ctx.restore();
             }
@@ -4411,6 +4446,47 @@ export default function PhotoStudioModal({
                         onDoubleClick={canvasActive ? undefined : () => { setZoom(1); setPanX(0); setPanY(0); }}
                         style={{ cursor: (!canvasActive && zoom > 1) ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                     >
+                        {!canvasActive && selectedText && (
+                            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-[#12121A]/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+                                <button
+                                    onClick={() => setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, fontSize: Math.max(14, t.fontSize - 2) } : t))}
+                                    className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                                    title="Reducir tamaño"
+                                >
+                                    <Minus size={14} />
+                                </button>
+                                <span className="min-w-10 text-center text-xs font-semibold text-white/80">{selectedText.fontSize}px</span>
+                                <button
+                                    onClick={() => setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, fontSize: Math.min(72, t.fontSize + 2) } : t))}
+                                    className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                                    title="Aumentar tamaño"
+                                >
+                                    <Plus size={14} />
+                                </button>
+                                <div className="mx-1 h-5 w-px bg-white/10" />
+                                {([
+                                    { id: 'left', icon: AlignLeft, label: 'Alinear izquierda' },
+                                    { id: 'center', icon: AlignCenter, label: 'Alinear centro' },
+                                    { id: 'right', icon: AlignRight, label: 'Alinear derecha' },
+                                ] as const).map(opt => {
+                                    const Icon = opt.icon;
+                                    return (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, align: opt.id } : t))}
+                                            className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+                                                selectedText.align === opt.id
+                                                    ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
+                                                    : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                                            }`}
+                                            title={opt.label}
+                                        >
+                                            <Icon size={14} />
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
                         <div style={{ transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.05s ease-out' }}>
                             {!canvasActive && (brushMode !== null || healMode) ? (
@@ -4582,7 +4658,7 @@ export default function PhotoStudioModal({
                                                             return {
                                                                 ...t,
                                                                 text: e.target.value,
-                                                                width: measureTextAnnotationWidth(e.target.value, t.width, t.x, canvasWidthPx),
+                                                                width: measureTextAnnotationWidth(e.target.value, t.width, t.x, canvasWidthPx, t.fontSize),
                                                             };
                                                         }));
                                                         // auto-grow height
@@ -4608,8 +4684,11 @@ export default function PhotoStudioModal({
                                                         overflow: 'hidden',
                                                         padding: 0,
                                                         display: 'block',
-                                                        font: `600 24px Inter, sans-serif`,
+                                                        fontFamily: 'Inter, sans-serif',
+                                                        fontWeight: 600,
+                                                        fontSize: `${ta.fontSize}px`,
                                                         lineHeight: TEXT_LINE_HEIGHT,
+                                                        textAlign: ta.align,
                                                         color: getDrawColorHex(ta.color),
                                                         caretColor: getDrawColorHex(ta.color),
                                                         textShadow: '0 0 4px rgba(0,0,0,0.8)',
