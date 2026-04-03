@@ -2195,14 +2195,14 @@ export default function PhotoStudioModal({
                 for (let i = 0; i < lines.length; i++) {
                     ctx.fillText(lines[i], tx, ty + i * lineH);
                 }
-                const isSelected = ta.id === selectedTextId && textToolActive;
+                const isSelected = ta.id === selectedTextId;
                 if (isSelected) {
                     const ds = displayScale;
                     ctx.shadowBlur = 0;
                     ctx.setLineDash([3 * ds, 2 * ds]);
                     ctx.strokeStyle = getDrawColorHex(ta.color);
-                    ctx.lineWidth = ds;
-                    ctx.globalAlpha = 0.6;
+                    ctx.lineWidth = Math.max(ds, 1.5 * ds);
+                    ctx.globalAlpha = 0.8;
                     ctx.strokeRect(tx - 2 * ds, ty - 2 * ds, maxWidthPx + 4 * ds, totalH + 4 * ds);
                     // Resize handle — right edge, vertically centered
                     const hx = tx + maxWidthPx;
@@ -2211,8 +2211,8 @@ export default function PhotoStudioModal({
                     ctx.globalAlpha = 1;
                     ctx.fillStyle = '#ffffff';
                     ctx.strokeStyle = getDrawColorHex(ta.color);
-                    ctx.lineWidth = 1.5 * ds;
-                    const HR = 5 * ds;
+                    ctx.lineWidth = 2 * ds;
+                    const HR = 6 * ds;
                     ctx.fillRect(hx - HR, hy - HR, HR * 2, HR * 2);
                     ctx.strokeRect(hx - HR, hy - HR, HR * 2, HR * 2);
                 }
@@ -2951,9 +2951,11 @@ export default function PhotoStudioModal({
     }
 
     function finishTextEditing(id: string) {
+        const edited = textAnnotations.find(t => t.id === id);
+        const hasContent = Boolean(edited?.text.trim());
         setTextAnnotations(prev => prev.filter(t => t.id !== id || t.text.trim() !== ''));
         setEditingTextId(null);
-        setSelectedTextId(id); // keep visually selected so user can see + drag it
+        setSelectedTextId(hasContent ? id : null); // keep visually selected so user can see + drag it
         justFinishedEditRef.current = id;
         setTimeout(() => { justFinishedEditRef.current = null; }, 350);
     }
