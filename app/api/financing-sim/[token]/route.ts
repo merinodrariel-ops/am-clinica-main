@@ -40,7 +40,7 @@ async function getSimulationByToken(token: string) {
     }
 
     const allowedInstallments = normalizeOptions(data.allowed_installment_options, [3, 6, 12]);
-    const allowedUpfront = normalizeOptions(data.allowed_upfront_options, [30, 40, 50]);
+    const allowedUpfront = normalizeOptions(data.allowed_upfront_options, [30, 50]).filter((value) => [30, 50].includes(value));
 
     return {
         simulation: {

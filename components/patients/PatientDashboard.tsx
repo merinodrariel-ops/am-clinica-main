@@ -40,6 +40,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
+import { updatePatientAction } from '@/app/actions/patients';
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import type { PlanFinanciacion } from '@/lib/financiacion';
 import PatientCadence from '@/components/recalls/PatientCadence';
@@ -47,7 +48,12 @@ import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 import NuevaPrestacionModal from './NuevaPrestacionModal';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
 import { getPatientInventoryMaterials, type PatientMaterialRecord } from '@/app/actions/inventory-stock';
-import { calculateFinancingBreakdown, DEFAULT_MONTHLY_INTEREST_PCT } from '@/lib/financial-engine';
+import {
+    calculateFinancingBreakdown,
+    DEFAULT_MONTHLY_INTEREST_PCT,
+    FINANCING_INSTALLMENT_OPTIONS,
+    FINANCING_UPFRONT_OPTIONS,
+} from '@/lib/financial-engine';
 
 interface Movement {
     id: string;
@@ -111,6 +117,8 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
     const [showPrestacionModal, setShowPrestacionModal] = useState(false);
+    const [editableCuit, setEditableCuit] = useState(patient.cuit || '');
+    const [savingCuit, setSavingCuit] = useState(false);
 
     // Materiales state
     const [materiales, setMateriales] = useState<PatientMaterialRecord[]>([]);
@@ -179,32 +187,31 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const [crearPlanError, setCrearPlanError] = useState<string | null>(null);
     const [planForm, setPlanForm] = useState({
         tratamiento: '',
-        montoTotalUsd: '',
+        montoTratamientoUsd: '',
+        anticipoPct: '30',
         cuotasTotal: '',
         montoCuotaUsd: '',
-        tasaMensual: String(DEFAULT_MONTHLY_INTEREST_PCT),
         fechaInicio: '',
         notas: '',
     });
 
-    // Auto-recalculate installment when monto/cuotas/tasa change
-    function recalcCuota(monto: string, cuotas: string, tasa: string): string {
+    function getPlanPreview(monto: string, anticipoPct: string, cuotas: string) {
         const m = parseFloat(monto);
         const c = parseInt(cuotas);
-        const t = parseFloat(tasa);
-        if (m > 0 && c > 0 && !isNaN(t)) {
-            const bd = calculateFinancingBreakdown({ totalUsd: m, upfrontPct: 0, installments: c, monthlyInterestPct: t });
-            return bd.installmentUsd.toFixed(2);
+        const a = parseInt(anticipoPct);
+        if (m > 0 && c > 0 && [30, 50].includes(a) && [3, 6, 12].includes(c)) {
+            return calculateFinancingBreakdown({ totalUsd: m, upfrontPct: a, installments: c, monthlyInterestPct: DEFAULT_MONTHLY_INTEREST_PCT });
         }
-        return '';
+        return null;
     }
 
     async function handleCrearPlan() {
         setCrearPlanError(null);
-        const monto = parseFloat(planForm.montoTotalUsd);
+        const monto = parseFloat(planForm.montoTratamientoUsd);
         const cuotas = parseInt(planForm.cuotasTotal);
-        const cuotaMonto = parseFloat(planForm.montoCuotaUsd);
-        if (!planForm.tratamiento || isNaN(monto) || monto <= 0 || isNaN(cuotas) || cuotas < 1 || isNaN(cuotaMonto) || cuotaMonto <= 0 || !planForm.fechaInicio) {
+        const anticipoPct = parseInt(planForm.anticipoPct);
+        const preview = getPlanPreview(planForm.montoTratamientoUsd, planForm.anticipoPct, planForm.cuotasTotal);
+        if (!planForm.tratamiento || isNaN(monto) || monto <= 0 || ![30, 50].includes(anticipoPct) || !preview || !planForm.fechaInicio) {
             setCrearPlanError('Completá todos los campos requeridos.');
             return;
         }
@@ -214,11 +221,11 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                 pacienteId: patient.id_paciente,
                 pacienteNombre: `${patient.nombre} ${patient.apellido}`.trim(),
                 tratamiento: planForm.tratamiento,
-                montoTotalUsd: monto,
+                montoTotalUsd: preview.financedTotalUsd,
                 cuotasTotal: cuotas,
-                montoCuotaUsd: cuotaMonto,
+                montoCuotaUsd: preview.installmentUsd,
                 fechaInicio: planForm.fechaInicio,
-                notas: planForm.notas || undefined,
+                notas: planForm.notas || `Monto total: USD ${preview.totalUsd.toFixed(2)} · Anticipo ${preview.upfrontPct}%: USD ${preview.upfrontUsd.toFixed(2)} · Saldo financiado: USD ${preview.financedPrincipalUsd.toFixed(2)}`,
             });
             if (result.success) {
                 setShowCrearPlan(false);
@@ -273,6 +280,24 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const totalPagadoUSD = payments
         .filter(p => p.estado !== 'Anulado')
         .reduce((sum, p) => sum + (p.usd_equivalente || 0), 0);
+
+    async function handleSaveCuit() {
+        const nextCuit = editableCuit.trim();
+        if (nextCuit === (patient.cuit || '')) return;
+
+        setSavingCuit(true);
+        try {
+            const result = await updatePatientAction(patient.id_paciente, { cuit: nextCuit || null }, 'Actualización de CUIT/CUIL desde ficha del paciente');
+            if (result.error) {
+                toast.error(result.error.message || 'No se pudo guardar el CUIT/CUIL');
+                return;
+            }
+            toast.success('CUIT/CUIL actualizado');
+            router.refresh();
+        } finally {
+            setSavingCuit(false);
+        }
+    }
 
     return (
         <>
@@ -394,6 +419,33 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 label="Documento"
                                 value={patient.documento || 'No registrado'}
                             />
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                    <div className="text-gray-400"><CreditCard size={18} /></div>
+                                    <div className="flex-1">
+                                        <p className="text-xs text-gray-500">CUIT/CUIL</p>
+                                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                                            <input
+                                                type="text"
+                                                value={editableCuit}
+                                                onChange={(e) => setEditableCuit(e.target.value)}
+                                                placeholder="Ingresar CUIT/CUIL"
+                                                className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleSaveCuit()}
+                                                disabled={savingCuit}
+                                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                            >
+                                                <Save size={14} />
+                                                {savingCuit ? 'Guardando...' : 'Guardar'}
+                                            </button>
+                                        </div>
+                                        <p className="mt-2 text-xs text-gray-500">Dato usado para validar si la paciente puede financiarse.</p>
+                                    </div>
+                                </div>
+                            </div>
                             <InfoCard
                                 icon={<Calendar size={18} />}
                                 label="Fecha de Nacimiento"
@@ -781,7 +833,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 <button
                                                     onClick={() => {
                                                         setCrearPlanError(null);
-                                                        setPlanForm({ tratamiento: '', montoTotalUsd: '', cuotasTotal: '', montoCuotaUsd: '', tasaMensual: String(DEFAULT_MONTHLY_INTEREST_PCT), fechaInicio: '', notas: '' });
+                                                        setPlanForm({ tratamiento: '', montoTratamientoUsd: '', anticipoPct: '30', cuotasTotal: '', montoCuotaUsd: '', fechaInicio: '', notas: '' });
                                                         setShowCrearPlan(true);
                                                     }}
                                                     className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
@@ -1044,20 +1096,20 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 />
                             </div>
 
-                            {/* Monto a financiar */}
+                            {/* Monto total del tratamiento */}
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Monto a financiar (USD) *</label>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Monto total del tratamiento (USD) *</label>
                                 <input
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    value={planForm.montoTotalUsd}
+                                    value={planForm.montoTratamientoUsd}
                                     onChange={e => {
                                         const monto = e.target.value;
                                         setPlanForm(p => ({
                                             ...p,
-                                            montoTotalUsd: monto,
-                                            montoCuotaUsd: recalcCuota(monto, p.cuotasTotal, p.tasaMensual),
+                                            montoTratamientoUsd: monto,
+                                            montoCuotaUsd: getPlanPreview(monto, p.anticipoPct, p.cuotasTotal)?.installmentUsd.toFixed(2) || '',
                                         }));
                                     }}
                                     placeholder="0.00"
@@ -1065,11 +1117,35 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 />
                             </div>
 
-                            {/* Cuotas (botones como en calculadora pública) */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-2">Anticipo *</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {FINANCING_UPFRONT_OPTIONS.map(option => (
+                                        <button
+                                            key={option}
+                                            type="button"
+                                            onClick={() => setPlanForm(p => ({
+                                                ...p,
+                                                anticipoPct: String(option),
+                                                montoCuotaUsd: getPlanPreview(p.montoTratamientoUsd, String(option), p.cuotasTotal)?.installmentUsd.toFixed(2) || '',
+                                            }))}
+                                            className={`py-2 rounded-lg text-sm font-medium transition-all ${
+                                                planForm.anticipoPct === String(option)
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            {option}%
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Cuotas */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-2">Cantidad de cuotas *</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {[3, 6, 9, 12].map(n => (
+                                <div className="grid grid-cols-3 gap-2">
+                                    {FINANCING_INSTALLMENT_OPTIONS.map(n => (
                                         <button
                                             key={n}
                                             type="button"
@@ -1078,7 +1154,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 setPlanForm(p => ({
                                                     ...p,
                                                     cuotasTotal: cuotas,
-                                                    montoCuotaUsd: recalcCuota(p.montoTotalUsd, cuotas, p.tasaMensual),
+                                                    montoCuotaUsd: getPlanPreview(p.montoTratamientoUsd, p.anticipoPct, cuotas)?.installmentUsd.toFixed(2) || '',
                                                 }));
                                             }}
                                             className={`py-2 rounded-lg text-sm font-medium transition-all ${
@@ -1093,49 +1169,23 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 </div>
                             </div>
 
-                            {/* Tasa mensual */}
-                            <div className="grid grid-cols-2 gap-3 items-end">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Tasa mensual (%)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.1"
-                                        value={planForm.tasaMensual}
-                                        onChange={e => {
-                                            const tasa = e.target.value;
-                                            setPlanForm(p => ({
-                                                ...p,
-                                                tasaMensual: tasa,
-                                                montoCuotaUsd: recalcCuota(p.montoTotalUsd, p.cuotasTotal, tasa),
-                                            }));
-                                        }}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                                    />
-                                    <p className="text-xs text-gray-400 mt-0.5">Estándar: {DEFAULT_MONTHLY_INTEREST_PCT}% mensual</p>
+                            <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 text-sm space-y-1">
+                                <div className="flex justify-between gap-3">
+                                    <span className="text-gray-500">TNA</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">18% anual</span>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Monto cuota (USD)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={planForm.montoCuotaUsd}
-                                        onChange={e => setPlanForm(p => ({ ...p, montoCuotaUsd: e.target.value }))}
-                                        placeholder="auto"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                                    />
-                                    <p className="text-xs text-gray-400 mt-0.5">Ajustable manualmente</p>
+                                <div className="flex justify-between gap-3">
+                                    <span className="text-gray-500">Tasa mensual</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{DEFAULT_MONTHLY_INTEREST_PCT}%</span>
                                 </div>
+                                <p className="text-xs text-gray-500 pt-1">Financiación sujeta a evaluación y preaprobación de cada caso.</p>
                             </div>
 
-                            {/* Preview en vivo (igual que calculadora pública) */}
+                            {/* Preview en vivo */}
                             {(() => {
-                                const m = parseFloat(planForm.montoTotalUsd);
+                                const bd = getPlanPreview(planForm.montoTratamientoUsd, planForm.anticipoPct, planForm.cuotasTotal);
                                 const c = parseInt(planForm.cuotasTotal);
-                                const t = parseFloat(planForm.tasaMensual);
-                                if (m > 0 && c > 0 && !isNaN(t)) {
-                                    const bd = calculateFinancingBreakdown({ totalUsd: m, upfrontPct: 0, installments: c, monthlyInterestPct: t });
+                                if (bd && c > 0) {
                                     return (
                                         <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 space-y-2">
                                             <div className="text-center pb-2 border-b border-emerald-200 dark:border-emerald-800">
@@ -1147,11 +1197,23 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             </div>
                                             <div className="space-y-1 text-sm">
                                                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                                    <span>Interés ({t}% × {c} meses)</span>
+                                                    <span>Monto total</span>
+                                                    <span>USD {bd.totalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                                                    <span>Anticipo hoy</span>
+                                                    <span>USD {bd.upfrontUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                                                    <span>Saldo financiado</span>
+                                                    <span>USD {bd.financedPrincipalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                                                    <span>Interés (TNA 18%)</span>
                                                     <span>USD {bd.totalInterestUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                                 <div className="flex justify-between font-medium text-gray-900 dark:text-white border-t border-emerald-200 dark:border-emerald-800 pt-1">
-                                                    <span>Total a pagar</span>
+                                                    <span>Total financiado</span>
                                                     <span>USD {bd.financedTotalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             </div>

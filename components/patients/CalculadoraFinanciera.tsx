@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Copy, Download, ExternalLink, FileSignature, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Download, ExternalLink, FileSignature, RefreshCw, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { Input } from '@/components/ui/Input';
@@ -11,6 +11,8 @@ import { fetchDolarOficialRate, type DolarOficialRate } from '@/lib/dolar-oficia
 import {
     calculateFinancingBreakdown,
     DEFAULT_MONTHLY_INTEREST_PCT,
+    FINANCING_INSTALLMENT_OPTIONS,
+    FINANCING_UPFRONT_OPTIONS,
     formatArs,
     formatUsd,
 } from '@/lib/financial-engine';
@@ -23,6 +25,7 @@ import {
 } from '@/app/actions/contracts';
 import { buildFinancingOfferHtml } from '@/lib/financing-offer-template';
 import { formatIsoDateEsAr, getContractSchedule } from '@/lib/contract-dates';
+import { generateFinancingProposalPDF, getFinancingProposalPdfFileName } from '@/lib/financing-proposal-pdf';
 
 interface CalculadoraFinancieraProps {
     patient: Paciente;
@@ -37,15 +40,8 @@ const TOP_TREATMENT_OPTIONS = [
 ] as const;
 
 const OTHER_TREATMENT_OPTION = '__other__';
-const INSTALLMENT_OPTIONS = [3, 6, 12] as const;
-const ANTICIPO_PRESETS = [30, 40, 50] as const;
-const MIN_CUSTOM_ANTICIPO = 30;
-const MAX_CUSTOM_ANTICIPO = 90;
-
-function clampAnticipo(value: number): number {
-    if (!Number.isFinite(value)) return MIN_CUSTOM_ANTICIPO;
-    return Math.min(MAX_CUSTOM_ANTICIPO, Math.max(MIN_CUSTOM_ANTICIPO, Math.round(value)));
-}
+const INSTALLMENT_OPTIONS = [...FINANCING_INSTALLMENT_OPTIONS] as number[];
+const ANTICIPO_PRESETS = [...FINANCING_UPFRONT_OPTIONS] as number[];
 
 export default function CalculadoraFinanciera({
     patient,
@@ -55,7 +51,7 @@ export default function CalculadoraFinanciera({
     const [selectedTreatment, setSelectedTreatment] = useState<string>('Alineadores invisibles AM');
     const [customTreatment, setCustomTreatment] = useState('');
     const [totalUsd, setTotalUsd] = useState(
-        patient.presupuesto_total && patient.presupuesto_total > 0 ? patient.presupuesto_total : 5000
+        patient.presupuesto_total && patient.presupuesto_total > 0 ? patient.presupuesto_total : 0
     );
     const [anticipoPct, setAnticipoPct] = useState(30);
     const [cuotas, setCuotas] = useState(12);
@@ -68,6 +64,7 @@ export default function CalculadoraFinanciera({
     const [checkingReadiness, setCheckingReadiness] = useState(false);
     const [readiness, setReadiness] = useState<ContractMakerReadinessResult | null>(null);
     const [currentSimulationId, setCurrentSimulationId] = useState<string | null>(null);
+    const [sharingProposal, setSharingProposal] = useState(false);
 
     useEffect(() => {
         if (!initialPreset) {
@@ -84,9 +81,9 @@ export default function CalculadoraFinanciera({
             setCustomTreatment(normalizedTreatment);
         }
 
-        setTotalUsd(initialPreset.totalUsd > 0 ? initialPreset.totalUsd : 5000);
-        setAnticipoPct(clampAnticipo(initialPreset.upfrontPct));
-        setCuotas([3, 6, 12].includes(initialPreset.installments) ? initialPreset.installments : 12);
+        setTotalUsd(initialPreset.totalUsd > 0 ? initialPreset.totalUsd : 0);
+        setAnticipoPct(ANTICIPO_PRESETS.includes(initialPreset.upfrontPct) ? initialPreset.upfrontPct : 30);
+        setCuotas(INSTALLMENT_OPTIONS.includes(initialPreset.installments) ? initialPreset.installments : 12);
         setManualRate(initialPreset.bnaVentaArs > 0 ? initialPreset.bnaVentaArs : 0);
         setCurrentSimulationId(initialPreset.simulationId);
     }, [initialPreset]);
@@ -127,15 +124,6 @@ export default function CalculadoraFinanciera({
 
     const bnaVenta = manualRate > 0 ? manualRate : rateData?.venta || 0;
 
-    const setAnticipoByUsd = useCallback((usdValue: number) => {
-        if (!Number.isFinite(totalUsd) || totalUsd <= 0) {
-            setAnticipoPct(MIN_CUSTOM_ANTICIPO);
-            return;
-        }
-        const pct = (usdValue / totalUsd) * 100;
-        setAnticipoPct(clampAnticipo(pct));
-    }, [totalUsd]);
-
     const quote = useMemo(
         () =>
             calculateFinancingBreakdown({
@@ -162,7 +150,7 @@ export default function CalculadoraFinanciera({
             anticipoUsd: quote.upfrontUsd,
             anticipoArs: quote.upfrontArs,
             saldoFinanciadoUsd: quote.financedPrincipalUsd,
-            saldoFinanciadoArs: quote.financedTotalArs,
+            saldoFinanciadoArs: quote.financedPrincipalUsd * quote.bnaVentaArs,
             cuotas: quote.installments,
             cuotaUsd: quote.installmentUsd,
             cuotaArs: quote.installmentArs,
@@ -213,6 +201,82 @@ export default function CalculadoraFinanciera({
             toast.error('No se pudo copiar el bloque HTML.');
         }
     }, [financingOfferHtml]);
+
+    const createProposalPdf = useCallback(() => {
+        return generateFinancingProposalPDF({
+            patientName: `${patient.nombre} ${patient.apellido}`.trim(),
+            patientDocument: patient.documento,
+            patientCuit: patient.cuit,
+            treatment: tratamiento || 'Tratamiento odontologico',
+            quote,
+            generatedAt: new Date(),
+        });
+    }, [patient.apellido, patient.cuit, patient.documento, patient.nombre, quote, tratamiento]);
+
+    const handleDownloadProposalPdf = useCallback(async () => {
+        try {
+            const blob = createProposalPdf();
+            const fileName = getFinancingProposalPdfFileName({
+                patientName: `${patient.nombre} ${patient.apellido}`.trim(),
+                treatment: tratamiento || 'Tratamiento odontologico',
+                quote,
+            });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+            toast.success('Propuesta PDF descargada');
+        } catch {
+            toast.error('No se pudo generar la propuesta PDF');
+        }
+    }, [createProposalPdf, patient.apellido, patient.nombre, quote, tratamiento]);
+
+    const handleShareProposal = useCallback(async () => {
+        setSharingProposal(true);
+        try {
+            const blob = createProposalPdf();
+            const fileName = getFinancingProposalPdfFileName({
+                patientName: `${patient.nombre} ${patient.apellido}`.trim(),
+                treatment: tratamiento || 'Tratamiento odontologico',
+                quote,
+            });
+            const file = new File([blob], fileName, { type: 'application/pdf' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Propuesta de financiación',
+                    text: `Propuesta de financiación para ${patient.nombre} ${patient.apellido}`.trim(),
+                });
+                return;
+            }
+
+            const whatsappText = encodeURIComponent([
+                `Hola ${patient.nombre || ''}`.trim(),
+                '',
+                `Te compartimos la propuesta de financiación para ${tratamiento || 'tu tratamiento'}.`,
+                `Monto total: ${formatUsd(quote.totalUsd)}`,
+                `Anticipo hoy (${quote.upfrontPct}%): ${formatUsd(quote.upfrontUsd)}`,
+                `Saldo financiado: ${formatUsd(quote.financedPrincipalUsd)}`,
+                `${quote.installments} cuotas de ${formatUsd(quote.installmentUsd)}`,
+                '',
+                'Te descargamos también el PDF para adjuntarlo manualmente en WhatsApp si lo necesitás.',
+                'Financiación sujeta a evaluación y preaprobación de cada caso.',
+            ].join('\n'));
+
+            await handleDownloadProposalPdf();
+            window.open(`https://wa.me/?text=${whatsappText}`, '_blank', 'noopener,noreferrer');
+            toast.success('Abrí WhatsApp y te dejé el PDF descargado para adjuntar');
+        } catch {
+            toast.error('No se pudo compartir la propuesta');
+        } finally {
+            setSharingProposal(false);
+        }
+    }, [createProposalPdf, handleDownloadProposalPdf, patient.apellido, patient.nombre, quote, tratamiento]);
 
     const runReadinessCheck = useCallback(async () => {
         setCheckingReadiness(true);
@@ -463,32 +527,9 @@ export default function CalculadoraFinanciera({
                                 </button>
                             ))}
                         </div>
-                        <div className="mt-2">
-                            <Label htmlFor="anticipo-custom" className="text-[11px] text-slate-400">
-                                O ingresar porcentaje libre (30% a 90%)
-                            </Label>
-                            <Input
-                                id="anticipo-custom"
-                                type="number"
-                                min={MIN_CUSTOM_ANTICIPO}
-                                max={MAX_CUSTOM_ANTICIPO}
-                                step={1}
-                                value={anticipoPct}
-                                onChange={(event) => setAnticipoPct(clampAnticipo(Number(event.target.value)))}
-                                className="mt-1 border-slate-600 bg-slate-800/70 text-slate-100"
-                            />
-                        </div>
-                        <div className="mt-2">
-                            <Label className="text-[11px] text-slate-400">
-                                Si el paciente dice un monto de adelanto, ingresalo en USD
-                            </Label>
-                            <MoneyInput
-                                value={quote.upfrontUsd}
-                                onChange={setAnticipoByUsd}
-                                currency="USD"
-                                className="mt-1 border-slate-600 bg-slate-800/70 text-slate-100"
-                            />
-                        </div>
+                        <p className="mt-2 text-[11px] text-slate-400">
+                            Opciones habilitadas por política comercial: 30% o 50%.
+                        </p>
                     </div>
 
                     <div>
@@ -536,7 +577,7 @@ export default function CalculadoraFinanciera({
                         <div className="flex justify-between text-slate-300"><span>Anticipo ARS</span><span className="font-mono">{formatArs(quote.upfrontArs)}</span></div>
                         <div className="my-2 border-t border-slate-700" />
                         <div className="flex justify-between"><span>Saldo financiado</span><span className="font-mono">{formatUsd(quote.financedPrincipalUsd)}</span></div>
-                        <div className="flex justify-between"><span>Interes simple ({quote.monthlyInterestPct}% x {quote.installments})</span><span className="font-mono">{formatUsd(quote.totalInterestUsd)}</span></div>
+                        <div className="flex justify-between"><span>TNA 18% anual ({quote.monthlyInterestPct}% mensual)</span><span className="font-mono">{formatUsd(quote.totalInterestUsd)}</span></div>
                         <div className="flex justify-between font-semibold text-cyan-300"><span>Total financiado</span><span className="font-mono">{formatUsd(quote.financedTotalUsd)}</span></div>
                         <div className="my-2 border-t border-slate-700" />
                         <div className="flex justify-between text-lg font-bold text-white"><span>Cuota fija</span><span className="font-mono">{formatUsd(quote.installmentUsd)}</span></div>
@@ -549,11 +590,37 @@ export default function CalculadoraFinanciera({
             </div>
 
             <div className="mt-6 rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cyan-300/20 bg-cyan-400/5 px-4 py-3">
+                    <div>
+                        <p className="text-sm font-semibold text-white">Propuesta PDF para paciente</p>
+                        <p className="text-xs text-slate-400">Descargá la propuesta o compartila. En mobile se intentará compartir el PDF directo; si no, se descarga y abre WhatsApp.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => void handleDownloadProposalPdf()}
+                            className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/40 bg-cyan-400/20 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/30"
+                        >
+                            <Download size={14} />
+                            Descargar PDF
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void handleShareProposal()}
+                            disabled={sharingProposal}
+                            className="inline-flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/30 disabled:opacity-60"
+                        >
+                            <Share2 size={14} />
+                            {sharingProposal ? 'Preparando...' : 'Compartir por WhatsApp'}
+                        </button>
+                    </div>
+                </div>
+
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <p className="text-sm font-semibold text-white">Generador de contrato (template legal)</p>
                         <p className="text-xs text-slate-400">
-                            Incluye monto total, anticipo, plan de cuotas y clausula de mora ({quote.dailyPenaltyPct.toFixed(2)}% diario). Firma valida: manuscrita.
+                            Incluye monto total, anticipo, plan de cuotas y clausula de mora ({quote.dailyPenaltyPct.toFixed(2)}% diario). Financiacion sujeta a evaluacion y preaprobacion de cada caso.
                         </p>
                     </div>
                     <div className="flex gap-2">

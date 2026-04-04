@@ -16,6 +16,7 @@ import type { PrestacionCatalogoItem } from '@/app/actions/prestaciones';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface EditForm {
+    paciente_nombre: string;
     nombre: string;
     fecha: string;
     monto: string;
@@ -127,12 +128,21 @@ function InlineEditRow({
             <div className="grid grid-cols-2 gap-2">
                 <input
                     className={inputCls}
+                    placeholder="Paciente"
+                    value={form.paciente_nombre}
+                    onChange={e => setForm(f => ({ ...f, paciente_nombre: e.target.value }))}
+                    onKeyDown={onKey}
+                    autoFocus
+                />
+                <input
+                    className={inputCls}
                     placeholder="Nombre prestación"
                     value={form.nombre}
                     onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                     onKeyDown={onKey}
-                    autoFocus
                 />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
                 <input
                     type="number"
                     className={inputCls}
@@ -143,8 +153,6 @@ function InlineEditRow({
                     onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
                     onKeyDown={onKey}
                 />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
                 <input
                     type="date"
                     className={inputCls}
@@ -208,7 +216,7 @@ function CatalogItem({ item }: { item: PrestacionCatalogoItem }) {
 
 export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose, onRefresh }: Props) {
     const defaultDate = `${mes}-01`;
-    const emptyForm: EditForm = { nombre: '', fecha: defaultDate, monto: '', slides_url: '' };
+    const emptyForm: EditForm = { paciente_nombre: '', nombre: '', fecha: defaultDate, monto: '', slides_url: '' };
 
     const [prestaciones, setPrestaciones] = useState<PrestacionRealizada[]>([]);
     const [loading, setLoading] = useState(true);
@@ -280,10 +288,11 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
     async function handleSaveEdit() {
         if (!editingId) return;
         const monto = parseFloat(form.monto);
-        if (!form.nombre.trim() || isNaN(monto) || monto <= 0) { toast.error('Completá nombre y monto válido'); return; }
+        if (!form.paciente_nombre.trim() || !form.nombre.trim() || isNaN(monto) || monto <= 0) { toast.error('Completá paciente, nombre y monto válido'); return; }
         await saveAndRefresh(() => upsertPrestacion({
             id: editingId,
             profesional_id: row.personal_id,
+            paciente_nombre: form.paciente_nombre.trim(),
             prestacion_nombre: form.nombre.trim(),
             fecha_realizacion: form.fecha,
             monto_honorarios: monto,
@@ -294,9 +303,10 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
 
     async function handleSaveNew() {
         const monto = parseFloat(form.monto);
-        if (!form.nombre.trim() || isNaN(monto) || monto <= 0) { toast.error('Completá nombre y monto válido'); return; }
+        if (!form.paciente_nombre.trim() || !form.nombre.trim() || isNaN(monto) || monto <= 0) { toast.error('Completá paciente, nombre y monto válido'); return; }
         await saveAndRefresh(() => upsertPrestacion({
             profesional_id: row.personal_id,
+            paciente_nombre: form.paciente_nombre.trim(),
             prestacion_nombre: form.nombre.trim(),
             fecha_realizacion: form.fecha,
             monto_honorarios: monto,
@@ -314,7 +324,7 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
     function startEdit(p: PrestacionRealizada) {
         setAddingNew(false);
         setEditingId(p.id);
-        setForm({ nombre: p.prestacion_nombre, fecha: p.fecha_realizacion, monto: String(p.monto_honorarios), slides_url: p.slides_url || '' });
+        setForm({ paciente_nombre: p.paciente_nombre, nombre: p.prestacion_nombre, fecha: p.fecha_realizacion, monto: String(p.monto_honorarios), slides_url: p.slides_url || '' });
     }
 
     function startAdd() {
@@ -333,6 +343,7 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
             setEditingId(null);
             setAddingNew(true);
             setForm({
+                paciente_nombre: '',
                 nombre: item.nombre,
                 fecha: defaultDate,
                 monto: String(item.precio_base || ''),

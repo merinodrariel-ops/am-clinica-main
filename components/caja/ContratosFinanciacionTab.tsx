@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Calculator, Printer, Search, User, Calendar, DollarSign, ChevronRight, CheckCircle2, AlertCircle, X, Zap, ShieldCheck, Star, MessageCircle } from 'lucide-react';
 
 import { createClient } from '@/utils/supabase/client';
+import { calculateFinancingBreakdown, DEFAULT_MONTHLY_INTEREST_PCT } from '@/lib/financial-engine';
 
 const supabase = createClient();
 
@@ -108,7 +109,7 @@ function InlineEditField({ value, placeholder = '___________________________', o
 export default function ContratosFinanciacionTab({ initialPatientId }: ContratosFinanciacionTabProps) {
   // Estados del Simulador
   const [totalAmount, setTotalAmount] = useState<string>('');
-  const [totalRecibido, setTotalRecibido] = useState<string>('');
+  const [anticipoPct, setAnticipoPct] = useState<number>(30);
   const [cuit, setCuit] = useState<string>('');
   const [cuitError, setCuitError] = useState<string | null>(null);
   const [isCuitValid, setIsCuitValid] = useState<boolean | null>(null);
@@ -145,9 +146,6 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-
-  // Tasa de interés anual (ej: 45%)
-  const annualRate = 0.45;
 
   // Cargar paciente inicial
   useEffect(() => {
@@ -371,37 +369,30 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     const amount = parseFloat(totalAmount.replace(/\./g, ''));
     if (isNaN(amount) || amount <= 0) return null;
 
-    const recibido = parseFloat(totalRecibido.replace(/\./g, '')) || 0;
+    const recibido = amount * (anticipoPct / 100);
     const amountToFinance = Math.max(amount - recibido, 0);
-    const pctRecibido = amount > 0 ? Math.round((recibido / amount) * 100) : 0;
+    const pctRecibido = anticipoPct;
 
-    const plans: PlanOption[] = [
-      {
-        id: '3m',
-        months: 3,
-        installmentValue: (amountToFinance * (1 + (annualRate * (3 / 12)))) / 3,
-        totalCredit: amountToFinance * (1 + (annualRate * (3 / 12))),
-        color: 'from-blue-400 to-indigo-500'
-      },
-      {
-        id: '6m',
-        months: 6,
-        installmentValue: (amountToFinance * (1 + (annualRate * (6 / 12)))) / 6,
-        totalCredit: amountToFinance * (1 + (annualRate * (6 / 12))),
-        tag: 'Más Popular',
-        color: 'from-emerald-400 to-teal-500'
-      },
-      {
-        id: '12m',
-        months: 12,
-        installmentValue: (amountToFinance * (1 + (annualRate * (12 / 12)))) / 12,
-        totalCredit: amountToFinance * (1 + (annualRate * (12 / 12))),
-        color: 'from-orange-400 to-red-500'
-      }
-    ];
+    const plans: PlanOption[] = [3, 6, 12].map((months) => {
+      const quote = calculateFinancingBreakdown({
+        totalUsd: amount,
+        upfrontPct: anticipoPct,
+        installments: months,
+        monthlyInterestPct: DEFAULT_MONTHLY_INTEREST_PCT,
+      });
+
+      return {
+        id: `${months}m`,
+        months,
+        installmentValue: quote.installmentUsd,
+        totalCredit: quote.financedTotalUsd,
+        tag: months === 6 ? 'Más Popular' : undefined,
+        color: months === 3 ? 'from-blue-400 to-indigo-500' : months === 6 ? 'from-emerald-400 to-teal-500' : 'from-orange-400 to-red-500'
+      };
+    });
 
     return { amount, recibido, amountToFinance, pctRecibido, plans };
-  }, [totalAmount, totalRecibido]);
+  }, [anticipoPct, totalAmount]);
 
   return (
     <div className="bg-[#0a0a0a] text-white p-4 md:p-8 font-sans selection:bg-emerald-500/30 rounded-2xl max-w-full overflow-hidden">
@@ -549,7 +540,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                       <div className="mb-8 mt-2">
                         <h3 className="text-3xl font-bold text-white mb-2">{plan.months} Cuotas</h3>
-                        <p className="text-sm text-gray-500">Tasa recargo fija {annualRate * 100}% anual</p>
+                        <p className="text-sm text-gray-500">TNA 18% anual · 1.5% mensual sobre saldo financiado</p>
                       </div>
 
                       <div className="mb-10">
@@ -564,7 +555,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                       <div className="space-y-4 mb-10">
                         <div className="flex justify-between items-center text-sm border-b border-white/5 pb-4">
-                          <span className="text-gray-500 font-medium">Ya Recibido</span>
+                          <span className="text-gray-500 font-medium">Anticipo hoy</span>
                           <span className="font-mono text-white text-base">{formatCurrency(calculations.recibido)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm border-b border-white/5 pb-4">
@@ -818,7 +809,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase text-gray-500 font-bold">Monto a financiar (USD)</label>
+                    <label className="text-[10px] uppercase text-gray-500 font-bold">Monto total del tratamiento (USD)</label>
                     <input
                       type="text"
                       value={totalAmount}
@@ -829,22 +820,26 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase text-gray-500 font-bold">Total ya recibido (USD)</label>
-                    <input
-                      type="text"
-                      value={totalRecibido}
-                      onChange={(e) => setTotalRecibido(formatInput(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                      placeholder="Ej: 1.000"
-                    />
-                    {calculations && calculations.recibido > 0 && (
+                    <label className="text-[10px] uppercase text-gray-500 font-bold">Anticipo</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[30, 50].map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setAnticipoPct(value)}
+                          className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                            anticipoPct === value
+                              ? 'bg-emerald-500 text-black'
+                              : 'bg-white/5 border border-white/10 text-white hover:border-emerald-500'
+                          }`}
+                        >
+                          {value}%
+                        </button>
+                      ))}
+                    </div>
+                    {calculations && (
                       <p className="text-[10px] text-emerald-400 font-medium">
-                        {calculations.pctRecibido}% recibido · {formatCurrency(calculations.amountToFinance)} a financiar
-                      </p>
-                    )}
-                    {(!calculations || calculations.recibido === 0) && (
-                      <p className="text-[10px] text-gray-500 italic">
-                        Si el paciente no adelantó nada, dejá en blanco.
+                        Anticipo hoy: {formatCurrency(calculations.recibido)} · {formatCurrency(calculations.amountToFinance)} a financiar
                       </p>
                     )}
                   </div>
@@ -871,6 +866,9 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
                         </option>
                       ))}
                     </select>
+                    <p className="text-[10px] text-gray-500 italic">
+                      TNA 18% anual sobre el saldo financiado. Financiación sujeta a evaluación y preaprobación de cada caso.
+                    </p>
                   </div>
                 </div>
 

@@ -40,14 +40,28 @@ export function useModalKeyboard(
         const handler = (e: KeyboardEvent) => {
             if (options.disabled) return;
 
+            // Global Escape to close
             if (e.key === 'Escape') {
                 e.preventDefault();
                 onClose();
-            } else if (e.key === 'Enter' && onConfirm) {
+                return;
+            }
+
+            // Enter handling
+            if (e.key === 'Enter' && onConfirm) {
+                // EXPLICIT CMD+ENTER or CTRL+ENTER: Always submit if possible
+                if (e.metaKey || e.ctrlKey) {
+                    e.preventDefault();
+                    onConfirm();
+                    return;
+                }
+
+                // Regular Enter: only if allowed by shouldSubmitOnEnter logic
                 const shouldHandle = options.shouldHandleEnter ?? shouldSubmitOnEnter;
-                if (!shouldHandle(e)) return;
-                e.preventDefault();
-                onConfirm();
+                if (shouldHandle(e)) {
+                    e.preventDefault();
+                    onConfirm();
+                }
             }
         };
 

@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
-import { Upload, Search, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Star, Sparkles, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle2, AlertTriangle, XCircle, RefreshCw, FileSpreadsheet, UserCheck, UserX, Save, Link, Clock, Download, ChevronDown, ChevronUp, Trophy, Star, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-    previewProsoftFileSafe, importProsoftPreviewSafe,
+    importProsoftPreviewSafe,
     getAllPersonalBasic, saveProsoftMapping,
     getProsoftMappings, deleteProsoftMapping,
     ProsoftPreview,
 } from '@/app/actions/prosoft-import';
+import { parseProsoftXml } from '@/lib/prosoft-xml';
 
 function mesLabel(ym: string) {
     const [y, m] = ym.split('-');
@@ -32,8 +33,86 @@ interface SavedMapping {
 type ProsoftFila = ProsoftPreview['filas'][number];
 type ProsoftRegistro = ProsoftFila['registros'][number];
 
+function norm(s: string) {
+    return s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function scorePersonalMatch(rawName: string, person: PersonalOption) {
+    const target = norm(rawName);
+    const fullName = norm(`${person.nombre} ${person.apellido || ''}`);
+    const reverseName = norm(`${person.apellido || ''} ${person.nombre}`);
+
+    if (fullName === target || reverseName === target) return 100;
+    if (fullName.includes(target) || target.includes(fullName)) return 80;
+    if (reverseName.includes(target) || target.includes(reverseName)) return 80;
+    const nombre = norm(person.nombre);
+    if (nombre === target) return 70;
+    if (target.includes(nombre)) return 60;
+    return 0;
+}
+
+function applyClientMatches(
+    preview: ProsoftPreview,
+    allPersonal: PersonalOption[],
+    savedMappings: SavedMapping[]
+): ProsoftPreview {
+    const byId = new Map(allPersonal.map((person) => [person.id, person]));
+    const savedByRaw = new Map(savedMappings.map((mapping) => [mapping.raw_name, mapping.personal_id]));
+    const sinMatch: string[] = [];
+
+    const filas = preview.filas.map((fila) => {
+        const mappedId = savedByRaw.get(fila.rawName);
+        const mappedPerson = mappedId ? byId.get(mappedId) : undefined;
+        if (mappedPerson) {
+            return {
+                ...fila,
+                personalId: mappedPerson.id,
+                personalNombre: `${mappedPerson.nombre} ${mappedPerson.apellido || ''}`.trim(),
+            };
+        }
+
+        let bestMatch: PersonalOption | null = null;
+        let bestScore = 0;
+
+        for (const person of allPersonal) {
+            const score = scorePersonalMatch(fila.rawName, person);
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = person;
+            }
+        }
+
+        if (bestMatch && bestScore >= 60) {
+            return {
+                ...fila,
+                personalId: bestMatch.id,
+                personalNombre: `${bestMatch.nombre} ${bestMatch.apellido || ''}`.trim(),
+            };
+        }
+
+        sinMatch.push(fila.rawName);
+        return {
+            ...fila,
+            personalId: null,
+            personalNombre: '',
+        };
+    });
+
+    return {
+        ...preview,
+        filas,
+        sinMatch,
+    };
+}
+
 export default function ProsoftImporter() {
-    const [file, setFile] = useState<File | null>(null);
+    const [, setFile] = useState<File | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [preview, setPreview] = useState<ProsoftPreview | null>(null);
     const [loading, setLoading] = useState(false);
@@ -54,13 +133,7 @@ export default function ProsoftImporter() {
 
     const getFriendlyActionError = (error: unknown, fallback: string) => {
         const rawMessage = error instanceof Error ? error.message : '';
-        if (!rawMessage) return fallback;
-
-        if (rawMessage.includes('Server Components render')) {
-            return 'No se pudo procesar la planilla. Verificá que el link sea público, que apunte a la pestaña correcta (gid) y reintentá.';
-        }
-
-        return rawMessage;
+        return rawMessage || fallback;
     };
 
     useEffect(() => {
@@ -68,25 +141,30 @@ export default function ProsoftImporter() {
         getProsoftMappings().then(setSavedMappings).catch(() => { });
     }, []);
 
+    useEffect(() => {
+        if (!preview || allPersonal.length === 0) return;
+        setPreview((current) => {
+            if (!current) return current;
+            return applyClientMatches(current, allPersonal, savedMappings);
+        });
+    }, [preview, allPersonal, savedMappings]);
+
     async function handlePreview(selectedFile: File) {
         setLoading(true);
         setPreview(null);
         setResult(null);
         setPendingMaps({});
         try {
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            const previewResult = await previewProsoftFileSafe(formData);
-            if (!previewResult.success) {
-                toast.error(previewResult.error);
-                return;
+            if (!selectedFile.name.toLowerCase().endsWith('.xml')) {
+                throw new Error('Subí un archivo XML exportado desde ProSoft.');
             }
 
-            const data = previewResult.data;
+            const xmlText = await selectedFile.text();
+            const data = applyClientMatches(parseProsoftXml(xmlText) as ProsoftPreview, allPersonal, savedMappings);
             setPreview(data);
             toast.success(`${data.totalRegistros} registros encontrados · ${mesLabel(data.mes)}`);
         } catch (e: unknown) {
-            toast.error(getFriendlyActionError(e, 'Error al leer la planilla'));
+            toast.error(getFriendlyActionError(e, 'Error al leer el XML'));
         } finally {
             setLoading(false);
         }
@@ -132,22 +210,9 @@ export default function ProsoftImporter() {
             const res = await saveProsoftMapping(rawName, personalId);
             if (!res.success) { toast.error(res.error || 'Error al guardar'); return; }
             toast.success('Equivalencia guardada');
-            // Optimistically update preview
-            const person = allPersonal.find(p => p.id === personalId);
-            if (person && preview) {
-                setPreview({
-                    ...preview,
-                    filas: preview.filas.map(f =>
-                        f.rawName === rawName
-                            ? { ...f, personalId, personalNombre: `${person.nombre} ${person.apellido || ''}`.trim() }
-                            : f
-                    ),
-                    sinMatch: preview.sinMatch.filter(n => n !== rawName),
-                });
-            }
-            // Refresh saved mappings list
             const fresh = await getProsoftMappings();
             setSavedMappings(fresh);
+            setPreview((current) => current ? applyClientMatches(current, allPersonal, fresh) : current);
         } catch {
             toast.error('Error al guardar equivalencia');
         } finally {
@@ -157,7 +222,9 @@ export default function ProsoftImporter() {
 
     async function handleDeleteMapping(rawName: string) {
         await deleteProsoftMapping(rawName);
-        setSavedMappings(prev => prev.filter(m => m.raw_name !== rawName));
+        const nextMappings = savedMappings.filter(m => m.raw_name !== rawName);
+        setSavedMappings(nextMappings);
+        setPreview((current) => current ? applyClientMatches(current, allPersonal, nextMappings) : current);
         toast.success('Equivalencia eliminada');
     }
 
@@ -170,6 +237,7 @@ export default function ProsoftImporter() {
             toast.success('Equivalencia actualizada');
             const fresh = await getProsoftMappings();
             setSavedMappings(fresh);
+            setPreview((current) => current ? applyClientMatches(current, allPersonal, fresh) : current);
             setEditingMapping(null);
         } catch {
             toast.error('Error al actualizar');
@@ -298,8 +366,8 @@ export default function ProsoftImporter() {
                         <FileSpreadsheet size={18} className="text-teal-400" />
                     </div>
                     <div>
-                        <h2 className="text-base font-semibold text-white">Importar desde Prosoft</h2>
-                        <p className="text-xs text-slate-400">Cargá asistencias desde la planilla mensual</p>
+                        <h2 className="text-base font-semibold text-white">Importar horas XML</h2>
+                        <p className="text-xs text-slate-400">Arrastrá el XML exportado desde ProSoft para registrar horas del personal</p>
                     </div>
                 </div>
                 <button
@@ -400,7 +468,7 @@ export default function ProsoftImporter() {
                 <input
                     type="file"
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".csv, .xls, .xlsx"
+                    accept=".xml,text/xml,application/xml"
                     onChange={(e) => {
                         const selectedFile = e.target.files?.[0];
                         if (selectedFile) {
@@ -416,10 +484,10 @@ export default function ProsoftImporter() {
                         <Upload className="w-10 h-10 text-slate-400 mx-auto mb-4" />
                     )}
                     <p className="text-sm font-medium text-white">
-                        {loading ? 'Procesando archivo...' : 'Haz clic para subir o arrastra tu archivo aquí'}
+                        {loading ? 'Procesando XML...' : 'Haz clic para subir o arrastra tu XML aquí'}
                     </p>
                     <p className="text-xs text-slate-400 mt-2">
-                        Acepta archivos .xls, .xlsx, .csv generados por Prosoft
+                        Acepta archivos `.xml` exportados desde ProSoft
                     </p>
                 </div>
             </div>
@@ -451,7 +519,7 @@ export default function ProsoftImporter() {
                         </div>
                         <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
                             <p className="text-lg font-bold text-white">{preview.totalRegistros}</p>
-                            <p className="text-xs text-slate-400">Registros de asistencia</p>
+                            <p className="text-xs text-slate-400">Registros del XML</p>
                         </div>
                         <div className={`border rounded-xl p-3 text-center ${unmatchedRows.length > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-slate-800 border-slate-700'}`}>
                             <p className={`text-lg font-bold ${unmatchedRows.length > 0 ? 'text-amber-400' : 'text-slate-400'}`}>

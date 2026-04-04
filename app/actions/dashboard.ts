@@ -115,6 +115,11 @@ export async function getOwnerDashboardStatsAction(): Promise<OwnerDashboardStat
             .select('*', { count: 'exact', head: true })
             .eq('is_deleted', false);
 
+        // ─── REGLA DE ORO AM CLÍNICA: Autocompletado JIT (Just-In-Time) ───
+        // Sincronizamos las fechas de primera consulta para que el dashboard sea instantáneo.
+        // Si el turno pasó el horario y no fue cancelado -> se considera completado y cuenta para el gráfico.
+        await supabase.rpc('sync_primera_consulta_dates');
+
         // Contar primeras consultas desde pacientes.primera_consulta_fecha (fuente de verdad)
         // Este campo solo se setea cuando un turno tipo 'consulta' pasa a completado/arrived
         // y el paciente no tenía fecha previa — evita contar pacientes existentes puestos como notas en la agenda

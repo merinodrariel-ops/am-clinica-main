@@ -44,7 +44,7 @@ Prestacion del tratamiento odontologico de alta complejidad: **{{TRATAMIENTO}}**
 
 ## 4) Saldo financiado
 - Capital a financiar: **{{SALDO_FINANCIADO_USD}}** (referencia ARS: **{{SALDO_FINANCIADO_ARS}}**).
-- Tasa nominal aplicada: **{{INTERES_MENSUAL_PCT}}% mensual** (interes simple).
+- TNA aplicada: **18.00% anual** (**{{INTERES_MENSUAL_PCT}}% mensual**) sobre el saldo financiado.
 - Plan de pago: **{{CUOTAS}} cuotas mensuales** de **{{CUOTA_USD}}** cada una.
 - Referencia por cuota al dia de emision: **{{CUOTA_ARS}}**.
 - Vencimiento de primera cuota: **{{FECHA_PRIMERA_CUOTA}}**.

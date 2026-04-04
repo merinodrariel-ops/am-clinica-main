@@ -695,6 +695,7 @@ export async function getMonthlyLeaderboard(limit = 10): Promise<LeaderboardEntr
 export interface PrestacionRealizada {
     id: string;
     profesional_id: string;
+    paciente_nombre: string;
     prestacion_nombre: string;
     fecha_realizacion: string;
     monto_honorarios: number;
@@ -704,6 +705,7 @@ export interface PrestacionRealizada {
 export interface UpsertPrestacionInput {
     id?: string;           // si undefined → INSERT, si presente → UPDATE
     profesional_id: string;
+    paciente_nombre: string;
     prestacion_nombre: string;
     fecha_realizacion: string;   // 'YYYY-MM-DD'
     monto_honorarios: number;    // USD
@@ -722,7 +724,7 @@ export async function getPrestacionesDelMes(
 
     const { data, error } = await admin
         .from('prestaciones_realizadas')
-        .select('id, profesional_id, prestacion_nombre, fecha_realizacion, monto_honorarios, slides_url')
+        .select('id, profesional_id, paciente_nombre, prestacion_nombre, fecha_realizacion, monto_honorarios, slides_url')
         .eq('profesional_id', personalId)
         .gte('fecha_realizacion', startDate)
         .lte('fecha_realizacion', endDate)
@@ -741,6 +743,7 @@ export async function upsertPrestacion(
             const { error } = await admin
                 .from('prestaciones_realizadas')
                 .update({
+                    paciente_nombre: input.paciente_nombre,
                     prestacion_nombre: input.prestacion_nombre,
                     fecha_realizacion: input.fecha_realizacion,
                     monto_honorarios: input.monto_honorarios,
@@ -753,6 +756,7 @@ export async function upsertPrestacion(
                 .from('prestaciones_realizadas')
                 .insert({
                     profesional_id: input.profesional_id,
+                    paciente_nombre: input.paciente_nombre,
                     prestacion_nombre: input.prestacion_nombre,
                     fecha_realizacion: input.fecha_realizacion,
                     monto_honorarios: input.monto_honorarios,

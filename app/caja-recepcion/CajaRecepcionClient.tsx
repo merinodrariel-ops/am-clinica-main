@@ -1024,7 +1024,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
 
                         <button
                             onClick={() => setShowNuevoIngreso(true)}
-                            className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-teal-500/20 bg-teal-500 hover:bg-teal-400 hover:scale-[1.03] active:scale-[0.97] text-navy-950"
+                            className="md:ml-auto flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-teal-500/20 bg-teal-500 hover:bg-teal-400 hover:scale-[1.03] active:scale-[0.97] text-navy-950"
                         >
                             <Plus size={20} strokeWidth={3} />
                             Nuevo Ingreso

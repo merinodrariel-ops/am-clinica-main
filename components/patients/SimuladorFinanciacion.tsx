@@ -26,7 +26,7 @@ const TOP_TREATMENT_OPTIONS = [
 
 const OTHER_TREATMENT_OPTION = '__other__';
 const INSTALLMENT_OPTIONS = [3, 6, 12] as const;
-const UPFRONT_OPTIONS = [30, 40, 50] as const;
+const UPFRONT_OPTIONS = [30, 50] as const;
 type WhatsappMessageMode = 'short' | 'formal';
 
 interface SimuladorFinanciacionProps {
@@ -145,7 +145,7 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
     const [selectedTreatment, setSelectedTreatment] = useState<string>('Alineadores invisibles AM');
     const [customTreatment, setCustomTreatment] = useState('');
     const [totalUsd, setTotalUsd] = useState(
-        patient.presupuesto_total && patient.presupuesto_total > 0 ? patient.presupuesto_total : 5000
+        patient.presupuesto_total && patient.presupuesto_total > 0 ? patient.presupuesto_total : 0
     );
     const [manualRate, setManualRate] = useState(0);
     const [rateData, setRateData] = useState<DolarOficialRate | null>(null);
@@ -155,7 +155,7 @@ export default function SimuladorFinanciacion({ patient, onUseInContract }: Simu
     const [usingSimulationId, setUsingSimulationId] = useState<string | null>(null);
     const [expiresInDays, setExpiresInDays] = useState(14);
     const [allowedInstallments, setAllowedInstallments] = useState<number[]>([3, 6, 12]);
-    const [allowedUpfronts, setAllowedUpfronts] = useState<number[]>([30, 40, 50]);
+    const [allowedUpfronts, setAllowedUpfronts] = useState<number[]>([30, 50]);
     const [simulations, setSimulations] = useState<FinancingSimulationRecord[]>([]);
     const [latestShareUrl, setLatestShareUrl] = useState<string | null>(null);
     const [messageMode, setMessageMode] = useState<WhatsappMessageMode>('short');

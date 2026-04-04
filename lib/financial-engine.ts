@@ -1,5 +1,9 @@
-export const DEFAULT_MONTHLY_INTEREST_PCT = 1.5;
+export const DEFAULT_ANNUAL_INTEREST_RATE = 0.18;
+export const DEFAULT_MONTHLY_INTEREST_RATE = DEFAULT_ANNUAL_INTEREST_RATE / 12;
+export const DEFAULT_MONTHLY_INTEREST_PCT = DEFAULT_MONTHLY_INTEREST_RATE * 100;
 export const DEFAULT_DAILY_PENALTY_INTEREST_PCT = 3;
+export const FINANCING_UPFRONT_OPTIONS = [30, 50] as const;
+export const FINANCING_INSTALLMENT_OPTIONS = [3, 6, 12] as const;
 
 const ONE_HUNDRED_PERCENT_BPS = 10000;
 
@@ -48,9 +52,15 @@ function percentToBps(percent: number): number {
     return Math.round(toSafeNonNegativeNumber(percent) * 100);
 }
 
-function applySimpleInterest(principalCents: number, monthlyInterestPct: number, months: number): number {
-    const bps = percentToBps(monthlyInterestPct);
-    return Math.round((principalCents * bps * months) / ONE_HUNDRED_PERCENT_BPS);
+function calculateFrenchInstallment(principalCents: number, monthlyInterestPct: number, months: number): number {
+    if (principalCents <= 0 || months <= 0) return 0;
+    if (months === 1) return principalCents;
+
+    const monthlyRate = toSafeNonNegativeNumber(monthlyInterestPct) / 100;
+    if (monthlyRate === 0) return Math.round(principalCents / months);
+
+    const factor = Math.pow(1 + monthlyRate, months);
+    return Math.round(principalCents * ((monthlyRate * factor) / (factor - 1)));
 }
 
 function applyRateToArs(usdAmount: number, bnaVentaArs: number): number {
@@ -69,9 +79,9 @@ export function calculateFinancingBreakdown(input: FinancingInput): FinancingBre
     const totalCents = toCents(input.totalUsd);
     const upfrontCents = Math.round((totalCents * upfrontPct) / 100);
     const financedPrincipalCents = Math.max(0, totalCents - upfrontCents);
-    const totalInterestCents = applySimpleInterest(financedPrincipalCents, monthlyInterestPct, installments);
-    const financedTotalCents = financedPrincipalCents + totalInterestCents;
-    const installmentCents = Math.round(financedTotalCents / installments);
+    const installmentCents = calculateFrenchInstallment(financedPrincipalCents, monthlyInterestPct, installments);
+    const financedTotalCents = installmentCents * installments;
+    const totalInterestCents = Math.max(0, financedTotalCents - financedPrincipalCents);
 
     const totalUsd = fromCents(totalCents);
     const upfrontUsd = fromCents(upfrontCents);

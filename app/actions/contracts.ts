@@ -348,8 +348,8 @@ export async function generateAutomatedContractToDriveAction(input: AutomatedCon
             throw new Error('El monto total en USD debe ser mayor a cero');
         }
         const anticipoNormalizado = Math.round(input.anticipoPct);
-        if (anticipoNormalizado < 30 || anticipoNormalizado > 90) {
-            throw new Error('El anticipo debe estar entre 30% y 90%');
+        if (![30, 50].includes(anticipoNormalizado)) {
+            throw new Error('El anticipo solo puede ser 30% o 50%');
         }
         const cuotasNormalizadas = Math.round(input.cuotas);
         if (![3, 6, 12].includes(cuotasNormalizadas)) {
@@ -496,8 +496,8 @@ export async function createFinancingSimulationAction(input: CreateFinancingSimu
         const baseInstallments = clampInstallments(input.baseInstallments);
         const allowedInstallmentOptions = normalizeSimulationOptions(input.allowedInstallmentOptions, [3, 6, 12])
             .filter((value) => [3, 6, 12].includes(value));
-        const allowedUpfrontOptions = normalizeSimulationOptions(input.allowedUpfrontOptions, [30, 40, 50])
-            .filter((value) => value >= 30 && value <= 90);
+        const allowedUpfrontOptions = normalizeSimulationOptions(input.allowedUpfrontOptions, [30, 50])
+            .filter((value) => [30, 50].includes(value));
 
         const expiresInDays = Math.min(30, Math.max(1, Math.floor(Number(input.expiresInDays || 14))));
         const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString();

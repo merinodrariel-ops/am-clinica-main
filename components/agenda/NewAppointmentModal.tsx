@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
 import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
@@ -80,6 +80,7 @@ const TYPE_DURATIONS_MIN: Record<string, number> = {
 export default function NewAppointmentModal({ isOpen, onClose, onSave, initialData, initialDate }: NewAppointmentModalProps) {
     const supabase = createClient();
     const [loading, setLoading] = useState(false);
+    const isSubmitting = useRef(false);
     const [doctors, setDoctors] = useState<Doctor[]>([]);
 
     // Form State
@@ -239,7 +240,6 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         return true;
     }, [filteredDoctors.length, filteredTarifarioItems.length, patients.length, showDoctorResults, showTarifarioResults]);
 
-    useModalKeyboard(isOpen, onClose, undefined, { disabled: loading });
 
     const selectTarifarioItem = (item: TarifarioItem) => {
         setTitle(item.concepto_nombre);
@@ -269,8 +269,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (loading || isSubmitting.current) return;
+        
+        isSubmitting.current = true;
         setLoading(true);
 
         const formData = new FormData();
@@ -322,8 +325,15 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             alert(message);
         } finally {
             setLoading(false);
+            isSubmitting.current = false;
         }
-    };
+    }, [initialData?.id, loading, title, patientId, doctorId, startTime, endTime, status, type, orthoReplacementDays, notes, onSave, onClose]);
+
+    const handleFormSubmit = useCallback(() => {
+        handleSubmit();
+    }, [handleSubmit]);
+
+    useModalKeyboard(isOpen, onClose, handleFormSubmit);
 
     const handleDelete = async () => {
         if (!initialData?.id || !confirm('¿Estás seguro de eliminar esta cita?')) return;
@@ -361,11 +371,6 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
                 <form
                     onSubmit={handleSubmit}
-                    onKeyDown={(event) => {
-                        if (loading || !shouldHandleEnterAsSubmit(event)) return;
-                        event.preventDefault();
-                        event.currentTarget.requestSubmit();
-                    }}
                     className="p-6 space-y-5"
                 >
 
@@ -715,14 +720,8 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm resize-none h-auto"
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                                    e.preventDefault();
-                                    e.currentTarget.form?.requestSubmit();
-                                }
-                            }}
                         />
-                        <p className="text-[10px] text-gray-400 mt-1 pl-1">Ctrl+Enter para guardar</p>
+                        <p className="text-[10px] text-gray-400 mt-1 pl-1 font-medium">Cmd + Enter para guardar</p>
                     </div>
 
                     {/* Footer Actions */}

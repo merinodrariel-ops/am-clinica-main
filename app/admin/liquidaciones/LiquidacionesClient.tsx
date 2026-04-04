@@ -1391,7 +1391,8 @@ export default function LiquidacionesPage() {
     const now = new Date();
     const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const [tab, setTab] = useState<'liquidaciones' | 'prosoft' | 'prestaciones' | 'horas'>('liquidaciones');
+    const [tab, setTab] = useState<'liquidaciones' | 'prestaciones' | 'horas'>('liquidaciones');
+    const [liquidacionesSubtab, setLiquidacionesSubtab] = useState<'resumen' | 'prosoft'>('resumen');
     const [prestacionesCatalogo, setPrestacionesCatalogo] = useState<PrestacionCatalogoItem[]>([]);
     const [mes, setMes] = useState(defaultMes);
     const [rows, setRows] = useState<LiquidacionAdminRow[]>([]);
@@ -2008,13 +2009,6 @@ export default function LiquidacionesPage() {
                     Liquidaciones
                 </button>
                 <button
-                    onClick={() => setTab('prosoft')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'prosoft' ? 'bg-teal-600 border-teal-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
-                >
-                    <FileSpreadsheet size={14} />
-                    Importar Prosoft
-                </button>
-                <button
                     onClick={() => setTab('prestaciones')}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${tab === 'prestaciones' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
                 >
@@ -2029,12 +2023,6 @@ export default function LiquidacionesPage() {
                     Horas (No odontólogos)
                 </button>
             </div>
-
-            {tab === 'prosoft' && (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <ProsoftImporter />
-                </div>
-            )}
 
             {tab === 'prestaciones' && (
                 <div className="space-y-4">
@@ -2061,6 +2049,28 @@ export default function LiquidacionesPage() {
             )}
 
             {tab === 'liquidaciones' && <>
+                <div className="flex flex-wrap gap-2 mb-5">
+                    <button
+                        onClick={() => setLiquidacionesSubtab('resumen')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${liquidacionesSubtab === 'resumen' ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
+                    >
+                        <Wallet size={14} />
+                        Resumen de liquidaciones
+                    </button>
+                    <button
+                        onClick={() => setLiquidacionesSubtab('prosoft')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${liquidacionesSubtab === 'prosoft' ? 'bg-teal-600 border-teal-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
+                    >
+                        <FileSpreadsheet size={14} />
+                        Importar ProSoft XML
+                    </button>
+                </div>
+
+                {liquidacionesSubtab === 'prosoft' ? (
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                        <ProsoftImporter />
+                    </div>
+                ) : <>
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -2650,6 +2660,7 @@ export default function LiquidacionesPage() {
                     </span>
                 </div>
 
+                </>}
             </>}
         </div>
     );

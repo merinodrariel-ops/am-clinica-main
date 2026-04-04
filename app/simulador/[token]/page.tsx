@@ -203,10 +203,13 @@ export default function PatientSimulationPage() {
                         <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                             <p className="flex justify-between"><span>Anticipo</span><span className="font-mono">{formatUsd(quote.upfrontUsd)}</span></p>
                             <p className="flex justify-between"><span>Anticipo ARS</span><span className="font-mono">{formatArs(quote.upfrontArs)}</span></p>
-                            <p className="flex justify-between"><span>Saldo financiado</span><span className="font-mono">{formatUsd(quote.financedTotalUsd)}</span></p>
+                            <p className="flex justify-between"><span>Saldo financiado</span><span className="font-mono">{formatUsd(quote.financedPrincipalUsd)}</span></p>
+                            <p className="flex justify-between"><span>TNA 18% anual</span><span className="font-mono">{quote.monthlyInterestPct.toFixed(2)}% mensual</span></p>
                             <p className="flex justify-between"><span>Cuota mensual</span><span className="font-mono">{formatUsd(quote.installmentUsd)}</span></p>
+                            <p className="flex justify-between"><span>Total financiado</span><span className="font-mono">{formatUsd(quote.financedTotalUsd)}</span></p>
                             <p className="flex justify-between md:col-span-2"><span>Cuota ARS hoy</span><span className="font-mono">{formatArs(quote.installmentArs)}</span></p>
                         </div>
+                        <p className="mt-3 text-xs text-slate-400">Financiacion sujeta a evaluacion y preaprobacion de cada caso.</p>
                     </section>
                 )}
 

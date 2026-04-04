@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { calculateFinancingBreakdown, DEFAULT_MONTHLY_INTEREST_PCT } from '@/lib/financial-engine';
+import {
+    calculateFinancingBreakdown,
+    DEFAULT_MONTHLY_INTEREST_PCT,
+    FINANCING_INSTALLMENT_OPTIONS,
+    FINANCING_UPFRONT_OPTIONS,
+} from '@/lib/financial-engine';
 
-const INSTALLMENT_OPTIONS = [3, 6, 9, 12];
-const MIN_ENTRADA_PCT = 30;
-const MAX_ENTRADA_PCT = 70;
+const INSTALLMENT_OPTIONS: number[] = [...FINANCING_INSTALLMENT_OPTIONS];
+const UPFRONT_OPTIONS = [...FINANCING_UPFRONT_OPTIONS];
 
 function fmt(n: number) {
     return new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -22,7 +26,7 @@ export default function CalculadoraClient() {
     });
     const [entradaPct, setEntradaPct] = useState(() => {
         const v = parseInt(searchParams.get('entrada') || '');
-        return isNaN(v) ? 30 : Math.min(MAX_ENTRADA_PCT, Math.max(MIN_ENTRADA_PCT, v));
+        return UPFRONT_OPTIONS.some((option) => option === v) ? v : 30;
     });
     const [cuotas, setCuotas] = useState(() => {
         const v = parseInt(searchParams.get('cuotas') || '');
@@ -109,7 +113,7 @@ export default function CalculadoraClient() {
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
                     <div className="flex justify-between items-center mb-3">
                         <label className="text-xs text-[#D4AF37] tracking-widest uppercase">
-                            Entrada
+                            Anticipo
                         </label>
                         <span className="text-2xl font-light text-white">{entradaPct}%
                             {breakdown && (
@@ -117,18 +121,20 @@ export default function CalculadoraClient() {
                             )}
                         </span>
                     </div>
-                    <input
-                        type="range"
-                        min={MIN_ENTRADA_PCT}
-                        max={MAX_ENTRADA_PCT}
-                        step="5"
-                        value={entradaPct}
-                        onChange={e => setEntradaPct(parseInt(e.target.value))}
-                        className="w-full accent-[#D4AF37] h-2 rounded-full"
-                    />
-                    <div className="flex justify-between text-xs text-gray-600 mt-1">
-                        <span>{MIN_ENTRADA_PCT}%</span>
-                        <span>{MAX_ENTRADA_PCT}%</span>
+                    <div className="grid grid-cols-2 gap-2">
+                        {UPFRONT_OPTIONS.map(option => (
+                            <button
+                                key={option}
+                                onClick={() => setEntradaPct(option)}
+                                className={`py-3 rounded-xl text-center font-medium transition-all ${
+                                    entradaPct === option
+                                        ? 'bg-[#D4AF37] text-black'
+                                        : 'bg-white/5 border border-white/10 text-gray-300 hover:border-[#D4AF37]/50'
+                                }`}
+                            >
+                                {option}%
+                            </button>
+                        ))}
                     </div>
                 </div>
 
@@ -175,11 +181,11 @@ export default function CalculadoraClient() {
 
                         {/* Desglose */}
                         <div className="space-y-2 text-sm">
-                            <Row label="Entrada" value={`USD ${fmt(breakdown.upfrontUsd)}`} sub={showArs ? `ARS ${fmt(breakdown.upfrontArs)}` : undefined} />
-                            <Row label="Monto financiado" value={`USD ${fmt(breakdown.financedPrincipalUsd)}`} />
-                            <Row label={`Interés (${DEFAULT_MONTHLY_INTEREST_PCT}% mensual)`} value={`USD ${fmt(breakdown.totalInterestUsd)}`} dimmed />
+                            <Row label="Anticipo hoy" value={`USD ${fmt(breakdown.upfrontUsd)}`} sub={showArs ? `ARS ${fmt(breakdown.upfrontArs)}` : undefined} />
                             <div className="border-t border-white/10 pt-2 mt-2">
-                                <Row label="Total a pagar" value={`USD ${fmt(breakdown.upfrontUsd + breakdown.financedTotalUsd)}`} bold sub={showArs ? `ARS ${fmt(breakdown.upfrontArs + breakdown.financedTotalArs)}` : undefined} />
+                                <Row label="Saldo financiado" value={`USD ${fmt(breakdown.financedPrincipalUsd)}`} sub={showArs ? `ARS ${fmt(breakdown.financedPrincipalUsd * bnaNum)}` : undefined} />
+                                <Row label={`TNA 18% anual (${DEFAULT_MONTHLY_INTEREST_PCT}% mensual)`} value={`USD ${fmt(breakdown.totalInterestUsd)}`} dimmed />
+                                <Row label="Total financiado" value={`USD ${fmt(breakdown.financedTotalUsd)}`} bold sub={showArs ? `ARS ${fmt(breakdown.financedTotalArs)}` : undefined} />
                             </div>
                         </div>
                     </div>
@@ -221,7 +227,8 @@ export default function CalculadoraClient() {
                 {/* Footer */}
                 <div className="text-center text-gray-600 text-xs pb-6 space-y-1">
                     <p>AM Clínica · Estética Dental · Buenos Aires</p>
-                    <p>Simulación orientativa. Los valores finales se confirman en consulta.</p>
+                    <p>TNA 18% anual sobre el saldo financiado.</p>
+                    <p>Financiación sujeta a evaluación y preaprobación de cada caso.</p>
                 </div>
             </div>
         </div>

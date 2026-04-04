@@ -51,12 +51,21 @@ export async function getAppointments(start: string, end: string) {
     if (!data) return [];
 
     // Map data to include computed full_name and ensure patient/doctor objects are properly structured
+    const now = new Date();
+    
     return data.map(apt => {
         const patient = Array.isArray(apt.patient_data) ? apt.patient_data[0] : apt.patient_data;
         const doctor = Array.isArray(apt.doctor_data) ? apt.doctor_data[0] : apt.doctor_data;
 
+        // Regla de Oro AM Clínica: Turno que pasó el horario y no está cancelado/no-show -> COMPLETADO
+        const isPast = new Date(apt.end_time) < now;
+        const virtualStatus = (isPast && !['cancelled', 'no_show'].includes(apt.status)) 
+            ? 'completed' 
+            : apt.status;
+
         return {
             ...apt,
+            status: virtualStatus,
             patient: patient ? {
                 ...patient,
                 full_name: `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'Paciente',
