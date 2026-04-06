@@ -4897,6 +4897,44 @@ export default function PhotoStudioModal({
                         )}
                     </div>
 
+                    {/* Inline rotation strip — shown while in crop mode so the user can
+                        straighten the image without leaving the crop view */}
+                    {cropActive && (
+                        <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center gap-3 px-4 py-2.5 bg-black/70 backdrop-blur-sm border-t border-white/10">
+                            <button
+                                onClick={() => setRotation((r: number) => { const n = r - 0.5; return n < -180 ? n + 360 : n; })}
+                                className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
+                                title="-0.5°"
+                            >
+                                <RotateCcw size={13} />
+                            </button>
+                            <input
+                                type="range" min={-180} max={180} step={0.5}
+                                value={rotation}
+                                onChange={e => setRotation(Number(e.target.value))}
+                                className="w-48 md:w-64 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
+                            />
+                            <button
+                                onClick={() => setRotation((r: number) => { const n = r + 0.5; return n > 180 ? n - 360 : n; })}
+                                className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
+                                title="+0.5°"
+                            >
+                                <RotateCw size={13} />
+                            </button>
+                            <span className="text-white/50 font-mono text-xs w-14 text-center flex-shrink-0">
+                                {rotation > 0 ? `+${rotation.toFixed(1)}°` : `${rotation.toFixed(1)}°`}
+                            </span>
+                            {rotation !== 0 && (
+                                <button
+                                    onClick={() => setRotation(0)}
+                                    className="text-[10px] text-[#C9A96E] hover:text-[#C9A96E]/80 transition-colors font-bold uppercase flex-shrink-0"
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {/* Tab to restore panel when hidden */}
                     {toolsHidden && (
                         <button
