@@ -3743,7 +3743,8 @@ export default function PhotoStudioModal({
             objectUrlRef.current = newUrl;
             preCropImageRef.current = newUrl; // full baked image shown in crop mode
             setImageUrl(newUrl);
-            setRotation(0); // baked into pixel data — useEffect will see 0 and skip rebake
+            // Keep rotation state as-is — slider still shows the correct value so the user
+            // can fine-tune from here. The rotation will be reset to 0 on confirm (baked).
         } catch {
             preCropImageRef.current = imageUrl; // fallback: bake failed
         }
@@ -3807,6 +3808,9 @@ export default function PhotoStudioModal({
             }
             prevCroppedUrlRef.current = null;
             objectUrlRef.current = newUrl;
+            // Update preCropImageRef so that re-entering crop mode shows the current
+            // (already-cropped) image instead of jumping back to the full original.
+            preCropImageRef.current = newUrl;
             setImageUrl(newUrl);
             setCompletedCrop(null);
             setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
