@@ -664,6 +664,10 @@ export default function PhotoStudioModal({
     const preBgUrlRef = useRef<string | null>(null); // URL before bg removal (for undo)
     const preCropImageRef = useRef<string | null>(null);  // full image (rotation-baked) used as crop source; stays until reset
     const prevCroppedUrlRef = useRef<string | null>(null); // cropped imageUrl saved when entering re-crop (for cancel)
+    const cropPreBakeRef = useRef<string | null>(null);    // un-rotated base image used as rebake source while in crop mode
+    const cropEntryRotationRef = useRef<number>(0);        // rotation value when crop was entered (restored on cancel)
+    const cropJustEnteredRef = useRef<boolean>(false);     // skip the first useEffect fire when entering crop mode
+    const cropRebakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
     const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
     const touchRef = useRef<{ dist: number; startZoom: number } | null>(null);
@@ -1086,6 +1090,82 @@ export default function PhotoStudioModal({
             if (photoStateSaveTimerRef.current) clearTimeout(photoStateSaveTimerRef.current);
         };
     }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations, photoStateReady, flushPhotoStateSave]);
+
+    // Rebake crop source when user adjusts rotation while crop mode is active.
+    // This lets the user simultaneously rotate and crop (like Keynote / Google Slides).
+    useEffect(() => {
+        if (!cropActive || cropPreBakeRef.current === null) return;
+
+        // Skip the initial fire that happens right when entering crop mode
+        // (the entry handler already set up the correct initial image)
+        if (cropJustEnteredRef.current) {
+            cropJustEnteredRef.current = false;
+            return;
+        }
+
+        if (cropRebakeTimerRef.current) clearTimeout(cropRebakeTimerRef.current);
+        cropRebakeTimerRef.current = setTimeout(async () => {
+            const base = cropPreBakeRef.current;
+            if (!base) return;
+
+            if (rotation === 0) {
+                // No rotation — restore flat base image
+                preCropImageRef.current = base;
+                setImageUrl(base);
+                if (objectUrlRef.current && objectUrlRef.current !== base) {
+                    URL.revokeObjectURL(objectUrlRef.current);
+                }
+                objectUrlRef.current = base.startsWith('blob:') ? base : null;
+                setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+                setCompletedCrop(null);
+                return;
+            }
+
+            try {
+                const img = await new Promise<HTMLImageElement>((res, rej) => {
+                    const i = new Image();
+                    i.crossOrigin = 'anonymous';
+                    i.onload = () => res(i);
+                    i.onerror = () => rej(new Error('load failed'));
+                    i.src = base;
+                });
+                const radians = (rotation * Math.PI) / 180;
+                const sin = Math.abs(Math.sin(radians));
+                const cos = Math.abs(Math.cos(radians));
+                const cW = Math.ceil(img.naturalWidth * cos + img.naturalHeight * sin);
+                const cH = Math.ceil(img.naturalWidth * sin + img.naturalHeight * cos);
+                const canvas = document.createElement('canvas');
+                canvas.width = cW;
+                canvas.height = cH;
+                const ctx = canvas.getContext('2d')!;
+                ctx.translate(cW / 2, cH / 2);
+                ctx.rotate(radians);
+                ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                const isPng = bgDone || activeFile?.name.toLowerCase().endsWith('.png');
+                const blob = await new Promise<Blob>((res, rej) =>
+                    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
+                );
+                const newUrl = URL.createObjectURL(blob);
+                if (objectUrlRef.current && objectUrlRef.current !== base) {
+                    URL.revokeObjectURL(objectUrlRef.current);
+                }
+                objectUrlRef.current = newUrl;
+                preCropImageRef.current = newUrl;
+                setImageUrl(newUrl);
+                // Reset crop selection since image dimensions changed after rotation
+                setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+                setCompletedCrop(null);
+            } catch {
+                // ignore — keep current crop image
+            }
+        }, 250);
+
+        return () => {
+            if (cropRebakeTimerRef.current) clearTimeout(cropRebakeTimerRef.current);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rotation, cropActive]);
 
     // UI state
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -3597,6 +3677,10 @@ export default function PhotoStudioModal({
         setDrawMode('idle');
         setMousePos(null);
 
+        // Save rotation and imageUrl so we can restore them if the user cancels.
+        cropEntryRotationRef.current = rotation;
+        prevCroppedUrlRef.current = imageUrl;
+
         // If the user has rotated the image since the last crop reference was taken,
         // the preCropImageRef is now stale (points to the old, unrotated image).
         // In that case, skip the restore branch and bake the current rotation below.
@@ -3605,24 +3689,30 @@ export default function PhotoStudioModal({
         if (preCropImageRef.current && !hasStaleRef) {
             // Already have a valid, up-to-date full image reference → restore it
             // so the user crops from the full (pre-any-crop) image again.
-            prevCroppedUrlRef.current = imageUrl; // save current for cancel
+            cropPreBakeRef.current = preCropImageRef.current; // base for rotation rebaking
             setImageUrl(preCropImageRef.current);
             objectUrlRef.current = preCropImageRef.current.startsWith('blob:') ? preCropImageRef.current : null;
             setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
             setCompletedCrop(null);
+            cropJustEnteredRef.current = true;
             setCropActive(true);
             return;
         }
 
         if (rotation === 0) {
             // No rotation to bake — remember the current image as pre-crop reference
+            cropPreBakeRef.current = imageUrl;
             preCropImageRef.current = imageUrl;
+            cropJustEnteredRef.current = true;
             setCropActive(true);
             return;
         }
 
         // Bake the current rotation into a new blob so the user sees the straightened
         // image while drawing the crop selection, and coordinates are correct.
+        // cropPreBakeRef stores the un-rotated source so the user can re-adjust
+        // rotation from the slider while in crop mode (useEffect handles rebaking).
+        cropPreBakeRef.current = imageUrl; // un-rotated base for future rebakes
         try {
             const img = await new Promise<HTMLImageElement>((res, rej) => {
                 const i = new Image();
@@ -3651,12 +3741,13 @@ export default function PhotoStudioModal({
             const newUrl = URL.createObjectURL(blob);
             if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
             objectUrlRef.current = newUrl;
-            preCropImageRef.current = newUrl; // full baked image for all future crops
+            preCropImageRef.current = newUrl; // full baked image shown in crop mode
             setImageUrl(newUrl);
-            setRotation(0); // baked into pixel data
+            setRotation(0); // baked into pixel data — useEffect will see 0 and skip rebake
         } catch {
             preCropImageRef.current = imageUrl; // fallback: bake failed
         }
+        cropJustEnteredRef.current = true;
         setCropActive(true);
     }
 
@@ -3719,6 +3810,8 @@ export default function PhotoStudioModal({
             setImageUrl(newUrl);
             setCompletedCrop(null);
             setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+            // Rotation was baked into the crop source image; reset so it isn't applied twice
+            setRotation(0);
         } catch {
             toast.error('No se pudo aplicar el recorte');
             if (prevCroppedUrlRef.current) {
@@ -3727,6 +3820,7 @@ export default function PhotoStudioModal({
                 prevCroppedUrlRef.current = null;
             }
         }
+        cropPreBakeRef.current = null;
         setCropActive(false);
     }
 
@@ -3737,6 +3831,9 @@ export default function PhotoStudioModal({
             objectUrlRef.current = prevCroppedUrlRef.current.startsWith('blob:') ? prevCroppedUrlRef.current : null;
             prevCroppedUrlRef.current = null;
         }
+        // Restore the rotation that was active when crop mode was entered
+        setRotation(cropEntryRotationRef.current);
+        cropPreBakeRef.current = null;
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
         setCompletedCrop(null);
         setCropActive(false);

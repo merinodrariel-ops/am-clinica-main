@@ -52,7 +52,7 @@ export async function savePatientPhotoEditStateAction(params: {
     .upsert({
       file_id: params.fileId,
       patient_id: params.patientId,
-      rotation: params.rotation,
+      rotation: Math.round(params.rotation),
       brightness: params.brightness,
       draw_shapes: params.drawShapes,
       text_annotations: params.textAnnotations,
