@@ -832,6 +832,10 @@ export default function PhotoStudioModal({
     const [canvasLayerCropId, setCanvasLayerCropId] = useState<string | null>(null);
     const [canvasLayerCropSel, setCanvasLayerCropSel] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     const [canvasLayerCompletedCrop, setCanvasLayerCompletedCrop] = useState<PixelCrop | null>(null);
+    const [canvasLayerCropRotation, setCanvasLayerCropRotation] = useState(0);
+    const [canvasLayerCropBakedSrc, setCanvasLayerCropBakedSrc] = useState<string | null>(null);
+    const canvasLayerCropPreBakeRef = useRef<string | null>(null); // layer.src before any rotation bake
+    const canvasLayerCropRebakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const canvasLayerCropImgRef = useRef<HTMLImageElement>(null);
     const canvasLayersRef = useRef<HTMLCanvasElement>(null);
     const canvasHealPreviewRef = useRef<{ layerId: string; canvas: HTMLCanvasElement } | null>(null);
@@ -1105,6 +1109,7 @@ export default function PhotoStudioModal({
 
         if (cropRebakeTimerRef.current) clearTimeout(cropRebakeTimerRef.current);
         cropRebakeTimerRef.current = setTimeout(async () => {
+            // 50ms debounce — fast enough to feel live without flooding canvas ops
             const base = cropPreBakeRef.current;
             if (!base) return;
 
@@ -1159,7 +1164,7 @@ export default function PhotoStudioModal({
             } catch {
                 // ignore — keep current crop image
             }
-        }, 250);
+        }, 50);
 
         return () => {
             if (cropRebakeTimerRef.current) clearTimeout(cropRebakeTimerRef.current);
@@ -1168,6 +1173,52 @@ export default function PhotoStudioModal({
     }, [rotation, cropActive]);
 
     // UI state
+    // Rebake canvas layer crop source when rotation changes inside the layer crop overlay.
+    // Same debounce pattern as the photo-mode rebake above.
+    useEffect(() => {
+        if (!canvasLayerCropId || canvasLayerCropPreBakeRef.current === null) return;
+        if (canvasLayerCropRebakeTimerRef.current) clearTimeout(canvasLayerCropRebakeTimerRef.current);
+        canvasLayerCropRebakeTimerRef.current = setTimeout(async () => {
+            const base = canvasLayerCropPreBakeRef.current;
+            if (!base) return;
+            if (canvasLayerCropRotation === 0) {
+                setCanvasLayerCropBakedSrc(base);
+                return;
+            }
+            try {
+                const img = await new Promise<HTMLImageElement>((res, rej) => {
+                    const i = new Image(); i.crossOrigin = 'anonymous';
+                    i.onload = () => res(i); i.onerror = () => rej(new Error('load'));
+                    i.src = base;
+                });
+                const radians = (canvasLayerCropRotation * Math.PI) / 180;
+                const sin = Math.abs(Math.sin(radians));
+                const cos = Math.abs(Math.cos(radians));
+                const cW = Math.ceil(img.naturalWidth * cos + img.naturalHeight * sin);
+                const cH = Math.ceil(img.naturalWidth * sin + img.naturalHeight * cos);
+                const canvas = document.createElement('canvas');
+                canvas.width = cW; canvas.height = cH;
+                const ctx = canvas.getContext('2d')!;
+                ctx.translate(cW / 2, cH / 2);
+                ctx.rotate(radians);
+                ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                const blob = await new Promise<Blob>((res, rej) =>
+                    canvas.toBlob(b => b ? res(b) : rej(new Error('null')), 'image/jpeg', 0.95)
+                );
+                const newUrl = URL.createObjectURL(blob);
+                setCanvasLayerCropBakedSrc(prev => {
+                    if (prev && prev !== base) URL.revokeObjectURL(prev);
+                    return newUrl;
+                });
+                setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+                setCanvasLayerCompletedCrop(null);
+            } catch { /* ignore */ }
+        }, 50);
+        return () => { if (canvasLayerCropRebakeTimerRef.current) clearTimeout(canvasLayerCropRebakeTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canvasLayerCropRotation, canvasLayerCropId]);
+
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [saving, setSaving] = useState<'replace' | 'copy' | null>(null);
 
@@ -2560,7 +2611,12 @@ export default function PhotoStudioModal({
         const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
         for (let i = canvasLayers.length - 1; i >= 0; i--) {
             if (hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) {
-                setCanvasLayerCropId(canvasLayers[i].id);
+                const layer = canvasLayers[i];
+                const initialRot = layer.rotation ?? 0;
+                canvasLayerCropPreBakeRef.current = layer.src;
+                setCanvasLayerCropRotation(initialRot);
+                setCanvasLayerCropBakedSrc(initialRot === 0 ? layer.src : null); // will bake via useEffect if != 0
+                setCanvasLayerCropId(layer.id);
                 setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
                 setCanvasLayerCompletedCrop(null);
                 setCanvasSelectedId(null);
@@ -2582,7 +2638,7 @@ export default function PhotoStudioModal({
 
         const scaleX = isPercent ? (img.naturalWidth / 100) : (img.naturalWidth / (img.width || 1));
         const scaleY = isPercent ? (img.naturalHeight / 100) : (img.naturalHeight / (img.height || 1));
-        
+
         const srcX = Math.round(canvasLayerCompletedCrop.x * scaleX);
         const srcY = Math.round(canvasLayerCompletedCrop.y * scaleY);
         const srcW = Math.round(canvasLayerCompletedCrop.width * scaleX);
@@ -2599,8 +2655,15 @@ export default function PhotoStudioModal({
             setCanvasLayers(prev => prev.map(l => {
                 if (l.id !== canvasLayerCropId) return l;
                 const newAspect = srcW / (srcH || 1);
-                return { ...l, src: newUrl, img: newImg, h: l.w / newAspect };
+                // rotation was baked into the baked source → reset to 0 on the layer
+                return { ...l, src: newUrl, img: newImg, h: l.w / newAspect, rotation: 0 };
             }));
+            // Clean up baked URL
+            setCanvasLayerCropBakedSrc(prev => {
+                if (prev && prev !== canvasLayerCropPreBakeRef.current) URL.revokeObjectURL(prev);
+                return null;
+            });
+            canvasLayerCropPreBakeRef.current = null;
             setCanvasLayerCropId(null);
         } catch {
             toast.error('No se pudo aplicar el recorte');
@@ -4650,10 +4713,12 @@ export default function PhotoStudioModal({
                                         {canvasLayerCropId && (() => {
                                             const layer = canvasLayers.find(l => l.id === canvasLayerCropId);
                                             if (!layer) return null;
+                                            // Show the baked (rotation-applied) image if available, otherwise raw src
+                                            const cropSrc = canvasLayerCropBakedSrc ?? layer.src;
                                             return (
                                                 <div className="absolute inset-0 bg-black/85 flex flex-col z-20 rounded-lg overflow-hidden">
                                                     <div className="flex items-center justify-between px-3 py-2 bg-black/60 border-b border-white/10 shrink-0">
-                                                        <span className="text-white/70 text-xs">Recortá la foto — doble clic activó modo edición</span>
+                                                        <span className="text-white/70 text-xs">Recortá la foto — ajustá rotación y área</span>
                                                         <div className="flex gap-2">
                                                             <button
                                                                 onClick={handleConfirmCanvasLayerCrop}
@@ -4662,7 +4727,14 @@ export default function PhotoStudioModal({
                                                                 <Check size={12} /> Aplicar
                                                             </button>
                                                             <button
-                                                                onClick={() => setCanvasLayerCropId(null)}
+                                                                onClick={() => {
+                                                                    setCanvasLayerCropBakedSrc(prev => {
+                                                                        if (prev && prev !== canvasLayerCropPreBakeRef.current) URL.revokeObjectURL(prev);
+                                                                        return null;
+                                                                    });
+                                                                    canvasLayerCropPreBakeRef.current = null;
+                                                                    setCanvasLayerCropId(null);
+                                                                }}
                                                                 className="flex items-center gap-1 px-3 py-1 rounded-md text-xs bg-white/10 text-white/60 hover:bg-white/20 transition-colors"
                                                             >
                                                                 <X size={12} /> Cancelar
@@ -4673,11 +4745,6 @@ export default function PhotoStudioModal({
                                                         {/*
                                                           CRITICAL: wrap ReactCrop in inline-block so its container
                                                           collapses to the image's actual rendered size.
-                                                          Without this, ReactCrop's wrapper div stretches to fill
-                                                          the flex parent width. The crop selection (100% width)
-                                                          would then calculate against the CONTAINER width (e.g. 600px)
-                                                          rather than the IMAGE width (e.g. 350px), causing crop
-                                                          handles to fly off screen.
                                                         */}
                                                         <div style={{ display: 'inline-block', lineHeight: 0 }}>
                                                             <ReactCrop
@@ -4687,17 +4754,49 @@ export default function PhotoStudioModal({
                                                             >
                                                                 <img
                                                                     ref={canvasLayerCropImgRef}
-                                                                    src={layer.src}
+                                                                    src={cropSrc}
                                                                     alt="recorte"
                                                                     style={{
                                                                         display: 'block',
                                                                         maxWidth: 'min(100%, calc(100vw - 100px))',
-                                                                        maxHeight: 'calc(70vh - 120px)',
+                                                                        maxHeight: 'calc(60vh - 120px)',
                                                                     }}
                                                                     crossOrigin="anonymous"
                                                                 />
                                                             </ReactCrop>
                                                         </div>
+                                                    </div>
+                                                    {/* Inline rotation strip — same UX as photo crop mode */}
+                                                    <div className="flex items-center justify-center gap-3 px-4 py-2.5 bg-black/60 border-t border-white/10 shrink-0">
+                                                        <button
+                                                            onClick={() => setCanvasLayerCropRotation(r => { const n = r - 0.5; return n < -180 ? n + 360 : n; })}
+                                                            className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
+                                                        >
+                                                            <RotateCcw size={13} />
+                                                        </button>
+                                                        <input
+                                                            type="range" min={-180} max={180} step={0.5}
+                                                            value={canvasLayerCropRotation}
+                                                            onChange={e => setCanvasLayerCropRotation(Number(e.target.value))}
+                                                            className="flex-1 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
+                                                        />
+                                                        <button
+                                                            onClick={() => setCanvasLayerCropRotation(r => { const n = r + 0.5; return n > 180 ? n - 360 : n; })}
+                                                            className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
+                                                        >
+                                                            <RotateCw size={13} />
+                                                        </button>
+                                                        <span className="text-white/50 font-mono text-xs w-14 text-center flex-shrink-0">
+                                                            {canvasLayerCropRotation > 0 ? `+${canvasLayerCropRotation.toFixed(1)}°` : `${canvasLayerCropRotation.toFixed(1)}°`}
+                                                        </span>
+                                                        {canvasLayerCropRotation !== 0 && (
+                                                            <button
+                                                                onClick={() => setCanvasLayerCropRotation(0)}
+                                                                className="text-[10px] text-[#C9A96E] hover:text-[#C9A96E]/80 transition-colors font-bold uppercase flex-shrink-0"
+                                                            >
+                                                                Reset
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
@@ -5102,11 +5201,14 @@ export default function PhotoStudioModal({
                             onEnterCropMode={canvasActive && canvasSelectedId
                                 // When a canvas layer is selected, crop that layer (not the main photo)
                                 ? () => {
+                                    const layer = canvasLayers.find(l => l.id === canvasSelectedId);
+                                    const initialRot = layer?.rotation ?? 0;
+                                    canvasLayerCropPreBakeRef.current = layer?.src ?? null;
+                                    setCanvasLayerCropRotation(initialRot);
+                                    setCanvasLayerCropBakedSrc(initialRot === 0 ? (layer?.src ?? null) : null);
                                     setCanvasLayerCropId(canvasSelectedId);
                                     const initialCrop: Crop = { unit: '%', width: 100, height: 100, x: 0, y: 0 };
                                     setCanvasLayerCropSel(initialCrop);
-                                    // Pre-set completed crop so "Apply" works even if user doesn't drag
-                                    // Use type assertion to bypass strict PixelCrop vs Crop check here
                                     setCanvasLayerCompletedCrop(initialCrop as any);
                                     setCanvasSelectedId(null);
                                 }
