@@ -7,7 +7,8 @@ import {
     Bell, Clock, CalendarDays, Phone, MessageCircle,
     CheckCircle2, PauseCircle, XCircle, Search, Filter,
     TrendingUp, AlertTriangle, ChevronDown, Plus, User,
-    ArrowRight, RefreshCw, Calendar, Timer, Zap, ExternalLink
+    ArrowRight, RefreshCw, Calendar, Timer, Zap, ExternalLink,
+    PhoneCall, Repeat,
 } from 'lucide-react';
 import {
     getRecallWorklist,
@@ -18,6 +19,14 @@ import {
     snoozeRecall,
     deactivateRecall,
 } from '@/app/actions/recalls';
+import {
+    getSeguimientos,
+    createSeguimiento,
+    updateSeguimientoState,
+    snoozeSeguimiento,
+    type Seguimiento,
+    type SeguimientoFilter,
+} from '@/app/actions/seguimientos';
 import {
     RECALL_TYPE_LABELS,
     RECALL_STATE_LABELS,
@@ -637,39 +646,315 @@ function CreateRecallModal({ open, onClose, onCreate }: {
     );
 }
 
+// ─── Seguimiento Card ─────────────────────────────────────────
+
+function SeguimientoCard({ seg, onAction }: { seg: Seguimiento; onAction: () => void }) {
+    const [isPending, startTransition] = useTransition();
+    const [showSnooze, setShowSnooze] = useState(false);
+    const [snoozeDate, setSnoozeDate] = useState('');
+
+    const contactName = seg.patient
+        ? `${seg.patient.nombre} ${seg.patient.apellido}`
+        : seg.contacto_libre || 'Sin contacto';
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const due = new Date(seg.due_date + 'T00:00:00');
+    const diff = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+    const isPastDue = diff < 0;
+    const countdownText = diff === 0 ? 'Hoy' : diff > 0 ? `En ${diff} días` : `Vencido hace ${Math.abs(diff)} días`;
+    const countdownColor = isPastDue ? 'text-red-600 dark:text-red-400' : diff <= 3 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400';
+
+    const waLink = seg.patient?.whatsapp_numero
+        ? `https://wa.me/${(seg.patient.whatsapp_pais_code || '+54').replace('+', '')}${seg.patient.whatsapp_numero}`
+        : seg.patient?.whatsapp
+            ? `https://wa.me/54${seg.patient.whatsapp.replace(/\D/g, '')}`
+            : null;
+
+    const act = (fn: () => Promise<unknown>) => startTransition(async () => { await fn(); onAction(); });
+
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className={`group relative bg-white dark:bg-gray-800 rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-200 p-4
+                ${isPastDue && seg.state === 'pendiente' ? 'border-red-200 dark:border-red-800/50' : 'border-orange-200 dark:border-orange-800/40'}`}
+        >
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white bg-orange-500">
+                            <PhoneCall className="w-3 h-3" /> Seguimiento
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
+                            ${seg.state === 'pendiente' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                              seg.state === 'realizado' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
+                              seg.state === 'pospuesto' ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
+                              'bg-gray-50 text-gray-700'}`}>
+                            {seg.state === 'pendiente' ? 'Pendiente' : seg.state === 'realizado' ? 'Realizado' : seg.state === 'pospuesto' ? 'Pospuesto' : 'No aplica'}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        {seg.patient ? (
+                            <Link href={`/patients/${seg.patient.id_paciente}`}
+                                className="text-sm font-semibold text-gray-900 dark:text-white hover:text-orange-600 transition-colors truncate">
+                                {contactName}
+                            </Link>
+                        ) : (
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{contactName}</span>
+                        )}
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">{seg.motivo}</p>
+                    <div className="flex items-center gap-4 mt-1">
+                        <span className={`flex items-center gap-1 text-xs font-medium ${countdownColor}`}>
+                            <Timer className="w-3 h-3" />{countdownText}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                            {due.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {isPending && <RefreshCw className="w-4 h-4 text-orange-500 animate-spin" />}
+                    {waLink && (
+                        <a href={waLink} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 transition-colors">
+                            <MessageCircle className="w-3.5 h-3.5" />
+                        </a>
+                    )}
+                    {seg.patient?.whatsapp && (
+                        <a href={`tel:${seg.patient.whatsapp}`}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 transition-colors">
+                            <Phone className="w-3.5 h-3.5" />
+                        </a>
+                    )}
+                    {seg.state === 'pendiente' && (
+                        <button onClick={() => act(() => updateSeguimientoState(seg.id, 'realizado'))}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 transition-colors"
+                            title="Marcar como realizado">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    <button onClick={() => setShowSnooze(s => !s)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 transition-colors"
+                        title="Posponer">
+                        <PauseCircle className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => act(() => updateSeguimientoState(seg.id, 'no_aplica'))}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-400 transition-colors"
+                        title="Descartar">
+                        <XCircle className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </div>
+
+            {showSnooze && (
+                <div className="mt-3 flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <input type="date" value={snoozeDate} onChange={e => setSnoozeDate(e.target.value)}
+                        className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                    <button onClick={() => { if (snoozeDate) act(() => snoozeSeguimiento(seg.id, snoozeDate)); setShowSnooze(false); }}
+                        disabled={!snoozeDate}
+                        className="px-3 py-1.5 text-xs rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium disabled:opacity-50">
+                        Posponer
+                    </button>
+                </div>
+            )}
+        </motion.div>
+    );
+}
+
+// ─── Crear Seguimiento Modal ──────────────────────────────────
+
+function CreateSeguimientoModal({ open, onClose, onCreate }: {
+    open: boolean;
+    onClose: () => void;
+    onCreate: () => void;
+}) {
+    const [patientSearch, setPatientSearch] = useState('');
+    const [patients, setPatients] = useState<Array<{ id_paciente: string; nombre: string; apellido: string }>>([]);
+    const [selectedPatient, setSelectedPatient] = useState<{ id_paciente: string; nombre: string; apellido: string } | null>(null);
+    const [contactoLibre, setContactoLibre] = useState('');
+    const [motivo, setMotivo] = useState('');
+    const [dueDate, setDueDate] = useState('');
+    const [notes, setNotes] = useState('');
+    const [searching, setSearching] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const searchPatients = useCallback(async (query: string) => {
+        if (query.length < 2) { setPatients([]); return; }
+        setSearching(true);
+        const { createClient } = await import('@/utils/supabase/client');
+        const supabase = createClient();
+        const { data } = await supabase
+            .from('pacientes')
+            .select('id_paciente, nombre, apellido')
+            .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`)
+            .eq('is_deleted', false)
+            .limit(8);
+        setPatients(data || []);
+        setSearching(false);
+    }, []);
+
+    useEffect(() => {
+        const t = setTimeout(() => searchPatients(patientSearch), 300);
+        return () => clearTimeout(t);
+    }, [patientSearch, searchPatients]);
+
+    const handleReset = () => {
+        setPatientSearch(''); setPatients([]); setSelectedPatient(null);
+        setContactoLibre(''); setMotivo(''); setDueDate(''); setNotes('');
+    };
+
+    if (!open) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <PhoneCall className="w-5 h-5 text-orange-500" />
+                    Nuevo seguimiento
+                </h3>
+
+                {/* Paciente (opcional) */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Paciente <span className="text-gray-400 font-normal">(opcional)</span>
+                    </label>
+                    {selectedPatient ? (
+                        <div className="flex items-center justify-between bg-orange-50 dark:bg-orange-900/20 rounded-lg px-3 py-2">
+                            <span className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                                {selectedPatient.nombre} {selectedPatient.apellido}
+                            </span>
+                            <button onClick={() => { setSelectedPatient(null); setContactoLibre(''); }}
+                                className="text-orange-500 text-xs hover:underline">Cambiar</button>
+                        </div>
+                    ) : (
+                        <div className="relative">
+                            <input type="text" value={patientSearch} onChange={e => setPatientSearch(e.target.value)}
+                                placeholder="Buscar paciente..."
+                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" />
+                            {searching && <RefreshCw className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-gray-400" />}
+                            {patients.length > 0 && (
+                                <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+                                    {patients.map(p => (
+                                        <button key={p.id_paciente}
+                                            onClick={() => { setSelectedPatient(p); setPatientSearch(''); setPatients([]); }}
+                                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                                            {p.nombre} {p.apellido}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {!selectedPatient && (
+                        <input type="text" value={contactoLibre} onChange={e => setContactoLibre(e.target.value)}
+                            placeholder="O escribí el nombre del contacto (proveedor, colega, etc.)"
+                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white mt-2" />
+                    )}
+                </div>
+
+                {/* Motivo */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Motivo *</label>
+                    <input type="text" value={motivo} onChange={e => setMotivo(e.target.value)}
+                        placeholder="Ej: Confirmar turno, consultar presupuesto, seguimiento post-tratamiento..."
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" />
+                </div>
+
+                {/* Fecha */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha *</label>
+                    <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" />
+                </div>
+
+                {/* Notas */}
+                <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Notas <span className="text-gray-400 font-normal">(opcional)</span>
+                    </label>
+                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                        placeholder="Contexto adicional..."
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white resize-none" />
+                </div>
+
+                <div className="flex gap-3">
+                    <button onClick={() => { onClose(); handleReset(); }}
+                        className="flex-1 px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={async () => {
+                            if (!motivo.trim() || !dueDate) return;
+                            setSaving(true);
+                            await createSeguimiento({
+                                patient_id: selectedPatient?.id_paciente || null,
+                                contacto_libre: !selectedPatient && contactoLibre.trim() ? contactoLibre.trim() : null,
+                                motivo: motivo.trim(),
+                                due_date: dueDate,
+                                notes: notes.trim() || null,
+                            });
+                            setSaving(false);
+                            handleReset();
+                            onClose();
+                            onCreate();
+                        }}
+                        disabled={!motivo.trim() || !dueDate || saving}
+                        className="flex-1 px-4 py-2.5 text-sm rounded-xl bg-orange-500 text-white hover:bg-orange-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        {saving ? 'Guardando...' : 'Crear seguimiento'}
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    );
+}
+
 // ─── Main Worklist Component ─────────────────────────────────
 
 export default function RecallWorklist() {
     const [rules, setRules] = useState<RecallRule[]>([]);
+    const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
     const [stats, setStats] = useState<{
         totalActive: number; pendingContact: number; contacted: number;
         scheduled: number; snoozed: number; pastDue: number; dueThisWeek: number;
         byType: Record<string, number>;
     } | null>(null);
+    // 'recalls' = automáticos del sistema | 'manuales' = seguimientos manuales
+    const [mode, setMode] = useState<'recalls' | 'manuales'>('manuales');
     const [activeTab, setActiveTab] = useState<WorklistFilter>('all');
     const [typeFilter, setTypeFilter] = useState<RecallType | ''>('');
     const [stateFilter, setStateFilter] = useState<RecallState | ''>('');
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    const [isPending, startTransition] = useTransition();
+    const [, startTransition] = useTransition();
 
     const loadData = useCallback(() => {
         startTransition(async () => {
             setLoading(true);
-            const [worklistData, statsData] = await Promise.all([
-                getRecallWorklist(activeTab, {
-                    recall_type: typeFilter as RecallType || undefined,
-                    state: stateFilter as RecallState || undefined,
-                    search: search || undefined,
-                }),
-                getRecallStats(),
-            ]);
-            setRules(worklistData);
-            setStats(statsData);
+            if (mode === 'recalls') {
+                const [worklistData, statsData] = await Promise.all([
+                    getRecallWorklist(activeTab, {
+                        recall_type: typeFilter as RecallType || undefined,
+                        state: stateFilter as RecallState || undefined,
+                        search: search || undefined,
+                    }),
+                    getRecallStats(),
+                ]);
+                setRules(worklistData);
+                setStats(statsData);
+            } else {
+                const segData = await getSeguimientos(activeTab as SeguimientoFilter, search || undefined);
+                setSeguimientos(segData);
+            }
             setLoading(false);
         });
-    }, [activeTab, typeFilter, stateFilter, search]);
+    }, [mode, activeTab, typeFilter, stateFilter, search]);
 
     useEffect(() => {
         loadData();
@@ -702,25 +987,42 @@ export default function RecallWorklist() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Bell className="w-7 h-7 text-blue-500" />
-                        Recall Engine
+                        <PhoneCall className="w-7 h-7 text-orange-500" />
+                        Seguimientos
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Gestión de recordatorios recurrentes para pacientes
+                        {mode === 'manuales' ? 'Recordatorios manuales de recepción y admin' : 'Recalls automáticos por tratamiento'}
                     </p>
                 </div>
-                <button
-                    onClick={() => setShowCreate(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl
-            hover:bg-blue-700 transition-colors text-sm font-medium shadow-lg shadow-blue-500/25"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nuevo Recall
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Toggle manuales / automáticos */}
+                    <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                        <button onClick={() => { setMode('manuales'); setActiveTab('all'); }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all
+                                ${mode === 'manuales' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                            <PhoneCall className="w-3.5 h-3.5" /> Manuales
+                        </button>
+                        <button onClick={() => { setMode('recalls'); setActiveTab('all'); }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all
+                                ${mode === 'recalls' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                            <Repeat className="w-3.5 h-3.5" /> Automáticos
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => setShowCreate(true)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg transition-colors
+                            ${mode === 'manuales'
+                                ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-500/25'
+                                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/25'}`}
+                    >
+                        <Plus className="w-4 h-4" />
+                        {mode === 'manuales' ? 'Nuevo seguimiento' : 'Nuevo recall'}
+                    </button>
+                </div>
             </div>
 
-            {/* Stats */}
-            <StatsBar stats={stats} />
+            {/* Stats — solo en modo automático */}
+            {mode === 'recalls' && <StatsBar stats={stats} />}
 
             {/* Tabs */}
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-2xl p-1.5 overflow-x-auto">
@@ -792,27 +1094,34 @@ export default function RecallWorklist() {
                         <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
                         <span className="ml-2 text-sm text-gray-500">Cargando...</span>
                     </div>
-                ) : rules.length === 0 ? (
+                ) : (mode === 'manuales' ? seguimientos.length : rules.length) === 0 ? (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         className="text-center py-20"
                     >
-                        <Bell className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                        {mode === 'manuales'
+                            ? <PhoneCall className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                            : <Bell className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />}
                         <p className="text-gray-500 dark:text-gray-400 text-sm">
-                            No hay recalls en esta vista.
+                            {mode === 'manuales' ? 'No hay seguimientos en esta vista.' : 'No hay recalls en esta vista.'}
                         </p>
                         <button
                             onClick={() => setShowCreate(true)}
-                            className="mt-3 text-sm text-blue-500 hover:text-blue-600 font-medium"
+                            className={`mt-3 text-sm font-medium ${mode === 'manuales' ? 'text-orange-500 hover:text-orange-600' : 'text-blue-500 hover:text-blue-600'}`}
                         >
-                            Crear primer recall →
+                            {mode === 'manuales' ? 'Crear primer seguimiento →' : 'Crear primer recall →'}
                         </button>
                     </motion.div>
+                ) : mode === 'manuales' ? (
+                    <AnimatePresence>
+                        {seguimientos.map(seg => (
+                            <SeguimientoCard key={seg.id} seg={seg} onAction={loadData} />
+                        ))}
+                    </AnimatePresence>
                 ) : (
                     <AnimatePresence>
                         {(() => {
-                            // Detect patients with more than one recall in the current view
                             const patientCount = new Map<string, number>();
                             rules.forEach(r => {
                                 if (r.patient?.id_paciente) {
@@ -834,18 +1143,28 @@ export default function RecallWorklist() {
             </div>
 
             {/* Total count */}
-            {!loading && rules.length > 0 && (
+            {!loading && (mode === 'manuales' ? seguimientos.length : rules.length) > 0 && (
                 <p className="text-center text-xs text-gray-400 dark:text-gray-500 pb-4">
-                    {rules.length} recall{rules.length !== 1 ? 's' : ''} encontrados
+                    {mode === 'manuales'
+                        ? `${seguimientos.length} seguimiento${seguimientos.length !== 1 ? 's' : ''}`
+                        : `${rules.length} recall${rules.length !== 1 ? 's' : ''}`} encontrados
                 </p>
             )}
 
-            {/* Create Modal */}
-            <CreateRecallModal
-                open={showCreate}
-                onClose={() => setShowCreate(false)}
-                onCreate={handleCreate}
-            />
+            {/* Modales */}
+            {mode === 'manuales' ? (
+                <CreateSeguimientoModal
+                    open={showCreate}
+                    onClose={() => setShowCreate(false)}
+                    onCreate={loadData}
+                />
+            ) : (
+                <CreateRecallModal
+                    open={showCreate}
+                    onClose={() => setShowCreate(false)}
+                    onCreate={handleCreate}
+                />
+            )}
         </div>
     );
 }

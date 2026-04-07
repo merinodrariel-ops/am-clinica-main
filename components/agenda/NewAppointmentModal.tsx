@@ -59,6 +59,7 @@ const APPOINTMENT_TYPE_OPTIONS = [
     { value: 'tallado', label: 'Tallado' },
     { value: 'botox', label: 'Botox' },
     { value: 'control', label: 'Control general / urgencia' },
+    { value: 'recordatorio_interno', label: '📞 Recordatorio interno' },
 ] as const;
 
 const TYPE_DURATIONS_MIN: Record<string, number> = {
@@ -566,8 +567,10 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
                     {/* Doctor & Type Row */}
                     <div className="grid grid-cols-2 gap-5">
-                        <div className="relative">
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Odontologo</label>
+                        <div className={`relative ${type === 'recordatorio_interno' ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">
+                                Odontologo{type === 'recordatorio_interno' ? ' (no aplica)' : ''}
+                            </label>
                             <div className="relative">
                                 <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <Input
@@ -653,6 +656,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             {type === 'consulta' && (
                                 <p className="text-[11px] text-violet-500 font-semibold mt-1.5 pl-1">
                                     El paciente será contabilizado como nuevo ingreso
+                                </p>
+                            )}
+                            {type === 'recordatorio_interno' && (
+                                <p className="text-[11px] text-orange-500 font-semibold mt-1.5 pl-1">
+                                    Solo visible para recepción y admin — no aparece como turno de paciente
                                 </p>
                             )}
                         </div>

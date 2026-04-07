@@ -90,7 +90,7 @@ const MENU_ITEMS = [
     },
     {
         icon: Bell,
-        label: 'Recall Engine',
+        label: 'Seguimientos',
         href: '/recalls',
         key: 'recalls',
         roles: ['owner', 'admin', 'reception', 'developer', 'asistente', 'odontologo', 'recaptacion']

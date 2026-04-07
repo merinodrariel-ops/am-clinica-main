@@ -1224,6 +1224,8 @@ export default function PhotoStudioModal({
 
     const baseImageFiles = useMemo(() => allFolderFiles.filter(isImageFile), [allFolderFiles]);
     const [imageOrderIds, setImageOrderIds] = useState<string[]>(() => baseImageFiles.map(item => item.id));
+    // Tracks the ID of a recently saved copy so it always lands at the end of the filmstrip
+    const pendingCopyIdRef = useRef<string | null>(null);
     const imageFiles = useMemo(() => {
         const byId = new Map(baseImageFiles.map(item => [item.id, item]));
         const ordered: DriveFile[] = [];
@@ -1242,7 +1244,15 @@ export default function PhotoStudioModal({
     useEffect(() => {
         setImageOrderIds((prev) => {
             const validPrev = prev.filter((id) => baseImageFiles.some((item) => item.id === id));
-            const missing = baseImageFiles.map((item) => item.id).filter((id) => !validPrev.includes(id));
+            const allIds = baseImageFiles.map((item) => item.id);
+            const missing = allIds.filter((id) => !validPrev.includes(id));
+            // If a copy was just saved, ensure its ID lands at the very end
+            const pendingId = pendingCopyIdRef.current;
+            if (pendingId && missing.includes(pendingId)) {
+                pendingCopyIdRef.current = null;
+                const otherMissing = missing.filter((id) => id !== pendingId);
+                return [...validPrev, ...otherMissing, pendingId];
+            }
             return [...validPrev, ...missing];
         });
     }, [baseImageFiles]);
@@ -4184,18 +4194,22 @@ export default function PhotoStudioModal({
                     toast.error(`Error al guardar: ${result.error}`);
                     return;
                 }
+                // Store the new file ID so the sync effect places it at the end of the filmstrip
+                if (result.fileId) {
+                    pendingCopyIdRef.current = result.fileId;
+                }
                 toast.success('Copia guardada en Drive');
             }
-            
+
             setSaveDialogOpen(false);
-            
+
             // For copies, wait a moment for Drive consistency before refreshing the list
             if (mode === 'copy') {
                 const toastId = toast.loading('Sincronizando con Google Drive...');
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 toast.dismiss(toastId);
             }
-            
+
             onSaved(); // refresca la carpeta, pero nos quedamos en el estudio
         } catch (err) {
             toast.error('Error inesperado al guardar');

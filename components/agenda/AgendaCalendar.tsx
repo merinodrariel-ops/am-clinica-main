@@ -344,6 +344,33 @@ export default function AgendaCalendar() {
                 const isConflict = conflictMap.has(apt.id);
                 const isCancelled = apt.status === 'cancelled';
                 const isSurgery = SURGERY_APPOINTMENT_TYPES.has(apt.type);
+                const isInternal = apt.type === 'recordatorio_interno';
+
+                // Recordatorios internos: color naranja distintivo, sin lógica de doctor/cirugía
+                if (isInternal) {
+                    return {
+                        id: apt.id,
+                        title: apt.title || '📞 Recordatorio',
+                        start: apt.start_time,
+                        end: apt.end_time,
+                        backgroundColor: '#f97316',
+                        borderColor: '#ea580c',
+                        textColor: '#ffffff',
+                        className: 'premium-event recordatorio-interno-event',
+                        extendedProps: {
+                            status: apt.status,
+                            type: apt.type,
+                            notes: apt.notes || '',
+                            patient_id: apt.patient_id || '',
+                            doctor_id: apt.doctor_id || '',
+                            start_time: apt.start_time,
+                            patient: apt.patient || undefined,
+                            doctor: apt.doctor || undefined,
+                            conflict: false,
+                        }
+                    };
+                }
+
                 const doctorColor = isSurgery
                     ? '#dc2626'
                     : apt.doctor_id
@@ -702,8 +729,27 @@ export default function AgendaCalendar() {
                         eventContent={(arg) => {
                             const { event } = arg;
                             const props = event.extendedProps as AgendaEventExtendedProps;
-                            const patientName = props.patient?.full_name ?? '';
                             const isTimeGridView = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
+
+                            // Render especial para recordatorios internos
+                            if (props.type === 'recordatorio_interno') {
+                                const label = props.patient?.full_name || event.title?.replace('📞 ', '') || 'Recordatorio';
+                                return (
+                                    <div className={`px-1 overflow-hidden ${isTimeGridView ? 'py-0.5' : ''}`}>
+                                        <div className="font-semibold truncate text-[11px] leading-tight flex items-center gap-1">
+                                            <span>📞</span>
+                                            <span className="truncate">{label}</span>
+                                        </div>
+                                        {isTimeGridView && (
+                                            <div className="text-[9px] font-bold uppercase tracking-wide opacity-90 leading-tight mt-0.5">
+                                                Recordatorio interno
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+
+                            const patientName = props.patient?.full_name ?? '';
                             // Badge solo cuando la fecha del turno coincide exactamente
                             // con primera_consulta_fecha del paciente — dato verificado en DB.
                             const aptDate = props.start_time?.split('T')[0] ?? '';

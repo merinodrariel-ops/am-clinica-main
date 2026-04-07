@@ -23,7 +23,7 @@ export default function RecallsPage() {
                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                     >
                         <ListChecks className="w-4 h-4" />
-                        Worklist
+                        Seguimientos
                     </button>
                     <button
                         onClick={() => setView('calendar')}
