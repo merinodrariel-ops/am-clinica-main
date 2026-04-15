@@ -11,7 +11,7 @@ import {
     Loader2,
     Package,
     DollarSign,
-    Check
+    Check,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import type { TarifarioItem, TarifarioVersion } from '@/lib/supabase';
@@ -19,18 +19,37 @@ import type { TarifarioItem, TarifarioVersion } from '@/lib/supabase';
 const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 
-const CATEGORIAS = [
-    'Consultas',
-    'Ortodoncia',
-    'Implantes',
-    'Estética',
-    'Endodoncia',
-    'Cirugía',
-    'Periodoncia',
-    'Odontopediatría',
-    'Prótesis',
-    'General',
+// Categorías de fallback — se reemplazan por las categorías reales del tarifario en DB
+const CATEGORIAS_FALLBACK = [
+    'Consultas', 'Ortodoncia', 'Implantes', 'Estética', 'Endodoncia',
+    'Cirugía', 'Periodoncia', 'Odontopediatría', 'Prótesis', 'General',
 ];
+
+function formatPrecio(item: TarifarioItem): string {
+    if (item.moneda === 'ARS') {
+        return item.precio_base_ars != null && item.precio_base_ars > 0
+            ? `$${item.precio_base_ars.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+            : 'Variable';
+    }
+    return item.precio_base_usd > 0 ? formatCurrency(item.precio_base_usd, 'USD') : 'Variable';
+}
+
+type NewItemState = {
+    categoria: string;
+    concepto_nombre: string;
+    moneda: 'USD' | 'ARS';
+    precio_base_usd: number;
+    precio_base_ars: number;
+    notas: string;
+};
+
+type EditFormState = {
+    concepto_nombre: string;
+    moneda: 'USD' | 'ARS';
+    precio_base_usd: number;
+    precio_base_ars: number;
+    notas: string;
+};
 
 export default function TarifarioPage() {
     const [version, setVersion] = useState<TarifarioVersion | null>(null);
@@ -38,25 +57,25 @@ export default function TarifarioPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    // Groupings
     const [itemsByCategoria, setItemsByCategoria] = useState<Record<string, TarifarioItem[]>>({});
+    const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_FALLBACK);
+    const [categoriaPersonalizada, setCategoriaPersonalizada] = useState('');
 
-    // Edit mode
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState({ concepto_nombre: '', precio_base_usd: 0, notas: '' });
+    const [editForm, setEditForm] = useState<EditFormState>({
+        concepto_nombre: '', moneda: 'USD', precio_base_usd: 0, precio_base_ars: 0, notas: '',
+    });
 
-    // New item mode
     const [showNewItem, setShowNewItem] = useState(false);
-    const [newItem, setNewItem] = useState({ categoria: 'General', concepto_nombre: '', precio_base_usd: 0, notas: '' });
+    const [newItem, setNewItem] = useState<NewItemState>({
+        categoria: 'General', concepto_nombre: '', moneda: 'USD', precio_base_usd: 0, precio_base_ars: 0, notas: '',
+    });
 
-    useEffect(() => {
-        loadTarifario();
-    }, []);
+    useEffect(() => { loadTarifario(); }, []);
 
     async function loadTarifario() {
         setLoading(true);
         try {
-            // Get the active version
             const { data: versionData, error: versionError } = await supabase
                 .from('tarifario_versiones')
                 .select('*')
@@ -68,7 +87,6 @@ export default function TarifarioPage() {
             }
             setVersion(versionData);
 
-            // Get items
             if (versionData) {
                 const { data: itemsData, error: itemsError } = await supabase
                     .from('tarifario_items')
@@ -79,15 +97,24 @@ export default function TarifarioPage() {
                     .order('concepto_nombre');
 
                 if (itemsError) throw itemsError;
-                setItems(itemsData || []);
+                const rows = (itemsData || []) as TarifarioItem[];
+                setItems(rows);
 
-                // Group by category
-                const grouped = (itemsData || []).reduce((acc: Record<string, TarifarioItem[]>, item: TarifarioItem) => {
+                const grouped = rows.reduce((acc: Record<string, TarifarioItem[]>, item: TarifarioItem) => {
                     if (!acc[item.categoria]) acc[item.categoria] = [];
                     acc[item.categoria].push(item);
                     return acc;
-                }, {} as Record<string, TarifarioItem[]>);
+                }, {});
                 setItemsByCategoria(grouped);
+
+                // Categorías reales de la BD + las del fallback que no estén ya
+                const realCats = Object.keys(grouped);
+                const merged = [...new Set([...realCats, ...CATEGORIAS_FALLBACK])].sort();
+                setCategorias(merged);
+                // Inicializar el selector de nuevo ítem con la primera categoría real
+                if (realCats.length > 0) {
+                    setNewItem(prev => ({ ...prev, categoria: realCats[0] }));
+                }
             }
         } catch (error) {
             console.error('Error loading tarifario:', error);
@@ -96,31 +123,33 @@ export default function TarifarioPage() {
         }
     }
 
-    async function startEdit(item: TarifarioItem) {
+    function startEdit(item: TarifarioItem) {
         setEditingId(item.id);
         setEditForm({
             concepto_nombre: item.concepto_nombre,
+            moneda: item.moneda ?? 'USD',
             precio_base_usd: item.precio_base_usd,
+            precio_base_ars: item.precio_base_ars ?? 0,
             notas: item.notas || '',
         });
     }
 
     async function saveEdit() {
         if (!editingId) return;
-
         setSaving(true);
         try {
             const { error } = await supabase
                 .from('tarifario_items')
                 .update({
                     concepto_nombre: editForm.concepto_nombre,
-                    precio_base_usd: editForm.precio_base_usd,
+                    moneda: editForm.moneda,
+                    precio_base_usd: editForm.moneda === 'USD' ? editForm.precio_base_usd : 0,
+                    precio_base_ars: editForm.moneda === 'ARS' ? editForm.precio_base_ars : null,
                     notas: editForm.notas || null,
                 })
                 .eq('id', editingId);
 
             if (error) throw error;
-
             setEditingId(null);
             await loadTarifario();
         } catch (error) {
@@ -133,13 +162,11 @@ export default function TarifarioPage() {
 
     async function deleteItem(id: string) {
         if (!confirm('¿Desactivar este item del tarifario?')) return;
-
         try {
             const { error } = await supabase
                 .from('tarifario_items')
                 .update({ activo: false })
                 .eq('id', id);
-
             if (error) throw error;
             await loadTarifario();
         } catch (error) {
@@ -149,10 +176,16 @@ export default function TarifarioPage() {
     }
 
     async function addNewItem() {
-        if (!version || !newItem.concepto_nombre || newItem.precio_base_usd < 0) {
-            alert('Complete todos los campos');
+        const categoriaFinal = newItem.categoria === '__nueva__'
+            ? categoriaPersonalizada.trim()
+            : newItem.categoria;
+
+        if (!version || !newItem.concepto_nombre || !categoriaFinal) {
+            alert('Complete todos los campos obligatorios');
             return;
         }
+        if (newItem.moneda === 'USD' && newItem.precio_base_usd < 0) return;
+        if (newItem.moneda === 'ARS' && newItem.precio_base_ars < 0) return;
 
         setSaving(true);
         try {
@@ -160,9 +193,11 @@ export default function TarifarioPage() {
                 .from('tarifario_items')
                 .insert({
                     tarifario_version_id: version.id,
-                    categoria: newItem.categoria,
+                    categoria: categoriaFinal,
                     concepto_nombre: newItem.concepto_nombre,
-                    precio_base_usd: newItem.precio_base_usd,
+                    moneda: newItem.moneda,
+                    precio_base_usd: newItem.moneda === 'USD' ? newItem.precio_base_usd : 0,
+                    precio_base_ars: newItem.moneda === 'ARS' ? newItem.precio_base_ars : null,
                     notas: newItem.notas || null,
                     activo: true,
                 });
@@ -170,11 +205,13 @@ export default function TarifarioPage() {
             if (error) throw error;
 
             setShowNewItem(false);
-            setNewItem({ categoria: 'General', concepto_nombre: '', precio_base_usd: 0, notas: '' });
+            setNewItem({ categoria: 'General', concepto_nombre: '', moneda: 'USD', precio_base_usd: 0, precio_base_ars: 0, notas: '' });
+            setCategoriaPersonalizada('');
             await loadTarifario();
         } catch (error) {
-            console.error('Error adding:', error);
-            alert('Error al agregar');
+            const msg = error instanceof Error ? error.message : JSON.stringify(error);
+            console.error('Error adding:', msg);
+            alert(`Error al agregar: ${msg}`);
         } finally {
             setSaving(false);
         }
@@ -230,7 +267,8 @@ export default function TarifarioPage() {
                                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-900">
                                     <tr>
                                         <th className="px-4 py-3 text-left">Concepto</th>
-                                        <th className="px-4 py-3 text-right w-32">Precio USD</th>
+                                        <th className="px-4 py-3 text-center w-20">Moneda</th>
+                                        <th className="px-4 py-3 text-right w-36">Precio</th>
                                         <th className="px-4 py-3 text-left w-48">Notas</th>
                                         <th className="px-4 py-3 text-center w-24">Acciones</th>
                                     </tr>
@@ -249,12 +287,37 @@ export default function TarifarioPage() {
                                                         />
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        <input
-                                                            type="number"
-                                                            value={editForm.precio_base_usd || ''}
-                                                            onChange={(e) => setEditForm({ ...editForm, precio_base_usd: parseFloat(e.target.value) || 0 })}
-                                                            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-right"
-                                                        />
+                                                        <select
+                                                            value={editForm.moneda}
+                                                            onChange={(e) => setEditForm({ ...editForm, moneda: e.target.value as 'USD' | 'ARS' })}
+                                                            className="w-full px-2 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-sm"
+                                                        >
+                                                            <option value="USD">USD</option>
+                                                            <option value="ARS">ARS</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {editForm.moneda === 'ARS' ? (
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={editForm.precio_base_ars || ''}
+                                                                    onChange={(e) => setEditForm({ ...editForm, precio_base_ars: parseFloat(e.target.value) || 0 })}
+                                                                    className="w-full pl-7 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-right"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">U$D</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={editForm.precio_base_usd || ''}
+                                                                    onChange={(e) => setEditForm({ ...editForm, precio_base_usd: parseFloat(e.target.value) || 0 })}
+                                                                    className="w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-right"
+                                                                />
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <input
@@ -288,8 +351,16 @@ export default function TarifarioPage() {
                                                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                                                         {item.concepto_nombre}
                                                     </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
+                                                            ${(item.moneda ?? 'USD') === 'ARS'
+                                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}>
+                                                            {item.moneda ?? 'USD'}
+                                                        </span>
+                                                    </td>
                                                     <td className="px-4 py-3 text-right font-medium">
-                                                        {item.precio_base_usd > 0 ? formatCurrency(item.precio_base_usd, 'USD') : 'Variable'}
+                                                        {formatPrecio(item)}
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-gray-500 truncate">
                                                         {item.notas || '-'}
@@ -325,10 +396,7 @@ export default function TarifarioPage() {
                 <div className="text-center py-16 text-gray-500">
                     <Package size={48} className="mx-auto mb-4 text-gray-300" />
                     <p>No hay items en el tarifario.</p>
-                    <button
-                        onClick={() => setShowNewItem(true)}
-                        className="mt-4 text-blue-600 hover:underline"
-                    >
+                    <button onClick={() => setShowNewItem(true)} className="mt-4 text-blue-600 hover:underline">
                         Agregar primer item
                     </button>
                 </div>
@@ -349,23 +417,37 @@ export default function TarifarioPage() {
                         </div>
                         <div className="p-5 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Categoría *
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoría *</label>
                                 <select
-                                    value={newItem.categoria}
-                                    onChange={(e) => setNewItem({ ...newItem, categoria: e.target.value })}
+                                    value={newItem.categoria === '__nueva__' ? '__nueva__' : newItem.categoria}
+                                    onChange={(e) => {
+                                        if (e.target.value === '__nueva__') {
+                                            setNewItem({ ...newItem, categoria: '__nueva__' });
+                                        } else {
+                                            setNewItem({ ...newItem, categoria: e.target.value });
+                                            setCategoriaPersonalizada('');
+                                        }
+                                    }}
                                     className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
                                 >
-                                    {CATEGORIAS.map((cat) => (
+                                    {categorias.map((cat) => (
                                         <option key={cat} value={cat}>{cat}</option>
                                     ))}
+                                    <option value="__nueva__">+ Nueva categoría...</option>
                                 </select>
+                                {newItem.categoria === '__nueva__' && (
+                                    <input
+                                        type="text"
+                                        value={categoriaPersonalizada}
+                                        onChange={(e) => setCategoriaPersonalizada(e.target.value)}
+                                        placeholder="Nombre de la nueva categoría"
+                                        className="w-full mt-2 px-4 py-2.5 border border-blue-300 dark:border-blue-600 rounded-lg bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500/20"
+                                        autoFocus
+                                    />
+                                )}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Nombre del concepto *
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del concepto *</label>
                                 <input
                                     type="text"
                                     value={newItem.concepto_nombre}
@@ -374,26 +456,61 @@ export default function TarifarioPage() {
                                     placeholder="Ej: Consulta inicial"
                                 />
                             </div>
+                            {/* Moneda toggle */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Moneda *</label>
+                                <div className="flex gap-2">
+                                    {(['USD', 'ARS'] as const).map((m) => (
+                                        <button
+                                            key={m}
+                                            type="button"
+                                            onClick={() => setNewItem({ ...newItem, moneda: m })}
+                                            className={`flex-1 py-2.5 text-sm font-semibold rounded-lg border-2 transition-all
+                                                ${newItem.moneda === m
+                                                    ? m === 'USD'
+                                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                                                        : 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'}`}
+                                        >
+                                            {m === 'USD' ? '🇺🇸 Dólares (USD)' : '🇦🇷 Pesos (ARS)'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Precio según moneda */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Precio base USD *
+                                    Precio base {newItem.moneda} *
                                 </label>
                                 <div className="relative">
-                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                    <input
-                                        type="number"
-                                        value={newItem.precio_base_usd || ''}
-                                        onChange={(e) => setNewItem({ ...newItem, precio_base_usd: parseFloat(e.target.value) || 0 })}
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
-                                        placeholder="0.00"
-                                    />
+                                    {newItem.moneda === 'ARS' ? (
+                                        <>
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+                                            <input
+                                                type="number"
+                                                value={newItem.precio_base_ars || ''}
+                                                onChange={(e) => setNewItem({ ...newItem, precio_base_ars: parseFloat(e.target.value) || 0 })}
+                                                className="w-full pl-8 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                                placeholder="0"
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                            <input
+                                                type="number"
+                                                value={newItem.precio_base_usd || ''}
+                                                onChange={(e) => setNewItem({ ...newItem, precio_base_usd: parseFloat(e.target.value) || 0 })}
+                                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+                                                placeholder="0.00"
+                                            />
+                                        </>
+                                    )}
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">Ingrese 0 para precio variable</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Notas (opcional)
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas (opcional)</label>
                                 <input
                                     type="text"
                                     value={newItem.notas}

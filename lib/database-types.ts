@@ -17,6 +17,8 @@ export interface TarifarioItem {
     categoria: string;
     concepto_nombre: string;
     precio_base_usd: number;
+    precio_base_ars: number | null;
+    moneda: 'USD' | 'ARS';
     activo: boolean;
     notas: string | null;
     created_at: string;
