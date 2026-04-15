@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AgendaCalendar from '@/components/agenda/AgendaCalendar';
 import TodaySchedulePanel from '@/components/agenda/TodaySchedulePanel';
 import DoctorScheduleConfig from '@/components/agenda/DoctorScheduleConfig';
 import CsvImportWizard from '@/components/agenda/CsvImportWizard';
 import DoctorReassignmentPanel from '@/components/agenda/DoctorReassignmentPanel';
+import AgendaBlocksManager from '@/components/agenda/AgendaBlocksManager';
 import { Calendar, Settings, Upload, X } from 'lucide-react';
 
 type Tab = 'calendar' | 'config' | 'import';
@@ -19,6 +20,13 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 export default function AgendaPage() {
     const [activeTab, setActiveTab] = useState<Tab>('calendar');
     const [showPanel, setShowPanel] = useState(false);
+    const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
+
+    useEffect(() => {
+        import('@/app/actions/agenda').then(({ getDoctors }) => {
+            getDoctors().then(setDoctors);
+        });
+    }, []);
 
     return (
         <div className="h-screen flex flex-col px-4 pb-4 pt-4">
@@ -97,8 +105,10 @@ export default function AgendaPage() {
 
             {activeTab === 'config' && (
                 <div className="flex-1 min-h-0 overflow-y-auto">
-                    <div className="max-w-4xl mx-auto">
+                    <div className="max-w-4xl mx-auto space-y-8 pb-8">
                         <DoctorScheduleConfig />
+                        <hr className="border-gray-200 dark:border-gray-700" />
+                        <AgendaBlocksManager doctors={doctors} />
                     </div>
                 </div>
             )}

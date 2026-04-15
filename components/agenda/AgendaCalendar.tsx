@@ -13,12 +13,13 @@ import type {
     EventInput,
     EventSourceFuncArg,
 } from '@fullcalendar/core';
-import { getAppointments, updateAppointment, deleteAppointment, getDoctors, getTomorrowAppointments, sendBulkWhatsAppConfirmations } from '@/app/actions/agenda';
-import type { TomorrowAppointment } from '@/app/actions/agenda';
+import { getAppointments, updateAppointment, deleteAppointment, getDoctors, getTomorrowAppointments, sendBulkWhatsAppConfirmations, getAgendaBlocks } from '@/app/actions/agenda';
+import type { TomorrowAppointment, AgendaBlock } from '@/app/actions/agenda';
+import AgendaBlockModal from './AgendaBlockModal';
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus } from 'lucide-react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus, BanIcon, AlertTriangle } from 'lucide-react';
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -64,6 +65,7 @@ interface AgendaEventExtendedProps {
     doctor?: { full_name?: string };
     conflict?: boolean;
     start_time?: string;
+    isBlock?: boolean;
 }
 
 interface Doctor {
@@ -159,6 +161,10 @@ export default function AgendaCalendar() {
     const [tomorrowSending, setTomorrowSending] = useState(false);
     const [tomorrowResult, setTomorrowResult] = useState<{ sent: number; failed: number; noPhone: number } | null>(null);
     const [selectedAptIds, setSelectedAptIds] = useState<Set<string>>(new Set());
+    const [agendaBlocks, setAgendaBlocks] = useState<AgendaBlock[]>([]);
+    const [blockModalOpen, setBlockModalOpen] = useState(false);
+    const [blockModalInitialStart, setBlockModalInitialStart] = useState<Date | undefined>();
+    const [blockModalInitialEnd, setBlockModalInitialEnd] = useState<Date | undefined>();
     const { canEdit: canEditModule } = useAuth();
     const router = useRouter();
 
@@ -168,17 +174,26 @@ export default function AgendaCalendar() {
     }, []);
 
     const handleDateSelect = (selectInfo: DateSelectArg) => {
-        setSelectedEvent({
-            title: '',
-            start: selectInfo.start,
-            end: selectInfo.end,
-            patientId: '',
-            doctorId: '',
-            status: 'confirmed',
-            type: 'consulta',
-            notes: ''
-        });
-        setModalOpen(true);
+        const durationMs = selectInfo.end.getTime() - selectInfo.start.getTime();
+        const isMultiDay = durationMs >= 24 * 60 * 60 * 1000;
+
+        if (isMultiDay && canEdit) {
+            setBlockModalInitialStart(selectInfo.start);
+            setBlockModalInitialEnd(selectInfo.end);
+            setBlockModalOpen(true);
+        } else {
+            setSelectedEvent({
+                title: '',
+                start: selectInfo.start,
+                end: selectInfo.end,
+                patientId: '',
+                doctorId: '',
+                status: 'confirmed',
+                type: 'consulta',
+                notes: ''
+            });
+            setModalOpen(true);
+        }
         selectInfo.view.calendar.unselect();
     };
 
@@ -311,7 +326,11 @@ export default function AgendaCalendar() {
         failureCallback: (error: Error) => void
     ) => {
         try {
-            const appointments = (await getAppointments(fetchInfo.startStr, fetchInfo.endStr)) as AgendaAppointmentRecord[];
+            const [appointments, blocks] = await Promise.all([
+                getAppointments(fetchInfo.startStr, fetchInfo.endStr) as Promise<AgendaAppointmentRecord[]>,
+                getAgendaBlocks(fetchInfo.startStr, fetchInfo.endStr),
+            ]);
+            setAgendaBlocks(blocks);
 
             const filtered = activeDoctorIds.has('all')
                 ? appointments
@@ -406,7 +425,16 @@ export default function AgendaCalendar() {
                     }
                 };
             });
-            successCallback(events);
+            const blockEvents: EventInput[] = blocks.map(block => ({
+                id: `block-${block.id}`,
+                start: block.start_time,
+                end: block.end_time,
+                display: 'background',
+                backgroundColor: 'rgba(239, 68, 68, 0.10)',
+                extendedProps: { isBlock: true },
+            }));
+
+            successCallback([...events, ...blockEvents]);
         } catch (error) {
             failureCallback(error instanceof Error ? error : new Error('Error cargando citas'));
         }
@@ -485,6 +513,16 @@ export default function AgendaCalendar() {
     }, () => void handleDropConfirmSave(true), { disabled: isNotifying });
 
     const canEdit = canEditModule('turnos');
+
+    function isAppointmentBlocked(aptStart: Date, aptEnd: Date, doctorId: string | undefined): boolean {
+        return agendaBlocks.some(block => {
+            const blockStart = new Date(block.start_time);
+            const blockEnd = new Date(block.end_time);
+            const overlaps = aptStart < blockEnd && aptEnd > blockStart;
+            if (!overlaps) return false;
+            return block.doctor_id === null || block.doctor_id === doctorId;
+        });
+    }
 
     return (
         <div className="h-full bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col">
@@ -613,17 +651,33 @@ export default function AgendaCalendar() {
                     })}
                 </div>
 
-                {/* Bulk confirm button */}
-                {canEdit && (
-                    <button
-                        onClick={handleOpenConfirmTomorrow}
-                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-all"
-                        title="Enviar WhatsApp de confirmación a todos los pacientes de mañana"
-                    >
-                        <Send size={13} />
-                        Confirmar mañana
-                    </button>
-                )}
+                {/* Bulk confirm + Block buttons */}
+                <div className="ml-auto flex items-center gap-2">
+                    {canEdit && (
+                        <button
+                            onClick={() => {
+                                setBlockModalInitialStart(undefined);
+                                setBlockModalInitialEnd(undefined);
+                                setBlockModalOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
+                            title="Bloquear agenda para un período"
+                        >
+                            <BanIcon size={13} />
+                            Bloquear agenda
+                        </button>
+                    )}
+                    {canEdit && (
+                        <button
+                            onClick={handleOpenConfirmTomorrow}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-all"
+                            title="Enviar WhatsApp de confirmación a todos los pacientes de mañana"
+                        >
+                            <Send size={13} />
+                            Confirmar mañana
+                        </button>
+                    )}
+                </div>
 
                 {/* Resource View Date Navigator */}
                 {viewMode === 'resource' && (
@@ -729,6 +783,7 @@ export default function AgendaCalendar() {
                         eventContent={(arg) => {
                             const { event } = arg;
                             const props = event.extendedProps as AgendaEventExtendedProps;
+                            if (props.isBlock) return null;
                             const isTimeGridView = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
 
                             // Render especial para recordatorios internos
@@ -750,13 +805,14 @@ export default function AgendaCalendar() {
                             }
 
                             const patientName = props.patient?.full_name ?? '';
-                            // Badge solo cuando la fecha del turno coincide exactamente
-                            // con primera_consulta_fecha del paciente — dato verificado en DB.
                             const aptDate = props.start_time?.split('T')[0] ?? '';
                             const primeraFecha = props.patient?.primera_consulta_fecha ?? null;
                             const isPrimeraVez = props.type === 'consulta' &&
                                 primeraFecha !== null &&
                                 primeraFecha === aptDate;
+                            const aptStart = event.start ?? new Date();
+                            const aptEnd = event.end ?? new Date(aptStart.getTime() + 30 * 60 * 1000);
+                            const isBlocked = isAppointmentBlocked(aptStart, aptEnd, props.doctor_id);
                             const isCancelled = props.status === 'cancelled';
                             const TYPE_LABELS: Record<string, string> = {
                                 control: 'Control / urgencia',
@@ -781,8 +837,15 @@ export default function AgendaCalendar() {
                             return (
                                     <div className={`px-1 overflow-hidden ${isTimeGridView ? 'py-0.5' : ''}`}>
                                         <div className="font-semibold truncate text-[11px] leading-tight flex items-center justify-between">
-                                            <span>{primaryLine}</span>
-                                            {props.conflict && <span title="Conflicto de horario" className="text-white ml-1">⚠️</span>}
+                                            <span className="truncate">{primaryLine}</span>
+                                            <span className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+                                                {props.conflict && <span title="Conflicto de horario" className="text-white">⚠️</span>}
+                                                {isBlocked && !props.conflict && (
+                                                    <span title="Pendiente de notificar — agenda bloqueada">
+                                                        <AlertTriangle size={9} className="text-amber-300" />
+                                                    </span>
+                                                )}
+                                            </span>
                                         </div>
                                         {isCancelled && (
                                             <div className="inline-flex items-center rounded-full bg-gray-600/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-gray-700 mt-1 mb-0.5">
@@ -966,6 +1029,19 @@ export default function AgendaCalendar() {
                     onClose={() => setModalOpen(false)}
                     onSave={refreshCalendar}
                     initialData={selectedEvent}
+                />
+            )}
+
+            {blockModalOpen && (
+                <AgendaBlockModal
+                    doctors={doctors}
+                    initialStart={blockModalInitialStart}
+                    initialEnd={blockModalInitialEnd}
+                    onClose={() => setBlockModalOpen(false)}
+                    onCreated={() => {
+                        setBlockModalOpen(false);
+                        refreshCalendar();
+                    }}
                 />
             )}
 

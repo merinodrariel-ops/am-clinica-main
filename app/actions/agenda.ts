@@ -500,3 +500,100 @@ export async function sendBulkWhatsAppConfirmations(
 
     return { sent, failed, noPhone };
 }
+
+// ─── Agenda Blocks ────────────────────────────────────────────────────────────
+
+export interface AgendaBlock {
+    id: string;
+    doctor_id: string | null;
+    start_time: string;
+    end_time: string;
+    reason: string | null;
+    block_type: string;
+    created_by: string | null;
+    created_at: string;
+    doctor?: { full_name: string } | null;
+}
+
+export interface CreateAgendaBlockPayload {
+    doctor_id: string | null;
+    start_time: string;
+    end_time: string;
+    block_type: string;
+    reason?: string;
+}
+
+export async function getAgendaBlocks(start: string, end: string): Promise<AgendaBlock[]> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('agenda_blocks')
+        .select('*, doctor:doctor_id(full_name)')
+        .lt('start_time', end)
+        .gt('end_time', start)
+        .order('start_time', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching agenda blocks:', error);
+        return [];
+    }
+    return (data ?? []) as AgendaBlock[];
+}
+
+export async function createAgendaBlock(payload: CreateAgendaBlockPayload) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado' };
+
+    const admin = getAdminClient();
+    const { error } = await admin
+        .from('agenda_blocks')
+        .insert({ ...payload, created_by: user.id });
+
+    if (error) return { error: error.message };
+    revalidatePath('/agenda');
+    return { success: true };
+}
+
+export async function deleteAgendaBlock(blockId: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado' };
+
+    const admin = getAdminClient();
+    const { error } = await admin
+        .from('agenda_blocks')
+        .delete()
+        .eq('id', blockId);
+
+    if (error) return { error: error.message };
+    revalidatePath('/agenda');
+    return { success: true };
+}
+
+export async function getBlockedAppointments(blockId: string) {
+    const supabase = await createClient();
+
+    const { data: block } = await supabase
+        .from('agenda_blocks')
+        .select('*')
+        .eq('id', blockId)
+        .single();
+
+    if (!block) return [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabase as any)
+        .from('agenda_appointments')
+        .select('id, title, start_time, end_time, status, doctor_id, patient_id, doctor:doctor_id(full_name), patient:patient_id(nombre, apellido)')
+        .lt('start_time', block.end_time)
+        .gt('end_time', block.start_time)
+        .not('status', 'in', '("cancelled","no_show")');
+
+    if (block.doctor_id) {
+        query = query.eq('doctor_id', block.doctor_id);
+    }
+
+    const { data, error } = await query;
+    if (error) return [];
+    return data ?? [];
+}
