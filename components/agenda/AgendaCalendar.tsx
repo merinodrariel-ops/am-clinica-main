@@ -165,6 +165,7 @@ export default function AgendaCalendar() {
     const [blockModalOpen, setBlockModalOpen] = useState(false);
     const [blockModalInitialStart, setBlockModalInitialStart] = useState<Date | undefined>();
     const [blockModalInitialEnd, setBlockModalInitialEnd] = useState<Date | undefined>();
+    const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; start: Date; end: Date } | null>(null);
     const { canEdit: canEditModule } = useAuth();
     const router = useRouter();
 
@@ -174,27 +175,27 @@ export default function AgendaCalendar() {
     }, []);
 
     const handleDateSelect = (selectInfo: DateSelectArg) => {
-        const durationMs = selectInfo.end.getTime() - selectInfo.start.getTime();
-        const isMultiDay = durationMs >= 24 * 60 * 60 * 1000;
+        if (!canEdit) { selectInfo.view.calendar.unselect(); return; }
 
-        if (isMultiDay && canEdit) {
-            setBlockModalInitialStart(selectInfo.start);
-            setBlockModalInitialEnd(selectInfo.end);
-            setBlockModalOpen(true);
-        } else {
-            setSelectedEvent({
-                title: '',
-                start: selectInfo.start,
-                end: selectInfo.end,
-                patientId: '',
-                doctorId: '',
-                status: 'confirmed',
-                type: 'consulta',
-                notes: ''
-            });
-            setModalOpen(true);
-        }
+        const jsEvent = selectInfo.jsEvent as MouseEvent | null;
+        const x = jsEvent?.clientX ?? window.innerWidth / 2;
+        const y = jsEvent?.clientY ?? window.innerHeight / 2;
+
+        setSelectionPopup({ x, y, start: selectInfo.start, end: selectInfo.end });
         selectInfo.view.calendar.unselect();
+    };
+
+    const confirmNewAppointment = (start: Date, end: Date) => {
+        setSelectionPopup(null);
+        setSelectedEvent({ title: '', start, end, patientId: '', doctorId: '', status: 'confirmed', type: 'consulta', notes: '' });
+        setModalOpen(true);
+    };
+
+    const confirmBlock = (start: Date, end: Date) => {
+        setSelectionPopup(null);
+        setBlockModalInitialStart(start);
+        setBlockModalInitialEnd(end);
+        setBlockModalOpen(true);
     };
 
     const handleEventClick = (arg: EventClickArg) => {
@@ -1030,6 +1031,43 @@ export default function AgendaCalendar() {
                     onSave={refreshCalendar}
                     initialData={selectedEvent}
                 />
+            )}
+
+            {/* ── Selection Choice Popup ───────────────────────────── */}
+            {selectionPopup && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setSelectionPopup(null)} />
+                    <div
+                        className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 min-w-[180px]"
+                        style={{
+                            top: Math.min(selectionPopup.y, window.innerHeight - 120),
+                            left: Math.min(selectionPopup.x, window.innerWidth - 200),
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                                {selectionPopup.start.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                {' – '}
+                                {selectionPopup.end.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => confirmNewAppointment(selectionPopup.start, selectionPopup.end)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                        >
+                            <CalendarPlus size={14} />
+                            Nuevo turno
+                        </button>
+                        <button
+                            onClick={() => confirmBlock(selectionPopup.start, selectionPopup.end)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                            <BanIcon size={14} />
+                            Bloquear agenda
+                        </button>
+                    </div>
+                </>
             )}
 
             {blockModalOpen && (
