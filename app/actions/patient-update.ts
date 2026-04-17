@@ -249,7 +249,7 @@ export async function generatePatientUpdateToken(
 
     if (error) return { success: false, error: error.message };
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+    const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://am-clinica-main.vercel.app').replace(/\/$/, '');
     const url = `${baseUrl}/actualizar-datos?t=${token}`;
     return { success: true, url };
 }
