@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import {
     getPatientDriveFolders,
     createPatientDriveFolderAction,
+    createCustomSubfolderAction,
     loadFolderFiles,
     getPatientFotosOrder,
     saveFotosOrderAction,
@@ -133,6 +134,9 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [previewAutoSmile, setPreviewAutoSmile] = useState(false);
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
     const [creating, setCreating] = useState(false);
+    const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
+    const [creatingCustom, setCreatingCustom] = useState(false);
     const [uploadTargetFolderId, setUploadTargetFolderId] = useState(() => extractFolderIdFromUrl(motherFolderUrl) || '');
     const [isGlobalDragging, setIsGlobalDragging] = useState(false);
     const [globalDropFolderId, setGlobalDropFolderId] = useState('');
@@ -302,6 +306,26 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             toast.success('Carpeta de Drive creada correctamente');
         }
         setCreating(false);
+    };
+
+    const handleCreateCustomFolder = async () => {
+        const name = newFolderName.trim();
+        if (!name) return;
+        if (!currentFolderUrl) {
+            toast.error('Primero creá la carpeta del paciente');
+            return;
+        }
+        setCreatingCustom(true);
+        const result = await createCustomSubfolderAction(patientId, currentFolderUrl, name);
+        if (result.error) {
+            toast.error(`Error: ${result.error}`);
+        } else {
+            toast.success(`Carpeta "${name}" creada`);
+            setNewFolderName('');
+            setShowNewFolderInput(false);
+            if (currentFolderUrl) fetchFolders(currentFolderUrl);
+        }
+        setCreatingCustom(false);
     };
 
     const [loadingFolders, setLoadingFolders] = useState<Set<string>>(new Set());
@@ -518,6 +542,47 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
+                    {canUpload && (
+                        <div className="flex items-center gap-1">
+                            {showNewFolderInput ? (
+                                <>
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={newFolderName}
+                                        onChange={e => setNewFolderName(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') handleCreateCustomFolder();
+                                            if (e.key === 'Escape') { setShowNewFolderInput(false); setNewFolderName(''); }
+                                        }}
+                                        placeholder="Nombre de carpeta..."
+                                        className="px-2 py-1 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
+                                    />
+                                    <button
+                                        onClick={handleCreateCustomFolder}
+                                        disabled={creatingCustom || !newFolderName.trim()}
+                                        className="px-2 py-1 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                                    >
+                                        {creatingCustom ? <Loader2 size={14} className="animate-spin" /> : 'Crear'}
+                                    </button>
+                                    <button
+                                        onClick={() => { setShowNewFolderInput(false); setNewFolderName(''); }}
+                                        className="px-2 py-1 rounded-lg text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                                    >
+                                        ✕
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => setShowNewFolderInput(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                >
+                                    <FolderPlus size={14} />
+                                    Nueva carpeta
+                                </button>
+                            )}
+                        </div>
+                    )}
                     <a
                         href={currentFolderUrl}
                         target="_blank"

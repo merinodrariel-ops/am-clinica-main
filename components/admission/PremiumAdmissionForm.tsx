@@ -36,6 +36,7 @@ type FormData = {
     firstName: string;
     lastName: string;
     dni: string;
+    cuit: string;
     dob: string;
 
     // Location
@@ -201,6 +202,7 @@ export default function PremiumAdmissionForm() {
         firstName: '',
         lastName: '',
         dni: '',
+        cuit: '',
         dob: '',
         city: '',
         neighborhood: '',
@@ -370,7 +372,7 @@ export default function PremiumAdmissionForm() {
             nombre: formData.firstName,
             apellido: formData.lastName,
             dni: formData.dni,
-            cuit: undefined,
+            cuit: formData.cuit.replace(/\D/g, '') || undefined,
             email: formData.email,
             whatsapp: `${formData.countryCode}${formData.phone.replace(/\D/g, '')}`,
             motivo_consulta: REASONS.find(r => r.id === formData.dentalReason)?.label || formData.dentalReason,
@@ -416,6 +418,10 @@ export default function PremiumAdmissionForm() {
         const dniDigits = formData.dni.replace(/\D/g, '');
         if (!dniTrimmed) errors.dni = 'Ingresa tu DNI o Pasaporte';
         else if (dniDigits.length < 7 || dniDigits.length > 14) errors.dni = 'DNI inválido (7 a 14 dígitos)';
+
+        const cuitDigits = (formData.cuit || '').replace(/\D/g, '');
+        if (!cuitDigits) errors.cuit = 'Ingresa tu CUIT/CUIL';
+        else if (cuitDigits.length !== 11) errors.cuit = 'CUIT/CUIL debe tener 11 dígitos';
 
         if (!formData.dob) errors.dob = 'Selecciona tu fecha de nacimiento';
 
@@ -483,7 +489,7 @@ export default function PremiumAdmissionForm() {
     );
 
     const renderPersonal = () => {
-        const isStepValid = !errors.firstName && !errors.lastName && !errors.dni && !errors.dob && !errors.city && !errors.neighborhood && !errors.email && !errors.phone;
+        const isStepValid = !errors.firstName && !errors.lastName && !errors.dni && !errors.cuit && !errors.dob && !errors.city && !errors.neighborhood && !errors.email && !errors.phone;
 
         return (
             <motion.div
@@ -554,6 +560,25 @@ export default function PremiumAdmissionForm() {
                             submitAttempted={submitAttempted}
                         />
                     </div>
+
+                    <InputField
+                        icon={IdCard}
+                        type="text"
+                        placeholder="CUIT / CUIL (ej: 20-12345678-9)"
+                        value={formData.cuit}
+                        onChange={(e: any) => {
+                            // Auto-format: strip non-digits then insert dashes at positions 2 and 10
+                            const raw = e.target.value.replace(/\D/g, '').slice(0, 11);
+                            const formatted = raw.length <= 2 ? raw
+                                : raw.length <= 10 ? `${raw.slice(0,2)}-${raw.slice(2)}`
+                                : `${raw.slice(0,2)}-${raw.slice(2,10)}-${raw.slice(10)}`;
+                            updateData({ cuit: formatted });
+                        }}
+                        onBlur={() => handleBlur('cuit')}
+                        error={errors.cuit}
+                        touched={touched.cuit}
+                        submitAttempted={submitAttempted}
+                    />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <InputField

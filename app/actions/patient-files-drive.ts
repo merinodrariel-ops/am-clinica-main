@@ -12,6 +12,8 @@ import {
     updateFileContentInDrive,
     copyDriveFile,
     renameFileInDrive,
+    createDriveFolder,
+    getDriveClient,
 } from '@/lib/google-drive';
 
 /**
@@ -410,6 +412,33 @@ export async function duplicateDriveFileAction(
         const result = await copyDriveFile(fileId, newName);
         if (result.error) return { error: result.error };
         return { fileId: result.fileId };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+export async function createCustomSubfolderAction(
+    patientId: string,
+    motherFolderIdOrUrl: string,
+    folderName: string
+): Promise<{ folderId?: string; folderUrl?: string; error?: string }> {
+    try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        const name = folderName.trim();
+        if (!name) return { error: 'El nombre de la carpeta no puede estar vacío' };
+
+        const motherFolderId = extractFolderIdFromUrl(motherFolderIdOrUrl) || motherFolderIdOrUrl;
+        if (!motherFolderId) return { error: 'No se encontró la carpeta del paciente' };
+
+        const drive = getDriveClient();
+        const result = await createDriveFolder(drive, motherFolderId, name);
+        if (result.error) return { error: result.error };
+
+        const folderUrl = result.folderId ? await getFolderWebViewLink(result.folderId) : null;
+        return { folderId: result.folderId, folderUrl: folderUrl || undefined };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
     }
