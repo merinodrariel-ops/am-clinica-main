@@ -92,27 +92,35 @@ function buildInternalQrCode() {
     return `INV-${stamp}-${random}`;
 }
 
-async function assertAdminAccess() {
+async function getAuthenticatedUser() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Sesion invalida. Vuelve a iniciar sesion.');
+    return { supabase, user };
+}
 
-    if (!user) {
-        throw new Error('Sesion invalida. Vuelve a iniciar sesion.');
-    }
+async function logItemEdit(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    itemId: string,
+    userEmail: string,
+    changes: Record<string, { before: unknown; after: unknown }>,
+    motivo: string = 'Edicion de item'
+) {
+    const rows = Object.entries(changes)
+        .filter(([, { before, after }]) => String(before ?? '') !== String(after ?? ''))
+        .map(([campo, { before, after }]) => ({
+            id_registro: itemId,
+            tabla_origen: 'inventario_items',
+            campo_modificado: campo,
+            valor_anterior: before != null ? String(before) : null,
+            valor_nuevo: after != null ? String(after) : null,
+            usuario_editor: userEmail,
+            usuario_email: userEmail,
+            motivo_edicion: motivo,
+        }));
 
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('categoria')
-        .eq('id', user.id)
-        .maybeSingle();
-
-    const role = (profile?.categoria || user.user_metadata?.role || '').toLowerCase();
-
-    if (!['owner', 'admin'].includes(role)) {
-        throw new Error('Solo Admin/Dueno puede realizar esta accion.');
-    }
-
-    return user;
+    if (rows.length === 0) return;
+    await supabase.from('historial_ediciones').insert(rows);
 }
 
 async function uploadProductImages(productName: string, payload: ProductImagePayload) {
@@ -215,8 +223,7 @@ export async function listInventoryProducts(filters: ProductListFilters = {}) {
 
 export async function createInventoryProduct(input: CreateProductInput) {
     try {
-        const user = await assertAdminAccess();
-        const supabase = await createClient();
+        const { supabase, user } = await getAuthenticatedUser();
 
         const name = sanitizeRequiredText(input.name || '');
         const category = sanitizeRequiredText(input.category || '');
@@ -277,8 +284,7 @@ export async function createInventoryProduct(input: CreateProductInput) {
 
 export async function updateInventoryProduct(input: UpdateProductInput) {
     try {
-        const user = await assertAdminAccess();
-        const supabase = await createClient();
+        const { supabase, user } = await getAuthenticatedUser();
 
         const name = sanitizeRequiredText(input.name || '');
         const category = sanitizeRequiredText(input.category || '');
@@ -287,6 +293,13 @@ export async function updateInventoryProduct(input: UpdateProductInput) {
         if (!name || !category || !unit) {
             return { success: false, error: 'Completa nombre, categoria y unidad.' };
         }
+
+        // Read current values for audit log
+        const { data: before } = await supabase
+            .from('inventario_items')
+            .select('nombre, marca, categoria, area, unidad_medida, stock_minimo, descripcion, proveedor, link, costo_unitario')
+            .eq('id', input.id)
+            .maybeSingle();
 
         let imageUrl: string | null = null;
         if (input.imagePayload) {
@@ -308,7 +321,7 @@ export async function updateInventoryProduct(input: UpdateProductInput) {
             proveedor: sanitizeOptionalText(input.supplier),
             link: sanitizeOptionalText(input.link),
             costo_unitario: input.unitCost ?? null,
-            ...(imageUrl !== undefined ? { imagen_url: imageUrl } : {}),
+            ...(imageUrl !== null ? { imagen_url: imageUrl } : {}),
         };
 
         const { error } = await supabase
@@ -318,6 +331,22 @@ export async function updateInventoryProduct(input: UpdateProductInput) {
 
         if (error) {
             return { success: false, error: error.message };
+        }
+
+        // Audit log — only records fields that actually changed
+        if (before) {
+            await logItemEdit(supabase, input.id, user.email || '', {
+                nombre:       { before: before.nombre,       after: patchPayload.nombre },
+                marca:        { before: before.marca,        after: patchPayload.marca },
+                categoria:    { before: before.categoria,    after: patchPayload.categoria },
+                area:         { before: before.area,         after: patchPayload.area },
+                unidad_medida:{ before: before.unidad_medida,after: patchPayload.unidad_medida },
+                stock_minimo: { before: before.stock_minimo, after: patchPayload.stock_minimo },
+                descripcion:  { before: before.descripcion,  after: patchPayload.descripcion },
+                proveedor:    { before: before.proveedor,    after: patchPayload.proveedor },
+                link:         { before: before.link,         after: patchPayload.link },
+                costo_unitario:{ before: before.costo_unitario, after: patchPayload.costo_unitario },
+            });
         }
 
         revalidatePath('/inventario/productos');
@@ -337,8 +366,7 @@ export async function updateInventoryProductImage(input: {
     imagePayload: ProductImagePayload;
 }) {
     try {
-        const user = await assertAdminAccess();
-        const supabase = await createClient();
+        const { supabase, user } = await getAuthenticatedUser();
 
         const { data: current, error: currentError } = await supabase
             .from('inventario_items')
