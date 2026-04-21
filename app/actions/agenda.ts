@@ -37,7 +37,7 @@ export async function getAppointments(start: string, end: string) {
         .from('agenda_appointments')
         .select(`
             *,
-            patient_data:patient_id (nombre, apellido, whatsapp, primera_consulta_fecha),
+            patient_data:patient_id (nombre, apellido, whatsapp, primera_consulta_fecha, intervalo_limpieza_meses),
             doctor_data:doctor_id (full_name)
         `)
         .gte('start_time', start)
@@ -71,7 +71,7 @@ export async function getAppointments(start: string, end: string) {
                 full_name: `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'Paciente',
                 primera_consulta_fecha: patient.primera_consulta_fecha ?? null,
                 fecha_alta: patient.fecha_alta ?? null,
-                intervalo_limpieza_meses: (patient as { intervalo_limpieza_meses?: number | null }).intervalo_limpieza_meses ?? null,
+                intervalo_limpieza_meses: patient.intervalo_limpieza_meses ?? null,
             } : null,
             doctor: doctor || null
         };
