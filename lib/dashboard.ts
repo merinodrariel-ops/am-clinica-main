@@ -12,6 +12,8 @@ export interface DashboardStats {
         ars: number;
         usd: number;
     };
+    limpiezasMes: number;
+    limpiezasAnio: number;
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -71,12 +73,33 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         // 4. Admin Cash Balance (Last Closure)
         const adminCash = await getGlobalAdminCashBalance();
 
+        // 5. Limpiezas (cleanings) — current month and current year
+        const yearStart = new Date(year, 0, 1).toISOString();
+
+        const { count: limpiezasAnio } = await supabase
+            .from('caja_recepcion_movimientos')
+            .select('*', { count: 'exact', head: true })
+            .or('concepto_nombre.ilike.%limpieza%,concepto_nombre.ilike.%profilaxis%')
+            .gte('fecha_hora', yearStart)
+            .eq('estado', 'pagado')
+            .eq('is_deleted', false);
+
+        const { count: limpiezasMesCount } = await supabase
+            .from('caja_recepcion_movimientos')
+            .select('*', { count: 'exact', head: true })
+            .or('concepto_nombre.ilike.%limpieza%,concepto_nombre.ilike.%profilaxis%')
+            .gte('fecha_hora', monthStart)
+            .eq('estado', 'pagado')
+            .eq('is_deleted', false);
+
         return {
             patientsCount: patientsCount || 0,
             newPatientsCount: newPatientsCount || 0,
             todayIncome: Math.round(todayIncome),
             monthIncome: Math.round(monthIncome),
-            adminCash
+            adminCash,
+            limpiezasMes: limpiezasMesCount || 0,
+            limpiezasAnio: limpiezasAnio || 0,
         };
     } catch (error) {
         console.error('Error in getDashboardStats:', error);
@@ -85,7 +108,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             newPatientsCount: 0,
             todayIncome: 0,
             monthIncome: 0,
-            adminCash: { ars: 0, usd: 0 }
+            adminCash: { ars: 0, usd: 0 },
+            limpiezasMes: 0,
+            limpiezasAnio: 0,
         };
     }
 }

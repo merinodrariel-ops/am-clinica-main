@@ -36,7 +36,7 @@ interface AppointmentModalData {
     status: string;
     type: string;
     notes: string;
-    patient?: { full_name?: string };
+    patient?: { full_name?: string; intervalo_limpieza_meses?: number | null };
     doctor?: { full_name?: string };
 }
 
@@ -51,7 +51,7 @@ interface AgendaAppointmentRecord {
     patient_id: string | null;
     doctor_id: string | null;
     color_tag?: string | null;
-    patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null } | null;
+    patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null; intervalo_limpieza_meses?: number | null } | null;
     doctor?: { full_name?: string } | null;
 }
 
@@ -61,7 +61,7 @@ interface AgendaEventExtendedProps {
     notes?: string;
     patient_id?: string;
     doctor_id?: string;
-    patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null };
+    patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null; intervalo_limpieza_meses?: number | null };
     doctor?: { full_name?: string };
     conflict?: boolean;
     start_time?: string;
@@ -1215,18 +1215,27 @@ export default function AgendaCalendar() {
                         {quickPopup.fullData.patientId && canEdit && (
                             <div className="px-3 pb-2">
                                 {(['limpieza', 'limpieza_convencional', 'limpieza_laser'].includes(quickPopup.fullData.type) ? (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {[4, 6].map((months) => (
+                                    <div>
+                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">Programar próxima limpieza</p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                        {([3, 4, 6] as const).map((months) => {
+                                            const isPreferred = quickPopup.fullData.patient?.intervalo_limpieza_meses === months;
+                                            return (
                                             <button
                                                 key={months}
-                                                onClick={() => {
+                                                onClick={async () => {
                                                     const sourceStart = new Date(quickPopup.fullData.start);
                                                     const durationMs = Math.max(30 * 60 * 1000, new Date(quickPopup.fullData.end).getTime() - sourceStart.getTime());
                                                     const nextDate = new Date(sourceStart);
                                                     nextDate.setMonth(nextDate.getMonth() + months);
                                                     const nextEnd = new Date(nextDate.getTime() + durationMs);
                                                     const cleaningType = inferCleaningType(quickPopup.fullData.type, quickPopup.fullData.title);
-
+                                                    // Save preferred interval to patient record
+                                                    if (quickPopup.fullData.patientId) {
+                                                        const { createClient } = await import('@/utils/supabase/client');
+                                                        const sb = createClient();
+                                                        await sb.from('pacientes').update({ intervalo_limpieza_meses: months }).eq('id_paciente', quickPopup.fullData.patientId);
+                                                    }
                                                     openFullModal({
                                                         title: getCleaningTitle(cleaningType),
                                                         start: nextDate,
@@ -1240,12 +1249,19 @@ export default function AgendaCalendar() {
                                                         doctor: quickPopup.fullData.doctor,
                                                     });
                                                 }}
-                                                className="w-full flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 rounded-xl transition-colors"
+                                                className={`w-full flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold rounded-xl transition-colors ${
+                                                    isPreferred
+                                                        ? 'text-violet-700 bg-violet-100 ring-2 ring-violet-400 dark:bg-violet-800/40 dark:text-violet-300'
+                                                        : 'text-violet-600 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400'
+                                                }`}
                                             >
                                                 <CalendarPlus size={14} />
-                                                {`Limpieza +${months} meses`}
+                                                {`+${months}m`}
+                                                {isPreferred && <span className="text-[9px] font-bold text-violet-500">usual</span>}
                                             </button>
-                                        ))}
+                                            );
+                                        })}
+                                        </div>
                                     </div>
                                 ) : (
                                     <button

@@ -62,10 +62,12 @@ export async function getDashboardStatsAction(): Promise<DashboardStats> {
             todayIncome: Math.round(todayIncome),
             monthIncome: Math.round(monthIncome),
             adminCash,
+            limpiezasMes: 0,
+            limpiezasAnio: 0,
         };
     } catch (error) {
         console.error('getDashboardStatsAction:', error);
-        return { patientsCount: 0, newPatientsCount: 0, todayIncome: 0, monthIncome: 0, adminCash: { ars: 0, usd: 0 } };
+        return { patientsCount: 0, newPatientsCount: 0, todayIncome: 0, monthIncome: 0, adminCash: { ars: 0, usd: 0 }, limpiezasMes: 0, limpiezasAnio: 0 };
     }
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, Banknote, BarChart3, Wallet } from 'lucide-react';
+import { Users, Banknote, BarChart3, Wallet, Sparkles } from 'lucide-react';
 import { getDashboardStatsAction as getDashboardStats } from '@/app/actions/dashboard';
 import type { DashboardStats } from '@/lib/dashboard';
 
@@ -20,8 +20,8 @@ export default function StatsGrid() {
 
     if (loading) {
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
-                {[1, 2, 3, 4].map((i) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8 stagger-children">
+                {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} className="glass-card rounded-2xl p-6 border border-white/10 animate-pulse">
                         <div className="flex items-center gap-4">
                             <div className="h-12 w-12 rounded-xl bg-white/5 border border-white/5" />
@@ -71,10 +71,20 @@ export default function StatsGrid() {
             iconBg: 'hsla(25, 95%, 53%, 0.12)',
             iconColor: 'hsl(25 95% 60%)',
         },
+        {
+            icon: Sparkles,
+            label: 'Limpiezas',
+            isLimpiezas: true,
+            valueMonth: stats?.limpiezasMes ?? 0,
+            valueYear: stats?.limpiezasAnio ?? 0,
+            gradient: 'linear-gradient(135deg, hsl(180 75% 45%), hsl(190 70% 38%))',
+            iconBg: 'hsla(180, 75%, 45%, 0.12)',
+            iconColor: 'hsl(180 75% 55%)',
+        },
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8 stagger-children">
             {cards.map((card, i) => {
                 const Icon = card.icon;
                 return (
@@ -89,7 +99,15 @@ export default function StatsGrid() {
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm text-slate-400">{card.label}</p>
-                                {card.isDouble ? (
+                                {'isLimpiezas' in card && card.isLimpiezas ? (
+                                    <div className="flex flex-col">
+                                        <div className="flex items-baseline gap-2">
+                                            <p className="text-2xl font-bold text-white drop-shadow-sm">{card.valueMonth}</p>
+                                            <span className="text-xs text-slate-400">este mes</span>
+                                        </div>
+                                        <span className="text-sm font-medium text-slate-500">{card.valueYear} en el año</span>
+                                    </div>
+                                ) : card.isDouble ? (
                                     <div className="flex flex-col">
                                         <span className="text-lg font-bold truncate block text-white drop-shadow-sm">
                                             {card.valueUsd}
