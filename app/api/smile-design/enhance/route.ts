@@ -8,21 +8,21 @@ function getAI() {
 }
 
 const LEVEL_PROMPTS: Record<string, string> = {
-    'Natural': 'Apply a radiant and healthy naturally white tooth shade (A1/B1). Remove all yellow or brown stains. Teeth must look clean, vibrant, and bright while maintaining standard natural tooth coloration.',
-    'Natural White': 'Apply a luminous, fresh white (BL4/BL3 shade). The teeth must look aesthetically perfect and exceptionally clean, but without being aggressively white or artificial. No artifacts.',
-    'Natural Ultra White': 'Apply a spectacular, ultra-bright Hollywood white (BL1/BL2 shade). Teeth must be radiantly luminous and perfectly white. Uncompromising brilliance and cleanliness.',
+    'Natural': 'Subtle cleaning and light whitening, similar to the effect of a professional dental hygiene appointment. The teeth should look healthy and clean, keeping their natural warmth and subtle shade variations between individual teeth. Do not make them uniformly white.',
+    'Natural White': 'Moderate cosmetic whitening. The teeth should look noticeably cleaner and whiter than the original, but still keep natural shade variations, incisal translucency and a realistic tooth appearance. Avoid a uniform chalky white.',
+    'Natural Ultra White': 'Cosmetic whitening on the brighter side of natural. The teeth should look fresh and bright but still like real teeth — keep the subtle shade gradient from cervical to incisal, mild translucency at the edges, and slight variation between teeth.',
 };
 
 const EDGES_PROMPTS: Record<string, string> = {
-    'Sutil': 'Add very subtle incisal translucency — barely noticeable blue-white edge effect.',
-    'Medio': 'Add natural incisal translucency — the typical blue-white edge seen in healthy young teeth.',
-    'Marcado': 'Add prominent incisal translucency — clearly visible blue-white edge effect for dramatic aesthetic result.',
+    'Sutil': 'Keep a hint of incisal translucency — barely noticeable.',
+    'Medio': 'Keep natural incisal translucency typical of healthy adult teeth.',
+    'Marcado': 'Keep visible incisal translucency at the biting edges.',
 };
 
 const TEXTURE_PROMPTS: Record<string, string> = {
-    'Sutil': 'Add very subtle surface micro-texture — smooth with just a hint of natural tooth structure.',
-    'Medio': 'Add natural surface micro-texture — the typical horizontal perikymata and subtle lobes of healthy teeth.',
-    'Detallado': 'Add detailed realistic surface texture — prominent perikymata, lobes, and natural surface variations.',
+    'Sutil': 'Preserve subtle natural surface micro-texture.',
+    'Medio': 'Preserve natural surface micro-texture with soft perikymata.',
+    'Detallado': 'Preserve realistic surface texture with visible perikymata and subtle lobes.',
 };
 
 // Legacy intensity → level mapping
@@ -64,34 +64,37 @@ export async function POST(req: NextRequest) {
 
         const shapeInstruction = shape && Math.abs(shape) > 0.1
             ? shape < 0
-                ? `TOOTH SHAPE: More feminine morphology with rounded incisal embrasures and softer disto-incisal angles.`
-                : `TOOTH SHAPE: More masculine morphology with flatter incisal edges and squarer, ~90-degree line angles.`
+                ? 'Slightly rounder incisal embrasures and softer disto-incisal angles (more feminine morphology).'
+                : 'Slightly flatter incisal edges and squarer line angles (more masculine morphology).'
             : '';
 
-        const prompt = `You are an expert PROSTHODONTIST and cosmetic dental technician performing a highly realistic digital smile design simulation on this photograph. Your goal is to vastly improve the patient's smile aesthetics following strict clinical dental rules, while maintaining absolute photographic realism.
+        // Opt-in anatomy fixes: only include when explicitly requested by the operator.
+        // Applying all of these at once forces the model to hallucinate geometries.
+        const anatomyLines: string[] = [];
+        if (edgesInstruction) anatomyLines.push(`- ${edgesInstruction}`);
+        if (textureInstruction) anatomyLines.push(`- ${textureInstruction}`);
+        if (centralLengthInstruction) anatomyLines.push(`- ${centralLengthInstruction}`);
+        if (shapeInstruction) anatomyLines.push(`- ${shapeInstruction}`);
 
-DENTAL MODIFICATIONS REQUIRED:
-1. WHITENING: ${baseWhitening}
-${edgesInstruction ? `2. INCISAL EDGES: ${edgesInstruction}` : ''}
-${textureInstruction ? `3. SURFACE TEXTURE: ${textureInstruction}` : ''}
-${centralLengthInstruction ? `4. ${centralLengthInstruction}` : ''}
-${shapeInstruction ? `5. ${shapeInstruction}` : ''}
+        const prompt = `Photorealistic dental whitening simulation on this portrait photograph.
 
-CRITICAL CLINICAL ANATOMY RULES (YOU MUST FOLLOW THESE STRICTLY):
-- CLOSE ALL GAPS: You MUST completely close ANY AND ALL diastemas, black triangles, or missing teeth spaces (especially in the lower anteriors). Never leave a hole, gap, or dark empty space between the teeth.
-- GOLDEN PROPORTION: Lateral incisors MUST be visibly shorter and slightly narrower than the central incisors. Do NOT make laterals the same length as centrals.
-- CANINE ALIGNMENT: Bring flared or outward-pointing canines into proper arch alignment. They must not bulge outward excessively or rest awkwardly on the lower lip. Create a smooth, aesthetic buccal corridor.
-- GINGIVAL MARGINS: Ensure gingival zeniths are harmonious.
-- MIDLINE CORRECTION: If the dental midline is canted or off-center relative to the face, you MUST subtly correct it.
+Goal: show how the same patient would look after a cosmetic dental treatment — the result must look like a real photo of the same person, not a dental portfolio shot or a porcelain veneer render.
 
-STRICT VISUAL CONSTRAINTS (DO NOT VIOLATE):
-- UPPER FACE PRESERVATION: The eyes, nose, forehead, eyes, and skin MUST remain 100% identical to the original image. Only modify the teeth and gums area.
-- EXTREME DEFINITION: The teeth and gums MUST be rendered with maximum 4K sharpness and perfect micro-contrast. Every edge must be razor-sharp. NO BLURRINESS.
-- CLEAN RADIANT WHITE: Use only pure, radiant white tones for the teeth. ABSOLUTELY NO GRAY, GREEN, YELLOW, OR DARK HALOS. 
-- NATURAL BEAUTY: The result must look like professional cosmetic dentistry (perfect porcelain veneers). The gums must look healthy and pink.
-- NO AI NOISE: The image must be flawless, high-resolution, and free of digital artifacts.
+Whitening effect:
+${baseWhitening}
+${anatomyLines.length > 0 ? `\nAdditional adjustments:\n${anatomyLines.join('\n')}\n` : ''}
+Keep the rest of the face completely unchanged (eyes, nose, skin, hair, lips outline, lighting, background). Only modify the visible teeth and the adjacent gum tissue.
 
-The objective is a high-end, ultra-sharp, and brilliantly white smile simulation that looks like a real 4K photograph.`;
+Important realism rules:
+- The teeth must keep subtle color variation between individual teeth — real teeth are never a perfectly uniform shade.
+- Keep a natural shade gradient from slightly warmer near the gum line to slightly brighter toward the incisal edge.
+- Keep mild natural translucency at the biting edges.
+- Gums remain healthy pink, consistent with the patient's own gum color in the photo.
+- Match the original photograph's lighting, warmth, white balance, depth of field and grain. Do not increase sharpness, contrast or saturation beyond the original.
+- Avoid a pure chalky white (#FFFFFF). Avoid the flat "porcelain veneer" look. Avoid uniform clones of the same tooth shape.
+- Do not add extra teeth, do not change the number of teeth visible, do not alter lip position.
+
+Output the edited photograph only.`;
 
 
         console.log(`[smile-design/enhance] level=${resolvedLevel}, edges=${edges}, texture=${texture}, shape=${shape}, imageSize=${imageBase64.length}`);
