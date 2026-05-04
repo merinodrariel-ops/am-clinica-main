@@ -120,6 +120,36 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const [editableCuit, setEditableCuit] = useState(patient.cuit || '');
     const [savingCuit, setSavingCuit] = useState(false);
 
+    // Inline editing for core identity fields
+    const [isEditingIdentity, setIsEditingIdentity] = useState(false);
+    const [editNombre, setEditNombre] = useState(patient.nombre || '');
+    const [editApellido, setEditApellido] = useState(patient.apellido || '');
+    const [editDocumento, setEditDocumento] = useState(patient.documento || '');
+    const [savingIdentity, setSavingIdentity] = useState(false);
+
+    async function handleSaveIdentity() {
+        const trimNombre = editNombre.trim();
+        const trimApellido = editApellido.trim();
+        if (!trimNombre || !trimApellido) {
+            toast.error('Nombre y apellido son obligatorios');
+            return;
+        }
+        setSavingIdentity(true);
+        const result = await updatePatientAction(patient.id_paciente, {
+            nombre: trimNombre,
+            apellido: trimApellido,
+            documento: editDocumento.trim() || null,
+        });
+        setSavingIdentity(false);
+        if (result.error) {
+            toast.error('Error al guardar: ' + result.error.message);
+        } else {
+            toast.success('Datos actualizados');
+            setIsEditingIdentity(false);
+            router.refresh();
+        }
+    }
+
     // Materiales state
     const [materiales, setMateriales] = useState<PatientMaterialRecord[]>([]);
     const [materialesLoading, setMaterialesLoading] = useState(false);
@@ -399,26 +429,88 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                     {!hideContactData && <PatientSection id="datos" title="Datos Personales" icon={User} defaultOpen>
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-lg font-semibold">Datos Personales</h2>
-                            <Link
-                                href={`/actualizar-datos?patientId=${patient.id_paciente}`}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200"
-                            >
-                                <Edit2 size={16} />
-                                Editar
-                            </Link>
+                            {!isEditingIdentity ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditingIdentity(true)}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    <Edit2 size={16} />
+                                    Editar
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleSaveIdentity()}
+                                        disabled={savingIdentity}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-60"
+                                    >
+                                        <Save size={14} />
+                                        {savingIdentity ? 'Guardando...' : 'Guardar'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsEditingIdentity(false);
+                                            setEditNombre(patient.nombre || '');
+                                            setEditApellido(patient.apellido || '');
+                                            setEditDocumento(patient.documento || '');
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <InfoCard
-                                icon={<User size={18} />}
-                                label="Nombre Completo"
-                                value={`${patient.nombre} ${patient.apellido}`}
-                            />
-                            <InfoCard
-                                icon={<FileIcon size={18} />}
-                                label="Documento"
-                                value={patient.documento || 'No registrado'}
-                            />
+                            {isEditingIdentity ? (
+                                <>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Nombre</p>
+                                        <input
+                                            type="text"
+                                            value={editNombre}
+                                            onChange={e => setEditNombre(e.target.value)}
+                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Apellido</p>
+                                        <input
+                                            type="text"
+                                            value={editApellido}
+                                            onChange={e => setEditApellido(e.target.value)}
+                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Documento (DNI)</p>
+                                        <input
+                                            type="text"
+                                            value={editDocumento}
+                                            onChange={e => setEditDocumento(e.target.value)}
+                                            placeholder="Sin documento"
+                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <InfoCard
+                                        icon={<User size={18} />}
+                                        label="Nombre Completo"
+                                        value={`${patient.nombre} ${patient.apellido}`}
+                                    />
+                                    <InfoCard
+                                        icon={<FileIcon size={18} />}
+                                        label="Documento"
+                                        value={patient.documento || 'No registrado'}
+                                    />
+                                </>
+                            )}
                             <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                 <div className="flex items-start gap-3">
                                     <div className="text-gray-400"><CreditCard size={18} /></div>

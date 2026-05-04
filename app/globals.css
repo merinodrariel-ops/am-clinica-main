@@ -500,3 +500,26 @@ textarea:focus-visible,
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: hsla(165, 100%, 42%, 0.5);
 }
+
+/* Agenda blocked slots — diagonal stripes pattern */
+.agenda-block-event {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(239, 68, 68, 0.12) 0px,
+    rgba(239, 68, 68, 0.12) 4px,
+    transparent 4px,
+    transparent 10px
+  ) !important;
+  border-left: 3px solid rgba(239, 68, 68, 0.8) !important;
+  border-radius: 4px !important;
+  opacity: 1 !important;
+}
+.agenda-block-event .fc-event-title {
+  font-weight: 700 !important;
+  font-size: 0.72rem !important;
+  color: #fca5a5 !important;
+  letter-spacing: 0.01em;
+}
+.agenda-block-event .fc-event-main {
+  padding: 3px 5px !important;
+}

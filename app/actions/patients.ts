@@ -52,7 +52,44 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
         const { data, error } = await query;
         if (error) throw error;
 
-        return { success: true, data: data as Paciente[] };
+        const patients = (data || []) as Paciente[];
+        if (!patients.length) {
+            return { success: true, data: patients };
+        }
+
+        const patientIds = patients.map((p) => p.id_paciente).filter(Boolean);
+        const { data: patientFiles, error: filesError } = await supabase
+            .from('patient_files')
+            .select('patient_id, thumbnail_url, file_url, created_at')
+            .in('patient_id', patientIds)
+            .eq('file_type', 'photo_before')
+            .order('created_at', { ascending: false });
+
+        if (filesError) {
+            console.error('Error loading patient profile photos:', filesError);
+            return { success: true, data: patients };
+        }
+
+        const photoByPatientId = new Map<string, string>();
+        for (const file of patientFiles || []) {
+            const patientId = typeof file.patient_id === 'string' ? file.patient_id : null;
+            if (!patientId || photoByPatientId.has(patientId)) continue;
+
+            const photoUrl = typeof file.thumbnail_url === 'string' && file.thumbnail_url.trim().length > 0
+                ? file.thumbnail_url
+                : (typeof file.file_url === 'string' ? file.file_url : null);
+
+            if (photoUrl) {
+                photoByPatientId.set(patientId, photoUrl);
+            }
+        }
+
+        const enriched = patients.map((patient) => ({
+            ...patient,
+            profile_photo_url: patient.profile_photo_url || photoByPatientId.get(patient.id_paciente) || null,
+        }));
+
+        return { success: true, data: enriched };
     } catch (error) {
         console.error('Error listing patients:', error);
         return { success: false, error: 'No se pudieron cargar los pacientes' };

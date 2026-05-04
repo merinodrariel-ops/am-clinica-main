@@ -24,6 +24,7 @@ import {
     Briefcase,
     Mail,
     Megaphone,
+    ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -333,22 +334,40 @@ export default function Sidebar() {
                     </button>
 
                     {/* Admin users link */}
-                    {(isRealOwner || userCategoria === 'owner' || userCategoria === 'admin') && (
-                        <Link
-                            href="/admin-users"
-                            className={clsx(
-                                'flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
-                                compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5',
-                                pathname.startsWith('/admin-users') ? 'text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]'
-                            )}
-                            title={compactMode ? 'Gestión de Usuarios' : undefined}
-                        >
-                            <div className={clsx('absolute inset-0 bg-white/10 transition-opacity duration-300 pointer-events-none -z-10', pathname.startsWith('/admin-users') ? 'opacity-100' : 'opacity-0')} />
-                            <div className="absolute inset-0 bg-white/5 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none -z-10" />
+                    {(isRealOwner || ['owner', 'admin', 'developer'].includes(userCategoria)) && (
+                        <>
+                            <Link
+                                href="/admin/control-interno"
+                                className={clsx(
+                                    'flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
+                                    compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5',
+                                    pathname.startsWith('/admin/control-interno') ? 'text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]'
+                                )}
+                                title={compactMode ? 'Control Interno' : undefined}
+                            >
+                                <div className={clsx('absolute inset-0 bg-white/10 transition-opacity duration-300 pointer-events-none -z-10', pathname.startsWith('/admin/control-interno') ? 'opacity-100' : 'opacity-0')} />
+                                <div className="absolute inset-0 bg-white/5 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none -z-10" />
 
-                            <Settings size={18} />
-                            {!compactMode && <span>Gestión de Usuarios</span>}
-                        </Link>
+                                <ShieldCheck size={18} />
+                                {!compactMode && <span>Control Interno</span>}
+                            </Link>
+
+                            <Link
+                                href="/admin-users"
+                                className={clsx(
+                                    'flex items-center rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
+                                    compactMode ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-2.5',
+                                    pathname.startsWith('/admin-users') ? 'text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]'
+                                )}
+                                title={compactMode ? 'Gestión de Usuarios' : undefined}
+                            >
+                                <div className={clsx('absolute inset-0 bg-white/10 transition-opacity duration-300 pointer-events-none -z-10', pathname.startsWith('/admin-users') ? 'opacity-100' : 'opacity-0')} />
+                                <div className="absolute inset-0 bg-white/5 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none -z-10" />
+
+                                <Settings size={18} />
+                                {!compactMode && <span>Gestión de Usuarios</span>}
+                            </Link>
+                        </>
                     )}
 
                     {/* Stop Impersonating Button */}

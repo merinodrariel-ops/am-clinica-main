@@ -238,14 +238,14 @@ export default function SmileDesignPanel({
           <button
             onClick={onRegenerate}
             disabled={isProcessing}
-            className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-[10px] font-bold py-2 rounded-md flex items-center justify-center gap-1"
+            className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm md:text-base font-bold py-2.5 rounded-md flex items-center justify-center gap-1"
           >
             🔄 Regenerar
           </button>
           {onOpenWarpBrush && isReady && (
             <button
               onClick={onOpenWarpBrush}
-              className="bg-[#1e2130] border border-purple-500/40 hover:border-purple-400 text-purple-300 text-[10px] py-2 rounded-md flex items-center justify-center gap-1"
+              className="bg-[#1e2130] border border-purple-500/40 hover:border-purple-400 text-purple-300 text-sm md:text-base py-2.5 rounded-md flex items-center justify-center gap-1"
             >
               🖌️ Pincel de corrección
             </button>
@@ -253,14 +253,14 @@ export default function SmileDesignPanel({
           <button
             onClick={onSave}
             disabled={isProcessing || !isReady}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold py-2 rounded-md shadow-sm transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm md:text-base font-bold py-2.5 rounded-md shadow-sm transition-colors"
           >
             💾 Guardar Copia en Drive + Portal
           </button>
           <button
             onClick={onShareLink}
             disabled={!canShare}
-            className="bg-[#1e2130] border border-[#2a2d3a] hover:border-gray-500 disabled:opacity-40 text-gray-300 text-[10px] py-2 rounded-md"
+            className="bg-[#1e2130] border border-[#2a2d3a] hover:border-gray-500 disabled:opacity-40 text-gray-300 text-sm md:text-base py-2.5 rounded-md"
           >
             🔗 Link para paciente
           </button>
@@ -272,7 +272,7 @@ export default function SmileDesignPanel({
             {(motionState === 'idle' || motionState === 'error') && (
               <button
                 onClick={onGenerateMotion}
-                className="w-full py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-sm font-medium transition-all flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-sm md:text-base font-medium transition-all flex items-center justify-center gap-2"
               >
                 🎬 Generar Smile Motion
               </button>
@@ -293,13 +293,13 @@ export default function SmileDesignPanel({
                 <p className="text-xs text-emerald-400 text-center">✓ Video listo</p>
                 <button
                   onClick={onSaveMotion}
-                  className="w-full py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-sm font-medium transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-sm md:text-base font-medium transition-all flex items-center justify-center gap-2"
                 >
                   💾 Guardar videos en Drive
                 </button>
                 <button
                   onClick={onShareLink}
-                  className="w-full py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 text-sky-300 text-sm font-medium transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 text-sky-300 text-sm md:text-base font-medium transition-all flex items-center justify-center gap-2"
                 >
                   📲 Incluir en link del paciente
                 </button>

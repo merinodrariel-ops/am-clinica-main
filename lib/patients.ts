@@ -46,6 +46,8 @@ export interface Paciente {
     welcome_email_sent?: boolean; // tracks if welcome email was sent
     como_nos_conocio?: string | null;
     primera_consulta_fecha?: string | null;
+    foto_perfil_url?: string | null;
+    profile_photo_url?: string | null;
 }
 
 export interface HistoriaClinica {

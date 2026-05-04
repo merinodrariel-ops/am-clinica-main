@@ -417,6 +417,44 @@ export async function duplicateDriveFileAction(
     }
 }
 
+/**
+ * Set (or clear) a patient's cover photo. We store just the Drive file ID —
+ * the actual image is served through `/api/drive/thumbnail/[fileId]`.
+ */
+export async function setPatientCoverPhotoAction(
+    patientId: string,
+    fileId: string | null
+): Promise<{ error?: string }> {
+    try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        const { data: profile } = await supabaseServer
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .single();
+        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
+            return { error: 'Sin permisos para editar pacientes' };
+        }
+
+        if (fileId !== null && (!fileId || !DRIVE_ID_RE.test(fileId))) {
+            return { error: 'ID de archivo inválido' };
+        }
+
+        const { error } = await supabase
+            .from('pacientes')
+            .update({ foto_perfil_url: fileId })
+            .eq('id_paciente', patientId);
+
+        if (error) return { error: error.message };
+        return {};
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+    }
+}
+
 export async function createCustomSubfolderAction(
     patientId: string,
     motherFolderIdOrUrl: string,

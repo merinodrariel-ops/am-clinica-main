@@ -412,183 +412,90 @@ function KpiCard({
     );
 }
 
-function NewPatientsTrendDetail({
-    monthly,
-    consultations,
+function MiniBarChart({
+    data,
+    color,
 }: {
-    monthly: OwnerDashboardStats['primeraVezMensual'];
-    consultations: OwnerDashboardStats['primerasConsultasRecientes'];
+    data: Array<{ key: string; shortLabel: string; label: string; count: number }>;
+    color: string;
 }) {
-    const [selectedMonthKey, setSelectedMonthKey] = useState(monthly[monthly.length - 1]?.key || '');
-    const [showSelectedList, setShowSelectedList] = useState(true);
-    const [showJanuaryList, setShowJanuaryList] = useState(false);
+    const maxCount = Math.max(1, ...data.map((m) => m.count));
+    return (
+        <div className="grid gap-1.5 items-end h-24" style={{ gridTemplateColumns: `repeat(${data.length}, 1fr)` }}>
+            {data.map((month) => {
+                const height = Math.max(8, Math.round((month.count / maxCount) * 100));
+                return (
+                    <div key={month.key} className="flex flex-col items-center justify-end gap-1" title={`${month.label}: ${month.count}`}>
+                        <span className="text-[9px] text-slate-500">{month.count > 0 ? month.count : ''}</span>
+                        <div
+                            className="w-full rounded-sm transition-all"
+                            style={{
+                                height: `${height}%`,
+                                background: color,
+                                opacity: 0.75,
+                            }}
+                        />
+                        <span className="text-[9px] uppercase text-slate-500">{month.shortLabel}</span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
 
-    const selectedIndex = monthly.findIndex((month) => month.key === selectedMonthKey);
-    const safeIndex = selectedIndex >= 0 ? selectedIndex : monthly.length - 1;
-    const selectedMonth = monthly[safeIndex];
-    const previousMonth = safeIndex > 0 ? monthly[safeIndex - 1] : null;
+function MonthlyTrendsPanel({
+    primeraVez,
+    limpiezas,
+}: {
+    primeraVez: OwnerDashboardStats['primeraVezMensual'];
+    limpiezas: OwnerDashboardStats['limpiezasMensual'];
+}) {
+    const currentMonth = primeraVez[primeraVez.length - 1];
+    const prevMonth = primeraVez[primeraVez.length - 2];
+    const pvCurrent = currentMonth?.count ?? 0;
+    const pvPrev = prevMonth?.count ?? 0;
+    const pvChange = pvPrev > 0 ? Math.round(((pvCurrent - pvPrev) / pvPrev) * 100) : null;
 
-    const currentCount = selectedMonth?.count || 0;
-    const previousCount = previousMonth?.count || 0;
-    const changePct = previousCount > 0
-        ? Math.round(((currentCount - previousCount) / previousCount) * 100)
-        : 0;
-    const trendUp = changePct > 0;
-    const trendDown = changePct < 0;
-
-    const maxCount = Math.max(1, ...monthly.map((month) => month.count));
-    const canPrev = safeIndex > 0;
-    const canNext = safeIndex >= 0 && safeIndex < monthly.length - 1;
-    const selectedPatients = consultations.filter((p) => p.monthKey === selectedMonth?.key);
-
-    const januaryMonth = monthly.find((month) => month.key.endsWith('-01'));
-    const januaryPatients = januaryMonth
-        ? consultations.filter((p) => p.monthKey === januaryMonth.key)
-        : [];
+    const limCurrent = limpiezas[limpiezas.length - 1]?.count ?? 0;
+    const limPrev = limpiezas[limpiezas.length - 2]?.count ?? 0;
+    const limChange = limPrev > 0 ? Math.round(((limCurrent - limPrev) / limPrev) * 100) : null;
 
     return (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg px-2 py-1 bg-black/40 border border-white/5">
-                <button
-                    type="button"
-                    onClick={() => canPrev && setSelectedMonthKey(monthly[safeIndex - 1].key)}
-                    disabled={!canPrev}
-                    className="p-1 rounded disabled:opacity-30 text-slate-400 hover:text-slate-300"
-                    aria-label="Mes anterior"
-                >
-                    <ChevronLeft size={14} />
-                </button>
-                <div className="text-center">
-                    <p className="text-xs capitalize text-slate-200">{selectedMonth?.label || 'Sin datos'}</p>
-                    <p className="text-[11px] text-slate-500">
-                        {currentCount} nuevos{previousMonth ? ` · vs ${previousMonth.shortLabel}: ${previousCount}` : ''}
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={() => canNext && setSelectedMonthKey(monthly[safeIndex + 1].key)}
-                    disabled={!canNext}
-                    className="p-1 rounded disabled:opacity-30 text-slate-400 hover:text-slate-300"
-                    aria-label="Mes siguiente"
-                >
-                    <ChevronRight size={14} />
-                </button>
+        <div className="glass-card rounded-2xl p-5 border border-white/10 bg-black/20">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-white">Tendencia Mensual</h3>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">últimos 6 meses</span>
             </div>
-
-            <div className="grid grid-cols-6 gap-2 items-end h-32">
-                {monthly.map((month) => {
-                    const isSelected = month.key === selectedMonth?.key;
-                    const height = Math.max(10, Math.round((month.count / maxCount) * 100));
-                    return (
-                        <button
-                            type="button"
-                            key={month.key}
-                            onClick={() => setSelectedMonthKey(month.key)}
-                            className="flex flex-col items-center justify-end gap-1"
-                            title={`${month.label}: ${month.count}`}
-                        >
-                            <span className={`text-[10px] ${isSelected ? 'text-teal-500' : 'text-slate-500'}`}>
-                                {month.count}
-                            </span>
-                            <div
-                                className="w-full rounded-md"
-                                style={{
-                                    height: `${height}%`,
-                                    background: isSelected
-                                        ? 'linear-gradient(180deg, #14b8a6, #0f766e)'
-                                        : 'rgba(255, 255, 255, 0.05)',
-                                    border: isSelected
-                                        ? '1px solid rgba(20, 184, 166, 0.5)'
-                                        : '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                            />
-                            <span className={`text-[10px] uppercase ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
-                                {month.shortLabel}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-
-            {(trendUp || trendDown) && (
-                <p className={`text-xs ${trendUp ? 'text-teal-500' : 'text-red-400'}`}>
-                    {trendUp ? 'Sube' : 'Baja'} {Math.abs(changePct)}% respecto al mes previo.
-                </p>
-            )}
-
-            <p className="text-[11px] text-slate-500">
-                Tocá una barra para cambiar el mes de referencia.
-            </p>
-
-            <div className="pt-2 border-t border-white/5">
-                <button
-                    type="button"
-                    onClick={() => setShowSelectedList((prev) => !prev)}
-                    className="flex items-center gap-1 text-xs transition-colors text-slate-400 hover:text-slate-300"
-                >
-                    {showSelectedList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                    {showSelectedList ? 'Ocultar lista del mes' : 'Ver lista del mes'}
-                </button>
-
-                {showSelectedList && (
-                    <div className="mt-2 space-y-1.5">
-                        {selectedPatients.length === 0 ? (
-                            <p className="text-xs text-slate-500">
-                                Sin pacientes nuevos para {selectedMonth?.label || 'el mes seleccionado'}.
-                            </p>
-                        ) : (
-                            selectedPatients.slice(0, 8).map((p, i) => (
-                                <Link
-                                    key={`${p.monthKey}-${p.nombre}-${p.apellido}-${i}`}
-                                    href={`/patients/${p.id_paciente}`}
-                                    className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group text-slate-300"
-                                >
-                                    <span className="font-medium group-hover:underline">{p.nombre} {p.apellido}</span>
-                                    <span className="text-slate-500">
-                                        {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
-                                    </span>
-                                </Link>
-                            ))
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {januaryMonth && (
-                <div className="pt-2 border-t border-white/5">
-                    <button
-                        type="button"
-                        onClick={() => setShowJanuaryList((prev) => !prev)}
-                        className="flex items-center gap-1 text-xs transition-colors text-slate-400 hover:text-slate-300"
-                    >
-                        {showJanuaryList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        {showJanuaryList ? 'Ocultar lista de enero' : `Ver lista de enero (${januaryMonth.count})`}
-                    </button>
-
-                    {showJanuaryList && (
-                        <div className="mt-2 space-y-1.5">
-                            {januaryPatients.length === 0 ? (
-                                <p className="text-xs text-slate-500">
-                                    No hay pacientes nuevos en enero.
-                                </p>
-                            ) : (
-                                januaryPatients.slice(0, 8).map((p, i) => (
-                                    <Link
-                                        key={`enero-${p.monthKey}-${p.nombre}-${p.apellido}-${i}`}
-                                        href={`/patients/${p.id_paciente}`}
-                                        className="flex items-center gap-2 text-xs hover:text-teal-400 transition-colors group text-slate-300"
-                                    >
-                                        <span className="font-medium group-hover:underline">{p.nombre} {p.apellido}</span>
-                                        <span className="text-slate-500">
-                                            {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
-                                        </span>
-                                    </Link>
-                                ))
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <div className="flex items-baseline justify-between mb-2">
+                        <p className="text-xs font-semibold text-slate-300">Pacientes Nuevos</p>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-base font-bold text-teal-400">{pvCurrent}</span>
+                            {pvChange !== null && (
+                                <span className={`text-[10px] font-bold ${pvChange >= 0 ? 'text-teal-500' : 'text-red-400'}`}>
+                                    {pvChange >= 0 ? '+' : ''}{pvChange}%
+                                </span>
                             )}
                         </div>
-                    )}
+                    </div>
+                    <MiniBarChart data={primeraVez} color="linear-gradient(180deg, #14b8a6, #0f766e)" />
                 </div>
-            )}
+                <div>
+                    <div className="flex items-baseline justify-between mb-2">
+                        <p className="text-xs font-semibold text-slate-300">Limpiezas</p>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-base font-bold text-cyan-400">{limCurrent}</span>
+                            {limChange !== null && (
+                                <span className={`text-[10px] font-bold ${limChange >= 0 ? 'text-cyan-500' : 'text-red-400'}`}>
+                                    {limChange >= 0 ? '+' : ''}{limChange}%
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <MiniBarChart data={limpiezas} color="linear-gradient(180deg, #06b6d4, #0891b2)" />
+                </div>
+            </div>
         </div>
     );
 }
@@ -605,7 +512,19 @@ export default function OwnerDashboard() {
     const droppedPulseTimeoutRef = useRef<number | null>(null);
     const isDragEnabled = isEditing;
 
-    const currentMonth = MONTH_NAMES[new Date().getMonth()];
+    // Month selector — default to current month
+    const todayRef = new Date();
+    const [selectedYear, setSelectedYear] = useState(todayRef.getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState(todayRef.getMonth()); // 0-based
+
+    const isCurrentMonth = selectedYear === todayRef.getFullYear() && selectedMonth === todayRef.getMonth();
+    const selectedMonthLabel = MONTH_NAMES[selectedMonth];
+
+    // Build last 12 months for the selector
+    const monthOptions = Array.from({ length: 12 }, (_, i) => {
+        const d = new Date(todayRef.getFullYear(), todayRef.getMonth() - (11 - i), 1);
+        return { year: d.getFullYear(), month: d.getMonth(), label: MONTH_NAMES[d.getMonth()], shortLabel: d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '') };
+    });
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -620,12 +539,13 @@ export default function OwnerDashboard() {
 
     useEffect(() => {
         async function load() {
-            const data = await getOwnerDashboardStats();
+            setLoading(true);
+            const data = await getOwnerDashboardStats(selectedYear, selectedMonth);
             setStats(data);
             setLoading(false);
         }
         load();
-    }, []);
+    }, [selectedYear, selectedMonth]);
 
     useEffect(() => {
         return () => {
@@ -828,7 +748,7 @@ export default function OwnerDashboard() {
             icon: Users,
             label: 'Pacientes Totales',
             value: stats.totalPacientes.toLocaleString(),
-            subtitle: 'Pacientes activos registrados',
+            subtitle: isCurrentMonth ? 'Pacientes activos registrados' : 'Total actual (no varía por mes)',
             gradient: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(224 76% 48%))',
             iconBg: 'hsla(217, 91%, 60%, 0.15)',
             iconColor: 'hsl(217 91% 65%)',
@@ -839,8 +759,8 @@ export default function OwnerDashboard() {
             icon: UserPlus,
             label: 'Pacientes Nuevos',
             value: stats.primeraVezMes,
-            badge: currentMonth,
-            subtitle: 'Comparativo mensual de primeras consultas',
+            badge: selectedMonthLabel,
+            subtitle: 'Primeras consultas este mes',
             gradient: 'linear-gradient(135deg, hsl(165 100% 42%), hsl(140 70% 35%))',
             iconBg: 'hsla(165, 100%, 42%, 0.15)',
             iconColor: 'hsl(165 85% 50%)',
@@ -848,10 +768,24 @@ export default function OwnerDashboard() {
             cardClassName: '',
             alwaysExpanded: false,
             expandContent: (
-                <NewPatientsTrendDetail
-                    monthly={stats.primeraVezMensual}
-                    consultations={stats.primerasConsultasRecientes}
-                />
+                <div className="space-y-1.5">
+                    {stats.listaPrimeraVez.length === 0 ? (
+                        <p className="text-xs text-slate-500">Sin pacientes nuevos este mes.</p>
+                    ) : (
+                        stats.listaPrimeraVez.slice(0, 10).map((p, i) => (
+                            <Link
+                                key={`${p.id_paciente}-${i}`}
+                                href={`/patients/${p.id_paciente}`}
+                                className="flex items-center justify-between text-xs hover:text-teal-400 transition-colors group text-slate-300"
+                            >
+                                <span className="font-medium group-hover:underline">{p.nombre} {p.apellido}</span>
+                                <span className="text-slate-500">
+                                    {new Date(`${p.primera_consulta_fecha}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                </span>
+                            </Link>
+                        ))
+                    )}
+                </div>
             ),
         },
         'ingresos-mes': {
@@ -859,7 +793,7 @@ export default function OwnerDashboard() {
             icon: TrendingUp,
             label: 'Ingresos Recepción',
             value: `$${stats.ingresosMesUsd.toLocaleString()} USD`,
-            badge: currentMonth,
+            badge: selectedMonthLabel,
             subtitle: 'Cobros pagados en caja de recepción',
             gradient: 'linear-gradient(135deg, hsl(150 80% 45%), hsl(165 90% 35%))',
             iconBg: 'hsla(150, 80%, 45%, 0.15)',
@@ -871,7 +805,7 @@ export default function OwnerDashboard() {
             icon: TrendingDown,
             label: 'Egresos Admin',
             value: `$${stats.egresosMesUsd.toLocaleString()} USD`,
-            badge: currentMonth,
+            badge: selectedMonthLabel,
             subtitle: 'Gastos operativos de administración',
             gradient: 'linear-gradient(135deg, hsl(0 75% 55%), hsl(15 80% 50%))',
             iconBg: 'hsla(0, 75%, 55%, 0.15)',
@@ -883,7 +817,7 @@ export default function OwnerDashboard() {
             icon: CreditCard,
             label: 'En Financiación',
             value: `${stats.personasEnFinanciacion} personas`,
-            subtitle: 'Con plan de cuotas activo',
+            subtitle: isCurrentMonth ? 'Con plan de cuotas activo' : 'Estado actual (no varía por mes)',
             gradient: 'linear-gradient(135deg, hsl(270 67% 55%), hsl(285 65% 50%))',
             iconBg: 'hsla(270, 67%, 55%, 0.15)',
             iconColor: 'hsl(270 67% 65%)',
@@ -923,7 +857,7 @@ export default function OwnerDashboard() {
             icon: Landmark,
             label: 'Deuda Total Circulante',
             value: `$${stats.deudaTotalUsd.toLocaleString()} USD`,
-            subtitle: 'Saldo pendiente de todos los planes',
+            subtitle: isCurrentMonth ? 'Saldo pendiente de todos los planes' : 'Estado actual (no varía por mes)',
             gradient: 'linear-gradient(135deg, hsl(35 95% 55%), hsl(25 90% 48%))',
             iconBg: 'hsla(35, 95%, 55%, 0.15)',
             iconColor: 'hsl(35 95% 60%)',
@@ -959,7 +893,8 @@ export default function OwnerDashboard() {
                         📊 Panel del Dueño
                     </h2>
                     <p className="text-sm mt-0.5 text-slate-400">
-                        {currentMonth} {new Date().getFullYear()} — Vista ejecutiva
+                        {selectedMonthLabel} {selectedYear} — Vista ejecutiva
+                        {!isCurrentMonth && <span className="ml-2 text-xs text-amber-400 font-medium">(mes histórico)</span>}
                     </p>
                     <div className="mt-3 inline-flex items-center gap-1 rounded-xl p-1 bg-black/40 border border-white/5">
                         <button
@@ -1004,6 +939,33 @@ export default function OwnerDashboard() {
                     )}
                 </div>
             </div>
+
+            {/* Month selector */}
+            {activeTab === 'dashboard' && (
+                <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    {monthOptions.map(opt => {
+                        const isSelected = opt.year === selectedYear && opt.month === selectedMonth;
+                        const isToday = opt.year === todayRef.getFullYear() && opt.month === todayRef.getMonth();
+                        return (
+                            <button
+                                key={`${opt.year}-${opt.month}`}
+                                onClick={() => { setSelectedYear(opt.year); setSelectedMonth(opt.month); }}
+                                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                                    isSelected
+                                        ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'
+                                        : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300'
+                                }`}
+                            >
+                                <span className="capitalize">{opt.shortLabel}</span>
+                                {opt.year !== todayRef.getFullYear() && (
+                                    <span className="ml-1 text-[10px] opacity-60">{opt.year}</span>
+                                )}
+                                {isToday && <span className="ml-1 text-[9px] text-teal-500">●</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
 
             {activeTab === 'config' && (
                 <div className="mb-4 glass-card rounded-2xl p-4 bg-black/20 border border-white/5">
@@ -1222,6 +1184,16 @@ export default function OwnerDashboard() {
                     )}
                 </DragOverlay>
             </DndContext>
+
+            {/* Monthly Trends */}
+            {activeTab === 'dashboard' && (
+                <div className="mt-4">
+                    <MonthlyTrendsPanel
+                        primeraVez={stats.primeraVezMensual}
+                        limpiezas={stats.limpiezasMensual}
+                    />
+                </div>
+            )}
         </div>
     );
 }

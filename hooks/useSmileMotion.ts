@@ -11,9 +11,8 @@ export interface MotionResult {
 
 export interface UseSmileMotionReturn {
   generate: (
-    beforeBase64: string,
-    afterBase64: string,
-    mimeType: string,
+    beforeDataUrl: string,
+    afterDataUrl: string,
     patientId: string,
     baseName: string
   ) => Promise<void>;
@@ -23,7 +22,7 @@ export interface UseSmileMotionReturn {
   reset: () => void;
 }
 
-async function compressForMotion(base64: string, mimeType: string): Promise<string> {
+async function compressForMotion(dataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -47,12 +46,12 @@ async function compressForMotion(base64: string, mimeType: string): Promise<stri
           reader.onerror = reject;
           reader.readAsDataURL(b);
         },
-        mimeType,
+        'image/jpeg',
         0.85
       );
     };
-    img.onerror = reject;
-    img.src = `data:${mimeType};base64,${base64}`;
+    img.onerror = () => reject(new Error('No se pudo leer la imagen para generar video'));
+    img.src = dataUrl;
   });
 }
 
@@ -62,9 +61,8 @@ export function useSmileMotion(): UseSmileMotionReturn {
   const [error, setError] = useState<string | null>(null);
 
   const generate = useCallback(async (
-    beforeBase64: string,
-    afterBase64: string,
-    mimeType: string,
+    beforeDataUrl: string,
+    afterDataUrl: string,
     patientId: string,
     baseName: string
   ) => {
@@ -74,8 +72,8 @@ export function useSmileMotion(): UseSmileMotionReturn {
     try {
       // Compress both images to ≤1024px before sending
       const [compBefore, compAfter] = await Promise.all([
-        compressForMotion(beforeBase64, mimeType),
-        compressForMotion(afterBase64, mimeType),
+        compressForMotion(beforeDataUrl),
+        compressForMotion(afterDataUrl),
       ]);
 
       const res = await fetch('/api/smile-design/motion', {
@@ -84,13 +82,14 @@ export function useSmileMotion(): UseSmileMotionReturn {
         body: JSON.stringify({
           beforeBase64: compBefore,
           afterBase64: compAfter,
-          mimeType,
+          mimeType: 'image/jpeg',
           patientId,
           baseName,
         }),
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
       if (data.error) throw new Error(data.error);
 
       setResult({ beforeVideoUrl: data.beforeVideoUrl, afterVideoUrl: data.afterVideoUrl });

@@ -8,9 +8,9 @@ function getAI() {
 }
 
 const LEVEL_PROMPTS: Record<string, string> = {
-    'Natural': 'Subtle cleaning and light whitening, similar to the effect of a professional dental hygiene appointment. The teeth should look healthy and clean, keeping their natural warmth and subtle shade variations between individual teeth. Do not make them uniformly white.',
-    'Natural White': 'Moderate cosmetic whitening. The teeth should look noticeably cleaner and whiter than the original, but still keep natural shade variations, incisal translucency and a realistic tooth appearance. Avoid a uniform chalky white.',
-    'Natural Ultra White': 'Cosmetic whitening on the brighter side of natural. The teeth should look fresh and bright but still like real teeth — keep the subtle shade gradient from cervical to incisal, mild translucency at the edges, and slight variation between teeth.',
+    Natural: 'un blanqueamiento natural de limpieza profesional',
+    'Natural White': 'un blanqueamiento estético moderado y realista',
+    'Natural Ultra White': 'un blanqueamiento brillante de alto impacto, pero aún fotorrealista',
 };
 
 const EDGES_PROMPTS: Record<string, string> = {
@@ -76,28 +76,25 @@ export async function POST(req: NextRequest) {
         if (centralLengthInstruction) anatomyLines.push(`- ${centralLengthInstruction}`);
         if (shapeInstruction) anatomyLines.push(`- ${shapeInstruction}`);
 
-        const prompt = `Photorealistic dental whitening simulation on this portrait photograph.
+        const prompt = `Efectúa un rediseño digital completo de la sonrisa de la persona en esta foto.
 
-Goal: show how the same patient would look after a cosmetic dental treatment — the result must look like a real photo of the same person, not a dental portfolio shot or a porcelain veneer render.
+INSTRUCCIONES CRÍTICAS:
+1. CORRECCIÓN ORTODÓNTICA: Cierra completamente cualquier espacio o diastema entre los dientes. Los dientes deben ser perfectamente contiguos.
+2. ALINEACIÓN Y FORMA: Corrige dientes torcidos o astillados. Hazlos perfectamente rectos, uniformes y simétricos.
+3. EFECTO CARILLAS: Crea una sonrisa perfecta tipo "Hollywood" con forma y proporciones ideales (como carillas de porcelana de alta calidad), pero sin perder el realismo fotográfico.
+4. COLOR: Aplica ${baseWhitening}.
+5. PRESERVACIÓN: El resultado DEBE ser fotorrealista. Mantén todas las demás facciones, la textura de la piel, la iluminación y el fondo original exactamente como están. SOLO los dientes y la sonrisa deben ser transformados.
 
-Whitening effect:
-${baseWhitening}
-${anatomyLines.length > 0 ? `\nAdditional adjustments:\n${anatomyLines.join('\n')}\n` : ''}
-Keep the rest of the face completely unchanged (eyes, nose, skin, hair, lips outline, lighting, background). Only modify the visible teeth and the adjacent gum tissue.
+CALIDAD DE DETALLE:
+- Evita dientes borrosos, pixelados o con bordes serruchados.
+- Mantén contornos dentales limpios y textura natural del esmalte.
+- No alteres labios, nariz, ojos, forma facial ni cabello.
+- No agregues ni elimines dientes visibles.
 
-Important realism rules:
-- The teeth must keep subtle color variation between individual teeth — real teeth are never a perfectly uniform shade.
-- Keep a natural shade gradient from slightly warmer near the gum line to slightly brighter toward the incisal edge.
-- Keep mild natural translucency at the biting edges.
-- Gums remain healthy pink, consistent with the patient's own gum color in the photo.
-- Match the original photograph's lighting, warmth, white balance, depth of field and grain. Do not increase sharpness, contrast or saturation beyond the original.
-- Avoid a pure chalky white (#FFFFFF). Avoid the flat "porcelain veneer" look. Avoid uniform clones of the same tooth shape.
-- Do not add extra teeth, do not change the number of teeth visible, do not alter lip position.
-
-Output the edited photograph only.`;
+${anatomyLines.length > 0 ? `AJUSTES FINOS SOLICITADOS:\n${anatomyLines.join('\n')}\n` : ''}Devuelve solo la imagen final editada.`;
 
 
-        console.log(`[smile-design/enhance] level=${resolvedLevel}, edges=${edges}, texture=${texture}, shape=${shape}, imageSize=${imageBase64.length}`);
+        console.log(`[smile-design/enhance] level=${resolvedLevel}, edges=${edges}, texture=${texture}, shape=${shape}, payloadBytes=${imageBase64.length}`);
 
         const ai = getAI();
         const response = await ai.models.generateContent({
@@ -109,7 +106,10 @@ Output the edited photograph only.`;
                     { inlineData: { mimeType, data: imageBase64 } }
                 ]
             }],
-            config: { responseModalities: ['IMAGE', 'TEXT'] }
+            config: {
+                responseModalities: ['IMAGE', 'TEXT'],
+                imageConfig: { imageSize: '1K' },
+            }
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

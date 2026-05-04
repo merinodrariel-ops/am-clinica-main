@@ -18,6 +18,10 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.FAL_KEY) {
+      return NextResponse.json({ error: 'FAL_KEY no configurada en el servidor' }, { status: 500 });
+    }
+
     const { beforeBase64, afterBase64, mimeType, patientId, baseName } = await req.json();
 
     if (!beforeBase64 || !afterBase64 || !mimeType || !patientId || !baseName) {
@@ -63,8 +67,9 @@ export async function POST(req: NextRequest) {
     ]);
 
     const supabase = createAdminClient();
-    const beforePath = `portal/${patientId}/${baseName}_Antes_Motion.mp4`;
-    const afterPath  = `portal/${patientId}/${baseName}_Despues_Motion.mp4`;
+    const safeBaseName = String(baseName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+    const beforePath = `portal/${patientId}/${safeBaseName}_Antes_Motion.mp4`;
+    const afterPath  = `portal/${patientId}/${safeBaseName}_Despues_Motion.mp4`;
 
     const [uploadBefore, uploadAfter] = await Promise.all([
       supabase.storage.from('patient-portal-files').upload(beforePath, beforeBuffer, { contentType: 'video/mp4', upsert: true }),
@@ -91,6 +96,7 @@ export async function POST(req: NextRequest) {
     if (msg.includes('content policy') || msg.includes('rejected')) {
       return NextResponse.json({ error: 'La imagen fue rechazada por el modelo. Intentá con otra foto.' }, { status: 422 });
     }
-    return NextResponse.json({ error: 'Error al generar video. Intentá de nuevo.' }, { status: 500 });
+    const isDev = process.env.NODE_ENV !== 'production';
+    return NextResponse.json({ error: isDev ? `Error al generar video: ${msg}` : 'Error al generar video. Intentá de nuevo.' }, { status: 500 });
   }
 }

@@ -27,7 +27,8 @@ export const EmailService = {
         attachments,
         cc,
         bcc,
-        replyTo
+        replyTo,
+        idempotencyKey
     }: {
         to: string | string[];
         subject: string;
@@ -36,6 +37,7 @@ export const EmailService = {
         cc?: string | string[];
         bcc?: string | string[];
         replyTo?: string;
+        idempotencyKey?: string;
     }) {
         return sendResendEmail({
             to,
@@ -44,9 +46,11 @@ export const EmailService = {
             attachments,
             cc,
             bcc,
-            replyTo
+            replyTo,
+            idempotencyKey
         });
     },
+
 
     /**
      * Sends a Welcome Email (Premium style)

@@ -157,6 +157,7 @@ export interface OwnerDashboardStats {
     listaPrimeraVez: Array<{ id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha: string }>;
     primeraVezMensual: Array<{ key: string; label: string; shortLabel: string; count: number }>;
     primerasConsultasRecientes: Array<{ id_paciente: string; nombre: string; apellido: string; primera_consulta_fecha: string; monthKey: string }>;
+    limpiezasMensual: Array<{ key: string; label: string; shortLabel: string; count: number }>;
     ingresosMesUsd: number;
     egresosMesUsd: number;
     personasEnFinanciacion: number;
@@ -289,6 +290,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             listaPrimeraVez,
             primeraVezMensual,
             primerasConsultasRecientes,
+            limpiezasMensual: [],
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
             personasEnFinanciacion,
@@ -303,6 +305,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             listaPrimeraVez: [],
             primeraVezMensual: [],
             primerasConsultasRecientes: [],
+            limpiezasMensual: [],
             ingresosMesUsd: 0,
             egresosMesUsd: 0,
             personasEnFinanciacion: 0,

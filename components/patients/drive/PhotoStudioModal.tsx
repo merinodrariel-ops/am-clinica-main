@@ -5121,23 +5121,33 @@ export default function PhotoStudioModal({
                                 }}
                                 onGenerateMotion={async () => {
                                     if (!smileDesign.result) return;
+                                    if (!patientId) {
+                                        toast.error('No se encontró el paciente para generar el video');
+                                        return;
+                                    }
                                     const cleanPatientName = patientName.replace(/\s+/g, '_');
-                                    const baseName = activeFile.name.substring(0, activeFile.name.lastIndexOf('.'));
+                                    const dotIndex = activeFile.name.lastIndexOf('.');
+                                    const baseName = dotIndex > 0 ? activeFile.name.slice(0, dotIndex) : activeFile.name;
+                                    const motionBaseName = `${cleanPatientName}_${baseName}`;
                                     
                                     await smileMotion.generate(
-                                        smileDesign.result.beforeDataUrl.split(',')[1],
-                                        smileDesign.result.afterDataUrl.split(',')[1],
-                                        'image/jpeg',
-                                        patientId || '',
-                                        `${cleanPatientName}_${baseName}`
+                                        smileDesign.result.beforeDataUrl,
+                                        smileDesign.result.afterDataUrl,
+                                        patientId,
+                                        motionBaseName
                                     );
                                 }}
                                 onSaveMotion={async () => {
                                     if (!smileMotion.result) return;
+                                    if (!folderId) {
+                                        toast.error('No se encontró la carpeta de Drive del paciente');
+                                        return;
+                                    }
                                     const tId = toast.loading("Subiendo videos a Drive...");
                                     try {
                                         const cleanPatientName = patientName.replace(/\s+/g, '_');
-                                        const baseName = activeFile.name.substring(0, activeFile.name.lastIndexOf('.'));
+                                        const dotIndex = activeFile.name.lastIndexOf('.');
+                                        const baseName = dotIndex > 0 ? activeFile.name.slice(0, dotIndex) : activeFile.name;
                                         const motionBaseName = `${cleanPatientName}_${baseName}`;
 
                                         // Upload before video to Drive
@@ -5175,7 +5185,32 @@ export default function PhotoStudioModal({
                                 }}
                                 motionState={smileMotion.state}
                                 motionError={smileMotion.error}
-                                onShareLink={() => {}}
+                                onShareLink={async () => {
+                                    if (!patientId) {
+                                        toast.error('No se encontró el paciente para generar el link');
+                                        return;
+                                    }
+
+                                    const tId = toast.loading('Generando link para paciente...');
+                                    const result = await getSmileShareUrl(patientId);
+                                    if (!result.success || !result.url) {
+                                        toast.error(result.error || 'No se pudo generar el link', { id: tId });
+                                        return;
+                                    }
+
+                                    try {
+                                        await navigator.clipboard.writeText(result.url);
+                                        toast.success('Link copiado al portapapeles', {
+                                            id: tId,
+                                            description: result.url,
+                                        });
+                                    } catch {
+                                        toast.success('Link generado', {
+                                            id: tId,
+                                            description: result.url,
+                                        });
+                                    }
+                                }}
                                 onExit={() => setSmileMode(false)}
                                 showGrid={showGrid}
                                 onToggleGrid={() => setShowGrid(!showGrid)}

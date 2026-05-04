@@ -426,14 +426,34 @@ export default function AgendaCalendar() {
                     }
                 };
             });
-            const blockEvents: EventInput[] = blocks.map(block => ({
-                id: `block-${block.id}`,
-                start: block.start_time,
-                end: block.end_time,
-                display: 'background',
-                backgroundColor: 'rgba(239, 68, 68, 0.10)',
-                extendedProps: { isBlock: true },
-            }));
+            const BLOCK_TYPE_LABELS: Record<string, string> = {
+                evento_externo: 'Evento externo',
+                vacaciones: 'Vacaciones',
+                feriado: 'Feriado',
+                mantenimiento: 'Mantenimiento',
+                otro: 'Bloqueado',
+            };
+            const blockEvents: EventInput[] = blocks.map(block => {
+                const typeLabel = BLOCK_TYPE_LABELS[block.block_type] ?? 'Bloqueado';
+                const doctorName = (block.doctor as any)?.full_name;
+                const titleParts = [
+                    '🚫 ' + typeLabel,
+                    block.reason ? block.reason : null,
+                    doctorName ? `(${doctorName})` : null,
+                ].filter(Boolean);
+                return {
+                    id: `block-${block.id}`,
+                    title: titleParts.join(' — '),
+                    start: block.start_time,
+                    end: block.end_time,
+                    display: 'block',
+                    backgroundColor: 'rgba(239, 68, 68, 0.18)',
+                    borderColor: 'rgba(239, 68, 68, 0.7)',
+                    textColor: '#fca5a5',
+                    classNames: ['agenda-block-event'],
+                    extendedProps: { isBlock: true, blockType: block.block_type, reason: block.reason, doctorName },
+                };
+            });
 
             successCallback([...events, ...blockEvents]);
         } catch (error) {

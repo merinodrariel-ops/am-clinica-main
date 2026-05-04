@@ -11,9 +11,12 @@ import {
     ChevronDown,
     ClipboardList,
     UserCheck,
+    LayoutGrid,
+    List,
 } from 'lucide-react';
 import Link from 'next/link';
 import PatientList from '@/components/patients/PatientList';
+import PatientGrid from '@/components/patients/PatientGrid';
 import { listPatientsAction, getPatientsCountAction } from '@/app/actions/patients';
 import { type Paciente } from '@/lib/patients';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
@@ -28,7 +31,19 @@ export default function PatientsPage() {
     const [estadoFilter, setEstadoFilter] = useState('');
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Restore view preference
+    useEffect(() => {
+        const saved = typeof window !== 'undefined' ? window.localStorage.getItem('patients_view_mode') : null;
+        if (saved === 'list' || saved === 'grid') setViewMode(saved);
+    }, []);
+
+    function changeView(next: 'grid' | 'list') {
+        setViewMode(next);
+        if (typeof window !== 'undefined') window.localStorage.setItem('patients_view_mode', next);
+    }
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -175,6 +190,30 @@ export default function PatientsPage() {
                             />
                         </div>
                         <div className="flex gap-2">
+                            <div className="inline-flex items-center rounded-lg border border-white/10 bg-navy-900/50 p-0.5">
+                                <button
+                                    onClick={() => changeView('grid')}
+                                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${viewMode === 'grid'
+                                        ? 'bg-white/10 text-white'
+                                        : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                    title="Vista rostros"
+                                >
+                                    <LayoutGrid size={16} />
+                                    <span className="hidden sm:inline">Rostros</span>
+                                </button>
+                                <button
+                                    onClick={() => changeView('list')}
+                                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${viewMode === 'list'
+                                        ? 'bg-white/10 text-white'
+                                        : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                    title="Vista lista"
+                                >
+                                    <List size={16} />
+                                    <span className="hidden sm:inline">Lista</span>
+                                </button>
+                            </div>
                             <select
                                 value={estadoFilter}
                                 onChange={(e) => {
@@ -210,6 +249,8 @@ export default function PatientsPage() {
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="animate-spin text-gray-400" size={32} />
                     </div>
+                ) : viewMode === 'grid' ? (
+                    <PatientGrid patients={patients} onRefresh={loadPatients} />
                 ) : (
                     <PatientList patients={patients} onRefresh={loadPatients} />
                 )}

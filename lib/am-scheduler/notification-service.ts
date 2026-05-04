@@ -25,6 +25,7 @@ export interface AppointmentNotificationContext {
   appointmentType?: string;
   clinicName?: string;
   surveyToken?: string;
+  idempotencyKey?: string;
 }
 
 export interface NotificationResult {
@@ -252,6 +253,7 @@ async function sendEmail(ctx: AppointmentNotificationContext): Promise<{ success
       to: ctx.patientEmail,
       subject,
       html,
+      idempotencyKey: ctx.idempotencyKey,
     });
 
     if (!response.success) return { success: false, error: (response as any).error?.message || 'Error sending email' };

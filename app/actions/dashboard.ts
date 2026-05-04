@@ -56,14 +56,30 @@ export async function getDashboardStatsAction(): Promise<DashboardStats> {
         // Sum all saldos — cuentas ARS/USD split is handled elsewhere; return totals
         Object.values(saldos).forEach(v => { adminCash.ars += Number(v) || 0; });
 
+        const yearStart = new Date(year, 0, 1).toISOString();
+
+        const { count: limpiezasMes } = await supabase
+            .from('agenda_appointments')
+            .select('*', { count: 'exact', head: true })
+            .in('type', ['limpieza', 'limpieza_convencional', 'limpieza_laser'])
+            .not('status', 'in', '("cancelled","no_show")')
+            .gte('start_time', monthStart);
+
+        const { count: limpiezasAnio } = await supabase
+            .from('agenda_appointments')
+            .select('*', { count: 'exact', head: true })
+            .in('type', ['limpieza', 'limpieza_convencional', 'limpieza_laser'])
+            .not('status', 'in', '("cancelled","no_show")')
+            .gte('start_time', yearStart);
+
         return {
             patientsCount: patientsCount || 0,
             newPatientsCount: newPatientsCount || 0,
             todayIncome: Math.round(todayIncome),
             monthIncome: Math.round(monthIncome),
             adminCash,
-            limpiezasMes: 0,
-            limpiezasAnio: 0,
+            limpiezasMes: limpiezasMes || 0,
+            limpiezasAnio: limpiezasAnio || 0,
         };
     } catch (error) {
         console.error('getDashboardStatsAction:', error);
@@ -94,12 +110,15 @@ export async function getReferralStatsAction(): Promise<ReferralStat[]> {
     }
 }
 
-export async function getOwnerDashboardStatsAction(): Promise<OwnerDashboardStats> {
+export async function getOwnerDashboardStatsAction(
+    targetYear?: number,
+    targetMonth?: number  // 0-based (0=enero, 11=diciembre)
+): Promise<OwnerDashboardStats> {
     const supabase = createAdminClient();
     try {
         const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
+        const year = targetYear ?? now.getFullYear();
+        const month = targetMonth ?? now.getMonth();
         const monthsToCompare = 6;
         const monthStart = new Date(year, month, 1).toISOString().split('T')[0];
         const nextMonthStart = new Date(year, month + 1, 1).toISOString().split('T')[0];
@@ -148,6 +167,23 @@ export async function getOwnerDashboardStatsAction(): Promise<OwnerDashboardStat
             .map(({ monthKey: _mk, ...rest }: any) => rest);
         const primeraVezMes = monthlyCounts[currentMonthKey] || 0;
 
+        // Limpiezas por mes (últimos 6 meses) — desde agenda_appointments por type
+        const limpiezasWindowStart = new Date(year, month - (monthsToCompare - 1), 1).toISOString();
+        const { data: limpiezasData } = await supabase
+            .from('agenda_appointments')
+            .select('start_time')
+            .in('type', ['limpieza', 'limpieza_convencional', 'limpieza_laser'])
+            .not('status', 'in', '("cancelled","no_show")')
+            .gte('start_time', limpiezasWindowStart)
+            .lt('start_time', new Date(year, month + 1, 1).toISOString());
+
+        const limpiezasCounts = monthWindows.reduce<Record<string, number>>((acc, m) => { acc[m.key] = 0; return acc; }, {});
+        (limpiezasData || []).forEach((row: { start_time: string }) => {
+            const key = row.start_time.slice(0, 7);
+            if (key in limpiezasCounts) limpiezasCounts[key] += 1;
+        });
+        const limpiezasMensual = monthWindows.map((m) => ({ ...m, count: limpiezasCounts[m.key] || 0 }));
+
         const { data: incomeData } = await supabase
             .from('caja_recepcion_movimientos')
             .select('usd_equivalente')
@@ -180,6 +216,7 @@ export async function getOwnerDashboardStatsAction(): Promise<OwnerDashboardStat
             listaPrimeraVez,
             primeraVezMensual,
             primerasConsultasRecientes,
+            limpiezasMensual,
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
             personasEnFinanciacion: financData?.length || 0,
@@ -188,6 +225,6 @@ export async function getOwnerDashboardStatsAction(): Promise<OwnerDashboardStat
         };
     } catch (error) {
         console.error('getOwnerDashboardStatsAction:', error);
-        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], ingresosMesUsd: 0, egresosMesUsd: 0, personasEnFinanciacion: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
+        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], limpiezasMensual: [], ingresosMesUsd: 0, egresosMesUsd: 0, personasEnFinanciacion: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
     }
 }
