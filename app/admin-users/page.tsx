@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { resendUserAccessEmail, inviteUser, setUserPassword, updateUser, deleteUserAccount, updateUserAccessOverrides } from '@/app/actions/user-management';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import {
@@ -55,10 +55,7 @@ function categoryLabel(cat: string) {
 }
 
 export default function UserManagementPage() {
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = createClient();
     const { session, isOwner } = useAuth();
     const [users, setUsers] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);

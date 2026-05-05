@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { createSmileReviewFollowupAction } from '@/app/actions/smile-followup';
 import {
@@ -15,10 +15,7 @@ import { IntensitySlider } from '../patients/IntensitySlider';
 
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
-const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+const supabase = createClient();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Phase = 'drop' | 'aligning' | 'preview' | 'processing' | 'result';

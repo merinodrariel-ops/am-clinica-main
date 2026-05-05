@@ -20,7 +20,7 @@ import {
     Edit, // Import Edit icon
     Smartphone
 } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -73,10 +73,7 @@ function InventarioContent() {
     const isLabUser = role === 'laboratorio';
     const canEditInventario = canEdit('inventario');
 
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = createClient();
 
     const loadItems = useCallback(async () => {
         if (authLoading) return; // Wait for auth

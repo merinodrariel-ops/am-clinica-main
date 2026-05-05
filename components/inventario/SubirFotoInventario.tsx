@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Camera, Loader2, CheckCircle, XCircle } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/utils/supabase/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -77,10 +77,7 @@ export default function SubirFotoInventario({ itemId, onSuccess }: SubirFotoInve
     const [status, setStatus] = useState<UploadStatus>('idle');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    const supabase = createClient();
 
     async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
