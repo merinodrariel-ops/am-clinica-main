@@ -3,11 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
 import { EmailService } from '@/lib/email-service';
 
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getSupabaseAdmin() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+        throw new Error('Faltan variables de entorno de Supabase');
+    }
+
+    return createClient(supabaseUrl, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    });
+}
 
 function getPublicUrl() {
     const url = process.env.NEXT_PUBLIC_APP_URL;
@@ -25,6 +32,7 @@ export async function POST(req: NextRequest) {
         }
 
         const normalizedEmail = email.trim().toLowerCase();
+        const supabaseAdmin = getSupabaseAdmin();
 
         // 1. Look up patient by email
         const { data: patient, error: patientError } = await supabaseAdmin

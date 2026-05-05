@@ -2,10 +2,16 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Service role client (bypasses RLS — solo para este endpoint seguro)
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+        throw new Error('Faltan variables de entorno de Supabase');
+    }
+
+    return createClient(supabaseUrl, serviceKey);
+}
 
 export async function GET(
     _request: Request,
@@ -16,6 +22,8 @@ export async function GET(
     if (!token) {
         return NextResponse.json({ error: 'Token requerido' }, { status: 400 });
     }
+
+    const supabase = getSupabase();
 
     // 1. Validar token
     const { data: tokenData, error: tokenError } = await supabase

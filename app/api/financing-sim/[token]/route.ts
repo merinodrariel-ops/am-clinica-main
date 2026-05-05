@@ -5,10 +5,16 @@ import {
     DEFAULT_MONTHLY_INTEREST_PCT,
 } from '@/lib/financial-engine';
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+        throw new Error('Faltan variables de entorno de Supabase');
+    }
+
+    return createClient(supabaseUrl, serviceKey);
+}
 
 function normalizeOptions(raw: unknown, fallback: number[]): number[] {
     if (!Array.isArray(raw)) return [...fallback];
@@ -21,6 +27,7 @@ function normalizeOptions(raw: unknown, fallback: number[]): number[] {
 }
 
 async function getSimulationByToken(token: string) {
+    const supabase = getSupabase();
     const { data, error } = await supabase
         .from('financing_simulations')
         .select('*')
@@ -82,6 +89,7 @@ export async function GET(
         return NextResponse.json({ error: 'Esta simulación expiró.' }, { status: 410 });
     }
 
+    const supabase = getSupabase();
     const { data: patient } = await supabase
         .from('pacientes')
         .select('nombre, apellido')
@@ -137,6 +145,7 @@ export async function POST(
         bnaVentaArs: simulation.bnaVentaArs,
     });
 
+    const supabase = getSupabase();
     const { error: updateError } = await supabase
         .from('financing_simulations')
         .update({
