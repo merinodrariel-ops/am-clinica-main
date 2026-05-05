@@ -21,7 +21,7 @@ import type { ProductRecord } from '@/app/actions/inventory-products';
 
 export default function InventoryProductDetailPage() {
     return (
-        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'asistente', 'partner_viewer', 'developer', 'laboratorio']}>
             <ProductDetailScreen />
         </CategoriaGuard>
     );

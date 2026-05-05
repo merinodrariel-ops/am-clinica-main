@@ -58,7 +58,7 @@ const VISUAL_MATCH_BETA_ENABLED =
 
 export default function InventoryScannerPage() {
     return (
-        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'laboratorio', 'developer']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'laboratorio', 'developer', 'asistente']}>
             <ScannerScreen />
         </CategoriaGuard>
     );

@@ -278,7 +278,7 @@ export async function registerInventoryIngress(input: {
         return { success: false, error: error || 'Sesion invalida' };
     }
 
-    const allowed = ['owner', 'admin', 'reception', 'laboratorio', 'developer'];
+    const allowed = ['owner', 'admin', 'reception', 'laboratorio', 'developer', 'asistente'];
     if (!allowed.includes(role || '')) {
         return { success: false, error: 'No tienes permisos para registrar ingresos de stock.' };
     }
@@ -326,7 +326,7 @@ export async function registerInventoryEgress(input: {
         return { success: false, error: error || 'Sesion invalida' };
     }
 
-    const allowed = ['owner', 'admin', 'reception', 'laboratorio', 'developer'];
+    const allowed = ['owner', 'admin', 'reception', 'laboratorio', 'developer', 'asistente'];
     if (!allowed.includes(role || '')) {
         return { success: false, error: 'No tienes permisos para registrar salidas de stock.' };
     }

@@ -36,15 +36,15 @@ function includesAny(text: string, needles: string[]) {
 
 export default function InventoryProductsPage() {
     return (
-        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'asistente', 'partner_viewer', 'developer', 'laboratorio']}>
             <ProductsScreen />
         </CategoriaGuard>
     );
 }
 
 function ProductsScreen() {
-    const { categoria: role } = useAuth();
-    const isAdmin = role === 'owner' || role === 'admin';
+    const { canEdit } = useAuth();
+    const canManage = canEdit('inventario');
 
     const [products, setProducts] = useState<ProductRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -216,7 +216,7 @@ function ProductsScreen() {
                         <History size={15} />
                         Movimientos
                     </Link>
-                    {isAdmin && (
+                    {canManage && (
                         <Link
                             href="/inventario/productos/rapido"
                             className="px-3 py-2 rounded-lg border border-violet-200 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-sm inline-flex items-center gap-1.5"
@@ -225,7 +225,7 @@ function ProductsScreen() {
                             Alta rapida
                         </Link>
                     )}
-                    {isAdmin && (
+                    {canManage && (
                         <button
                             onClick={() => setEditor({ mode: 'create' })}
                             className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium inline-flex items-center gap-2"
@@ -369,7 +369,7 @@ function ProductsScreen() {
                                         >
                                             Ver detalle
                                         </Link>
-                                        {isAdmin && (
+                                        {canManage && (
                                             <button
                                                 onClick={() => {
                                                     setQuickUploadTarget(product);
@@ -387,7 +387,7 @@ function ProductsScreen() {
                                                 Foto
                                             </button>
                                         )}
-                                        {isAdmin && (
+                                        {canManage && (
                                             <button
                                                 onClick={() => setEditor({ mode: 'edit', product })}
                                                 className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-xs font-semibold"

@@ -23,7 +23,7 @@ type MovementTypeFilter = 'ALL' | 'ENTRADA' | 'SALIDA' | 'AJUSTE';
 
 export default function InventoryMovementsPage() {
     return (
-        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'asistente', 'partner_viewer', 'developer', 'laboratorio']}>
             <InventoryMovementsScreen />
         </CategoriaGuard>
     );

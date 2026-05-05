@@ -28,7 +28,7 @@ const DENTAL_COLOR_OPTIONS = ['A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 
 
 export default function InventoryQuickProductPage() {
     return (
-        <CategoriaGuard allowedCategorias={['owner', 'admin']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'asistente', 'reception']}>
             <QuickProductScreen />
         </CategoriaGuard>
     );

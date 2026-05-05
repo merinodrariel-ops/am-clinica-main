@@ -207,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Reception
         if (categoria === 'reception') {
-            return ['turnos', 'pacientes', 'caja_recepcion'].includes(module);
+            return ['turnos', 'pacientes', 'caja_recepcion', 'inventario'].includes(module);
         }
 
         // Pricing Manager
