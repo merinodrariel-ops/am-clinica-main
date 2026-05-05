@@ -8,9 +8,16 @@ import { admissionSubmissionSchema, type AdmissionSubmission } from '@/lib/admis
 import type { Paciente } from '@/lib/patients';
 import { formatDateForLocale } from '@/lib/local-date';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getAdmissionSupabase() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Faltan variables de entorno de Supabase para admisión');
+    }
+
+    return createClient(supabaseUrl, supabaseKey);
+}
 
 export type AdmissionData = AdmissionSubmission;
 
@@ -98,6 +105,8 @@ async function createFirstDiagnosisTodo(params: {
     driveLink?: string;
     slidesLink?: string;
 }) {
+    const supabase = getAdmissionSupabase();
+
     const { data: doctor, error: doctorError } = await supabase
         .from('profiles')
         .select('id, full_name')
@@ -147,6 +156,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
     const triggers = buildDefaultTriggers();
 
     try {
+        const supabase = getAdmissionSupabase();
         const parsed = admissionSubmissionSchema.safeParse(rawData);
         if (!parsed.success) {
             return {
@@ -339,6 +349,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
  */
 export async function upsertAdmissionLeadAction(data: Partial<AdmissionData>) {
     try {
+        const supabase = getAdmissionSupabase();
         const patientUUID = data.id_paciente || undefined;
 
         const { data: upserted, error } = await supabase
@@ -379,6 +390,7 @@ export async function checkAdmissionIdentityAction(params: {
     excludePatientId?: string;
 }) {
     try {
+        const supabase = getAdmissionSupabase();
         const dni = normalizeDni(params.dni);
         const email = normalize(params.email);
 
@@ -428,6 +440,7 @@ export async function checkAdmissionIdentityAction(params: {
 
 export async function searchAdmissionPatientsAction(query: string) {
     try {
+        const supabase = getAdmissionSupabase();
         const term = query.trim();
         if (term.length < 2) {
             return { success: true, patients: [] as AdmissionIdentityMatch[] };
