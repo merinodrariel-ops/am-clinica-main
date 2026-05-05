@@ -2280,10 +2280,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     {(() => {
                                                         const tipoLower = (formData.tipo || '').toLowerCase();
                                                         const rolLower = (formData.rol || '').toLowerCase();
+                                                        const areaLower = normalizeText(formData.area);
                                                         const isOdontologoOwner = ['owner', 'odontologo', 'profesional'].includes(tipoLower) || rolLower.includes('owner');
-                                                        const isStaffOrLimpieza = !isOdontologoOwner;
+                                                        const hasCustomHourlyRule = formData.horas_base !== null || formData.costo_hora_extra !== null;
+                                                        const isLaboratorio = areaLower.includes('laboratorio') || areaLower === 'lab' || rolLower.includes('lab');
+                                                        const usesCentralizedHourlyValue = !isOdontologoOwner && !hasCustomHourlyRule && !isLaboratorio;
 
-                                                        if (isStaffOrLimpieza) {
+                                                        if (usesCentralizedHourlyValue) {
                                                             return (
                                                                 <div>
                                                                     <div className="relative">
@@ -2304,12 +2307,20 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         }
 
                                                         return (
-                                                            <MoneyInput
-                                                                value={formData.valor_hora_ars || 0}
-                                                                onChange={(val) => setFormData({ ...formData, valor_hora_ars: val })}
-                                                                currency="ARS"
-                                                                className="w-full"
-                                                            />
+                                                            <div>
+                                                                <MoneyInput
+                                                                    value={formData.valor_hora_ars || 0}
+                                                                    onChange={(val) => setFormData({ ...formData, valor_hora_ars: val })}
+                                                                    currency="ARS"
+                                                                    className="w-full"
+                                                                />
+                                                                {hasCustomHourlyRule && (
+                                                                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 flex items-start gap-1">
+                                                                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                                                        Este prestador tiene reglas propias de horas base/extra, por eso el valor hora se edita de forma individual.
+                                                                    </p>
+                                                                )}
+                                                            </div>
                                                         );
                                                     })()}
                                                 </div>
