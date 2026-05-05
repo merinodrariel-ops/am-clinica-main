@@ -4,7 +4,13 @@ import { createAdminClient } from '@/utils/supabase/admin';
 
 const supabase = createAdminClient();
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+function getGeminiAI() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY no configurada');
+    }
+    return new GoogleGenAI({ apiKey });
+}
 
 export async function GET(req: NextRequest) {
     try {
@@ -65,6 +71,7 @@ export async function GET(req: NextRequest) {
         }
 
         console.log('[predictive-pulse] Data aggregation complete. Prompting Gemini with model gemini-2.5-flash...');
+        const ai = getGeminiAI();
 
         const prompt = `
             Eres un analista experto en gestión de clínicas dentales. Analiza los siguientes datos históricos de los últimos 4 meses (del más reciente al más antiguo):

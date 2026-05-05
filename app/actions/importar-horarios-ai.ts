@@ -5,9 +5,13 @@ import { GoogleGenAI } from '@google/genai';
 import * as xlsx from 'xlsx';
 import { inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
 
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY || "",
-});
+function getGeminiAI() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY no configurada');
+    }
+    return new GoogleGenAI({ apiKey });
+}
 
 interface AIHorarioRegistro {
     personal_id?: string;
@@ -79,6 +83,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
 `;
 
         // 4. Call Gemini
+        const ai = getGeminiAI();
         const result = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: fullPrompt

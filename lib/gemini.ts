@@ -1,8 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY || "",
-});
+function getGeminiAI() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("GEMINI_API_KEY no configurada");
+    }
+    return new GoogleGenAI({ apiKey });
+}
 
 export interface ParsedImplicitHours {
     entrada: string | null;
@@ -42,6 +46,7 @@ Celda a procesar: "${cellContent}"
 Respuesta JSON:`;
 
     try {
+        const ai = getGeminiAI();
         const result = await ai.models.generateContent({
             model: "gemini-1.5-flash",
             contents: prompt

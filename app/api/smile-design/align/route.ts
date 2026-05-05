@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+function getGeminiAI() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY no configurada');
+    }
+    return new GoogleGenAI({ apiKey });
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -10,6 +16,8 @@ export async function POST(req: NextRequest) {
         if (!imageBase64 || !mimeType) {
             return NextResponse.json({ error: 'imageBase64 and mimeType required' }, { status: 400 });
         }
+
+        const ai = getGeminiAI();
 
         const prompt = `Analyze this dental patient portrait photo and return JSON with facial landmark coordinates (pixel positions from top-left corner 0,0):
 {

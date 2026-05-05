@@ -2,7 +2,13 @@
 
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+function getGeminiAI() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY no configurada');
+    }
+    return new GoogleGenAI({ apiKey });
+}
 
 /**
  * Assists with a free-form question or instruction over the full contract text.
@@ -13,6 +19,7 @@ export async function assistFullContractAction(
     instruction: string
 ): Promise<{ reply?: string; error?: string }> {
     try {
+        const ai = getGeminiAI();
         const prompt = `Sos un abogado laboral argentino especializado en contratos de locación de servicios para clínicas odontológicas.
 Tenés el texto completo de un contrato. El usuario tiene una consulta o instrucción sobre ese contrato.
 
@@ -56,6 +63,7 @@ export async function improveContractClauseAction(
     userInstruction?: string
 ): Promise<{ improved?: string; error?: string }> {
     try {
+        const ai = getGeminiAI();
         const instruction = userInstruction?.trim()
             ? `Instrucción adicional del usuario: "${userInstruction}"`
             : '';
