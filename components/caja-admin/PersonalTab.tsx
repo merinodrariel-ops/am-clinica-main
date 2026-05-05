@@ -490,15 +490,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             .toLowerCase();
     }
 
-    function escapeReportHtml(value: unknown) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
     function getPrestacionHonorario(row: PrestacionRealizada) {
         return Number(row.monto_honorarios || row.valor_cobrado || 0);
     }
@@ -626,72 +617,129 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         XLSX.writeFile(wb, `prestaciones_${sanitizeFilePart(prestador)}_${mes}.xlsx`);
     }
 
-    function printPrestacionesDashboard(p: Personal, rows: PrestacionRealizada[], mes: string) {
+    async function exportPrestacionesDashboardPdf(
+        p: Personal,
+        rows: PrestacionRealizada[],
+        mes: string,
+        mode: 'download' | 'view',
+    ) {
         const monthRows = rows
             .filter((row) => getDateOnlyMonth(row.fecha_realizacion) === mes)
             .sort((a, b) => toDateInputValue(a.fecha_realizacion).localeCompare(toDateInputValue(b.fecha_realizacion)));
 
-        const totals = getPrestacionesCurrencyTotals(monthRows);
-        const groupedRows = groupPrestacionesDashboardRows(monthRows);
-        const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
-        const detailRows = groupedRows.map((group) => `
-            <tr>
-                <td>${escapeReportHtml(getPrestacionGroupDateLabel(group))}</td>
-                <td>${escapeReportHtml(group.paciente_nombre || '-')}</td>
-                <td>${escapeReportHtml(group.prestacion_nombre)}</td>
-                <td>${group.cantidad}</td>
-                <td>${escapeReportHtml(group.moneda_cobro)}</td>
-                <td>${group.total_honorarios.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
-                <td>${escapeReportHtml(group.estado_pago || '')}</td>
-            </tr>
-        `).join('');
-
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            toast.error('El navegador bloqueó la ventana de impresión');
+        if (monthRows.length === 0) {
+            toast.info('No hay prestaciones para generar PDF en este mes');
             return;
         }
 
-        printWindow.document.write(`
-            <html>
-                <head>
-                    <title>Informe de prestaciones - ${escapeReportHtml(prestador)}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; color: #111827; padding: 28px; }
-                        h1 { margin: 0 0 4px; font-size: 22px; }
-                        p { margin: 0; color: #4b5563; }
-                        .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 22px 0; }
-                        .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; }
-                        .value { font-size: 18px; font-weight: 700; color: #047857; }
-                        .label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
-                        th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
-                        th { background: #f3f4f6; color: #374151; }
-                        td:nth-child(4), th:nth-child(4),
-                        td:nth-child(6), th:nth-child(6) { text-align: right; }
-                    </style>
-                </head>
-                <body>
-                    <h1>Informe de prestaciones</h1>
-                    <p>${escapeReportHtml(prestador)} · ${escapeReportHtml(mesLabel(mes))}</p>
-                    <div class="cards">
-                        <div class="card"><div class="value">${monthRows.length}</div><div class="label">Prestaciones</div></div>
-                        <div class="card"><div class="value">${groupedRows.length}</div><div class="label">Items resumidos</div></div>
-                        <div class="card"><div class="value">${totals.ARS.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}</div><div class="label">Total ARS</div></div>
-                        <div class="card"><div class="value">USD ${totals.USD.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</div><div class="label">Total USD</div></div>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr><th>Fecha</th><th>Paciente</th><th>Prestación</th><th>Cant.</th><th>Moneda</th><th>Honorarios</th><th>Estado</th></tr>
-                        </thead>
-                        <tbody>${detailRows || '<tr><td colspan="7">Sin prestaciones para este mes.</td></tr>'}</tbody>
-                    </table>
-                </body>
-            </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
+        const totals = getPrestacionesCurrencyTotals(monthRows);
+        const groupedRows = groupPrestacionesDashboardRows(monthRows);
+        const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
+        const fileName = `prestaciones_${sanitizeFilePart(prestador)}_${mes}.pdf`;
+        const { jsPDF } = await import('jspdf');
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 14;
+        let y = 16;
+
+        const addPageIfNeeded = (height = 8) => {
+            if (y + height <= pageHeight - margin) return;
+            doc.addPage();
+            y = margin;
+        };
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text('Informe de prestaciones', margin, y);
+        y += 7;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`${prestador} · ${mesLabel(mes)}`, margin, y);
+        y += 10;
+
+        const cardWidth = (pageWidth - margin * 2 - 9) / 4;
+        const cards = [
+            ['Prestaciones', String(monthRows.length)],
+            ['Items resumidos', String(groupedRows.length)],
+            ['Total ARS', totals.ARS.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })],
+            ['Total USD', `USD ${totals.USD.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`],
+        ];
+
+        cards.forEach(([label, value], index) => {
+            const x = margin + index * (cardWidth + 3);
+            doc.setDrawColor(209, 213, 219);
+            doc.roundedRect(x, y, cardWidth, 18, 2, 2);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.text(value, x + 4, y + 7);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.text(label.toUpperCase(), x + 4, y + 14);
+        });
+        y += 28;
+
+        const columns = [
+            { label: 'Fecha', x: margin, width: 24 },
+            { label: 'Paciente', x: margin + 27, width: 48 },
+            { label: 'Prestacion', x: margin + 78, width: 82 },
+            { label: 'Cant.', x: margin + 163, width: 15 },
+            { label: 'Moneda', x: margin + 181, width: 18 },
+            { label: 'Honorarios', x: margin + 202, width: 32 },
+            { label: 'Estado', x: margin + 237, width: 32 },
+        ];
+
+        const drawHeader = () => {
+            doc.setFillColor(243, 244, 246);
+            doc.rect(margin, y - 5, pageWidth - margin * 2, 8, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            columns.forEach(col => doc.text(col.label, col.x, y));
+            y += 6;
+        };
+
+        drawHeader();
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+
+        for (const group of groupedRows) {
+            const values = [
+                getPrestacionGroupDateLabel(group),
+                group.paciente_nombre || '-',
+                group.prestacion_nombre,
+                String(group.cantidad),
+                group.moneda_cobro,
+                group.total_honorarios.toLocaleString('es-AR', { maximumFractionDigits: 2 }),
+                group.estado_pago || '',
+            ];
+            const splitValues = values.map((value, index) => doc.splitTextToSize(value, columns[index].width));
+            const rowHeight = Math.max(7, Math.max(...splitValues.map(lines => lines.length)) * 4 + 2);
+
+            addPageIfNeeded(rowHeight + 3);
+            if (y === margin) drawHeader();
+
+            doc.setDrawColor(229, 231, 235);
+            doc.line(margin, y - 3, pageWidth - margin, y - 3);
+            splitValues.forEach((lines, index) => {
+                const isNumeric = index === 3 || index === 5;
+                const x = isNumeric ? columns[index].x + columns[index].width : columns[index].x;
+                doc.text(lines, x, y, { align: isNumeric ? 'right' : 'left' });
+            });
+            y += rowHeight;
+        }
+
+        if (mode === 'download') {
+            doc.save(fileName);
+            return;
+        }
+
+        const blobUrl = URL.createObjectURL(doc.output('blob'));
+        const pdfWindow = window.open(blobUrl, '_blank');
+        if (!pdfWindow) {
+            URL.revokeObjectURL(blobUrl);
+            toast.error('El navegador bloqueó la vista del PDF');
+        }
     }
 
     function isOdontologoTipo(tipo?: string | null) {
@@ -2338,7 +2386,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
                         onClick={() => setShowPrestacionForm(false)}
                     >
                         <motion.div
@@ -2377,12 +2425,21 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => selectedProfesional && printPrestacionesDashboard(selectedProfesional, modalPrestaciones, panelMes)}
+                                        onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'download')}
+                                        disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 disabled:opacity-40 transition-colors"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        Descargar PDF
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'view')}
                                         disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
                                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
                                     >
-                                        <FileText className="w-4 h-4" />
-                                        PDF / imprimir
+                                        <ExternalLink className="w-4 h-4" />
+                                        Ver PDF
                                     </button>
                                     <button
                                         onClick={() => setShowPrestacionForm(false)}
@@ -2749,12 +2806,21 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            onClick={() => selectedProfesional && printPrestacionesDashboard(selectedProfesional, modalPrestaciones, panelMes)}
+                                                            onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'download')}
+                                                            disabled={!selectedProfesional || filtered.length === 0}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 disabled:opacity-40 transition-colors"
+                                                        >
+                                                            <FileText className="w-3.5 h-3.5" />
+                                                            Descargar PDF
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'view')}
                                                             disabled={!selectedProfesional || filtered.length === 0}
                                                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
                                                         >
-                                                            <FileText className="w-3.5 h-3.5" />
-                                                            PDF / imprimir
+                                                            <ExternalLink className="w-3.5 h-3.5" />
+                                                            Ver PDF
                                                         </button>
                                                     </div>
                                                 </div>
