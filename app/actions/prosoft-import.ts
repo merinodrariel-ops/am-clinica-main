@@ -28,6 +28,7 @@ export interface ProsoftRow {
         requiereRevision?: boolean; // true when data is suspicious and needs manual check
         motivoObservado?: 'FaltaIngreso' | 'FaltaEgreso' | 'HorasExcesivas' | 'MarcacionesImpares' | 'ConflictoDuplicado' | 'Otro';
         observaciones?: string; // AI notes or metadata
+        marcaciones?: string[]; // raw explicit marks, used to repair overnight exits
     }[];
 }
 
@@ -85,6 +86,7 @@ interface ParsedTime {
     requiereRevision?: boolean;
     motivoObservado?: 'FaltaIngreso' | 'FaltaEgreso' | 'HorasExcesivas' | 'MarcacionesImpares' | 'ConflictoDuplicado' | 'Otro';
     observaciones?: string;
+    marcaciones?: string[];
 }
 
 function isValidTimeToken(token: string): boolean {
@@ -132,6 +134,7 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
             requiereRevision: true,
             motivoObservado: seemsExit ? 'FaltaIngreso' : 'FaltaEgreso',
             observaciones: 'Solo se detectó una marcación',
+            marcaciones: timeTokens,
         };
     }
 
@@ -153,6 +156,7 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
                 observaciones: suspiciousLongShift
                     ? `Jornada inusualmente larga (${horas}h), requiere revisión manual`
                     : (overnight ? 'Turno noche (cruza medianoche)' : undefined),
+                marcaciones: timeTokens,
             };
         }
 
@@ -164,6 +168,7 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
             requiereRevision: true,
             motivoObservado: 'Otro',
             observaciones: 'Marcación inválida, revisar manualmente',
+            marcaciones: timeTokens,
         };
     }
 
@@ -172,19 +177,21 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
         const entrada = timeTokens[0];
         const salida = timeTokens[timeTokens.length - 1];
         const { horas, overnight } = computeHours(entrada, salida);
-        const hasOddCount = timeTokens.length % 2 !== 0;
+        const suspiciousLongShift = horas > 14;
+        const intermediateCount = timeTokens.length - 2;
 
         return {
             entrada,
             salida,
             salidaDiaSiguiente: overnight,
             horas: horas > 0 && horas <= 24 ? horas : 0,
-            incompleto: hasOddCount,
-            requiereRevision: true,
-            motivoObservado: hasOddCount ? 'MarcacionesImpares' : 'ConflictoDuplicado',
-            observaciones: hasOddCount
-                ? `Se detectaron ${timeTokens.length} marcaciones (cantidad impar)`
-                : `Se detectaron ${timeTokens.length} marcaciones (posible doble fichada)`,
+            incompleto: false,
+            requiereRevision: suspiciousLongShift || horas <= 0 || horas > 24,
+            motivoObservado: suspiciousLongShift ? 'HorasExcesivas' : (horas <= 0 || horas > 24 ? 'Otro' : undefined),
+            observaciones: intermediateCount === 1
+                ? `Se ignoró 1 marcación intermedia (${timeTokens.slice(1, -1).join(', ')})`
+                : `Se ignoraron ${intermediateCount} marcaciones intermedias (${timeTokens.slice(1, -1).join(', ')})`,
+            marcaciones: timeTokens,
         };
     }
 
@@ -218,6 +225,153 @@ async function parseTimeCell(cell: string): Promise<ParsedTime | null> {
     }
 
     return null;
+}
+
+function parseExplicitTimeTokens(timeTokens: string[], raw = ''): ParsedTime | null {
+    if (timeTokens.length === 0) return null;
+
+    if (timeTokens.length === 1) {
+        const token = timeTokens[0];
+        const lower = raw.toLowerCase();
+        const seemsExit = /salida|egreso|sale/.test(lower);
+
+        return {
+            entrada: seemsExit ? '00:00' : token,
+            salida: seemsExit ? token : '00:00',
+            horas: 0,
+            incompleto: true,
+            requiereRevision: true,
+            motivoObservado: seemsExit ? 'FaltaIngreso' : 'FaltaEgreso',
+            observaciones: 'Solo se detectó una marcación',
+            marcaciones: timeTokens,
+        };
+    }
+
+    const entrada = timeTokens[0];
+    const salida = timeTokens[timeTokens.length - 1];
+    const { horas, overnight } = computeHours(entrada, salida);
+
+    if (timeTokens.length === 2 && horas > 0 && horas <= 24) {
+        const suspiciousLongShift = horas > 14;
+        return {
+            entrada,
+            salida,
+            salidaDiaSiguiente: overnight,
+            horas,
+            requiereRevision: suspiciousLongShift,
+            motivoObservado: suspiciousLongShift ? 'HorasExcesivas' : undefined,
+            observaciones: suspiciousLongShift
+                ? `Jornada inusualmente larga (${horas}h), requiere revisión manual`
+                : (overnight ? 'Turno noche (cruza medianoche)' : undefined),
+            marcaciones: timeTokens,
+        };
+    }
+
+    const suspiciousLongShift = horas > 14;
+    const intermediateCount = timeTokens.length - 2;
+    return {
+        entrada,
+        salida,
+        salidaDiaSiguiente: overnight,
+        horas: horas > 0 && horas <= 24 ? horas : 0,
+        incompleto: false,
+        requiereRevision: suspiciousLongShift || horas <= 0 || horas > 24,
+        motivoObservado: suspiciousLongShift ? 'HorasExcesivas' : (horas <= 0 || horas > 24 ? 'Otro' : undefined),
+        observaciones: intermediateCount === 1
+            ? `Se ignoró 1 marcación intermedia (${timeTokens.slice(1, -1).join(', ')})`
+            : `Se ignoraron ${intermediateCount} marcaciones intermedias (${timeTokens.slice(1, -1).join(', ')})`,
+        marcaciones: timeTokens,
+    };
+}
+
+function timeToMinutes(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return (hours * 60) + minutes;
+}
+
+function isNextCalendarDay(previousDate: string, nextDate: string): boolean {
+    const previous = new Date(`${previousDate}T12:00:00`);
+    const next = new Date(`${nextDate}T12:00:00`);
+    const diffMs = next.getTime() - previous.getTime();
+    return diffMs > 0 && diffMs <= 36 * 60 * 60 * 1000;
+}
+
+function repairOvernightExitMarks(registros: ProsoftRow['registros']): ProsoftRow['registros'] {
+    const sorted = [...registros].sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+    for (let index = 1; index < sorted.length; index++) {
+        const previous = sorted[index - 1];
+        const current = sorted[index];
+        const firstCurrentMark = current.marcaciones?.[0];
+
+        const previousNeedsExit =
+            previous.motivoObservado === 'FaltaEgreso' &&
+            previous.entrada !== '00:00' &&
+            previous.salida === '00:00';
+
+        const currentCanDonateEarlyExit =
+            Boolean(firstCurrentMark) &&
+            isNextCalendarDay(previous.fecha, current.fecha) &&
+            timeToMinutes(firstCurrentMark!) <= 5 * 60 &&
+            (current.marcaciones?.length || 0) >= 3;
+
+        if (!previousNeedsExit || !currentCanDonateEarlyExit) continue;
+
+        const { horas, overnight } = computeHours(previous.entrada, firstCurrentMark!);
+        if (!overnight || horas <= 0 || horas > 18) continue;
+
+        previous.salida = firstCurrentMark!;
+        previous.salidaDiaSiguiente = true;
+        previous.horas = horas;
+        previous.incompleto = false;
+        previous.requiereRevision = false;
+        previous.motivoObservado = undefined;
+        previous.observaciones = `Salida de madrugada tomada del día siguiente (${current.fecha} ${firstCurrentMark})`;
+
+        const remainingMarks = current.marcaciones!.slice(1);
+        const repairedCurrent = parseExplicitTimeTokens(remainingMarks, remainingMarks.join(' '));
+        if (repairedCurrent) {
+            Object.assign(current, repairedCurrent);
+        }
+    }
+
+    return sorted;
+}
+
+function normalizeRepeatedMarksAsValid(reg: ProsoftRow['registros'][number]): ProsoftRow['registros'][number] {
+    const repeatedMarksReason =
+        reg.motivoObservado === 'MarcacionesImpares' ||
+        reg.motivoObservado === 'ConflictoDuplicado';
+
+    const hasUsablePair =
+        reg.entrada &&
+        reg.salida &&
+        reg.entrada !== '00:00' &&
+        reg.salida !== '00:00' &&
+        Number(reg.horas || 0) > 0 &&
+        Number(reg.horas || 0) <= 14;
+
+    if (!repeatedMarksReason || !hasUsablePair) return reg;
+
+    return {
+        ...reg,
+        incompleto: false,
+        requiereRevision: false,
+        motivoObservado: undefined,
+        observaciones: reg.observaciones?.includes('marcación intermedia')
+            ? reg.observaciones
+            : 'Marcaciones múltiples: se tomó primera marca como ingreso y última como egreso',
+    };
+}
+
+function normalizePreviewRows(preview: ProsoftPreview): ProsoftPreview {
+    return {
+        ...preview,
+        filas: preview.filas.map((fila) => ({
+            ...fila,
+            registros: repairOvernightExitMarks(fila.registros).map(normalizeRepeatedMarksAsValid),
+        })),
+    };
 }
 
 function getGidFromUrl(url: URL): string {
@@ -708,7 +862,7 @@ export async function importProsoftData(
     mesOverride?: string,
     onlyMatched = true
 ): Promise<ImportResult> {
-    const preview = await previewProsoftImport(sheetUrl, mesOverride);
+    const preview = normalizePreviewRows(await previewProsoftImport(sheetUrl, mesOverride));
     const admin = getAdminClient();
 
     let inserted = 0;
@@ -741,14 +895,15 @@ export async function importProsoftData(
             // Check if record already exists (dedup by personal_id + fecha)
             const { data: existing } = await admin
                 .from('registro_horas')
-                .select('id, horas')
+                .select('id, horas, estado')
                 .eq('personal_id', fila.personalId)
                 .eq('fecha', reg.fecha)
                 .maybeSingle();
 
             if (existing) {
                 // Skip if the existing record has real hours (could be manually corrected)
-                if (Number(existing.horas) > 0 && !requiereRevision) {
+                const existingIsObserved = String(existing.estado || '').toLowerCase() === 'observado';
+                if (Number(existing.horas) > 0 && !requiereRevision && !existingIsObserved) {
                     skipped++;
                     continue;
                 }
@@ -853,7 +1008,9 @@ export async function processProsoftRows(
                 return { dia, fecha, ...parsed };
             });
 
-        const registros = (await Promise.all(registrosPromises)).filter(Boolean) as ProsoftRow['registros'];
+        const registros = repairOvernightExitMarks(
+            (await Promise.all(registrosPromises)).filter(Boolean) as ProsoftRow['registros']
+        );
 
         totalRegistros += registros.length;
 
@@ -913,14 +1070,15 @@ export async function importProsoftPreviewSafe(
     onlyMatched = true
 ): Promise<ActionResult<ImportResult>> {
     try {
+        const normalizedPreview = normalizePreviewRows(preview);
         const admin = getAdminClient();
         let inserted = 0;
         let skipped = 0;
         const errors: string[] = [];
 
         const filasToImport = onlyMatched
-            ? preview.filas.filter(f => f.personalId)
-            : preview.filas;
+            ? normalizedPreview.filas.filter(f => f.personalId)
+            : normalizedPreview.filas;
 
         for (const fila of filasToImport) {
             if (!fila.personalId) {
@@ -934,8 +1092,8 @@ export async function importProsoftPreviewSafe(
                 const motivoObservado = requiereRevision ? (reg.motivoObservado || 'Otro') : null;
 
                 let observaciones = requiereRevision
-                    ? `Registro observado por control automático (${motivoObservado}) — Local ${preview.mes}`
-                    : `Importado desde archivo local (${preview.mes})`;
+                    ? `Registro observado por control automático (${motivoObservado}) — Local ${normalizedPreview.mes}`
+                    : `Importado desde archivo local (${normalizedPreview.mes})`;
 
                 if (reg.observaciones) {
                     observaciones += ` | ${reg.observaciones}`;
@@ -943,13 +1101,14 @@ export async function importProsoftPreviewSafe(
 
                 const { data: existing } = await admin
                     .from('registro_horas')
-                    .select('id, horas')
+                    .select('id, horas, estado')
                     .eq('personal_id', fila.personalId)
                     .eq('fecha', reg.fecha)
                     .maybeSingle();
 
                 if (existing) {
-                    if (Number(existing.horas) > 0 && !requiereRevision) {
+                    const existingIsObserved = String(existing.estado || '').toLowerCase() === 'observado';
+                    if (Number(existing.horas) > 0 && !requiereRevision && !existingIsObserved) {
                         skipped++;
                         continue;
                     }

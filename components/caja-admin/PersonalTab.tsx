@@ -231,6 +231,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [hoursDashboardPersonal, setHoursDashboardPersonal] = useState<Personal | null>(null);
     const [hoursDashboardRows, setHoursDashboardRows] = useState<RegistroHoras[]>([]);
     const [hoursDashboardLoading, setHoursDashboardLoading] = useState(false);
+    const [hoursDashboardMes, setHoursDashboardMes] = useState(mesActual);
     const [openedInitialHoursId, setOpenedInitialHoursId] = useState<string | null>(null);
 
     const handleSavePrestacionEdit = async () => {
@@ -337,6 +338,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setHoursDashboardPersonal(p);
         setHoursDashboardRows([]);
         setHoursDashboardLoading(true);
+        setHoursDashboardMes(mesActual);
         try {
             const rows = await getRegistroHoras({ personalId: p.id });
             setHoursDashboardRows(rows);
@@ -348,6 +350,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     function downloadHoursDashboardCsv(p: Personal, rows: RegistroHoras[]) {
         const headers = ['Prestador', 'Mes', 'Fecha', 'Ingreso', 'Egreso', 'Horas', 'Estado', 'Observaciones'];
         const csvRows = rows
+            .filter((row) => row.fecha.startsWith(hoursDashboardMes))
             .slice()
             .sort((a, b) => a.fecha.localeCompare(b.fecha))
             .map((row) => [
@@ -370,7 +373,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `horas_${p.nombre}_${p.apellido || ''}_${mesActual}.csv`.replace(/\s+/g, '_');
+        link.download = `horas_${p.nombre}_${p.apellido || ''}_${hoursDashboardMes}.csv`.replace(/\s+/g, '_');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -379,7 +382,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     function printHoursDashboard(p: Personal, rows: RegistroHoras[]) {
         const monthRows = rows
-            .filter((row) => row.fecha.startsWith(mesActual))
+            .filter((row) => row.fecha.startsWith(hoursDashboardMes))
             .sort((a, b) => a.fecha.localeCompare(b.fecha));
         const total = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
         const pending = monthRows.filter(isObservedRegistro).length;
@@ -416,7 +419,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 </head>
                 <body>
                     <h1>Informe de horas</h1>
-                    <p>${p.nombre} ${p.apellido || ''} · ${mesLabel(mesActual)}</p>
+                    <p>${p.nombre} ${p.apellido || ''} · ${mesLabel(hoursDashboardMes)}</p>
                     <div class="cards">
                         <div class="card"><div class="value">${monthRows.length}</div><div class="label">Días cargados</div></div>
                         <div class="card"><div class="value">${Math.round(total * 10) / 10}h</div><div class="label">Total horas</div></div>
@@ -545,6 +548,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         if (initialMes && /^\d{4}-\d{2}$/.test(initialMes)) {
             setMesActual(initialMes);
             setPanelMes(initialMes);
+            setHoursDashboardMes(initialMes);
         }
     }, [initialMes]);
 
@@ -2706,8 +2710,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     >
                         {(() => {
                             const p = hoursDashboardPersonal;
+                            const dashboardYear = Number(hoursDashboardMes.slice(0, 4)) || new Date().getFullYear();
+                            const dashboardMonthTabs = Array.from({ length: 12 }, (_, index) => `${dashboardYear}-${String(index + 1).padStart(2, '0')}`);
+                            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                            const monthNamesShort = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
                             const monthRows = hoursDashboardRows
-                                .filter((row) => row.fecha.startsWith(mesActual))
+                                .filter((row) => row.fecha.startsWith(hoursDashboardMes))
                                 .sort((a, b) => a.fecha.localeCompare(b.fecha));
                             const totalMonthHours = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
                             const pendingMonth = monthRows.filter(isObservedRegistro).length;
@@ -2737,7 +2745,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 {p.nombre} {p.apellido}
                                             </h3>
                                             <p className="text-sm text-slate-500 mt-1">
-                                                {p.area || p.rol} · {mesLabel(mesActual)}
+                                                {p.area || p.rol} · {mesLabel(hoursDashboardMes)}
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
@@ -2792,6 +2800,38 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         </div>
                                     ) : (
                                         <>
+                                            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
+                                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">Mes del detalle</p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">Elegí el mes para ver los días, pendientes y totales de este prestador.</p>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {dashboardMonthTabs.map((tabMes, index) => {
+                                                            const selected = tabMes === hoursDashboardMes;
+                                                            const hasData = hoursDashboardRows.some((row) => row.fecha.startsWith(tabMes));
+                                                            return (
+                                                                <button
+                                                                    key={tabMes}
+                                                                    type="button"
+                                                                    onClick={() => setHoursDashboardMes(tabMes)}
+                                                                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                                                                        selected
+                                                                            ? 'bg-blue-600 border-blue-500 text-white'
+                                                                            : hasData
+                                                                                ? 'bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                                                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                                                    }`}
+                                                                >
+                                                                    <span className="hidden sm:inline">{monthNames[index]}</span>
+                                                                    <span className="sm:hidden">{monthNamesShort[index]}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                                                 {[
                                                     { label: 'Días cargados', value: monthRows.length, color: 'text-blue-500' },
@@ -2808,7 +2848,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
                                             {pendingMonth > 0 && (
                                                 <a
-                                                    href={`/caja-admin?tab=personal&subtab=observados&observado_mes=${mesActual}&observado_personal_id=${p.id}`}
+                                                    href={`/caja-admin?tab=personal&subtab=observados&observado_mes=${hoursDashboardMes}&observado_personal_id=${p.id}`}
                                                     className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
                                                 >
                                                     <span className="inline-flex items-center gap-2 font-medium">
@@ -2832,13 +2872,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                     <th className="px-3 py-2 text-center font-medium">Horario</th>
                                                                     <th className="px-3 py-2 text-right font-medium">Horas</th>
                                                                     <th className="px-3 py-2 text-center font-medium">Estado</th>
+                                                                    <th className="px-4 py-2 text-left font-medium">Motivo</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                                                 {monthRows.length === 0 ? (
                                                                     <tr>
-                                                                        <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
-                                                                            Sin horarios para {mesLabel(mesActual)}.
+                                                                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                                                                            Sin horarios para {mesLabel(hoursDashboardMes)}.
                                                                         </td>
                                                                     </tr>
                                                                 ) : monthRows.map((row) => (
@@ -2859,6 +2900,20 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                                 <span className="rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 text-[10px] font-medium">OK</span>
                                                                             )}
                                                                         </td>
+                                                                        <td className="px-4 py-2.5 text-left text-slate-500 dark:text-slate-400 max-w-[260px]">
+                                                                            {row.motivo_observado || row.observaciones ? (
+                                                                                <div>
+                                                                                    {row.motivo_observado && (
+                                                                                        <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-300">{row.motivo_observado}</p>
+                                                                                    )}
+                                                                                    {row.observaciones && (
+                                                                                        <p className="text-[10px] truncate" title={row.observaciones}>{row.observaciones}</p>
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <span className="text-[10px] text-slate-400">-</span>
+                                                                            )}
+                                                                        </td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
@@ -2874,7 +2929,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         {monthlyRows.length === 0 ? (
                                                             <p className="px-4 py-8 text-center text-sm text-slate-500">Sin historial de horas.</p>
                                                         ) : monthlyRows.map((row) => (
-                                                            <div key={row.mes} className="px-4 py-3">
+                                                            <button
+                                                                key={row.mes}
+                                                                type="button"
+                                                                onClick={() => setHoursDashboardMes(row.mes)}
+                                                                className={`w-full px-4 py-3 text-left transition-colors ${
+                                                                    row.mes === hoursDashboardMes
+                                                                        ? 'bg-blue-50 dark:bg-blue-900/20'
+                                                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                                                }`}
+                                                            >
                                                                 <div className="flex items-center justify-between gap-3 mb-1">
                                                                     <p className="text-sm font-medium text-slate-900 dark:text-white">{mesLabel(row.mes)}</p>
                                                                     <span className="text-sm font-bold text-teal-600 dark:text-teal-300">{Math.round(row.horas * 10) / 10}h</span>
@@ -2886,7 +2950,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                         {row.resueltos > 0 ? ` · ${row.resueltos} corregidos` : ''}
                                                                     </span>
                                                                 </div>
-                                                            </div>
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 </div>

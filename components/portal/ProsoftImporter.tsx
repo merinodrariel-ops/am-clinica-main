@@ -48,8 +48,11 @@ const DEFAULT_CALCULATION_PROMPT = `1. Identificar para cada persona las horas d
 5. Asignar el total de horas del período al final.
 
 Reglas de control AM:
+- Si una persona marca entrada por la tarde/noche y falta salida, y la primera marca del día siguiente es de madrugada (por ejemplo entre 00:00 y 05:00), interpretarla como salida tardía del día anterior, no como entrada nueva.
+- En esos casos calcular la jornada cruzando medianoche y dejar asentado que la salida pertenece al día siguiente.
+- Si en un mismo día hay 3 o más marcaciones, tomar la primera como ingreso y la última como egreso, omitiendo las marcaciones intermedias como movimientos internos o salidas breves.
+- Solo dejar esas marcaciones múltiples como Observado si el resultado queda inválido o supera el máximo de horas configurado.
 - Si falta entrada o salida, el fichaje queda Observado para corregir manualmente.
-- Si hay marcaciones repetidas o impares, queda Observado.
 - Si la jornada supera el máximo configurado, queda Observado por horas excesivas.
 - Las equivalencias ProSoft -> personal se guardan y se aplican automáticamente.`;
 
