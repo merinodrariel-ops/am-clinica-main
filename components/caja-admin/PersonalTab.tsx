@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Plus,
@@ -72,6 +73,7 @@ import PrestacionesTab from './PrestacionesTab';
 import PortfolioEditor from '@/components/caja-admin/PortfolioEditor';
 import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
+import { registrarMensualidadFija } from '@/app/actions/liquidaciones';
 import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
 import { eliminarPrestacion, updatePrestacionRealizada } from '@/app/actions/prestaciones';
 import { useAuth } from '@/contexts/AuthContext';
@@ -110,6 +112,7 @@ const DEFAULT_PROVIDER_TYPE_OPTIONS: ProviderTypeOption[] = [
 
 export default function PersonalTab({ tcBna, initialTab, initialObservedPersonalId, initialHoursPersonalId, initialMes }: Props) {
     const { categoria: role } = useAuth();
+    const [portalReady, setPortalReady] = useState(false);
     const [activeTab, setActiveTab] = useState<MainTab>((initialTab === 'equipo' ? 'prestadores' : initialTab) || 'prestadores');
     const [activeProviderCategory, setActiveProviderCategory] = useState<ProviderCategory | 'todos'>('todos');
     const [observadosCount, setObservadosCount] = useState(0);
@@ -233,6 +236,20 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [hoursDashboardLoading, setHoursDashboardLoading] = useState(false);
     const [hoursDashboardMes, setHoursDashboardMes] = useState(mesActual);
     const [openedInitialHoursId, setOpenedInitialHoursId] = useState<string | null>(null);
+    const [mensualidadPersonal, setMensualidadPersonal] = useState<Personal | null>(null);
+    const [mensualidadSaving, setMensualidadSaving] = useState(false);
+    const [mensualidadComprobante, setMensualidadComprobante] = useState<File | null>(null);
+    const [mensualidadForm, setMensualidadForm] = useState({
+        mes: mesActual,
+        monto: 0,
+        moneda: 'USD' as 'ARS' | 'USD',
+        fechaPago: new Date().toISOString().split('T')[0],
+        observaciones: '',
+    });
+
+    useEffect(() => {
+        setPortalReady(true);
+    }, []);
 
     const handleSavePrestacionEdit = async () => {
         if (!editingPrestacion) return;
@@ -705,6 +722,56 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setQuickAccessArea(saved);
         getPrestacionesRealizadas({ profesionalId }).then(data => setModalPrestaciones(data));
         setShowPrestacionForm(true);
+    }
+
+    function openMensualidadForm(p: Personal) {
+        const amount = Number(p.monto_mensual || 0);
+        setMensualidadPersonal(p);
+        setMensualidadComprobante(null);
+        setMensualidadForm({
+            mes: mesActual,
+            monto: amount > 0 ? amount : 250,
+            moneda: (p.moneda_mensual || 'USD') as 'ARS' | 'USD',
+            fechaPago: new Date().toISOString().split('T')[0],
+            observaciones: '',
+        });
+    }
+
+    async function handleSubmitMensualidad() {
+        if (!mensualidadPersonal) return;
+        if (!mensualidadForm.monto || mensualidadForm.monto <= 0) {
+            toast.error('Ingresá un monto válido');
+            return;
+        }
+
+        const payload = new FormData();
+        payload.append('personalId', mensualidadPersonal.id);
+        payload.append('mes', mensualidadForm.mes);
+        payload.append('monto', String(mensualidadForm.monto));
+        payload.append('moneda', mensualidadForm.moneda);
+        payload.append('fechaPago', mensualidadForm.fechaPago);
+        payload.append('tcLiquidacion', String(tcBna || 0));
+        payload.append('observaciones', mensualidadForm.observaciones);
+        if (mensualidadComprobante) {
+            payload.append('comprobante', mensualidadComprobante);
+        }
+
+        setMensualidadSaving(true);
+        try {
+            const result = await registrarMensualidadFija(payload);
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo registrar la mensualidad');
+            }
+
+            toast.success('Mensualidad registrada');
+            setMensualidadPersonal(null);
+            setMensualidadComprobante(null);
+            await loadData();
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo registrar la mensualidad');
+        } finally {
+            setMensualidadSaving(false);
+        }
     }
 
     async function handleSubmitPersonal() {
@@ -2678,7 +2745,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             if (mode === 'mensual') {
                                                 return (
                                                     <Button
-                                                        onClick={() => alert('Próximamente: Carga de Mensualidad')}
+                                                        onClick={() => openMensualidadForm(p)}
                                                         className="w-full h-auto py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-100 dark:shadow-none hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center gap-1 group border-0"
                                                     >
                                                         <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
@@ -2700,12 +2767,140 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     </div>
                 )}
 
-            {hoursDashboardPersonal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setHoursDashboardPersonal(null)}>
+            {mensualidadPersonal && portalReady && createPortal((
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setMensualidadPersonal(null)}>
                     <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-5xl m-4 max-h-[90vh] overflow-y-auto"
+                        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {(() => {
+                            const p = mensualidadPersonal;
+                            const nombre = `${p.nombre} ${p.apellido || ''}`.trim();
+                            const liquidacionMes = liquidaciones.find(l => l.personal_id === p.id && String(l.mes).startsWith(mensualidadForm.mes));
+                            const estimatedArs = mensualidadForm.moneda === 'ARS'
+                                ? mensualidadForm.monto
+                                : mensualidadForm.monto * (tcBna || 0);
+                            const estimatedUsd = mensualidadForm.moneda === 'USD'
+                                ? mensualidadForm.monto
+                                : (tcBna ? mensualidadForm.monto / tcBna : 0);
+
+                            return (
+                                <>
+                                    <div className="flex items-start justify-between border-b border-slate-200 p-6 dark:border-slate-800">
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-widest text-violet-500">Mensualidad fija</p>
+                                            <h3 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{nombre}</h3>
+                                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                Registrá el depósito mensual y adjuntá el comprobante.
+                                            </p>
+                                        </div>
+                                        <Button variant="ghost" size="icon" onClick={() => setMensualidadPersonal(null)} className="h-8 w-8 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                                            <X className="h-5 w-5" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid gap-5 p-6 sm:grid-cols-2">
+                                        <div>
+                                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Mes liquidado</label>
+                                            <Input
+                                                type="month"
+                                                value={mensualidadForm.mes}
+                                                onChange={(e) => setMensualidadForm(prev => ({ ...prev, mes: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Fecha de depósito</label>
+                                            <Input
+                                                type="date"
+                                                value={mensualidadForm.fechaPago}
+                                                onChange={(e) => setMensualidadForm(prev => ({ ...prev, fechaPago: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Monto</label>
+                                            <MoneyInput
+                                                value={mensualidadForm.monto}
+                                                onChange={(value) => setMensualidadForm(prev => ({ ...prev, monto: value }))}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Moneda</label>
+                                            <select
+                                                value={mensualidadForm.moneda}
+                                                onChange={(e) => setMensualidadForm(prev => ({ ...prev, moneda: e.target.value as 'ARS' | 'USD' }))}
+                                                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm dark:border-slate-700 dark:bg-slate-950"
+                                            >
+                                                <option value="USD">USD</option>
+                                                <option value="ARS">ARS</option>
+                                            </select>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Comprobante de depósito</label>
+                                            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-violet-950/20">
+                                                <span className="flex min-w-0 items-center gap-2">
+                                                    <FileText className="h-4 w-4 shrink-0 text-violet-500" />
+                                                    <span className="truncate">{mensualidadComprobante?.name || 'Adjuntar PDF, imagen o captura del comprobante'}</span>
+                                                </span>
+                                                <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-500 shadow-sm dark:bg-slate-800">Elegir</span>
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/*,.pdf"
+                                                    onChange={(e) => setMensualidadComprobante(e.target.files?.[0] || null)}
+                                                />
+                                            </label>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Notas</label>
+                                            <Textarea
+                                                value={mensualidadForm.observaciones}
+                                                onChange={(e) => setMensualidadForm(prev => ({ ...prev, observaciones: e.target.value }))}
+                                                placeholder="Ej: transferencia realizada, banco, referencia interna..."
+                                                rows={3}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-950/60">
+                                        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                <p className="text-xs font-semibold uppercase text-slate-400">Estado mes</p>
+                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">{liquidacionMes ? 'Ya tiene registro' : 'Sin registrar'}</p>
+                                            </div>
+                                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                <p className="text-xs font-semibold uppercase text-slate-400">Total USD</p>
+                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">USD {estimatedUsd.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
+                                            </div>
+                                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                <p className="text-xs font-semibold uppercase text-slate-400">Total ARS</p>
+                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">$ {estimatedArs.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                            <Button variant="outline" onClick={() => setMensualidadPersonal(null)} disabled={mensualidadSaving}>
+                                                Cancelar
+                                            </Button>
+                                            <Button onClick={handleSubmitMensualidad} disabled={mensualidadSaving} className="bg-violet-600 text-white hover:bg-violet-700">
+                                                {mensualidadSaving ? 'Registrando...' : 'Registrar mensualidad'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </motion.div>
+                </div>
+            ), document.body)}
+
+            {hoursDashboardPersonal && portalReady && createPortal((
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setHoursDashboardPersonal(null)}>
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto"
                         onClick={e => e.stopPropagation()}
                     >
                         {(() => {
@@ -2962,7 +3157,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         })()}
                     </motion.div>
                 </div>
-            )}
+            ), document.body)}
 
             {/* Hours Form — shown when showHorasForm is triggered */}
             {showHorasForm && (

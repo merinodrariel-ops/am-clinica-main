@@ -85,6 +85,25 @@ function isValidWhatsapp(value: string): boolean {
     return /^\+?\d{10,15}$/.test(value);
 }
 
+function normalizeDateOnly(value?: string): string | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+
+    const [year, month, day] = trimmed.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day ||
+        date > new Date()
+    ) {
+        return null;
+    }
+
+    return trimmed;
+}
+
 export interface PrestadorAutoRegistroInput {
     // Paso 1
     nombre: string;
@@ -118,6 +137,7 @@ export async function registerPrestadorPublico(
     const whatsapp = (data.whatsapp || '').trim();
     const direccion = sanitizeText(data.direccion);
     const barrioLocalidad = sanitizeText(data.barrio_localidad);
+    const fechaNacimiento = normalizeDateOnly(data.fecha_nacimiento);
     const company = sanitizeText(data.company);
     const formStartedAt = typeof data.form_started_at === 'number' ? data.form_started_at : 0;
     const categoria = getCategoriaFromInput(data.categoria);
@@ -149,10 +169,11 @@ export async function registerPrestadorPublico(
         return { error: 'Ya existe un prestador registrado con ese DNI.' };
     }
 
-    const { data: insertedPersonal, error } = await adminSupabase.from('personal').insert({
+    const basePersonalPayload = {
         nombre,
         apellido,
         documento,
+        fecha_nacimiento: fechaNacimiento,
         email,
         whatsapp,
         direccion: direccion || null,
@@ -169,7 +190,28 @@ export async function registerPrestadorPublico(
         activo: true,
         fuente_registro: 'autoregistro',
         fecha_ingreso: new Date().toISOString().split('T')[0],
-    }).select('id').single();
+    };
+
+    let insertResult = await adminSupabase
+        .from('personal')
+        .insert(basePersonalPayload)
+        .select('id')
+        .single();
+
+    if (
+        insertResult.error &&
+        /fecha_nacimiento|column .* does not exist|schema cache/i.test(insertResult.error.message || '')
+    ) {
+        const { fecha_nacimiento: _fechaNacimiento, ...fallbackPayload } = basePersonalPayload;
+        insertResult = await adminSupabase
+            .from('personal')
+            .insert(fallbackPayload)
+            .select('id')
+            .single();
+    }
+
+    const insertedPersonal = insertResult.data;
+    const error = insertResult.error;
 
     if (error) {
         console.error('registerPrestadorPublico error:', error);

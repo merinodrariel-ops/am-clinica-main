@@ -6,6 +6,7 @@ import { syncPatientToSheet } from '@/lib/google-sheets';
 import { EmailService } from '@/lib/email-service';
 import { admissionSubmissionSchema, type AdmissionSubmission } from '@/lib/admission-schema';
 import type { Paciente } from '@/lib/patients';
+import { formatDateForLocale } from '@/lib/local-date';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -19,6 +20,28 @@ type TriggerStatus = {
 };
 
 type PatientDocumentsResult = Awaited<ReturnType<typeof createPatientDocuments>>;
+
+function calculateAgeFromDateOnly(value?: string | null): string {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '-';
+    const [year, month, day] = value.split('-').map(Number);
+    const dob = new Date(year, month - 1, day);
+    if (
+        dob.getFullYear() !== year ||
+        dob.getMonth() !== month - 1 ||
+        dob.getDate() !== day
+    ) {
+        return '-';
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+    }
+
+    return age >= 0 && age <= 120 ? `${age} años` : '-';
+}
 
 export type AdmissionTriggerMap = {
     database: TriggerStatus;
@@ -190,17 +213,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 console.log('Creating patient documents in folder:', driveResult.motherFolderId);
 
                 // Calculate age from DOB
-                let edad = '-';
-                if (data.fecha_nacimiento) {
-                    const dob = new Date(data.fecha_nacimiento);
-                    const today = new Date();
-                    let age = today.getFullYear() - dob.getFullYear();
-                    const monthDiff = today.getMonth() - dob.getMonth();
-                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-                        age--;
-                    }
-                    edad = `${age} años`;
-                }
+                const edad = calculateAgeFromDateOnly(data.fecha_nacimiento);
 
                 // Build health alert strings
                 const alertParts: string[] = [];
@@ -216,7 +229,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                     dni: data.dni || '-',
                     fecha: new Date().toLocaleDateString('es-AR'),
                     fechaNacimiento: data.fecha_nacimiento
-                        ? new Date(data.fecha_nacimiento).toLocaleDateString('es-AR')
+                        ? formatDateForLocale(data.fecha_nacimiento)
                         : undefined,
                     edad,
                     whatsapp: data.whatsapp,

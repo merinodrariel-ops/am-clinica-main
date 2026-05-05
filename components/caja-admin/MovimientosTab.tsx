@@ -41,8 +41,10 @@ import {
   type CuentaFinanciera,
   type MovimientoLinea,
   type CajaAdminArqueo,
+  type Personal,
   getMovimientos,
   getCuentas,
+  getPersonal,
   createMovimiento,
   getAperturaAdminDelDia,
   getArqueosForMonth,
@@ -53,6 +55,7 @@ import {
   type CajaAdminCategoria,
 } from "@/lib/caja-admin";
 import { updateCajaAdminMovimientoSecure } from "@/app/actions/caja-admin";
+import { sincronizarLiquidacionDesdeMovimientoCaja } from "@/app/actions/liquidaciones";
 import { createClient } from "@/utils/supabase/client";
 import { ComprobanteLink } from "@/components/caja/ComprobanteLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -72,6 +75,16 @@ interface Props {
 }
 
 type MetodoPagoUI = "EFECTIVO" | "TRANSFERENCIA" | "TARJETA" | "OTRO";
+type TransferenciaAdmin = {
+  id: string;
+  fecha_hora: string;
+  tipo_transferencia: "RETIRO_EFECTIVO" | "TRASPASO_INTERNO";
+  motivo?: string | null;
+  moneda: "ARS" | "USD";
+  monto: number;
+  observaciones?: string | null;
+  comprobante_url?: string | null;
+};
 
 const TIPOS_MOVIMIENTO = [
   { value: "EGRESO", label: "Egreso" },
@@ -89,8 +102,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   const { categoria: role } = useAuth();
   const canEditAdminAmounts = role === "owner" || role === "admin";
   const [movimientos, setMovimientos] = useState<CajaAdminMovimiento[]>([]);
-  const [transfers, setTransfers] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<TransferenciaAdmin[]>([]);
   const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
+  const [personalLiquidacion, setPersonalLiquidacion] = useState<Personal[]>([]);
   const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -164,6 +178,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     descripcion: "",
     nota: "",
     fecha_movimiento: getLocalISODate(),
+    personal_id: "",
   });
   const [formLineas, setFormLineas] = useState<MovimientoLinea[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -208,7 +223,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
 
   // Derive payment method chip from movement lines
   function getMedioPagoChip(mov: CajaAdminMovimiento) {
-    const lines = (mov.caja_admin_movimiento_lineas || (mov as any).lineas || []) as { cuenta_id: string }[];
+    const lines = (mov.caja_admin_movimiento_lineas || mov.lineas || []) as { cuenta_id: string }[];
     if (lines.length === 0) return <span className="text-xs text-slate-400">—</span>;
     const tipos = [...new Set(lines.map(l => cuentas.find(c => c.id === l.cuenta_id)?.tipo_cuenta || 'OTRO'))];
     const label = tipos.length > 1 ? 'Mixto' : tipos[0] === 'EFECTIVO' ? 'Efectivo' : tipos[0] === 'BANCO' ? 'Banco' : tipos[0] === 'TARJETA' ? 'Tarjeta' : tipos[0] === 'SERVICIO' ? 'Servicio' : 'Otro';
@@ -254,6 +269,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       const aperturaHoy = await getAperturaAdminDelDia(sucursal.id);
       const arqueosData = await getArqueosForMonth(sucursal.id, mesActual);
       const balanceData = await getCurrentBalanceAdmin(sucursal.id);
+      const personalData = await getPersonal();
 
       setMovimientos(movData || []);
 
@@ -265,9 +281,10 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
         .eq("estado", "confirmada")
         .order("fecha_hora", { ascending: false });
 
-      setTransfers(transData || []);
+      setTransfers((transData || []) as TransferenciaAdmin[]);
       setCuentas(cuentasData || []);
       setCategorias((categoriasData || []).filter(c => c.activo));
+      setPersonalLiquidacion((personalData || []).filter(p => p.activo !== false && ['horas', 'prestaciones', 'mensual'].includes(p.modelo_pago)));
       setAperturaHoy(aperturaHoy);
       setArqueos(arqueosData || []);
       setBalanceVivo(balanceData);
@@ -860,7 +877,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       setSubmitting(false);
       if (error) { setFormError(error.message); return; }
       setShowForm(false);
-      setFormData({ tipo_movimiento: "EGRESO", subtipo: "", descripcion: "", nota: "", fecha_movimiento: getLocalISODate() });
+      setFormData({ tipo_movimiento: "EGRESO", subtipo: "", descripcion: "", nota: "", fecha_movimiento: getLocalISODate(), personal_id: "" });
       setGiroMonto("");
       setGiroMoneda("ARS");
       setGiroRate("");
@@ -919,7 +936,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
 
     setSubmitting(true);
 
-    const { error } = await createMovimiento(
+    const { data: createdMovimiento, error } = await createMovimiento(
       {
         sucursal_id: sucursal.id,
         tipo_movimiento:
@@ -943,6 +960,18 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       return;
     }
 
+    if (createdMovimiento?.id && formData.personal_id) {
+      const syncResult = await sincronizarLiquidacionDesdeMovimientoCaja({
+        movimientoId: createdMovimiento.id,
+        personalId: formData.personal_id,
+      });
+
+      if (!syncResult.success) {
+        setFormError(syncResult.error || "El movimiento se guardó, pero no se pudo sincronizar la liquidación");
+        return;
+      }
+    }
+
     // Reset form
     setShowForm(false);
     setFormData({
@@ -951,6 +980,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       descripcion: "",
       nota: "",
       fecha_movimiento: getLocalISODate(),
+      personal_id: "",
     });
     setFormLineas([]);
     setAdjuntos([]);
@@ -994,16 +1024,17 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       kind: "movimiento" as const, // We use kind movement for now to reuse handling
       data: {
         id: t.id,
+        sucursal_id: sucursal.id,
         fecha_hora: t.fecha_hora,
         fecha_movimiento: t.fecha_hora.split('T')[0],
-        tipo_movimiento: t.tipo_transferencia as any,
+        tipo_movimiento: t.tipo_transferencia === 'RETIRO_EFECTIVO' ? 'RETIRO' : 'TRANSFERENCIA',
         descripcion: t.motivo || (t.tipo_transferencia === 'RETIRO_EFECTIVO' ? 'Retiro de efectivo' : 'Traspaso interno'),
         usd_equivalente_total: t.moneda === 'USD' ? t.monto : (t.monto / (tcBna || 1)),
         estado: 'Registrado',
         nota: t.observaciones,
         adjuntos: t.comprobante_url ? [t.comprobante_url] : [],
         caja_admin_movimiento_lineas: []
-      } as any,
+      } as CajaAdminMovimiento,
       sortTs: t.fecha_hora,
     })),
     ...(arqueoVisible
@@ -1029,7 +1060,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     .filter((m) => (m.tipo_movimiento === "EGRESO" || m.tipo_movimiento === "RETIRO") && m.estado !== "Anulado")
     .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0) +
     transfers
-      .filter(t => t.tipo === "RETIRO" && t.estado === "completado")
+      .filter(t => t.tipo_transferencia === "RETIRO_EFECTIVO")
       .reduce((sum, t) => sum + (t.moneda === 'USD' ? t.monto : (t.monto / (tcBna || 1))), 0);
 
 
@@ -1335,6 +1366,39 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                     <option value="" disabled>Sin categorías</option>
                   )}
                 </select>
+              </div>
+            )}
+
+            {formData.tipo_movimiento === "EGRESO" && (
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">
+                  Vincular a prestador / liquidación
+                </label>
+                <select
+                  value={formData.personal_id}
+                  onChange={(e) => {
+                    const personalId = e.target.value;
+                    const selected = personalLiquidacion.find((p) => p.id === personalId);
+                    setFormData({
+                      ...formData,
+                      personal_id: personalId,
+                      descripcion: selected && !formData.descripcion
+                        ? `Pago liquidación ${selected.nombre} ${selected.apellido || ''}`.trim()
+                        : formData.descripcion,
+                    });
+                  }}
+                  className="w-full px-4 py-2.5 text-sm font-bold rounded-2xl border-none ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-950 h-11 focus:ring-2 ring-indigo-500 transition-all shadow-sm"
+                >
+                  <option value="">No vincular</option>
+                  {personalLiquidacion.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {`${p.nombre} ${p.apellido || ''}`.trim()} · {p.modelo_pago === 'mensual' ? 'Mensual' : p.modelo_pago === 'prestaciones' ? 'Prestaciones' : 'Horas'}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Si elegís una persona, este egreso y sus comprobantes se sincronizan con su liquidación del mes.
+                </p>
               </div>
             )}
 

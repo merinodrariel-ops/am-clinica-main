@@ -305,6 +305,255 @@ export async function markLiquidacionPaid(id: string, fechaPago: string): Promis
     revalidatePath('/caja-admin/liquidaciones');
 }
 
+export async function registrarMensualidadFija(formData: FormData): Promise<{ success: boolean; error?: string }> {
+    try {
+        const admin = getAdminClient();
+        const personalId = String(formData.get('personalId') || '');
+        const mes = String(formData.get('mes') || '');
+        const moneda = String(formData.get('moneda') || 'USD') as 'ARS' | 'USD';
+        const fechaPago = String(formData.get('fechaPago') || '');
+        const observaciones = String(formData.get('observaciones') || '').trim();
+        const monto = Number(formData.get('monto'));
+        const tcInput = Number(formData.get('tcLiquidacion'));
+        const comprobante = formData.get('comprobante');
+
+        if (!personalId) throw new Error('Seleccioná un prestador');
+        if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error('Mes inválido');
+        if (moneda !== 'ARS' && moneda !== 'USD') throw new Error('Moneda inválida');
+        if (!fechaPago) throw new Error('Indicá la fecha de pago');
+        if (!Number.isFinite(monto) || monto <= 0) throw new Error('Monto inválido');
+
+        const { data: personal, error: personalError } = await admin
+            .from('personal')
+            .select('id, nombre, apellido, modelo_pago')
+            .eq('id', personalId)
+            .single();
+
+        if (personalError || !personal) throw new Error('Prestador no encontrado');
+
+        const tcLiquidacion = Number.isFinite(tcInput) && tcInput > 0 ? tcInput : await fetchBnaVenta();
+        const totalUsd = moneda === 'USD' ? round(monto, 2) : round(monto / tcLiquidacion, 2);
+        const totalArs = moneda === 'ARS' ? round(monto, 2) : round(monto * tcLiquidacion, 2);
+        const mesDate = `${mes}-01`;
+        let comprobanteUrl: string | null = null;
+        let comprobanteNombre: string | null = null;
+
+        if (comprobante instanceof File && comprobante.size > 0) {
+            const safeName = comprobante.name
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9._-]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                || 'comprobante';
+            const filePath = `${mes}/mensualidades/${personalId}-${Date.now()}-${safeName}`;
+            const bytes = Buffer.from(await comprobante.arrayBuffer());
+            const { data: uploadData, error: uploadError } = await admin.storage
+                .from('caja-admin')
+                .upload(filePath, bytes, {
+                    contentType: comprobante.type || 'application/octet-stream',
+                    upsert: false,
+                });
+
+            if (uploadError) throw new Error(`No se pudo subir el comprobante: ${uploadError.message}`);
+            comprobanteUrl = `storage:caja-admin:${uploadData.path}`;
+            comprobanteNombre = comprobante.name;
+        }
+
+        const payloadBase = {
+            personal_id: personalId,
+            mes: mesDate,
+            modelo_pago: 'hora_ars',
+            total_ars: totalArs,
+            total_usd: totalUsd,
+            total_horas: 0,
+            valor_hora_snapshot: null,
+            tc_bna_venta: tcLiquidacion,
+            tc_liquidacion: tcLiquidacion,
+            prestaciones_validadas: 0,
+            prestaciones_pendientes: 0,
+            fecha_pago: fechaPago,
+            observaciones: observaciones || null,
+            breakdown: {
+                tipo: 'mensualidad_fija',
+                personal: `${personal.nombre || ''} ${personal.apellido || ''}`.trim(),
+                monto,
+                moneda,
+                total_ars: totalArs,
+                total_usd: totalUsd,
+                tc_liquidacion: tcLiquidacion,
+                fecha_pago: fechaPago,
+                comprobante_url: comprobanteUrl,
+                comprobante_nombre: comprobanteNombre,
+                observaciones: observaciones || null,
+                registrado_at: new Date().toISOString(),
+            },
+        };
+
+        let lastError: { message?: string } | null = null;
+        for (const estadoDb of ESTADO_DB_CANDIDATES.paid) {
+            const { error } = await admin
+                .from('liquidaciones_mensuales')
+                .upsert(
+                    {
+                        ...payloadBase,
+                        estado: estadoDb,
+                    },
+                    { onConflict: 'personal_id,mes' }
+                );
+
+            if (!error) {
+                lastError = null;
+                break;
+            }
+
+            lastError = error;
+            if (!isEstadoConstraintError(error.message)) break;
+        }
+
+        if (lastError) throw new Error(lastError.message || 'Error al registrar mensualidad');
+
+        revalidatePath('/admin/liquidaciones');
+        revalidatePath('/caja-admin');
+        revalidatePath('/caja-admin/liquidaciones');
+
+        return { success: true };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Error al registrar mensualidad',
+        };
+    }
+}
+
+export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
+    movimientoId: string;
+    personalId: string;
+}): Promise<{ success: boolean; error?: string }> {
+    try {
+        const admin = getAdminClient();
+        const { movimientoId, personalId } = input;
+
+        if (!movimientoId) throw new Error('Movimiento inválido');
+        if (!personalId) throw new Error('Prestador inválido');
+
+        const { data: movimiento, error: movError } = await admin
+            .from('caja_admin_movimientos')
+            .select('id, fecha_movimiento, descripcion, subtipo, nota, adjuntos, tc_bna_venta, usd_equivalente_total, tipo_movimiento, caja_admin_movimiento_lineas(*)')
+            .eq('id', movimientoId)
+            .single();
+
+        if (movError || !movimiento) throw new Error('Movimiento de caja no encontrado');
+        if (movimiento.tipo_movimiento !== 'EGRESO') {
+            throw new Error('Solo se sincronizan egresos de caja');
+        }
+
+        const { data: personal, error: personalError } = await admin
+            .from('personal')
+            .select('id, nombre, apellido, modelo_pago, monto_mensual, moneda_mensual')
+            .eq('id', personalId)
+            .single();
+
+        if (personalError || !personal) throw new Error('Prestador no encontrado');
+
+        const fechaMovimiento = String(movimiento.fecha_movimiento || new Date().toISOString().slice(0, 10));
+        const mes = fechaMovimiento.slice(0, 7);
+        const mesDate = `${mes}-01`;
+        const tcLiquidacion = Number(movimiento.tc_bna_venta || 0) > 0
+            ? Number(movimiento.tc_bna_venta)
+            : await fetchBnaVenta();
+
+        const lines = Array.isArray(movimiento.caja_admin_movimiento_lineas)
+            ? movimiento.caja_admin_movimiento_lineas as Array<{ importe?: number | null; moneda?: string | null; usd_equivalente?: number | null; cuenta_id?: string | null }>
+            : [];
+        const totalUsd = round(
+            Number(movimiento.usd_equivalente_total || 0) || lines.reduce((sum, line) => {
+                const moneda = String(line.moneda || '').toUpperCase();
+                const importe = Number(line.importe || 0);
+                const usdEq = Number(line.usd_equivalente);
+                if (Number.isFinite(usdEq) && usdEq > 0) return sum + usdEq;
+                if (moneda === 'USD') return sum + importe;
+                if (moneda === 'ARS' && tcLiquidacion > 0) return sum + (importe / tcLiquidacion);
+                return sum;
+            }, 0),
+            2
+        );
+        const totalArs = round(totalUsd * tcLiquidacion, 2);
+        const adjuntos = Array.isArray(movimiento.adjuntos) ? movimiento.adjuntos : [];
+
+        const payloadBase = {
+            personal_id: personalId,
+            mes: mesDate,
+            modelo_pago: personal.modelo_pago === 'prestaciones' ? 'prestacion_usd' : 'hora_ars',
+            total_ars: totalArs,
+            total_usd: totalUsd,
+            total_horas: 0,
+            valor_hora_snapshot: null,
+            tc_bna_venta: tcLiquidacion,
+            tc_liquidacion: tcLiquidacion,
+            prestaciones_validadas: 0,
+            prestaciones_pendientes: 0,
+            fecha_pago: fechaMovimiento,
+            observaciones: movimiento.nota || movimiento.descripcion || null,
+            breakdown: {
+                tipo: personal.modelo_pago === 'mensual' ? 'mensualidad_fija' : 'pago_liquidacion_caja_admin',
+                origen: 'caja_admin_movimientos',
+                caja_movimiento_id: movimiento.id,
+                personal: `${personal.nombre || ''} ${personal.apellido || ''}`.trim(),
+                descripcion: movimiento.descripcion,
+                subtipo: movimiento.subtipo,
+                nota: movimiento.nota,
+                fecha_pago: fechaMovimiento,
+                total_usd: totalUsd,
+                total_ars: totalArs,
+                tc_liquidacion: tcLiquidacion,
+                adjuntos,
+                comprobante_url: adjuntos[0] || null,
+                lineas: lines.map((line) => ({
+                    cuenta_id: line.cuenta_id || null,
+                    importe: Number(line.importe || 0),
+                    moneda: line.moneda || null,
+                    usd_equivalente: Number(line.usd_equivalente || 0),
+                })),
+                sincronizado_at: new Date().toISOString(),
+            },
+        };
+
+        let lastError: { message?: string } | null = null;
+        for (const estadoDb of ESTADO_DB_CANDIDATES.paid) {
+            const { error } = await admin
+                .from('liquidaciones_mensuales')
+                .upsert(
+                    {
+                        ...payloadBase,
+                        estado: estadoDb,
+                    },
+                    { onConflict: 'personal_id,mes' }
+                );
+
+            if (!error) {
+                lastError = null;
+                break;
+            }
+
+            lastError = error;
+            if (!isEstadoConstraintError(error.message)) break;
+        }
+
+        if (lastError) throw new Error(lastError.message || 'Error al sincronizar liquidación');
+
+        revalidatePath('/admin/liquidaciones');
+        revalidatePath('/caja-admin');
+        revalidatePath('/caja-admin/liquidaciones');
+
+        return { success: true };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Error al sincronizar liquidación',
+        };
+    }
+}
+
 export async function rejectLiquidacion(id: string, motivo?: string): Promise<void> {
     const admin = getAdminClient();
 

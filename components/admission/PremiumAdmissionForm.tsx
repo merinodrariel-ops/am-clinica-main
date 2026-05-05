@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { useAdmissionTriggers } from '@/hooks/useAdmissionTriggers';
 import { submitAdmissionAction, upsertAdmissionLeadAction, checkAdmissionIdentityAction } from '@/app/actions/admission';
 import { ADMISSION_BOOKING_PATHS } from '@/lib/admission-booking-links';
+import { getLocalISODate } from '@/lib/local-date';
 
 
 // --- Types ---
@@ -122,6 +123,38 @@ const slideInBlur = {
     })
 };
 
+type InputFieldProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'> & {
+    icon: React.ComponentType<{ className?: string }>;
+    type: React.HTMLInputTypeAttribute;
+    placeholder: string;
+    value: string;
+    onChange: React.ChangeEventHandler<HTMLInputElement>;
+    onBlur?: React.FocusEventHandler<HTMLInputElement>;
+    error?: string;
+    touched?: boolean;
+    submitAttempted?: boolean;
+};
+
+function isValidDateOnly(value: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function calculateAgeFromDateOnly(value: string): number | null {
+    if (!isValidDateOnly(value)) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    const birth = new Date(year, month - 1, day);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age;
+}
+
 const InputField = ({
     icon: Icon,
     type,
@@ -133,7 +166,7 @@ const InputField = ({
     touched,
     submitAttempted,
     ...props
-}: any) => {
+}: InputFieldProps) => {
     // Only show errors when:
     // 1. User clicked "Next" (submitAttempted) — shows all errors including 'required'
     // 2. Field was blurred AND has content — shows format/length errors only
@@ -424,6 +457,13 @@ export default function PremiumAdmissionForm() {
         else if (cuitDigits.length !== 11) errors.cuit = 'CUIT/CUIL debe tener 11 dígitos';
 
         if (!formData.dob) errors.dob = 'Selecciona tu fecha de nacimiento';
+        else if (!isValidDateOnly(formData.dob)) errors.dob = 'Fecha de nacimiento inválida';
+        else {
+            const age = calculateAgeFromDateOnly(formData.dob);
+            if (age === null) errors.dob = 'Fecha de nacimiento inválida';
+            else if (age < 0) errors.dob = 'La fecha no puede ser futura';
+            else if (age > 120) errors.dob = 'Revisá el año de nacimiento';
+        }
 
         if (!formData.city?.trim()) errors.city = 'Ingresa tu ciudad';
         if (!formData.neighborhood?.trim()) errors.neighborhood = 'Ingresa tu barrio o zona';
@@ -514,7 +554,7 @@ export default function PremiumAdmissionForm() {
                             type="text"
                             placeholder="Nombre"
                             value={formData.firstName}
-                            onChange={(e: any) => updateData({ firstName: e.target.value })}
+                            onChange={(e) => updateData({ firstName: e.target.value })}
                             onBlur={() => handleBlur('firstName')}
                             error={errors.firstName}
                             touched={touched.firstName}
@@ -525,7 +565,7 @@ export default function PremiumAdmissionForm() {
                             type="text"
                             placeholder="Apellido"
                             value={formData.lastName}
-                            onChange={(e: any) => updateData({ lastName: e.target.value })}
+                            onChange={(e) => updateData({ lastName: e.target.value })}
                             onBlur={() => handleBlur('lastName')}
                             error={errors.lastName}
                             touched={touched.lastName}
@@ -539,7 +579,7 @@ export default function PremiumAdmissionForm() {
                             type="text"
                             placeholder="DNI / Pasaporte"
                             value={formData.dni}
-                            onChange={(e: any) => updateData({ dni: e.target.value })}
+                            onChange={(e) => updateData({ dni: e.target.value })}
                             onBlur={async () => {
                                 handleBlur('dni');
                                 await runIdentityCheck(true);
@@ -553,11 +593,13 @@ export default function PremiumAdmissionForm() {
                             type="date"
                             placeholder="Fecha de Nacimiento"
                             value={formData.dob}
-                            onChange={(e: any) => updateData({ dob: e.target.value })}
+                            onChange={(e) => updateData({ dob: e.target.value })}
                             onBlur={() => handleBlur('dob')}
                             error={errors.dob}
                             touched={touched.dob}
                             submitAttempted={submitAttempted}
+                            max={getLocalISODate()}
+                            min="1900-01-01"
                         />
                     </div>
 
@@ -566,7 +608,7 @@ export default function PremiumAdmissionForm() {
                         type="text"
                         placeholder="CUIT / CUIL (ej: 20-12345678-9)"
                         value={formData.cuit}
-                        onChange={(e: any) => {
+                        onChange={(e) => {
                             // Auto-format: strip non-digits then insert dashes at positions 2 and 10
                             const raw = e.target.value.replace(/\D/g, '').slice(0, 11);
                             const formatted = raw.length <= 2 ? raw
@@ -586,7 +628,7 @@ export default function PremiumAdmissionForm() {
                             type="text"
                             placeholder="Ciudad"
                             value={formData.city}
-                            onChange={(e: any) => updateData({ city: e.target.value })}
+                            onChange={(e) => updateData({ city: e.target.value })}
                             onBlur={() => handleBlur('city')}
                             error={errors.city}
                             touched={touched.city}
@@ -597,7 +639,7 @@ export default function PremiumAdmissionForm() {
                             type="text"
                             placeholder="Barrio / Zona"
                             value={formData.neighborhood}
-                            onChange={(e: any) => updateData({ neighborhood: e.target.value })}
+                            onChange={(e) => updateData({ neighborhood: e.target.value })}
                             onBlur={() => handleBlur('neighborhood')}
                             error={errors.neighborhood}
                             touched={touched.neighborhood}
@@ -611,7 +653,7 @@ export default function PremiumAdmissionForm() {
                             type="email"
                             placeholder="Correo Electrónico"
                             value={formData.email}
-                            onChange={(e: any) => updateData({ email: e.target.value })}
+                            onChange={(e) => updateData({ email: e.target.value })}
                             onBlur={async () => {
                                 handleBlur('email');
                                 await runIdentityCheck(true);
@@ -819,7 +861,7 @@ export default function PremiumAdmissionForm() {
                                         type="text"
                                         placeholder="¿Qué medicación tomas? (Obligatorio)"
                                         value={formData.medications}
-                                        onChange={(e: any) => updateData({ medications: e.target.value })}
+                                        onChange={(e) => updateData({ medications: e.target.value })}
                                         onBlur={() => handleBlur('medications')}
                                         error={errors.medications}
                                         touched={touched.medications}
@@ -835,7 +877,7 @@ export default function PremiumAdmissionForm() {
                         type="text"
                         placeholder="¿Tienes alguna alergia? (ej. Penicilina, Anestesia)"
                         value={formData.allergies}
-                        onChange={(e: any) => updateData({ allergies: e.target.value })}
+                        onChange={(e) => updateData({ allergies: e.target.value })}
                         onBlur={() => handleBlur('allergies')}
                         error={errors.allergies}
                         touched={touched.allergies}

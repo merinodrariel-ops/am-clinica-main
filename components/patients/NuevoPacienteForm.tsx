@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { upsertPatientAction } from '@/app/actions/patients';
+import { formatDateForLocale } from '@/lib/local-date';
 
 interface NuevoPacienteFormProps {
     isOpen: boolean;
@@ -478,7 +479,7 @@ export default function NuevoPacienteForm({ isOpen, onClose, onSuccess }: NuevoP
                                 {form.fecha_nacimiento && (
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Fecha nacimiento:</span>
-                                        <span className="font-medium">{new Date(form.fecha_nacimiento).toLocaleDateString('es-AR')}</span>
+                                        <span className="font-medium">{formatDateForLocale(form.fecha_nacimiento)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between">

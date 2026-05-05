@@ -495,7 +495,14 @@ export async function logEmail(
 
 export function calculateAge(fechaNacimiento: string | null | undefined): number | null {
     if (!fechaNacimiento) return null;
-    const birth = new Date(fechaNacimiento);
+    const birth = /^\d{4}-\d{2}-\d{2}$/.test(fechaNacimiento)
+        ? new Date(
+            Number(fechaNacimiento.slice(0, 4)),
+            Number(fechaNacimiento.slice(5, 7)) - 1,
+            Number(fechaNacimiento.slice(8, 10))
+        )
+        : new Date(fechaNacimiento);
+    if (Number.isNaN(birth.getTime())) return null;
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();

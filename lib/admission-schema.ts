@@ -163,7 +163,7 @@ export const admissionSubmissionSchema = z.object({
     motivo_consulta: optionalText,
     referencia_origen: optionalText,
     referencia_recomendado_por: optionalText,
-    fecha_nacimiento: z.string().optional(),
+    fecha_nacimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha de nacimiento inválida').optional(),
     health_alerts: z.array(z.string()).default([]),
     health_notes: optionalText,
     mode: admissionModeSchema,

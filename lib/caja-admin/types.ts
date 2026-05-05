@@ -123,6 +123,7 @@ export interface Personal {
     email?: string;
     whatsapp?: string;
     documento?: string;
+    fecha_nacimiento?: string | null;
     dni_frente_url?: string;
     dni_dorso_url?: string;
     direccion?: string;
@@ -275,6 +276,7 @@ export interface CreatePersonalInput {
     email?: string;
     whatsapp?: string;
     documento?: string;
+    fecha_nacimiento?: string;
     direccion?: string;
     barrio_localidad?: string;
     condicion_afip?: 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro';

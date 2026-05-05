@@ -40,6 +40,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
+import { formatDateForLocale } from '@/lib/local-date';
 import { updatePatientAction } from '@/app/actions/patients';
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import type { PlanFinanciacion } from '@/lib/financiacion';
@@ -541,7 +542,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             <InfoCard
                                 icon={<Calendar size={18} />}
                                 label="Fecha de Nacimiento"
-                                value={patient.fecha_nacimiento ? new Date(patient.fecha_nacimiento).toLocaleDateString('es-AR') : 'No registrada'}
+                                value={patient.fecha_nacimiento ? formatDateForLocale(patient.fecha_nacimiento) : 'No registrada'}
                             />
                             <InfoCard
                                 icon={<Calendar size={18} />}
