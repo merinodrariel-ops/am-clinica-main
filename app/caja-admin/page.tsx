@@ -143,6 +143,10 @@ function CajaAdminContent() {
         const initialObservedPersonalId = requestedSubTab === 'observados'
             ? (searchParams.get('observado_personal_id') || undefined)
             : undefined;
+        const initialHoursPersonalId = requestedSubTab === 'equipo'
+            ? (searchParams.get('horas_personal_id') || undefined)
+            : undefined;
+        const initialPersonalMes = searchParams.get('observado_mes') || searchParams.get('horas_mes') || undefined;
 
         switch (activeTab) {
             case 'movimientos':
@@ -164,6 +168,8 @@ function CajaAdminContent() {
                         tcBna={tcBna}
                         initialTab={initialSubTab}
                         initialObservedPersonalId={initialObservedPersonalId}
+                        initialHoursPersonalId={initialHoursPersonalId}
+                        initialMes={initialPersonalMes}
                     />
                 );
             case 'reportes':
@@ -183,6 +189,9 @@ function CajaAdminContent() {
         if (tabId !== 'personal') {
             params.delete('subtab');
             params.delete('observado_personal_id');
+            params.delete('observado_mes');
+            params.delete('horas_personal_id');
+            params.delete('horas_mes');
         }
 
         router.replace(`/caja-admin?${params.toString()}`, { scroll: false });

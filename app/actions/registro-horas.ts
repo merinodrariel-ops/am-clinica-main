@@ -203,6 +203,7 @@ export async function editarRegistroHoras(
         .from('registro_horas')
         .update({
             ...input.cambios,
+            estado: 'Resuelto',
             observaciones: `[CORREGIDO] ${input.motivo}`,
         })
         .eq('id', input.registroId);
@@ -210,7 +211,14 @@ export async function editarRegistroHoras(
     if (updateErr) return { success: false, error: updateErr.message };
 
     // Insert audit records for each changed field
-    const auditRows: any[] = [];
+    const auditRows: Array<{
+        registro_id: string;
+        editado_por: string;
+        motivo: string;
+        campo: string;
+        valor_anterior: string | null;
+        valor_nuevo: string;
+    }> = [];
     const campos = ['horas', 'hora_ingreso', 'hora_egreso', 'salida_dia_siguiente', 'fecha'] as const;
 
     for (const campo of campos) {

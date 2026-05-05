@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     X, Plus, Check, Pencil, Trash2, LinkIcon, GripVertical,
-    Search, RefreshCw, CheckCircle2, Banknote, XCircle, Wallet,
+    Search, RefreshCw, CheckCircle2, Banknote, XCircle, Wallet, Download, Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -40,6 +40,24 @@ function formatUSD(n: number) {
 
 function formatARS(n: number) {
     return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+}
+
+function safeFileName(value: string) {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .toLowerCase();
+}
+
+function escapeHtml(value: string) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 const ESTADO_CONFIG: Record<string, { label: string; cls: string }> = {
@@ -390,6 +408,113 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
         } finally { setSaving(false); }
     }
 
+    async function exportPrestacionesExcel() {
+        if (prestaciones.length === 0) return;
+        try {
+            const XLSX = await import('xlsx');
+            const wb = XLSX.utils.book_new();
+            const pendientesUsd = withoutSlides.reduce((s, p) => s + Number(p.monto_honorarios || 0), 0);
+
+            const resumen = [{
+                Prestador: `${row.nombre} ${row.apellido || ''}`.trim(),
+                Mes: mes,
+                EstadoLiquidacion: ESTADO_CONFIG[liq.estado]?.label || liq.estado,
+                TC: Number(liq.tc_liquidacion || 0),
+                PrestacionesTotales: prestaciones.length,
+                PrestacionesValidadas: withSlides.length,
+                PrestacionesPendientes: withoutSlides.length,
+                TotalValidadoUSD: Number(totalUsd.toFixed(2)),
+                TotalValidadoARS: Number(totalArs.toFixed(2)),
+                PendienteUSD: Number(pendientesUsd.toFixed(2)),
+            }];
+
+            const detalle = prestaciones.map(p => ({
+                Fecha: new Date(`${p.fecha_realizacion}T00:00:00`).toLocaleDateString('es-AR'),
+                Paciente: p.paciente_nombre,
+                Prestacion: p.prestacion_nombre,
+                MontoUSD: Number(Number(p.monto_honorarios || 0).toFixed(2)),
+                Estado: p.slides_url ? 'Validada' : 'Pendiente sin slides',
+                Slides: p.slides_url || '',
+            }));
+
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), 'Resumen mensual');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), 'Detalle prestaciones');
+            XLSX.writeFile(wb, `prestaciones_${safeFileName(`${row.nombre}_${row.apellido || ''}`)}_${mes}.xlsx`);
+            toast.success('Excel de prestaciones exportado');
+        } catch {
+            toast.error('No se pudo exportar el Excel');
+        }
+    }
+
+    function exportPrestacionesPdf() {
+        if (prestaciones.length === 0) return;
+
+        const pendientesUsd = withoutSlides.reduce((s, p) => s + Number(p.monto_honorarios || 0), 0);
+        const rowsHtml = prestaciones
+            .map(p => `
+                <tr>
+                    <td>${new Date(`${p.fecha_realizacion}T00:00:00`).toLocaleDateString('es-AR')}</td>
+                    <td>${escapeHtml(p.paciente_nombre)}</td>
+                    <td>${escapeHtml(p.prestacion_nombre)}</td>
+                    <td style="text-align:right;">${Number(p.monto_honorarios || 0).toFixed(2)}</td>
+                    <td>${p.slides_url ? 'Validada' : 'Pendiente sin slides'}</td>
+                </tr>
+            `)
+            .join('');
+
+        const popup = window.open('', '_blank');
+        if (!popup) {
+            toast.error('El navegador bloqueó la ventana de impresión');
+            return;
+        }
+
+        popup.document.write(`
+            <html>
+                <head>
+                    <title>Resumen mensual de prestaciones - ${escapeHtml(row.nombre)} ${escapeHtml(row.apellido || '')}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+                        h1 { margin: 0 0 6px 0; font-size: 20px; }
+                        .meta { margin: 0 0 14px 0; color: #555; font-size: 12px; }
+                        .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0 18px; }
+                        .kpi { border: 1px solid #ddd; padding: 8px; font-size: 11px; }
+                        .kpi strong { display: block; margin-top: 4px; font-size: 14px; }
+                        table { width: 100%; border-collapse: collapse; }
+                        th, td { border: 1px solid #ddd; padding: 6px; font-size: 11px; text-align: left; }
+                        th { background: #f5f5f5; font-weight: 600; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Resumen mensual de prestaciones</h1>
+                    <p class="meta">${escapeHtml(row.nombre)} ${escapeHtml(row.apellido || '')} · ${escapeHtml(mes)} · Estado: ${escapeHtml(ESTADO_CONFIG[liq.estado]?.label || liq.estado)}</p>
+                    <div class="kpis">
+                        <div class="kpi">Prestaciones<strong>${prestaciones.length}</strong></div>
+                        <div class="kpi">Validadas<strong>${withSlides.length}</strong></div>
+                        <div class="kpi">Total validado USD<strong>${totalUsd.toFixed(2)}</strong></div>
+                        <div class="kpi">Total validado ARS<strong>${totalArs.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</strong></div>
+                    </div>
+                    <p class="meta">Pendientes sin slides: ${withoutSlides.length} · USD pendiente no incluido: ${pendientesUsd.toFixed(2)} · TC: ${Number(liq.tc_liquidacion || 0).toLocaleString('es-AR')}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Paciente</th>
+                                <th>Prestación</th>
+                                <th>Monto USD</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </body>
+            </html>
+        `);
+
+        popup.document.close();
+        popup.focus();
+        setTimeout(() => popup.print(), 200);
+    }
+
     const estadoCfg = ESTADO_CONFIG[liq.estado];
 
     return (
@@ -425,6 +550,20 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={exportPrestacionesExcel}
+                            disabled={loading || prestaciones.length === 0}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-slate-700 text-slate-300 hover:text-white disabled:opacity-50 transition-colors"
+                        >
+                            <Download size={14} /> Excel
+                        </button>
+                        <button
+                            onClick={exportPrestacionesPdf}
+                            disabled={loading || prestaciones.length === 0}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-slate-700 text-slate-300 hover:text-white disabled:opacity-50 transition-colors"
+                        >
+                            <Printer size={14} /> PDF
+                        </button>
                         {liq.estado === 'pending' && (
                             <>
                                 <button
@@ -532,7 +671,7 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
                                         <div className="text-center py-12 text-slate-600">
                                             <Wallet size={32} className="mx-auto mb-3 text-slate-700" />
                                             <p className="text-xs text-slate-500">Arrastrá prestaciones desde el catálogo</p>
-                                            <p className="text-xs text-slate-600 mt-1">o usá el botón "Agregar"</p>
+                                            <p className="text-xs text-slate-600 mt-1">o usá el botón Agregar</p>
                                         </div>
                                     )}
                                 </>

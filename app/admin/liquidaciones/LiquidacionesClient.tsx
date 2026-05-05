@@ -2062,13 +2062,13 @@ export default function LiquidacionesPage() {
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${liquidacionesSubtab === 'prosoft' ? 'bg-teal-600 border-teal-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
                     >
                         <FileSpreadsheet size={14} />
-                        Importar ProSoft XML
+                        Importar ProSoft
                     </button>
                 </div>
 
                 {liquidacionesSubtab === 'prosoft' ? (
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <ProsoftImporter />
+                        <ProsoftImporter mes={mes} />
                     </div>
                 ) : <>
 

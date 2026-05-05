@@ -1,9 +1,10 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Check, Plus, RefreshCw, Save, Wallet } from 'lucide-react';
+import { Calendar, Check, FileSpreadsheet, Plus, RefreshCw, Save, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
+import ProsoftImporter from '@/components/portal/ProsoftImporter';
 import {
     createInternalService,
     createProviderServiceRecord,
@@ -22,10 +23,11 @@ import {
     type ServiceRecordListItem,
 } from '@/app/actions/caja-liquidaciones';
 
-type LiquidacionesTabId = 'config' | 'hours' | 'services' | 'close';
+type LiquidacionesTabId = 'config' | 'prosoft' | 'hours' | 'services' | 'close';
 
 const TABS: Array<{ id: LiquidacionesTabId; label: string }> = [
     { id: 'config', label: 'Configuración de Valores' },
+    { id: 'prosoft', label: 'ProSoft' },
     { id: 'hours', label: 'Horas (Limpieza y Staff General)' },
     { id: 'services', label: 'Prestaciones (Odontólogos y Lab)' },
     { id: 'close', label: 'Cierre Mensual' },
@@ -180,6 +182,13 @@ export default function CajaAdminLiquidacionesPage() {
     useEffect(() => {
         loadPageData(mes);
     }, [loadPageData, mes]);
+
+    useEffect(() => {
+        const requestedTab = new URLSearchParams(window.location.search).get('tab');
+        if (requestedTab === 'prosoft') {
+            setActiveTab('prosoft');
+        }
+    }, []);
 
     useEffect(() => {
         if (!newServiceRecord.serviceId) return;
@@ -384,6 +393,21 @@ export default function CajaAdminLiquidacionesPage() {
                                 onChange={(event) => setMes(event.target.value)}
                                 className="bg-transparent border-none outline-none"
                             />
+                        </div>
+                    )}
+
+                    {activeTab === 'prosoft' && (
+                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                                    <FileSpreadsheet className="w-5 h-5 text-teal-300" />
+                                </div>
+                                <div>
+                                    <h2 className="font-semibold text-sm text-slate-100">Importador ProSoft</h2>
+                                    <p className="text-xs text-slate-400">Usá esta pestaña para arrastrar el archivo de horarios exportado desde ProSoft.</p>
+                                </div>
+                            </div>
+                            <ProsoftImporter mes={mes} />
                         </div>
                     )}
 
@@ -708,7 +732,7 @@ export default function CajaAdminLiquidacionesPage() {
                                                 {/* Records list */}
                                                 {providerRecords.length === 0 ? (
                                                     <div className="px-4 py-5 text-center text-xs text-slate-600">
-                                                        Sin prestaciones este mes. Usá "Agregar" para cargar.
+                                                        Sin prestaciones este mes. Usá Agregar para cargar.
                                                     </div>
                                                 ) : (
                                                     <div className="divide-y divide-slate-800/60">

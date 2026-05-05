@@ -22,6 +22,7 @@ import {
     Building2,
     BadgeCheck,
     ChevronDown,
+    Download,
     Trash2,
     MessageCircle,
     Copy,
@@ -80,6 +81,8 @@ interface Props {
     tcBna: number | null;
     initialTab?: MainTab | 'equipo' | 'contratos';
     initialObservedPersonalId?: string;
+    initialHoursPersonalId?: string;
+    initialMes?: string;
 }
 
 type MainTab = 'prestadores' | 'prestaciones' | 'observados' | 'contratos';
@@ -105,7 +108,7 @@ const DEFAULT_PROVIDER_TYPE_OPTIONS: ProviderTypeOption[] = [
     { value: 'laboratorio', label: 'Laboratorio', tipo: 'prestador' },
 ];
 
-export default function PersonalTab({ tcBna, initialTab, initialObservedPersonalId }: Props) {
+export default function PersonalTab({ tcBna, initialTab, initialObservedPersonalId, initialHoursPersonalId, initialMes }: Props) {
     const { categoria: role } = useAuth();
     const [activeTab, setActiveTab] = useState<MainTab>((initialTab === 'equipo' ? 'prestadores' : initialTab) || 'prestadores');
     const [activeProviderCategory, setActiveProviderCategory] = useState<ProviderCategory | 'todos'>('todos');
@@ -130,6 +133,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [deletingPersonalId, setDeletingPersonalId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [mesActual, setMesActual] = useState(() => {
+        if (initialMes && /^\d{4}-\d{2}$/.test(initialMes)) return initialMes;
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     });
@@ -224,6 +228,10 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         modelo_pago: 'horas' | 'prestaciones' | 'mensual';
     }>({ area: '', modelo_pago: 'prestaciones' });
     const [activating, setActivating] = useState(false);
+    const [hoursDashboardPersonal, setHoursDashboardPersonal] = useState<Personal | null>(null);
+    const [hoursDashboardRows, setHoursDashboardRows] = useState<RegistroHoras[]>([]);
+    const [hoursDashboardLoading, setHoursDashboardLoading] = useState(false);
+    const [openedInitialHoursId, setOpenedInitialHoursId] = useState<string | null>(null);
 
     const handleSavePrestacionEdit = async () => {
         if (!editingPrestacion) return;
@@ -309,6 +317,124 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         return isCleaning
             ? Number(hourConfig.cleaningHourValue || 0)
             : Number(hourConfig.staffGeneralHourValue || 0);
+    }
+
+    function mesLabel(ym: string) {
+        const [year, month] = ym.split('-');
+        const monthName = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][Number(month) - 1] || ym;
+        return `${monthName} ${year}`;
+    }
+
+    function isObservedRegistro(reg: RegistroHoras) {
+        return String(reg.estado || '').toLowerCase() === 'observado' && !isResolvedRegistro(reg);
+    }
+
+    function isResolvedRegistro(reg: RegistroHoras) {
+        return String(reg.estado || '').toLowerCase() === 'resuelto' || reg.observaciones?.startsWith('[CORREGIDO]');
+    }
+
+    async function openHoursDashboard(p: Personal) {
+        setHoursDashboardPersonal(p);
+        setHoursDashboardRows([]);
+        setHoursDashboardLoading(true);
+        try {
+            const rows = await getRegistroHoras({ personalId: p.id });
+            setHoursDashboardRows(rows);
+        } finally {
+            setHoursDashboardLoading(false);
+        }
+    }
+
+    function downloadHoursDashboardCsv(p: Personal, rows: RegistroHoras[]) {
+        const headers = ['Prestador', 'Mes', 'Fecha', 'Ingreso', 'Egreso', 'Horas', 'Estado', 'Observaciones'];
+        const csvRows = rows
+            .slice()
+            .sort((a, b) => a.fecha.localeCompare(b.fecha))
+            .map((row) => [
+                `${p.nombre} ${p.apellido || ''}`.trim(),
+                row.fecha.slice(0, 7),
+                row.fecha,
+                row.hora_ingreso || '',
+                row.hora_egreso || '',
+                row.horas,
+                isResolvedRegistro(row) ? 'Resuelto' : row.estado,
+                row.observaciones || '',
+            ]);
+
+        const csv = [
+            headers.join(','),
+            ...csvRows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+        ].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `horas_${p.nombre}_${p.apellido || ''}_${mesActual}.csv`.replace(/\s+/g, '_');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function printHoursDashboard(p: Personal, rows: RegistroHoras[]) {
+        const monthRows = rows
+            .filter((row) => row.fecha.startsWith(mesActual))
+            .sort((a, b) => a.fecha.localeCompare(b.fecha));
+        const total = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
+        const pending = monthRows.filter(isObservedRegistro).length;
+        const resolved = monthRows.filter(isResolvedRegistro).length;
+        const detailRows = monthRows.map((row) => `
+            <tr>
+                <td>${row.fecha}</td>
+                <td>${row.hora_ingreso || '-'}</td>
+                <td>${row.hora_egreso || '-'}</td>
+                <td>${Number(row.horas || 0).toFixed(1)}h</td>
+                <td>${isResolvedRegistro(row) ? 'Resuelto' : row.estado}</td>
+                <td>${row.observaciones || ''}</td>
+            </tr>
+        `).join('');
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Informe de horas - ${p.nombre} ${p.apellido || ''}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; color: #111827; padding: 28px; }
+                        h1 { margin: 0 0 4px; font-size: 22px; }
+                        p { margin: 0; color: #4b5563; }
+                        .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 22px 0; }
+                        .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; }
+                        .value { font-size: 18px; font-weight: 700; color: #0f766e; }
+                        .label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
+                        th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+                        th { background: #f3f4f6; color: #374151; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Informe de horas</h1>
+                    <p>${p.nombre} ${p.apellido || ''} · ${mesLabel(mesActual)}</p>
+                    <div class="cards">
+                        <div class="card"><div class="value">${monthRows.length}</div><div class="label">Días cargados</div></div>
+                        <div class="card"><div class="value">${Math.round(total * 10) / 10}h</div><div class="label">Total horas</div></div>
+                        <div class="card"><div class="value">${pending}</div><div class="label">Pendientes</div></div>
+                        <div class="card"><div class="value">${resolved}</div><div class="label">Corregidos</div></div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>Fecha</th><th>Ingreso</th><th>Egreso</th><th>Horas</th><th>Estado</th><th>Observaciones</th></tr>
+                        </thead>
+                        <tbody>${detailRows || '<tr><td colspan="6">Sin registros para este mes.</td></tr>'}</tbody>
+                    </table>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
     }
 
     function isOdontologoTipo(tipo?: string | null) {
@@ -414,6 +540,24 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         if (!initialTab) return;
         setActiveTab(initialTab === 'equipo' ? 'prestadores' : initialTab);
     }, [initialTab]);
+
+    useEffect(() => {
+        if (initialMes && /^\d{4}-\d{2}$/.test(initialMes)) {
+            setMesActual(initialMes);
+            setPanelMes(initialMes);
+        }
+    }, [initialMes]);
+
+    useEffect(() => {
+        if (!initialHoursPersonalId || loading || openedInitialHoursId === initialHoursPersonalId) return;
+        const provider = personal.find((p) => p.id === initialHoursPersonalId);
+        if (!provider) return;
+
+        setActiveTab('prestadores');
+        setActiveProviderCategory('pago-hora');
+        setOpenedInitialHoursId(initialHoursPersonalId);
+        openHoursDashboard(provider);
+    }, [initialHoursPersonalId, loading, openedInitialHoursId, personal]);
 
     // Auto-calculate hours in form
     useEffect(() => {
@@ -1266,7 +1410,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         Contratos
                     </Button>
                     <a
-                        href="/admin/liquidaciones?tab=prosoft"
+                        href="/caja-admin/liquidaciones?tab=prosoft"
                         className="flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors h-auto text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 dark:hover:text-teal-300 rounded-b-none border-b-2 border-transparent hover:border-teal-400"
                     >
                         <ExternalLink className="w-4 h-4" />
@@ -2515,25 +2659,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             if (mode === 'horas') {
                                                 return (
                                                     <Button
-                                                        onClick={() => {
-                                                            setHorasForm({
-                                                                personal_id: p.id,
-                                                                fecha: new Date().toISOString().split('T')[0],
-                                                                horas: 0,
-                                                                hora_ingreso: '',
-                                                                hora_egreso: '',
-                                                                salida_dia_siguiente: false,
-                                                                observaciones: '',
-                                                            });
-                                                            setShowHorasForm(true);
-                                                        }}
+                                                        onClick={() => openHoursDashboard(p)}
                                                         className="w-full h-auto py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-100 dark:shadow-none hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center gap-1 group border-0"
                                                     >
                                                         <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
                                                             <Clock className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                                            Chequeo de Horas
+                                                            Dashboard de Horas
                                                         </div>
-                                                        <span className="text-[10px] opacity-70 font-medium">Ver / editar horas</span>
+                                                        <span className="text-[10px] opacity-70 font-medium">Informe sincronizado</span>
                                                     </Button>
                                                 );
                                             }
@@ -2562,6 +2695,210 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     </div>
                     </div>
                 )}
+
+            {hoursDashboardPersonal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setHoursDashboardPersonal(null)}>
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-5xl m-4 max-h-[90vh] overflow-y-auto"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {(() => {
+                            const p = hoursDashboardPersonal;
+                            const monthRows = hoursDashboardRows
+                                .filter((row) => row.fecha.startsWith(mesActual))
+                                .sort((a, b) => a.fecha.localeCompare(b.fecha));
+                            const totalMonthHours = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
+                            const pendingMonth = monthRows.filter(isObservedRegistro).length;
+                            const resolvedMonth = monthRows.filter(isResolvedRegistro).length;
+                            const monthlyMap = new Map<string, { mes: string; dias: number; horas: number; pendientes: number; resueltos: number }>();
+
+                            for (const row of hoursDashboardRows) {
+                                const rowMes = row.fecha.slice(0, 7);
+                                const current = monthlyMap.get(rowMes) || { mes: rowMes, dias: 0, horas: 0, pendientes: 0, resueltos: 0 };
+                                current.dias += 1;
+                                current.horas += Number(row.horas || 0);
+                                if (isObservedRegistro(row)) current.pendientes += 1;
+                                if (isResolvedRegistro(row)) current.resueltos += 1;
+                                monthlyMap.set(rowMes, current);
+                            }
+
+                            const monthlyRows = Array.from(monthlyMap.values())
+                                .sort((a, b) => b.mes.localeCompare(a.mes))
+                                .slice(0, 12);
+
+                            return (
+                                <div className="space-y-5">
+                                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-wide text-blue-500 font-semibold">Prestador por hora</p>
+                                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+                                                {p.nombre} {p.apellido}
+                                            </h3>
+                                            <p className="text-sm text-slate-500 mt-1">
+                                                {p.area || p.rol} · {mesLabel(mesActual)}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => downloadHoursDashboardCsv(p, hoursDashboardRows)}
+                                                disabled={hoursDashboardLoading || hoursDashboardRows.length === 0}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-40 transition-colors"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                Descargar CSV
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => printHoursDashboard(p, hoursDashboardRows)}
+                                                disabled={hoursDashboardLoading}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
+                                            >
+                                                <FileText className="w-4 h-4" />
+                                                PDF / imprimir
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setHorasForm({
+                                                        personal_id: p.id,
+                                                        fecha: new Date().toISOString().split('T')[0],
+                                                        horas: 0,
+                                                        hora_ingreso: '',
+                                                        hora_egreso: '',
+                                                        salida_dia_siguiente: false,
+                                                        observaciones: '',
+                                                    });
+                                                    setHoursDashboardPersonal(null);
+                                                    setShowHorasForm(true);
+                                                }}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                Cargar manual
+                                            </button>
+                                            <Button variant="ghost" size="icon" onClick={() => setHoursDashboardPersonal(null)} className="text-slate-400 hover:text-slate-600 h-auto w-auto p-2">
+                                                <X className="w-5 h-5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {hoursDashboardLoading ? (
+                                        <div className="p-12 text-center text-slate-400">
+                                            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+                                            Cargando horarios del prestador...
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                                {[
+                                                    { label: 'Días cargados', value: monthRows.length, color: 'text-blue-500' },
+                                                    { label: 'Horas del mes', value: `${Math.round(totalMonthHours * 10) / 10}h`, color: 'text-teal-500' },
+                                                    { label: 'Pendientes', value: pendingMonth, color: pendingMonth > 0 ? 'text-amber-500' : 'text-slate-400' },
+                                                    { label: 'Corregidos', value: resolvedMonth, color: 'text-emerald-500' },
+                                                ].map((item) => (
+                                                    <div key={item.label} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 text-center">
+                                                        <p className={`text-xl font-bold ${item.color}`}>{item.value}</p>
+                                                        <p className="text-xs text-slate-500 mt-1">{item.label}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {pendingMonth > 0 && (
+                                                <a
+                                                    href={`/caja-admin?tab=personal&subtab=observados&observado_mes=${mesActual}&observado_personal_id=${p.id}`}
+                                                    className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                                                >
+                                                    <span className="inline-flex items-center gap-2 font-medium">
+                                                        <AlertTriangle className="w-4 h-4" />
+                                                        Hay {pendingMonth} fichaje{pendingMonth > 1 ? 's' : ''} pendiente{pendingMonth > 1 ? 's' : ''} de corrección
+                                                    </span>
+                                                    <span className="text-xs font-semibold">Corregir ahora</span>
+                                                </a>
+                                            )}
+
+                                            <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
+                                                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                                    <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">Detalle diario del mes</p>
+                                                    </div>
+                                                    <div className="max-h-80 overflow-y-auto">
+                                                        <table className="w-full text-xs">
+                                                            <thead className="sticky top-0 bg-white dark:bg-slate-900 text-slate-500">
+                                                                <tr className="border-b border-slate-200 dark:border-slate-800">
+                                                                    <th className="px-4 py-2 text-left font-medium">Fecha</th>
+                                                                    <th className="px-3 py-2 text-center font-medium">Horario</th>
+                                                                    <th className="px-3 py-2 text-right font-medium">Horas</th>
+                                                                    <th className="px-3 py-2 text-center font-medium">Estado</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                                {monthRows.length === 0 ? (
+                                                                    <tr>
+                                                                        <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                                                                            Sin horarios para {mesLabel(mesActual)}.
+                                                                        </td>
+                                                                    </tr>
+                                                                ) : monthRows.map((row) => (
+                                                                    <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-200 font-medium">{row.fecha}</td>
+                                                                        <td className="px-3 py-2.5 text-center text-slate-500 font-mono">
+                                                                            {row.hora_ingreso || '??:??'} - {row.hora_egreso || '??:??'}
+                                                                        </td>
+                                                                        <td className="px-3 py-2.5 text-right text-teal-600 dark:text-teal-300 font-semibold">
+                                                                            {Number(row.horas || 0).toFixed(1)}h
+                                                                        </td>
+                                                                        <td className="px-3 py-2.5 text-center">
+                                                                            {isObservedRegistro(row) ? (
+                                                                                <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-medium">Pendiente</span>
+                                                                            ) : isResolvedRegistro(row) ? (
+                                                                                <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-medium">Resuelto</span>
+                                                                            ) : (
+                                                                                <span className="rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 text-[10px] font-medium">OK</span>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+
+                                                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                                    <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">Comparativo mensual</p>
+                                                    </div>
+                                                    <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto">
+                                                        {monthlyRows.length === 0 ? (
+                                                            <p className="px-4 py-8 text-center text-sm text-slate-500">Sin historial de horas.</p>
+                                                        ) : monthlyRows.map((row) => (
+                                                            <div key={row.mes} className="px-4 py-3">
+                                                                <div className="flex items-center justify-between gap-3 mb-1">
+                                                                    <p className="text-sm font-medium text-slate-900 dark:text-white">{mesLabel(row.mes)}</p>
+                                                                    <span className="text-sm font-bold text-teal-600 dark:text-teal-300">{Math.round(row.horas * 10) / 10}h</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between text-xs text-slate-500">
+                                                                    <span>{row.dias} días</span>
+                                                                    <span>
+                                                                        {row.pendientes > 0 ? `${row.pendientes} pendientes` : 'Sin pendientes'}
+                                                                        {row.resueltos > 0 ? ` · ${row.resueltos} corregidos` : ''}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </motion.div>
+                </div>
+            )}
 
             {/* Hours Form — shown when showHorasForm is triggered */}
             {showHorasForm && (

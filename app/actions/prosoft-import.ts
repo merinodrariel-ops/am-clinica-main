@@ -727,7 +727,7 @@ export async function importProsoftData(
 
         for (const reg of fila.registros) {
             const requiereRevision = Boolean(reg.incompleto || reg.requiereRevision);
-            const estado = requiereRevision ? 'observado' : 'pending';
+            const estado = requiereRevision ? 'Observado' : 'Registrado';
             const motivoObservado = requiereRevision ? (reg.motivoObservado || 'Otro') : null;
 
             let observaciones = requiereRevision
@@ -821,7 +821,7 @@ export async function processProsoftRows(
     mesOverride?: string
 ): Promise<ProsoftPreview> {
     const detectedPeriod = extractPeriodFromCsv(csvRows);
-    const mes = mesOverride || detectedPeriod?.mes;
+    const mes = detectedPeriod?.mes || mesOverride;
 
     if (!mes) {
         throw new Error(
@@ -888,7 +888,8 @@ export async function previewProsoftFileSafe(
         if (!file) throw new Error('No se envió ningún archivo');
 
         const buffer = Buffer.from(await file.arrayBuffer());
-        const isCsv = file.name.endsWith('.csv');
+        const lowerName = file.name.toLowerCase();
+        const isCsv = lowerName.endsWith('.csv');
         let csvText = '';
 
         if (isCsv) {
@@ -929,7 +930,7 @@ export async function importProsoftPreviewSafe(
 
             for (const reg of fila.registros) {
                 const requiereRevision = Boolean(reg.incompleto || reg.requiereRevision);
-                const estado = requiereRevision ? 'observado' : 'pending';
+                const estado = requiereRevision ? 'Observado' : 'Registrado';
                 const motivoObservado = requiereRevision ? (reg.motivoObservado || 'Otro') : null;
 
                 let observaciones = requiereRevision
