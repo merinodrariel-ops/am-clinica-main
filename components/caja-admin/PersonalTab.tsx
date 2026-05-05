@@ -97,6 +97,21 @@ function getDateOnlyMonth(value?: string | null): string {
 function compareDateOnlyDesc(a?: string | null, b?: string | null): number {
     return toDateInputValue(b).localeCompare(toDateInputValue(a));
 }
+
+type PrestacionDashboardGroup = {
+    key: string;
+    rows: PrestacionRealizada[];
+    paciente_nombre: string;
+    prestacion_nombre: string;
+    moneda_cobro: 'ARS' | 'USD';
+    cantidad: number;
+    total_honorarios: number;
+    total_valor_cobrado: number;
+    firstDate: string;
+    lastDate: string;
+    estado_pago: string;
+};
+
 type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza' | 'pago-hora' | 'pago-prestacion' | 'mensual';
 
 type ProviderTypeOption = {
@@ -496,6 +511,65 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         }, { ARS: 0, USD: 0 });
     }
 
+    function getPrestacionGroupKey(row: PrestacionRealizada) {
+        return [
+            normalizeText(row.paciente_nombre || 'sin paciente'),
+            normalizeText(row.prestacion_nombre || 'sin prestacion'),
+            row.moneda_cobro || 'ARS',
+        ].join('|');
+    }
+
+    function groupPrestacionesDashboardRows(rows: PrestacionRealizada[]): PrestacionDashboardGroup[] {
+        const groups = new Map<string, PrestacionDashboardGroup>();
+
+        for (const row of rows) {
+            const key = getPrestacionGroupKey(row);
+            const fecha = toDateInputValue(row.fecha_realizacion);
+            const existing = groups.get(key);
+
+            if (!existing) {
+                groups.set(key, {
+                    key,
+                    rows: [row],
+                    paciente_nombre: row.paciente_nombre || 'Sin paciente',
+                    prestacion_nombre: row.prestacion_nombre,
+                    moneda_cobro: row.moneda_cobro || 'ARS',
+                    cantidad: 1,
+                    total_honorarios: getPrestacionHonorario(row),
+                    total_valor_cobrado: Number(row.valor_cobrado || 0),
+                    firstDate: fecha,
+                    lastDate: fecha,
+                    estado_pago: row.estado_pago || '',
+                });
+                continue;
+            }
+
+            existing.rows.push(row);
+            existing.cantidad += 1;
+            existing.total_honorarios += getPrestacionHonorario(row);
+            existing.total_valor_cobrado += Number(row.valor_cobrado || 0);
+            existing.firstDate = existing.firstDate < fecha ? existing.firstDate : fecha;
+            existing.lastDate = existing.lastDate > fecha ? existing.lastDate : fecha;
+            if (existing.estado_pago !== row.estado_pago) existing.estado_pago = 'mixto';
+        }
+
+        return Array.from(groups.values())
+            .map(group => ({
+                ...group,
+                total_honorarios: Math.round(group.total_honorarios * 100) / 100,
+                total_valor_cobrado: Math.round(group.total_valor_cobrado * 100) / 100,
+            }))
+            .sort((a, b) => b.lastDate.localeCompare(a.lastDate) || a.prestacion_nombre.localeCompare(b.prestacion_nombre));
+    }
+
+    function getPrestacionGroupDateLabel(group: PrestacionDashboardGroup) {
+        if (group.firstDate === group.lastDate) {
+            return formatDateForLocale(group.firstDate, 'es-AR', { day: '2-digit', month: '2-digit' });
+        }
+
+        return `${formatDateForLocale(group.firstDate, 'es-AR', { day: '2-digit', month: '2-digit' })} - ${formatDateForLocale(group.lastDate, 'es-AR', { day: '2-digit', month: '2-digit' })}`;
+    }
+
     async function downloadPrestacionesDashboardExcel(p: Personal, rows: PrestacionRealizada[], mes: string) {
         const monthRows = rows
             .filter((row) => getDateOnlyMonth(row.fecha_realizacion) === mes)
@@ -508,6 +582,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
         const XLSX = await import('xlsx');
         const totals = getPrestacionesCurrencyTotals(monthRows);
+        const groupedRows = groupPrestacionesDashboardRows(monthRows);
         const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
 
         const resumenRows = [
@@ -515,11 +590,24 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             { Concepto: 'Area', Valor: p.area || p.rol || '' },
             { Concepto: 'Mes', Valor: mesLabel(mes) },
             { Concepto: 'Prestaciones', Valor: monthRows.length },
+            { Concepto: 'Items resumidos', Valor: groupedRows.length },
             { Concepto: 'Total ARS', Valor: totals.ARS },
             { Concepto: 'Total USD', Valor: totals.USD },
         ];
 
-        const detalleRows = monthRows.map((row) => ({
+        const resumenDetalleRows = groupedRows.map((group) => ({
+            Paciente: group.paciente_nombre,
+            Prestacion: group.prestacion_nombre,
+            Cantidad: group.cantidad,
+            'Primera fecha': group.firstDate,
+            'Ultima fecha': group.lastDate,
+            Moneda: group.moneda_cobro,
+            'Honorarios total': group.total_honorarios,
+            'Valor cobrado total': group.total_valor_cobrado,
+            Estado: group.estado_pago,
+        }));
+
+        const detalleIndividualRows = monthRows.map((row) => ({
             Fecha: toDateInputValue(row.fecha_realizacion),
             Paciente: row.paciente_nombre || '',
             Prestacion: row.prestacion_nombre,
@@ -533,7 +621,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), 'Resumen');
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalleRows), 'Detalle');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenDetalleRows), 'Detalle resumido');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalleIndividualRows), 'Detalle individual');
         XLSX.writeFile(wb, `prestaciones_${sanitizeFilePart(prestador)}_${mes}.xlsx`);
     }
 
@@ -543,15 +632,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             .sort((a, b) => toDateInputValue(a.fecha_realizacion).localeCompare(toDateInputValue(b.fecha_realizacion)));
 
         const totals = getPrestacionesCurrencyTotals(monthRows);
+        const groupedRows = groupPrestacionesDashboardRows(monthRows);
         const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
-        const detailRows = monthRows.map((row) => `
+        const detailRows = groupedRows.map((group) => `
             <tr>
-                <td>${escapeReportHtml(formatDateForLocale(row.fecha_realizacion, 'es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }))}</td>
-                <td>${escapeReportHtml(row.paciente_nombre || '-')}</td>
-                <td>${escapeReportHtml(row.prestacion_nombre)}</td>
-                <td>${escapeReportHtml(row.moneda_cobro || 'ARS')}</td>
-                <td>${getPrestacionHonorario(row).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
-                <td>${escapeReportHtml(row.estado_pago || '')}</td>
+                <td>${escapeReportHtml(getPrestacionGroupDateLabel(group))}</td>
+                <td>${escapeReportHtml(group.paciente_nombre || '-')}</td>
+                <td>${escapeReportHtml(group.prestacion_nombre)}</td>
+                <td>${group.cantidad}</td>
+                <td>${escapeReportHtml(group.moneda_cobro)}</td>
+                <td>${group.total_honorarios.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
+                <td>${escapeReportHtml(group.estado_pago || '')}</td>
             </tr>
         `).join('');
 
@@ -569,14 +660,15 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         body { font-family: Arial, sans-serif; color: #111827; padding: 28px; }
                         h1 { margin: 0 0 4px; font-size: 22px; }
                         p { margin: 0; color: #4b5563; }
-                        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 22px 0; }
+                        .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 22px 0; }
                         .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; }
                         .value { font-size: 18px; font-weight: 700; color: #047857; }
                         .label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
                         table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
                         th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
                         th { background: #f3f4f6; color: #374151; }
-                        td:nth-child(5), th:nth-child(5) { text-align: right; }
+                        td:nth-child(4), th:nth-child(4),
+                        td:nth-child(6), th:nth-child(6) { text-align: right; }
                     </style>
                 </head>
                 <body>
@@ -584,14 +676,15 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     <p>${escapeReportHtml(prestador)} · ${escapeReportHtml(mesLabel(mes))}</p>
                     <div class="cards">
                         <div class="card"><div class="value">${monthRows.length}</div><div class="label">Prestaciones</div></div>
+                        <div class="card"><div class="value">${groupedRows.length}</div><div class="label">Items resumidos</div></div>
                         <div class="card"><div class="value">${totals.ARS.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}</div><div class="label">Total ARS</div></div>
                         <div class="card"><div class="value">USD ${totals.USD.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</div><div class="label">Total USD</div></div>
                     </div>
                     <table>
                         <thead>
-                            <tr><th>Fecha</th><th>Paciente</th><th>Prestación</th><th>Moneda</th><th>Honorarios</th><th>Estado</th></tr>
+                            <tr><th>Fecha</th><th>Paciente</th><th>Prestación</th><th>Cant.</th><th>Moneda</th><th>Honorarios</th><th>Estado</th></tr>
                         </thead>
-                        <tbody>${detailRows || '<tr><td colspan="6">Sin prestaciones para este mes.</td></tr>'}</tbody>
+                        <tbody>${detailRows || '<tr><td colspan="7">Sin prestaciones para este mes.</td></tr>'}</tbody>
                     </table>
                 </body>
             </html>
@@ -2620,6 +2713,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         const filtered = modalPrestaciones
                                             .filter(pr => getDateOnlyMonth(pr.fecha_realizacion) === panelMes)
                                             .sort((a, b) => compareDateOnlyDesc(a.fecha_realizacion, b.fecha_realizacion));
+                                        const grouped = groupPrestacionesDashboardRows(filtered);
                                         return (
                                             <>
                                                 {/* Month tabs */}
@@ -2674,56 +2768,81 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         </div>
                                                     ) : (
                                                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                                            {filtered.map(pr => (
-                                                                <div key={pr.id} className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
+                                                            {grouped.map(group => {
+                                                                const firstRow = group.rows[0];
+                                                                const canEditSingle = group.rows.length === 1;
+                                                                return (
+                                                                <div key={group.key} className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
                                                                     <div className="flex items-start justify-between gap-2">
                                                                         <div className="flex-1 min-w-0">
-                                                                            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{pr.prestacion_nombre}</p>
+                                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{group.prestacion_nombre}</p>
+                                                                                {group.cantidad > 1 && (
+                                                                                    <span className="shrink-0 rounded-full bg-violet-100 dark:bg-violet-900/40 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-300">
+                                                                                        x{group.cantidad}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                             <p className="text-xs text-slate-400 mt-0.5">
-                                                                                {pr.paciente_nombre && <span>{pr.paciente_nombre} · </span>}
-                                                                                {formatDateForLocale(pr.fecha_realizacion, 'es-AR', { day: '2-digit', month: '2-digit' })}
+                                                                                {group.paciente_nombre && <span>{group.paciente_nombre} · </span>}
+                                                                                {getPrestacionGroupDateLabel(group)}
                                                                             </p>
                                                                         </div>
                                                                         <div className="flex items-center gap-2 flex-shrink-0">
                                                                             <div className="text-right">
                                                                                 <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                                                                    {pr.moneda_cobro} {Number(pr.valor_cobrado || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                                                                                    {group.moneda_cobro} {group.total_honorarios.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                                                                                 </p>
-                                                                                {pr.slides_url && (
-                                                                                    <a href={pr.slides_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-500 hover:underline">HC ↗</a>
+                                                                                {group.cantidad > 1 && (
+                                                                                    <p className="text-[10px] text-slate-400">
+                                                                                        {group.total_honorarios / group.cantidad > 0
+                                                                                            ? `${group.moneda_cobro} ${(group.total_honorarios / group.cantidad).toLocaleString('es-AR', { maximumFractionDigits: 0 })} c/u`
+                                                                                            : `${group.cantidad} registros`}
+                                                                                    </p>
+                                                                                )}
+                                                                                {canEditSingle && firstRow.slides_url && (
+                                                                                    <a href={firstRow.slides_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-500 hover:underline">HC ↗</a>
                                                                                 )}
                                                                             </div>
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setEditingPrestacion(pr);
-                                                                                    setEditPrestacionForm({
-                                                                                        prestacion_nombre: pr.prestacion_nombre,
-                                                                                        fecha_realizacion: toDateInputValue(pr.fecha_realizacion),
-                                                                                        paciente_nombre: pr.paciente_nombre || '',
-                                                                                        valor_cobrado: Number(pr.valor_cobrado || 0),
-                                                                                        monto_honorarios: Number(pr.monto_honorarios || pr.valor_cobrado || 0),
-                                                                                        moneda_cobro: pr.moneda_cobro as 'ARS' | 'USD',
-                                                                                        slides_url: pr.slides_url || '',
-                                                                                        notas: pr.notas || '',
-                                                                                    });
-                                                                                }}
-                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
-                                                                                title="Editar"
-                                                                            >
-                                                                                <Pencil className="w-3.5 h-3.5" />
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => void handleDeletePrestacion(pr.id, pr.prestacion_nombre)}
-                                                                                disabled={confirmDeletePrestacionId === pr.id}
-                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-50"
-                                                                                title="Eliminar"
-                                                                            >
-                                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                                            </button>
+                                                                            {canEditSingle ? (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setEditingPrestacion(firstRow);
+                                                                                            setEditPrestacionForm({
+                                                                                                prestacion_nombre: firstRow.prestacion_nombre,
+                                                                                                fecha_realizacion: toDateInputValue(firstRow.fecha_realizacion),
+                                                                                                paciente_nombre: firstRow.paciente_nombre || '',
+                                                                                                valor_cobrado: Number(firstRow.valor_cobrado || 0),
+                                                                                                monto_honorarios: Number(firstRow.monto_honorarios || firstRow.valor_cobrado || 0),
+                                                                                                moneda_cobro: firstRow.moneda_cobro as 'ARS' | 'USD',
+                                                                                                slides_url: firstRow.slides_url || '',
+                                                                                                notas: firstRow.notas || '',
+                                                                                            });
+                                                                                        }}
+                                                                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
+                                                                                        title="Editar"
+                                                                                    >
+                                                                                        <Pencil className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => void handleDeletePrestacion(firstRow.id, firstRow.prestacion_nombre)}
+                                                                                        disabled={confirmDeletePrestacionId === firstRow.id}
+                                                                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-50"
+                                                                                        title="Eliminar"
+                                                                                    >
+                                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                </>
+                                                                            ) : (
+                                                                                <span className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] font-medium text-slate-400">
+                                                                                    Resumido
+                                                                                </span>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            ))}
+                                                            )})}
                                                         </div>
                                                     )}
                                                 </div>
@@ -2731,10 +2850,10 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 {filtered.length > 0 && (() => {
                                                     const totalARS = filtered
                                                         .filter(pr => (pr.moneda_cobro || 'ARS') === 'ARS')
-                                                        .reduce((s, pr) => s + Number(pr.valor_cobrado || 0), 0);
+                                                        .reduce((s, pr) => s + getPrestacionHonorario(pr), 0);
                                                     const totalUSD = filtered
                                                         .filter(pr => pr.moneda_cobro === 'USD')
-                                                        .reduce((s, pr) => s + Number(pr.valor_cobrado || 0), 0);
+                                                        .reduce((s, pr) => s + getPrestacionHonorario(pr), 0);
                                                     const hasBoth = totalARS > 0 && totalUSD > 0;
                                                     return (
                                                         <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
