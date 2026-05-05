@@ -574,6 +574,16 @@ function HorasDetalleModal({
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), 'Detalle diario');
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), 'Resumen semanal');
 
+            const totalArs = totalHoras * worker.valor_hora_ars;
+            const finalSummary = [
+                { 'Nombre': `${worker.nombre} ${worker.apellido || ''}`.trim() },
+                { 'Mes': mes },
+                { 'Valor Hora': worker.valor_hora_ars },
+                { 'Total Horas': Number(totalHoras.toFixed(2)) },
+                { 'Total a Liquidar': Number(totalArs.toFixed(2)) },
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(finalSummary), 'Liquidación');
+
             const file = `horarios_${safeFileName(`${worker.nombre}_${worker.apellido || ''}`)}_${mes}.xlsx`;
             XLSX.writeFile(wb, file);
             toast.success('Excel exportado');
@@ -676,6 +686,11 @@ function HorasDetalleModal({
                         </thead>
                         <tbody>${detalleHtml}</tbody>
                     </table>
+                    <div style="margin-top: 24px; padding-top: 12px; border-top: 2px solid #333;">
+                        <p style="font-size: 14px; margin: 4px 0;"><strong>Total de Horas:</strong> ${totalHoras.toFixed(2)}</p>
+                        <p style="font-size: 14px; margin: 4px 0;"><strong>Valor Hora:</strong> ${formatARS(worker.valor_hora_ars)}</p>
+                        <p style="font-size: 18px; margin: 8px 0; color: #10b981;"><strong>Total a Liquidar:</strong> ${formatARS(totalHoras * worker.valor_hora_ars)}</p>
+                    </div>
                 </body>
             </html>
         `);
@@ -722,6 +737,9 @@ function HorasDetalleModal({
                         <span className="px-2.5 py-1 rounded-full border border-slate-700 text-slate-300">{totalDias} días</span>
                         <span className="px-2.5 py-1 rounded-full border border-violet-500/30 text-violet-300 font-medium">
                             {totalHoras.toLocaleString('es-AR', { maximumFractionDigits: 2 })} h totales
+                        </span>
+                        <span className="px-2.5 py-1 rounded-full border border-emerald-500/30 text-emerald-300 font-medium">
+                            {formatARS(totalHoras * worker.valor_hora_ars)} a liquidar
                         </span>
                         <span className="px-2.5 py-1 rounded-full border border-slate-700 text-slate-300 inline-flex items-center gap-1">
                             <CalendarDays size={12} /> {weeklyRows.length} semanas
