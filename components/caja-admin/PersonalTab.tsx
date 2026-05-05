@@ -77,6 +77,7 @@ import { registrarMensualidadFija } from '@/app/actions/liquidaciones';
 import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
 import { eliminarPrestacion, updatePrestacionRealizada } from '@/app/actions/prestaciones';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatDateForLocale, getLocalISODate, toDateInputValue } from '@/lib/local-date';
 
 interface Props {
     sucursal: Sucursal;
@@ -88,6 +89,14 @@ interface Props {
 }
 
 type MainTab = 'prestadores' | 'prestaciones' | 'observados' | 'contratos';
+
+function getDateOnlyMonth(value?: string | null): string {
+    return toDateInputValue(value).slice(0, 7);
+}
+
+function compareDateOnlyDesc(a?: string | null, b?: string | null): number {
+    return toDateInputValue(b).localeCompare(toDateInputValue(a));
+}
 type ProviderCategory = 'odontologos' | 'lab' | 'staff-general' | 'limpieza' | 'pago-hora' | 'pago-prestacion' | 'mensual';
 
 type ProviderTypeOption = {
@@ -153,7 +162,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         prestacion_id: '',
         prestacion_nombre_manual: '',
         paciente_nombre: '',
-        fecha_realizacion: new Date().toISOString().split('T')[0],
+        fecha_realizacion: getLocalISODate(),
         slides_url: '',
         valor_cobrado: 0,
         moneda: 'ARS' as 'ARS' | 'USD',
@@ -197,6 +206,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         barrio_localidad: '',
         condicion_afip: undefined,
         valor_hora_ars: 0,
+        horas_base: null as number | null,
+        costo_hora_extra: null as number | null,
         descripcion: '',
         poliza_url: '',
         modelo_pago: 'horas',
@@ -209,7 +220,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     // Hours form state
     const [horasForm, setHorasForm] = useState({
         personal_id: '',
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: getLocalISODate(),
         horas: 0,
         hora_ingreso: '',
         hora_egreso: '',
@@ -243,7 +254,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         mes: mesActual,
         monto: 0,
         moneda: 'USD' as 'ARS' | 'USD',
-        fechaPago: new Date().toISOString().split('T')[0],
+        fechaPago: getLocalISODate(),
         observaciones: '',
     });
 
@@ -254,11 +265,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const handleSavePrestacionEdit = async () => {
         if (!editingPrestacion) return;
         setSavingPrestacion(true);
-        const [fy, fm, fd] = editPrestacionForm.fecha_realizacion.split('-').map(Number);
-        const fechaLocal = new Date(fy, fm - 1, fd, 12, 0, 0).toISOString();
         const res = await updatePrestacionRealizada(editingPrestacion.id, {
             prestacion_nombre: editPrestacionForm.prestacion_nombre,
-            fecha_realizacion: fechaLocal,
+            fecha_realizacion: editPrestacionForm.fecha_realizacion,
             paciente_nombre: editPrestacionForm.paciente_nombre,
             valor_cobrado: editPrestacionForm.valor_cobrado,
             monto_honorarios: editPrestacionForm.monto_honorarios,
@@ -457,6 +466,141 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         printWindow.print();
     }
 
+    function sanitizeFilePart(value: string) {
+        return value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9_-]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .toLowerCase();
+    }
+
+    function escapeReportHtml(value: unknown) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function getPrestacionHonorario(row: PrestacionRealizada) {
+        return Number(row.monto_honorarios || row.valor_cobrado || 0);
+    }
+
+    function getPrestacionesCurrencyTotals(rows: PrestacionRealizada[]) {
+        return rows.reduce<Record<'ARS' | 'USD', number>>((acc, row) => {
+            const currency = row.moneda_cobro === 'USD' ? 'USD' : 'ARS';
+            acc[currency] += getPrestacionHonorario(row);
+            return acc;
+        }, { ARS: 0, USD: 0 });
+    }
+
+    async function downloadPrestacionesDashboardExcel(p: Personal, rows: PrestacionRealizada[], mes: string) {
+        const monthRows = rows
+            .filter((row) => getDateOnlyMonth(row.fecha_realizacion) === mes)
+            .sort((a, b) => compareDateOnlyDesc(a.fecha_realizacion, b.fecha_realizacion));
+
+        if (monthRows.length === 0) {
+            toast.info('No hay prestaciones para descargar en este mes');
+            return;
+        }
+
+        const XLSX = await import('xlsx');
+        const totals = getPrestacionesCurrencyTotals(monthRows);
+        const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
+
+        const resumenRows = [
+            { Concepto: 'Prestador', Valor: prestador },
+            { Concepto: 'Area', Valor: p.area || p.rol || '' },
+            { Concepto: 'Mes', Valor: mesLabel(mes) },
+            { Concepto: 'Prestaciones', Valor: monthRows.length },
+            { Concepto: 'Total ARS', Valor: totals.ARS },
+            { Concepto: 'Total USD', Valor: totals.USD },
+        ];
+
+        const detalleRows = monthRows.map((row) => ({
+            Fecha: toDateInputValue(row.fecha_realizacion),
+            Paciente: row.paciente_nombre || '',
+            Prestacion: row.prestacion_nombre,
+            Moneda: row.moneda_cobro || 'ARS',
+            Honorarios: getPrestacionHonorario(row),
+            'Valor cobrado': Number(row.valor_cobrado || 0),
+            Estado: row.estado_pago || '',
+            'Historia clinica': row.slides_url || '',
+            Notas: row.notas || '',
+        }));
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), 'Resumen');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalleRows), 'Detalle');
+        XLSX.writeFile(wb, `prestaciones_${sanitizeFilePart(prestador)}_${mes}.xlsx`);
+    }
+
+    function printPrestacionesDashboard(p: Personal, rows: PrestacionRealizada[], mes: string) {
+        const monthRows = rows
+            .filter((row) => getDateOnlyMonth(row.fecha_realizacion) === mes)
+            .sort((a, b) => toDateInputValue(a.fecha_realizacion).localeCompare(toDateInputValue(b.fecha_realizacion)));
+
+        const totals = getPrestacionesCurrencyTotals(monthRows);
+        const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
+        const detailRows = monthRows.map((row) => `
+            <tr>
+                <td>${escapeReportHtml(formatDateForLocale(row.fecha_realizacion, 'es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }))}</td>
+                <td>${escapeReportHtml(row.paciente_nombre || '-')}</td>
+                <td>${escapeReportHtml(row.prestacion_nombre)}</td>
+                <td>${escapeReportHtml(row.moneda_cobro || 'ARS')}</td>
+                <td>${getPrestacionHonorario(row).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
+                <td>${escapeReportHtml(row.estado_pago || '')}</td>
+            </tr>
+        `).join('');
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            toast.error('El navegador bloqueó la ventana de impresión');
+            return;
+        }
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Informe de prestaciones - ${escapeReportHtml(prestador)}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; color: #111827; padding: 28px; }
+                        h1 { margin: 0 0 4px; font-size: 22px; }
+                        p { margin: 0; color: #4b5563; }
+                        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 22px 0; }
+                        .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; }
+                        .value { font-size: 18px; font-weight: 700; color: #047857; }
+                        .label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
+                        th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+                        th { background: #f3f4f6; color: #374151; }
+                        td:nth-child(5), th:nth-child(5) { text-align: right; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Informe de prestaciones</h1>
+                    <p>${escapeReportHtml(prestador)} · ${escapeReportHtml(mesLabel(mes))}</p>
+                    <div class="cards">
+                        <div class="card"><div class="value">${monthRows.length}</div><div class="label">Prestaciones</div></div>
+                        <div class="card"><div class="value">${totals.ARS.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}</div><div class="label">Total ARS</div></div>
+                        <div class="card"><div class="value">USD ${totals.USD.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</div><div class="label">Total USD</div></div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>Fecha</th><th>Paciente</th><th>Prestación</th><th>Moneda</th><th>Honorarios</th><th>Estado</th></tr>
+                        </thead>
+                        <tbody>${detailRows || '<tr><td colspan="6">Sin prestaciones para este mes.</td></tr>'}</tbody>
+                    </table>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+    }
+
     function isOdontologoTipo(tipo?: string | null) {
         return tipo === 'odontologo' || tipo === 'profesional';
     }
@@ -606,6 +750,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             barrio_localidad: p.barrio_localidad || '',
             condicion_afip: p.condicion_afip,
             valor_hora_ars: p.valor_hora_ars,
+            horas_base: p.horas_base ?? null,
+            costo_hora_extra: p.costo_hora_extra ?? null,
             descripcion: p.descripcion || '',
             matricula_provincial: p.matricula_provincial || '',
             especialidad: p.especialidad || '',
@@ -701,7 +847,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             paciente_nombre: '',
             prestacion_id: '',
             prestacion_nombre_manual: '',
-            fecha_realizacion: new Date().toISOString().split('T')[0],
+            fecha_realizacion: getLocalISODate(),
             slides_url: '',
             valor_cobrado: 0,
             moneda: 'ARS',
@@ -732,7 +878,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             mes: mesActual,
             monto: amount > 0 ? amount : 250,
             moneda: (p.moneda_mensual || 'USD') as 'ARS' | 'USD',
-            fechaPago: new Date().toISOString().split('T')[0],
+            fechaPago: getLocalISODate(),
             observaciones: '',
         });
     }
@@ -836,7 +982,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             setShowHorasForm(false);
             setHorasForm({
                 personal_id: personal[0]?.id || '',
-                fecha: new Date().toISOString().split('T')[0],
+                fecha: getLocalISODate(),
                 horas: 0,
                 hora_ingreso: '',
                 hora_egreso: '',
@@ -920,16 +1066,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const honorarios = prestacionForm.valor_cobrado;
         const finalPrestacionNombre = prestacion?.nombre || manualName;
 
-        // Parse fecha_realizacion as local date to avoid UTC offset shifting the day
-        const [fy, fm, fd] = prestacionForm.fecha_realizacion.split('-').map(Number);
-        const fechaLocal = new Date(fy, fm - 1, fd, 12, 0, 0).toISOString();
-
         const savePayload = {
             profesional_id: selectedProfesionalId,
             paciente_nombre: prestacionForm.paciente_nombre,
             prestacion_id: hasCatalogSelection ? prestacionForm.prestacion_id : undefined,
             prestacion_nombre: finalPrestacionNombre,
-            fecha_realizacion: fechaLocal,
+            fecha_realizacion: prestacionForm.fecha_realizacion,
             valor_cobrado: prestacionForm.valor_cobrado,
             moneda_cobro: prestacionForm.moneda,
             porcentaje_honorarios: 100,
@@ -970,7 +1112,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 paciente_nombre: '',
                 prestacion_id: '',
                 prestacion_nombre_manual: '',
-                fecha_realizacion: new Date().toISOString().split('T')[0],
+                fecha_realizacion: getLocalISODate(),
                 slides_url: '',
                 valor_cobrado: 0,
                 moneda: 'ARS',
@@ -1303,6 +1445,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 .filter(Boolean)
         )).slice(0, 8)
         : [];
+
+    const selectedPrestacionesPanelRows = modalPrestaciones
+        .filter((pr) => getDateOnlyMonth(pr.fecha_realizacion) === panelMes)
+        .sort((a, b) => compareDateOnlyDesc(a.fecha_realizacion, b.fecha_realizacion));
+    const selectedPrestacionesPanelTotals = getPrestacionesCurrencyTotals(selectedPrestacionesPanelRows);
 
     const providerTypeOptions: ProviderTypeOption[] = (() => {
         const byKey = new Map<string, ProviderTypeOption>();
@@ -2010,6 +2157,45 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 </div>
                                             )}
 
+                                            {formData.modelo_pago === 'horas' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        <Clock className="w-4 h-4 inline mr-1 text-slate-400" />
+                                                        Horas base mensuales
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        step={1}
+                                                        value={formData.horas_base ?? ''}
+                                                        onChange={e => setFormData({ ...formData, horas_base: e.target.value === '' ? null : Number(e.target.value) })}
+                                                        placeholder="Sin límite"
+                                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                    />
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        Dejar vacío si todas las horas se pagan igual.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {formData.modelo_pago === 'horas' && formData.horas_base !== null && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                        <Clock className="w-4 h-4 inline mr-1 text-amber-400" />
+                                                        Valor hora extra (sobre base)
+                                                    </label>
+                                                    <MoneyInput
+                                                        value={formData.costo_hora_extra ?? 0}
+                                                        onChange={(val) => setFormData({ ...formData, costo_hora_extra: val || null })}
+                                                        currency="ARS"
+                                                        className="w-full"
+                                                    />
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        Tarifa para las horas que superen las {formData.horas_base}h base.
+                                                    </p>
+                                                </div>
+                                            )}
+
 
                                             <div className="md:col-span-2">
                                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -2052,7 +2238,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 )}
             </AnimatePresence>
 
-            {/* Registrar Prestacion Modal */}
+            {/* Dashboard de Prestaciones Modal */}
             <AnimatePresence>
                 {showPrestacionForm && (
                     <motion.div
@@ -2070,24 +2256,49 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             onClick={e => e.stopPropagation()}
                         >
                             {/* Header */}
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-                                <div className="flex items-center gap-3">
+                            <div className="flex flex-col gap-3 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="flex items-center gap-3 min-w-0">
                                     <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
                                         <Stethoscope className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg text-slate-900 dark:text-white">Cargar Prestaciones</h3>
+                                    <div className="min-w-0">
+                                        <h3 className="font-bold text-lg text-slate-900 dark:text-white">Dashboard de Prestaciones</h3>
                                         {selectedProfesional && (
-                                            <p className="text-xs text-slate-500">{selectedProfesional.nombre} {selectedProfesional.apellido} · {mesActual}</p>
+                                            <p className="text-xs text-slate-500">
+                                                {selectedProfesional.nombre} {selectedProfesional.apellido} · {mesLabel(panelMes)} · {selectedPrestacionesPanelRows.length} prestaciones
+                                                {selectedPrestacionesPanelTotals.USD > 0 && ` · USD ${selectedPrestacionesPanelTotals.USD.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`}
+                                                {selectedPrestacionesPanelTotals.ARS > 0 && ` · ${selectedPrestacionesPanelTotals.ARS.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}`}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setShowPrestacionForm(false)}
-                                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => selectedProfesional && void downloadPrestacionesDashboardExcel(selectedProfesional, modalPrestaciones, panelMes)}
+                                        disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        Descargar Excel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => selectedProfesional && printPrestacionesDashboard(selectedProfesional, modalPrestaciones, panelMes)}
+                                        disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        PDF / imprimir
+                                    </button>
+                                    <button
+                                        onClick={() => setShowPrestacionForm(false)}
+                                        className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                        aria-label="Cerrar"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Two-panel body */}
@@ -2403,12 +2614,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 <div className="hidden md:flex flex-col w-1/2">
                                     {(() => {
                                         const allMonths = Array.from(new Set(
-                                            modalPrestaciones.map(pr => new Date(pr.fecha_realizacion).toISOString().slice(0, 7))
+                                            modalPrestaciones.map(pr => getDateOnlyMonth(pr.fecha_realizacion))
                                         )).sort((a, b) => b.localeCompare(a));
                                         if (!allMonths.includes(mesActual)) allMonths.unshift(mesActual);
                                         const filtered = modalPrestaciones
-                                            .filter(pr => new Date(pr.fecha_realizacion).toISOString().slice(0, 7) === panelMes)
-                                            .sort((a, b) => new Date(b.fecha_realizacion).getTime() - new Date(a.fecha_realizacion).getTime());
+                                            .filter(pr => getDateOnlyMonth(pr.fecha_realizacion) === panelMes)
+                                            .sort((a, b) => compareDateOnlyDesc(a.fecha_realizacion, b.fecha_realizacion));
                                         return (
                                             <>
                                                 {/* Month tabs */}
@@ -2417,7 +2628,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         {allMonths.map(m => {
                                                             const [y, mo] = m.split('-');
                                                             const label = new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
-                                                            const count = modalPrestaciones.filter(pr => new Date(pr.fecha_realizacion).toISOString().slice(0, 7) === m).length;
+                                                            const count = modalPrestaciones.filter(pr => getDateOnlyMonth(pr.fecha_realizacion) === m).length;
                                                             return (
                                                                 <button
                                                                     key={m}
@@ -2431,6 +2642,26 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                 </button>
                                                             );
                                                         })}
+                                                    </div>
+                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => selectedProfesional && void downloadPrestacionesDashboardExcel(selectedProfesional, modalPrestaciones, panelMes)}
+                                                            disabled={!selectedProfesional || filtered.length === 0}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                                                        >
+                                                            <Download className="w-3.5 h-3.5" />
+                                                            Descargar Excel
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => selectedProfesional && printPrestacionesDashboard(selectedProfesional, modalPrestaciones, panelMes)}
+                                                            disabled={!selectedProfesional || filtered.length === 0}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
+                                                        >
+                                                            <FileText className="w-3.5 h-3.5" />
+                                                            PDF / imprimir
+                                                        </button>
                                                     </div>
                                                 </div>
                                                 {/* List */}
@@ -2450,7 +2681,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                             <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{pr.prestacion_nombre}</p>
                                                                             <p className="text-xs text-slate-400 mt-0.5">
                                                                                 {pr.paciente_nombre && <span>{pr.paciente_nombre} · </span>}
-                                                                                {new Date(pr.fecha_realizacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                                                                {formatDateForLocale(pr.fecha_realizacion, 'es-AR', { day: '2-digit', month: '2-digit' })}
                                                                             </p>
                                                                         </div>
                                                                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -2464,14 +2695,10 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                             </div>
                                                                             <button
                                                                                 onClick={() => {
-                                                                                    const fecha = new Date(pr.fecha_realizacion);
-                                                                                    const y = fecha.getFullYear();
-                                                                                    const m = String(fecha.getMonth() + 1).padStart(2, '0');
-                                                                                    const d = String(fecha.getDate()).padStart(2, '0');
                                                                                     setEditingPrestacion(pr);
                                                                                     setEditPrestacionForm({
                                                                                         prestacion_nombre: pr.prestacion_nombre,
-                                                                                        fecha_realizacion: `${y}-${m}-${d}`,
+                                                                                        fecha_realizacion: toDateInputValue(pr.fecha_realizacion),
                                                                                         paciente_nombre: pr.paciente_nombre || '',
                                                                                         valor_cobrado: Number(pr.valor_cobrado || 0),
                                                                                         monto_honorarios: Number(pr.monto_honorarios || pr.valor_cobrado || 0),
@@ -2720,9 +2947,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     >
                                                         <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
                                                             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                                                            Cargar Prestaciones
+                                                            Dashboard de Prestaciones
                                                         </div>
-                                                        <span className="text-[10px] opacity-70 font-medium">Pago por procedimiento</span>
+                                                        <span className="text-[10px] opacity-70 font-medium">Cargar, revisar y descargar informe</span>
                                                     </Button>
                                                 );
                                             }
@@ -2967,7 +3194,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 onClick={() => {
                                                     setHorasForm({
                                                         personal_id: p.id,
-                                                        fecha: new Date().toISOString().split('T')[0],
+                                                        fecha: getLocalISODate(),
                                                         horas: 0,
                                                         hora_ingreso: '',
                                                         hora_egreso: '',
@@ -3500,7 +3727,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 <div>
                                     <h2 className="text-xl font-bold text-slate-800 dark:text-white">Editar Registro de Horas</h2>
                                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                        Modificando registro del {new Date(horasEditForm.fecha).toLocaleDateString('es-AR')}
+                                        Modificando registro del {formatDateForLocale(horasEditForm.fecha)}
                                     </p>
                                 </div>
                                 <button

@@ -364,6 +364,51 @@ function normalizeRepeatedMarksAsValid(reg: ProsoftRow['registros'][number]): Pr
     };
 }
 
+// When multiple ProSoft employees share the same personal_id (e.g. cleaning group
+// mapped to "Limpieza Horas Totales"), merge their registros by date, summing hours.
+function aggregateSharedPersonalIds(filas: ProsoftRow[]): ProsoftRow[] {
+    const grouped = new Map<string, ProsoftRow>();
+    const unmatched: ProsoftRow[] = [];
+
+    for (const fila of filas) {
+        if (!fila.personalId) {
+            unmatched.push(fila);
+            continue;
+        }
+
+        const existing = grouped.get(fila.personalId);
+        if (!existing) {
+            grouped.set(fila.personalId, {
+                ...fila,
+                registros: fila.registros.map(r => ({ ...r })),
+            });
+            continue;
+        }
+
+        // Merge this fila's registros into the existing one
+        for (const reg of fila.registros) {
+            const match = existing.registros.find(r => r.fecha === reg.fecha);
+            if (match) {
+                match.horas = Math.round((match.horas + reg.horas) * 100) / 100;
+                const note = `+${reg.horas}h (${fila.rawName})`;
+                match.observaciones = match.observaciones
+                    ? `${match.observaciones} | ${note}`
+                    : note;
+            } else {
+                existing.registros.push({
+                    ...reg,
+                    observaciones: reg.observaciones
+                        ? `${reg.observaciones} (${fila.rawName})`
+                        : `${reg.horas}h (${fila.rawName})`,
+                });
+            }
+        }
+        existing.rawName = `${existing.rawName} + ${fila.rawName}`;
+    }
+
+    return [...grouped.values(), ...unmatched];
+}
+
 function normalizePreviewRows(preview: ProsoftPreview): ProsoftPreview {
     return {
         ...preview,
@@ -520,25 +565,24 @@ function parseIsoDate(dateIso: string): { year: number; month: number; day: numb
     };
 }
 
-function buildDayToDateMap(period: { desde: string; hasta: string } | null): Map<number, string> {
-    const map = new Map<number, string>();
-    if (!period) return map;
+function getPeriodDates(period: { desde: string; hasta: string } | null): string[] {
+    if (!period) return [];
 
     const desde = parseIsoDate(period.desde);
     const hasta = parseIsoDate(period.hasta);
-    if (!desde || !hasta) return map;
+    if (!desde || !hasta) return [];
 
+    const dates: string[] = [];
     let cursor = Date.UTC(desde.year, desde.month - 1, desde.day);
     const end = Date.UTC(hasta.year, hasta.month - 1, hasta.day);
 
     while (cursor <= end) {
         const d = new Date(cursor);
-        const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-        map.set(d.getUTCDate(), iso);
+        dates.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`);
         cursor += 24 * 60 * 60 * 1000;
     }
 
-    return map;
+    return dates;
 }
 
 function extractPeriodFromCsv(rows: string[][]): { desde: string; hasta: string; mes: string } | null {
@@ -601,8 +645,8 @@ async function fetchCsvWithFallback(csvUrls: string[]): Promise<string[][]> {
 
 // ─── Parse Matrix ─────────────────────────────────────────────────────────────
 
-function parseProsoftMatrix(rows: string[][]): {
-    employeeRows: { rawName: string; timeCells: Record<number, string> }[];
+function parseProsoftMatrix(rows: string[][], period: { desde: string; hasta: string } | null = null): {
+    employeeRows: { rawName: string; timeCells: Record<string, string> }[];
     dayColumns: Record<number, number>; // colIndex → day number (1-31)
 } {
     // Find the header row: the row with the most day-number columns (1–31).
@@ -649,12 +693,28 @@ function parseProsoftMatrix(rows: string[][]): {
         );
     }
 
-    const validDays = dayColumns;
+    const periodDates = getPeriodDates(period);
+    const sortedDayCols = Object.keys(dayColumns).map(Number).sort((a, b) => a - b);
+
+    // Build col → ISO date mapping.
+    // When the period is known, map columns LEFT-TO-RIGHT against the period dates
+    // (ProSoft exports days as consecutive columns; header numbers can be unreliable
+    // due to weird Excel formatting, 0-indexed headers, or off-by-one shifts).
+    const colToDate = new Map<number, string>();
+    if (periodDates.length > 0) {
+        const usedCols = sortedDayCols.slice(0, periodDates.length);
+        usedCols.forEach((col, index) => colToDate.set(col, periodDates[index]));
+    } else {
+        // No period detected: fall back to header day numbers as string keys
+        for (const [colStr, day] of Object.entries(dayColumns)) {
+            colToDate.set(parseInt(colStr), String(day));
+        }
+    }
 
     // Detect name column: the non-day column (among first 3 cols) with the most
     // alphabetic content in the data rows. Handles Prosoft layouts where col 0
     // is a row-index number and col 1 is the actual employee name.
-    const dayColSet = new Set(Object.keys(validDays).map(Number));
+    const dayColSet = new Set(colToDate.keys());
     const candidateCols = [0, 1, 2].filter(c => !dayColSet.has(c));
     let nameColIdx = 0;
     let bestAlpha = -1;
@@ -669,7 +729,7 @@ function parseProsoftMatrix(rows: string[][]): {
 
     // Employee rows: every row after the header with a non-empty name column
     // and at least one time cell
-    const employeeRows: { rawName: string; timeCells: Record<number, string> }[] = [];
+    const employeeRows: { rawName: string; timeCells: Record<string, string> }[] = [];
 
     for (let r = headerRowIdx + 1; r < rows.length; r++) {
         const row = rows[r];
@@ -679,14 +739,13 @@ function parseProsoftMatrix(rows: string[][]): {
         if (/total|resumen|horas|promedio/i.test(rawName)) continue;
         if (/^\d+$/.test(rawName)) continue;
 
-        const timeCells: Record<number, string> = {};
+        const timeCells: Record<string, string> = {};
         let hasAny = false;
 
-        for (const [colStr, day] of Object.entries(validDays)) {
-            const col = parseInt(colStr);
+        for (const [col, dateKey] of colToDate) {
             const cell = (row[col] || '').trim();
             if (cell) {
-                timeCells[day] = cell;
+                timeCells[dateKey] = cell;
                 hasAny = true;
             }
         }
@@ -696,7 +755,7 @@ function parseProsoftMatrix(rows: string[][]): {
         }
     }
 
-    return { employeeRows, dayColumns: validDays as Record<number, number> };
+    return { employeeRows, dayColumns };
 }
 
 // ─── Match employees ──────────────────────────────────────────────────────────
@@ -893,12 +952,13 @@ export async function importProsoftData(
             }
 
             // Check if record already exists (dedup by personal_id + fecha)
-            const { data: existing } = await admin
+            const { data: existingRows } = await admin
                 .from('registro_horas')
                 .select('id, horas, estado')
                 .eq('personal_id', fila.personalId)
                 .eq('fecha', reg.fecha)
-                .maybeSingle();
+                .limit(1);
+            const existing = existingRows?.[0] ?? null;
 
             if (existing) {
                 // Skip if the existing record has real hours (could be manually corrected)
@@ -984,10 +1044,9 @@ export async function processProsoftRows(
         );
     }
 
-    const { employeeRows } = parseProsoftMatrix(csvRows);
+    const { employeeRows } = parseProsoftMatrix(csvRows, detectedPeriod);
 
     const [year, month] = mes.split('-').map(Number);
-    const dayToDateMap = buildDayToDateMap(detectedPeriod);
 
     const rawNames = employeeRows.map(r => r.rawName);
     const matchMap = await matchEmployees(rawNames);
@@ -1000,11 +1059,14 @@ export async function processProsoftRows(
         if (!match) sinMatch.push(emp.rawName);
 
         const registrosPromises = Object.entries(emp.timeCells)
-            .map(async ([dayStr, cell]) => {
-                const dia = parseInt(dayStr);
+            .map(async ([key, cell]) => {
                 const parsed = await parseTimeCell(cell);
                 if (!parsed) return null;
-                const fecha = dayToDateMap.get(dia) || `${year}-${String(month).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                // key is an ISO date when period is detected, or a day number string as fallback
+                const fecha = key.includes('-')
+                    ? key
+                    : `${year}-${String(month).padStart(2, '0')}-${String(parseInt(key)).padStart(2, '0')}`;
+                const dia = parseInt(fecha.slice(-2));
                 return { dia, fecha, ...parsed };
             });
 
@@ -1022,6 +1084,8 @@ export async function processProsoftRows(
         };
     }));
 
+    const aggregatedFilas = aggregateSharedPersonalIds(filas);
+
     const [retYear, retMonth] = mes.split('-').map(Number);
     const lastDay = new Date(retYear, retMonth, 0).getDate();
 
@@ -1030,9 +1094,9 @@ export async function processProsoftRows(
         periodoDesde: detectedPeriod?.desde || `${mes}-01`,
         periodoHasta: detectedPeriod?.hasta || `${mes}-${String(lastDay).padStart(2, '0')}`,
         periodoDetectado: Boolean(detectedPeriod),
-        filas,
+        filas: aggregatedFilas,
         sinMatch,
-        totalRegistros,
+        totalRegistros: aggregatedFilas.reduce((s, f) => s + f.registros.length, 0),
     };
 }
 
@@ -1099,12 +1163,13 @@ export async function importProsoftPreviewSafe(
                     observaciones += ` | ${reg.observaciones}`;
                 }
 
-                const { data: existing } = await admin
+                const { data: existingRows2 } = await admin
                     .from('registro_horas')
                     .select('id, horas, estado')
                     .eq('personal_id', fila.personalId)
                     .eq('fecha', reg.fecha)
-                    .maybeSingle();
+                    .limit(1);
+                const existing = existingRows2?.[0] ?? null;
 
                 if (existing) {
                     const existingIsObserved = String(existing.estado || '').toLowerCase() === 'observado';

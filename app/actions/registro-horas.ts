@@ -84,9 +84,14 @@ export interface ResumenPrestador {
     apellido: string | null;
     dias: number;
     total_horas: number;
+    horas_extra: number;
     prom_horas_dia: number;
-    hora_ingreso_min: string | null;  // earliest entry in month
-    hora_egreso_max: string | null;   // latest exit in month
+    hora_ingreso_min: string | null;
+    hora_egreso_max: string | null;
+    valor_hora_ars: number | null;
+    horas_base: number | null;
+    costo_hora_extra: number | null;
+    costo_total: number | null;
 }
 
 export interface ResumenMes {
@@ -105,7 +110,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
 
     const { data } = await admin
         .from('registro_horas')
-        .select('personal_id, horas, hora_ingreso, hora_egreso, salida_dia_siguiente, personal!inner(nombre, apellido)')
+        .select('personal_id, horas, hora_ingreso, hora_egreso, salida_dia_siguiente, personal!inner(nombre, apellido, valor_hora_ars, horas_base, costo_hora_extra)')
         .gte('fecha', start)
         .lte('fecha', end);
 
@@ -116,14 +121,24 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
     // Group by personal_id
     const byPersonal = new Map<string, {
         nombre: string; apellido: string | null;
+        valorHoraArs: number | null; horasBase: number | null; costoHoraExtra: number | null;
         horas: number[]; ingresos: string[]; egresos: string[];
     }>();
 
     for (const row of data as Record<string, unknown>[]) {
         const pid = row.personal_id as string;
-        const p = (Array.isArray(row.personal) ? row.personal[0] : row.personal) as { nombre: string; apellido: string | null };
+        const p = (Array.isArray(row.personal) ? row.personal[0] : row.personal) as {
+            nombre: string; apellido: string | null;
+            valor_hora_ars: number | null; horas_base: number | null; costo_hora_extra: number | null;
+        };
         if (!byPersonal.has(pid)) {
-            byPersonal.set(pid, { nombre: p.nombre, apellido: p.apellido, horas: [], ingresos: [], egresos: [] });
+            byPersonal.set(pid, {
+                nombre: p.nombre, apellido: p.apellido,
+                valorHoraArs: p.valor_hora_ars ?? null,
+                horasBase: p.horas_base ?? null,
+                costoHoraExtra: p.costo_hora_extra ?? null,
+                horas: [], ingresos: [], egresos: [],
+            });
         }
         const entry = byPersonal.get(pid)!;
         entry.horas.push(Number(row.horas) || 0);
@@ -136,19 +151,41 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
     let total_dias = 0;
 
     for (const [pid, e] of byPersonal.entries()) {
-        const th = e.horas.reduce((a, b) => a + b, 0);
+        const th = Math.round(e.horas.reduce((a, b) => a + b, 0) * 100) / 100;
         const dias = e.horas.length;
         total_horas += th;
         total_dias += dias;
+
+        const valorHora = e.valorHoraArs && e.valorHoraArs > 0 ? e.valorHoraArs : null;
+        const horasBase = e.horasBase ?? null;
+        const costoExtra = e.costoHoraExtra ?? null;
+
+        let costoTotal: number | null = null;
+        let horasExtra = 0;
+        if (valorHora !== null) {
+            if (horasBase !== null && th > horasBase) {
+                horasExtra = Math.round((th - horasBase) * 100) / 100;
+                costoTotal = horasBase * valorHora + horasExtra * (costoExtra ?? valorHora);
+            } else {
+                costoTotal = th * valorHora;
+            }
+            costoTotal = Math.round(costoTotal);
+        }
+
         prestadores.push({
             personal_id: pid,
             nombre: e.nombre,
             apellido: e.apellido,
             dias,
-            total_horas: Math.round(th * 100) / 100,
+            total_horas: th,
+            horas_extra: horasExtra,
             prom_horas_dia: dias > 0 ? Math.round((th / dias) * 100) / 100 : 0,
             hora_ingreso_min: e.ingresos.length > 0 ? e.ingresos.sort()[0] : null,
             hora_egreso_max: e.egresos.length > 0 ? e.egresos.sort().at(-1)! : null,
+            valor_hora_ars: valorHora,
+            horas_base: horasBase,
+            costo_hora_extra: costoExtra,
+            costo_total: costoTotal,
         });
     }
 
@@ -159,6 +196,95 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         prestadores,
         total_horas: Math.round(total_horas * 100) / 100,
         total_dias_persona: total_dias,
+    };
+}
+
+// ─── Resumen de prestaciones por mes ─────────────────────────────────────────
+
+export interface ResumenPrestacionPrestador {
+    personal_id: string;
+    nombre: string;
+    apellido: string | null;
+    area: string;
+    cantidad: number;
+    total_honorarios_usd: number;
+}
+
+export interface ResumenPrestacionesMes {
+    mes: string;
+    prestadores: ResumenPrestacionPrestador[];
+    total_honorarios_usd: number;
+    total_prestaciones: number;
+}
+
+export async function getResumenPrestacionesMes(mes: string): Promise<ResumenPrestacionesMes> {
+    const admin = getAdminClient();
+    const [year, month] = mes.split('-').map(Number);
+    const start = `${mes}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const end = `${mes}-${String(lastDay).padStart(2, '0')}`;
+
+    const [prestData, personalData] = await Promise.all([
+        admin
+            .from('prestaciones_realizadas')
+            .select('profesional_id, monto_honorarios')
+            .gte('fecha_realizacion', start)
+            .lte('fecha_realizacion', end),
+        admin
+            .from('personal')
+            .select('id, nombre, apellido, area')
+            .eq('activo', true),
+    ]);
+
+    if (!prestData.data || prestData.data.length === 0) {
+        return { mes, prestadores: [], total_honorarios_usd: 0, total_prestaciones: 0 };
+    }
+
+    const personalMap = new Map(
+        (personalData.data || []).map(p => [p.id, p])
+    );
+
+    const byPersonal = new Map<string, { nombre: string; apellido: string | null; area: string; honorarios: number[] }>();
+
+    for (const row of prestData.data) {
+        const pid = row.profesional_id as string;
+        if (!byPersonal.has(pid)) {
+            const p = personalMap.get(pid);
+            byPersonal.set(pid, {
+                nombre: p?.nombre ?? 'Desconocido',
+                apellido: p?.apellido ?? null,
+                area: p?.area ?? '',
+                honorarios: [],
+            });
+        }
+        byPersonal.get(pid)!.honorarios.push(Number(row.monto_honorarios) || 0);
+    }
+
+    let total_honorarios = 0;
+    let total_prestaciones = 0;
+    const prestadores: ResumenPrestacionPrestador[] = [];
+
+    for (const [pid, e] of byPersonal.entries()) {
+        const total = Math.round(e.honorarios.reduce((a, b) => a + b, 0) * 100) / 100;
+        total_honorarios += total;
+        total_prestaciones += e.honorarios.length;
+        prestadores.push({
+            personal_id: pid,
+            nombre: e.nombre,
+            apellido: e.apellido,
+            area: e.area,
+            cantidad: e.honorarios.length,
+            total_honorarios_usd: total,
+        });
+    }
+
+    prestadores.sort((a, b) => b.total_honorarios_usd - a.total_honorarios_usd);
+
+    return {
+        mes,
+        prestadores,
+        total_honorarios_usd: Math.round(total_honorarios * 100) / 100,
+        total_prestaciones,
     };
 }
 

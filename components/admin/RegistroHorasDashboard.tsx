@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
-import { Clock, TrendingUp, Users, ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react';
+import { Clock, TrendingUp, Users, ChevronLeft, ChevronRight, RefreshCw, X, Download, Printer } from 'lucide-react';
 import { getResumenHorasMes, getRegistrosHorasMes, editarRegistroHoras, ResumenMes, ResumenPrestador, RegistroHoras } from '@/app/actions/registro-horas';
 import { calculateWorkedHours } from '@/lib/caja-admin/attendance-utils';
 import { toast } from 'sonner';
@@ -271,6 +271,7 @@ export default function RegistroHorasDashboard() {
                                         <th className="px-3 py-2.5 text-right font-medium">{mesLabel(mes)}</th>
                                         <th className="px-3 py-2.5 text-right font-medium">Dif.</th>
                                         <th className="px-3 py-2.5 text-right font-medium">Prom/día</th>
+                                        <th className="px-3 py-2.5 text-right font-medium">Costo estimado</th>
                                         <th className="px-3 py-2.5 text-center font-medium">Horario</th>
                                     </tr>
                                 </thead>
@@ -281,6 +282,10 @@ export default function RegistroHorasDashboard() {
                                         const horario = e.hora_ingreso_min && e.hora_egreso_max
                                             ? `${e.hora_ingreso_min} – ${e.hora_egreso_max}`
                                             : '—';
+                                        const costoStr = e.costo_total !== null
+                                            ? `$${e.costo_total.toLocaleString('es-AR')}`
+                                            : '—';
+                                        const hasExtra = e.horas_extra > 0;
                                         return (
                                             <tr key={e.personal_id} className="hover:bg-slate-800/30 transition-colors">
                                                 <td className="px-4 py-2.5">
@@ -300,11 +305,27 @@ export default function RegistroHorasDashboard() {
                                                 <td className="px-3 py-2.5 text-right text-slate-500">
                                                     {prev ? `${prev.total_horas}h` : '—'}
                                                 </td>
-                                                <td className="px-3 py-2.5 text-right font-semibold text-blue-400">{e.total_horas}h</td>
+                                                <td className="px-3 py-2.5 text-right">
+                                                    <span className="font-semibold text-blue-400">{e.total_horas}h</span>
+                                                    {hasExtra && (
+                                                        <span className="ml-1 text-[10px] text-amber-400">+{e.horas_extra}h extra</span>
+                                                    )}
+                                                </td>
                                                 <td className={`px-3 py-2.5 text-right font-medium ${dif === null ? 'text-slate-600' : dif > 0 ? 'text-emerald-400' : dif < 0 ? 'text-red-400' : 'text-slate-500'}`}>
                                                     {dif === null ? '—' : `${dif > 0 ? '+' : ''}${Math.round(dif * 10) / 10}h`}
                                                 </td>
                                                 <td className="px-3 py-2.5 text-right text-slate-300">{e.prom_horas_dia}h</td>
+                                                <td className="px-3 py-2.5 text-right">
+                                                    <span className={e.costo_total !== null ? 'text-emerald-400 font-semibold' : 'text-slate-600'}>
+                                                        {costoStr}
+                                                    </span>
+                                                    {e.valor_hora_ars !== null && (
+                                                        <p className="text-[10px] text-slate-500">
+                                                            ${e.valor_hora_ars.toLocaleString('es-AR')}/h
+                                                            {e.horas_base !== null && ` · base ${e.horas_base}h`}
+                                                        </p>
+                                                    )}
+                                                </td>
                                                 <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-[10px]">{horario}</td>
                                             </tr>
                                         );
@@ -321,7 +342,14 @@ export default function RegistroHorasDashboard() {
                                         <td className={`px-3 py-2.5 text-right ${diff === null ? '' : diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                             {diff === null ? '—' : `${diff >= 0 ? '+' : ''}${Math.round(diff * 10) / 10}h`}
                                         </td>
-                                        <td colSpan={2} />
+                                        <td className="px-3 py-2.5 text-right text-slate-300">—</td>
+                                        <td className="px-3 py-2.5 text-right text-emerald-300 font-semibold">
+                                            {(() => {
+                                                const total = resumen.prestadores.reduce((s, p) => s + (p.costo_total ?? 0), 0);
+                                                return total > 0 ? `$${total.toLocaleString('es-AR')}` : '—';
+                                            })()}
+                                        </td>
+                                        <td />
                                     </tr>
                                 </tfoot>
                             </table>

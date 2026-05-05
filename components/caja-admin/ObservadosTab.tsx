@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { formatDateForLocale } from '@/lib/local-date';
 
 interface Props {
     mes: string;
@@ -346,7 +347,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                     <td className="px-6 py-4 text-sm">
                                         <div className="flex flex-col gap-1">
                                             <span>
-                                                {new Date(reg.fecha).toLocaleDateString('es-AR', {
+                                                {formatDateForLocale(reg.fecha, 'es-AR', {
                                                     weekday: 'short',
                                                     day: 'numeric',
                                                     month: 'short',
@@ -416,7 +417,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                     Resolver marcación observada
                                 </h2>
                                 <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                                    {selectedRegistro.personal?.nombre} • {new Date(selectedRegistro.fecha).toLocaleDateString('es-AR', {
+                                    {selectedRegistro.personal?.nombre} • {formatDateForLocale(selectedRegistro.fecha, 'es-AR', {
                                         weekday: 'long',
                                         day: 'numeric',
                                         month: 'long',
