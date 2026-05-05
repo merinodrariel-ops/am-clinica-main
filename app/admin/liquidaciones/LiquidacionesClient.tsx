@@ -1847,6 +1847,32 @@ export default function LiquidacionesPage() {
         setTimeout(() => popup.print(), 200);
     }
 
+    async function handleExportAllExcel() {
+        try {
+            const XLSX = await import('xlsx');
+            const wb = XLSX.utils.book_new();
+
+            const data = rows.map((row) => ({
+                Prestador: `${row.nombre} ${row.apellido || ''}`.trim(),
+                Area: row.area || '',
+                Rol: roleLabel(row.app_role),
+                Estado: getEstadoEmpresaMember(row),
+                Modelo: row.liquidacion?.modelo_pago || row.modelo_pago,
+                'Horas Totales': row.liquidacion?.total_horas || 0,
+                'Valor Hora': row.liquidacion?.valor_hora_snapshot || row.valor_hora_ars || 0,
+                'Total ARS': Number(row.liquidacion?.total_ars || 0),
+                'Total USD': Number(row.liquidacion?.total_usd || 0),
+                'TC': row.liquidacion?.tc_liquidacion || row.liquidacion?.tc_bna_venta || tcBna || 0,
+            }));
+
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Liquidaciones Completas');
+            XLSX.writeFile(wb, `liquidaciones_completas_${mes}.xlsx`);
+            toast.success('Informe completo exportado');
+        } catch {
+            toast.error('No se pudo exportar el informe completo');
+        }
+    }
+
     async function handleApprove(liqId: string) {
         try {
             await approveLiquidacion(liqId);
@@ -2253,6 +2279,14 @@ export default function LiquidacionesPage() {
                                         <FileSpreadsheet size={11} />
                                         Cargar prestaciones
                                     </a>
+                                    <button
+                                        onClick={handleExportAllExcel}
+                                        disabled={rows.length === 0}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-xs"
+                                    >
+                                        <FileSpreadsheet size={11} />
+                                        Informe completo
+                                    </button>
                                     <button
                                         onClick={handleCloseMonthAssisted}
                                         disabled={Boolean(quickActionBusy)}

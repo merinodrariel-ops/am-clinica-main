@@ -98,6 +98,7 @@ export interface LiquidacionAdminRow {
     empresa_prestadora_nombre?: string | null;
     tipo: string;
     modelo_pago: 'hora_ars' | 'prestacion_usd';
+    valor_hora_ars: number;
     liquidacion?: LiquidacionResult;
     tiene_pendientes: boolean;
 }
@@ -666,7 +667,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
 
     const workersExtendedRes = await admin
         .from('personal')
-        .select('id, nombre, apellido, foto_url, area, tipo, user_id, empresa_prestadora_id, empresas_prestadoras:empresa_prestadora_id(nombre)')
+        .select('id, nombre, apellido, foto_url, area, tipo, user_id, empresa_prestadora_id, empresas_prestadoras:empresa_prestadora_id(nombre), valor_hora_ars')
         .eq('activo', true)
         .order('nombre');
 
@@ -680,6 +681,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
         user_id?: string | null;
         empresa_prestadora_id?: string | null;
         empresas_prestadoras?: { nombre?: string } | Array<{ nombre?: string }> | null;
+        valor_hora_ars?: number;
     }> = [];
 
     if (workersExtendedRes.error) {
@@ -687,7 +689,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
 
         const workersFallbackRes = await admin
             .from('personal')
-            .select('id, nombre, apellido, foto_url, area, tipo, user_id')
+            .select('id, nombre, apellido, foto_url, area, tipo, user_id, valor_hora_ars')
             .eq('activo', true)
             .order('nombre');
 
@@ -756,6 +758,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
                 : (w.empresas_prestadoras?.nombre || null),
             tipo: w.tipo || 'prestador',
             modelo_pago: isDoctor ? 'prestacion_usd' : 'hora_ars',
+            valor_hora_ars: w.valor_hora_ars || 0,
             liquidacion: liquidacionNormalizada,
             tiene_pendientes: Boolean(
                 liquidacionNormalizada && Number(liquidacionNormalizada.prestaciones_pendientes) > 0
