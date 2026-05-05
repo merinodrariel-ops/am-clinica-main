@@ -561,6 +561,22 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         return `${formatDateForLocale(group.firstDate, 'es-AR', { day: '2-digit', month: '2-digit' })} - ${formatDateForLocale(group.lastDate, 'es-AR', { day: '2-digit', month: '2-digit' })}`;
     }
 
+    async function loadPublicImageDataUrl(src: string): Promise<string | null> {
+        try {
+            const response = await fetch(src);
+            if (!response.ok) return null;
+            const blob = await response.blob();
+            return await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+            });
+        } catch {
+            return null;
+        }
+    }
+
     async function exportPrestacionesDashboardPdf(
         p: Personal,
         rows: PrestacionRealizada[],
@@ -581,11 +597,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
         const fileName = `prestaciones_${sanitizeFilePart(prestador)}_${mes}.pdf`;
         const { jsPDF } = await import('jspdf');
+        const logoDataUrl = await loadPublicImageDataUrl('/am-logo.png');
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 14;
-        let y = 16;
+        let y = 17;
 
         const addPageIfNeeded = (height = 8) => {
             if (y + height <= pageHeight - margin) return;
@@ -593,15 +610,48 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             y = margin;
         };
 
+        doc.setFillColor(248, 250, 252);
+        doc.rect(0, 0, pageWidth, 40, 'F');
+        doc.setDrawColor(20, 184, 166);
+        doc.setLineWidth(1);
+        doc.line(margin, 39, pageWidth - margin, 39);
+
+        if (logoDataUrl) {
+            doc.addImage(logoDataUrl, 'PNG', margin, 9, 20, 20);
+        } else {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(20, 184, 166);
+            doc.text('AM', margin, 22);
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(15, 23, 42);
+        doc.text('AM Estética Dental', margin + 25, 17);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text('Puerto Madero · Buenos Aires', margin + 25, 22);
+        doc.text('Resumen mensual de honorarios profesionales', margin + 25, 27);
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
-        doc.text('Informe de prestaciones', margin, y);
-        y += 7;
-
+        doc.setTextColor(15, 23, 42);
+        doc.text('Informe de prestaciones', pageWidth - margin, 17, { align: 'right' });
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        doc.text(`${prestador} · ${mesLabel(mes)}`, margin, y);
-        y += 10;
+        doc.setTextColor(71, 85, 105);
+        doc.text(`${prestador} · ${mesLabel(mes)}`, pageWidth - margin, 24, { align: 'right' });
+        doc.setFontSize(8);
+        doc.text(`Emitido ${formatDateForLocale(getLocalISODate(), 'es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, pageWidth - margin, 30, { align: 'right' });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(70);
+        doc.setTextColor(241, 245, 249);
+        doc.text('AM', pageWidth / 2, pageHeight / 2 + 18, { align: 'center', angle: -18 });
+
+        y = 51;
 
         const cardWidth = (pageWidth - margin * 2 - 9) / 4;
         const cards = [
@@ -613,13 +663,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
         cards.forEach(([label, value], index) => {
             const x = margin + index * (cardWidth + 3);
-            doc.setDrawColor(209, 213, 219);
-            doc.roundedRect(x, y, cardWidth, 18, 2, 2);
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(226, 232, 240);
+            doc.roundedRect(x, y, cardWidth, 18, 2, 2, 'FD');
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
+            doc.setTextColor(index >= 2 ? 4 : 15, index >= 2 ? 120 : 23, index >= 2 ? 87 : 42);
             doc.text(value, x + 4, y + 7);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7);
+            doc.setTextColor(100, 116, 139);
             doc.text(label.toUpperCase(), x + 4, y + 14);
         });
         y += 28;
@@ -635,10 +688,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         ];
 
         const drawHeader = () => {
-            doc.setFillColor(243, 244, 246);
+            doc.setFillColor(240, 253, 250);
             doc.rect(margin, y - 5, pageWidth - margin * 2, 8, 'F');
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(8);
+            doc.setTextColor(15, 118, 110);
             columns.forEach(col => doc.text(col.label, col.x, y));
             y += 6;
         };
@@ -646,6 +700,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         drawHeader();
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
+        doc.setTextColor(30, 41, 59);
 
         for (const group of groupedRows) {
             const values = [
@@ -665,12 +720,25 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
             doc.setDrawColor(229, 231, 235);
             doc.line(margin, y - 3, pageWidth - margin, y - 3);
+            doc.setTextColor(30, 41, 59);
             splitValues.forEach((lines, index) => {
                 const isNumeric = index === 3 || index === 5;
                 const x = isNumeric ? columns[index].x + columns[index].width : columns[index].x;
                 doc.text(lines, x, y, { align: isNumeric ? 'right' : 'left' });
             });
             y += rowHeight;
+        }
+
+        const totalPages = doc.getNumberOfPages();
+        for (let page = 1; page <= totalPages; page += 1) {
+            doc.setPage(page);
+            doc.setDrawColor(226, 232, 240);
+            doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(100, 116, 139);
+            doc.text('AM Estética Dental · Informe interno de liquidaciones', margin, pageHeight - 7);
+            doc.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
         }
 
         if (mode === 'download') {
