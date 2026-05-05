@@ -561,62 +561,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         return `${formatDateForLocale(group.firstDate, 'es-AR', { day: '2-digit', month: '2-digit' })} - ${formatDateForLocale(group.lastDate, 'es-AR', { day: '2-digit', month: '2-digit' })}`;
     }
 
-    async function downloadPrestacionesDashboardExcel(p: Personal, rows: PrestacionRealizada[], mes: string) {
-        const monthRows = rows
-            .filter((row) => getDateOnlyMonth(row.fecha_realizacion) === mes)
-            .sort((a, b) => compareDateOnlyDesc(a.fecha_realizacion, b.fecha_realizacion));
-
-        if (monthRows.length === 0) {
-            toast.info('No hay prestaciones para descargar en este mes');
-            return;
-        }
-
-        const XLSX = await import('xlsx');
-        const totals = getPrestacionesCurrencyTotals(monthRows);
-        const groupedRows = groupPrestacionesDashboardRows(monthRows);
-        const prestador = `${p.nombre} ${p.apellido || ''}`.trim();
-
-        const resumenRows = [
-            { Concepto: 'Prestador', Valor: prestador },
-            { Concepto: 'Area', Valor: p.area || p.rol || '' },
-            { Concepto: 'Mes', Valor: mesLabel(mes) },
-            { Concepto: 'Prestaciones', Valor: monthRows.length },
-            { Concepto: 'Items resumidos', Valor: groupedRows.length },
-            { Concepto: 'Total ARS', Valor: totals.ARS },
-            { Concepto: 'Total USD', Valor: totals.USD },
-        ];
-
-        const resumenDetalleRows = groupedRows.map((group) => ({
-            Paciente: group.paciente_nombre,
-            Prestacion: group.prestacion_nombre,
-            Cantidad: group.cantidad,
-            'Primera fecha': group.firstDate,
-            'Ultima fecha': group.lastDate,
-            Moneda: group.moneda_cobro,
-            'Honorarios total': group.total_honorarios,
-            'Valor cobrado total': group.total_valor_cobrado,
-            Estado: group.estado_pago,
-        }));
-
-        const detalleIndividualRows = monthRows.map((row) => ({
-            Fecha: toDateInputValue(row.fecha_realizacion),
-            Paciente: row.paciente_nombre || '',
-            Prestacion: row.prestacion_nombre,
-            Moneda: row.moneda_cobro || 'ARS',
-            Honorarios: getPrestacionHonorario(row),
-            'Valor cobrado': Number(row.valor_cobrado || 0),
-            Estado: row.estado_pago || '',
-            'Historia clinica': row.slides_url || '',
-            Notas: row.notas || '',
-        }));
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), 'Resumen');
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenDetalleRows), 'Detalle resumido');
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalleIndividualRows), 'Detalle individual');
-        XLSX.writeFile(wb, `prestaciones_${sanitizeFilePart(prestador)}_${mes}.xlsx`);
-    }
-
     async function exportPrestacionesDashboardPdf(
         p: Personal,
         rows: PrestacionRealizada[],
@@ -984,6 +928,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     function openPrestacionForm(profesionalId: string) {
         setSelectedProfesionalId(profesionalId);
+        setShowPrestacionForm(true);
         setPrestacionForm({
             paciente_nombre: '',
             prestacion_id: '',
@@ -1007,8 +952,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             ? localStorage.getItem(`prestacion-area-${profesionalId}`) || ''
             : '';
         setQuickAccessArea(saved);
-        getPrestacionesRealizadas({ profesionalId }).then(data => setModalPrestaciones(data));
-        setShowPrestacionForm(true);
+        getPrestacionesRealizadas({ profesionalId })
+            .then(data => setModalPrestaciones(data))
+            .catch(error => {
+                console.error('Error loading provider prestations dashboard:', error);
+                toast.error('No se pudieron cargar las prestaciones del prestador');
+            });
     }
 
     function openMensualidadForm(p: Personal) {
@@ -2416,18 +2365,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 <div className="flex flex-wrap items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => selectedProfesional && void downloadPrestacionesDashboardExcel(selectedProfesional, modalPrestaciones, panelMes)}
-                                        disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                        Descargar Excel
-                                    </button>
-                                    <button
-                                        type="button"
                                         onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'download')}
                                         disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 disabled:opacity-40 transition-colors"
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                                     >
                                         <FileText className="w-4 h-4" />
                                         Descargar PDF
@@ -2797,18 +2737,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     <div className="mt-3 flex flex-wrap items-center gap-2">
                                                         <button
                                                             type="button"
-                                                            onClick={() => selectedProfesional && void downloadPrestacionesDashboardExcel(selectedProfesional, modalPrestaciones, panelMes)}
-                                                            disabled={!selectedProfesional || filtered.length === 0}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
-                                                        >
-                                                            <Download className="w-3.5 h-3.5" />
-                                                            Descargar Excel
-                                                        </button>
-                                                        <button
-                                                            type="button"
                                                             onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'download')}
                                                             disabled={!selectedProfesional || filtered.length === 0}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 disabled:opacity-40 transition-colors"
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                                                         >
                                                             <FileText className="w-3.5 h-3.5" />
                                                             Descargar PDF
@@ -3127,6 +3058,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             if (mode === 'prestaciones') {
                                                 return (
                                                     <Button
+                                                        type="button"
                                                         onClick={() => openPrestacionForm(p.id)}
                                                         className="w-full h-auto py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl shadow-lg shadow-emerald-100 dark:shadow-none hover:shadow-xl hover:-translate-y-0.5 transition-all flex flex-col items-center gap-1 group border-0"
                                                     >
