@@ -389,7 +389,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     }
 
     function downloadHoursDashboardCsv(p: Personal, rows: RegistroHoras[]) {
-        const headers = ['Prestador', 'Mes', 'Fecha', 'Ingreso', 'Egreso', 'Horas', 'Estado', 'Observaciones'];
+        const headers = ['Prestador', 'Mes', 'Fecha', 'Ingreso', 'Egreso', 'Horas', 'Valor Hora', 'Total Fila', 'Estado', 'Observaciones'];
+        const valorHora = p.valor_hora_ars || 0;
         const csvRows = rows
             .filter((row) => row.fecha.startsWith(hoursDashboardMes))
             .slice()
@@ -401,9 +402,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 row.hora_ingreso || '',
                 row.hora_egreso || '',
                 row.horas,
+                valorHora,
+                row.horas * valorHora,
                 isResolvedRegistro(row) ? 'Resuelto' : row.estado,
                 row.observaciones || '',
             ]);
+
+        const totalHoras = csvRows.reduce((sum, r) => sum + Number(r[5]), 0);
+        csvRows.push(['TOTAL', '', '', '', '', totalHoras, '', totalHoras * valorHora, '', '']);
 
         const csv = [
             headers.join(','),
@@ -449,13 +455,14 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         body { font-family: Arial, sans-serif; color: #111827; padding: 28px; }
                         h1 { margin: 0 0 4px; font-size: 22px; }
                         p { margin: 0; color: #4b5563; }
-                        .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 22px 0; }
+                        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 22px 0; }
+                        @media print { .cards { grid-template-columns: repeat(6, 1fr); } }
                         .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; }
                         .value { font-size: 18px; font-weight: 700; color: #0f766e; }
                         .label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
                         table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
                         th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
-                        th { background: #f3f4f6; color: #374151; }
+        th { background: #f3f4f6; color: #374151; }
                     </style>
                 </head>
                 <body>
@@ -464,14 +471,27 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     <div class="cards">
                         <div class="card"><div class="value">${monthRows.length}</div><div class="label">Días cargados</div></div>
                         <div class="card"><div class="value">${Math.round(total * 10) / 10}h</div><div class="label">Total horas</div></div>
+                        <div class="card"><div class="value">$${(p.valor_hora_ars || 0).toLocaleString('es-AR')}</div><div class="label">Valor Hora</div></div>
+                        <div class="card"><div class="value" style="color: #10b981;">$${(total * (p.valor_hora_ars || 0)).toLocaleString('es-AR')}</div><div class="label">Total a Liquidar</div></div>
                         <div class="card"><div class="value">${pending}</div><div class="label">Pendientes</div></div>
                         <div class="card"><div class="value">${resolved}</div><div class="label">Corregidos</div></div>
                     </div>
                     <table>
                         <thead>
-                            <tr><th>Fecha</th><th>Ingreso</th><th>Egreso</th><th>Horas</th><th>Estado</th><th>Observaciones</th></tr>
+                            <tr><th>Fecha</th><th>Ingreso</th><th>Egreso</th><th>Horas</th><th>Valor</th><th>Total</th><th>Estado</th><th>Observaciones</th></tr>
                         </thead>
-                        <tbody>${detailRows || '<tr><td colspan="6">Sin registros para este mes.</td></tr>'}</tbody>
+                        <tbody>${monthRows.map((row) => `
+                            <tr>
+                                <td>${row.fecha}</td>
+                                <td>${row.hora_ingreso || '-'}</td>
+                                <td>${row.hora_egreso || '-'}</td>
+                                <td>${Number(row.horas || 0).toFixed(1)}h</td>
+                                <td>$${(p.valor_hora_ars || 0).toLocaleString('es-AR')}</td>
+                                <td>$${(Number(row.horas || 0) * (p.valor_hora_ars || 0)).toLocaleString('es-AR')}</td>
+                                <td>${isResolvedRegistro(row) ? 'Resuelto' : row.estado}</td>
+                                <td>${row.observaciones || ''}</td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="8">Sin registros para este mes.</td></tr>'}</tbody>
                     </table>
                 </body>
             </html>
@@ -3450,10 +3470,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                                                 {[
                                                     { label: 'Días cargados', value: monthRows.length, color: 'text-blue-500' },
                                                     { label: 'Horas del mes', value: `${Math.round(totalMonthHours * 10) / 10}h`, color: 'text-teal-500' },
+                                                    { label: 'Valor Hora', value: `$${(p.valor_hora_ars || 0).toLocaleString('es-AR')}`, color: 'text-slate-500' },
+                                                    { label: 'Total Estimado', value: `$${(totalMonthHours * (p.valor_hora_ars || 0)).toLocaleString('es-AR')}`, color: 'text-emerald-500 font-black' },
                                                     { label: 'Pendientes', value: pendingMonth, color: pendingMonth > 0 ? 'text-amber-500' : 'text-slate-400' },
                                                     { label: 'Corregidos', value: resolvedMonth, color: 'text-emerald-500' },
                                                 ].map((item) => (
