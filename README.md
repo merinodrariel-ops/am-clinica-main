@@ -2,6 +2,9 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Project Guardrails
 
+- **Seguridad**: [Checklist de Seguridad](SECURITY_CHECKLIST.md)
+- **Finanzas**: [Reglas de Liquidación y Pago](docs/payroll_rules.md)
+- **Implementación**: [Plan de Implementación Financiera](IMPLEMENTATION_FINANCING.md)
 - Before making changes, read `docs/AGENT_GUARDRAILS.md`.
 - Project memory file used by agents:
   - `/Users/am/.claude/projects/-Users-am-Downloads-antigravity-apps-am-clinica-main/memory/MEMORY.md`

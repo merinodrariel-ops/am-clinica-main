@@ -186,3 +186,13 @@ npx @claude-flow/cli@latest doctor --fix
 
 - Documentation: https://github.com/ruvnet/claude-flow
 - Issues: https://github.com/ruvnet/claude-flow/issues
+
+## Project Business Rules: Payroll & Liquidation
+- **Hourly Rate**: Administrative, Reception, and Assistants are standardized at **7,160 ARS/hour**.
+- **Saturday Multiplier**: Pay **1.5x** (50% extra) for Assistants and Administrative staff working on Saturdays.
+- **Holiday Multiplier**: Pay **2.0x** (double) for Assistants and Administrative staff working on national holidays.
+- **Sunday Multiplier**: Pay **2.0x** (double) for staff working on Sundays.
+- **Laboratory Exclusion**: Laboratory staff follow a separate arrangement and are **EXCLUDED** from these multipliers (always 1.0x).
+- **Holiday List (2026)**: May 1, May 25, Jun 17, Jun 20, Jul 9, Aug 17, Oct 12, Nov 20, Dec 8, Dec 25.
+- **Reporting**: Financial reports (PDF/CSV) must show the **Total Amount** calculated with these multipliers but **NOT** the individual hourly rate.
+- **Implementation**: Rules are centralized in `lib/payroll-rules.ts`. Always use `calculateAdjustedEarnings` for payroll calculations.
