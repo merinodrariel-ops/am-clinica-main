@@ -578,7 +578,6 @@ function HorasDetalleModal({
             const finalSummary = [
                 { 'Nombre': `${worker.nombre} ${worker.apellido || ''}`.trim() },
                 { 'Mes': mes },
-                { 'Valor Hora': worker.valor_hora_ars },
                 { 'Total Horas': Number(totalHoras.toFixed(2)) },
                 { 'Total a Liquidar': Number(totalArs.toFixed(2)) },
             ];
@@ -688,7 +687,6 @@ function HorasDetalleModal({
                     </table>
                     <div style="margin-top: 24px; padding-top: 12px; border-top: 2px solid #333;">
                         <p style="font-size: 14px; margin: 4px 0;"><strong>Total de Horas:</strong> ${totalHoras.toFixed(2)}</p>
-                        <p style="font-size: 14px; margin: 4px 0;"><strong>Valor Hora:</strong> ${formatARS(worker.valor_hora_ars)}</p>
                         <p style="font-size: 18px; margin: 8px 0; color: #10b981;"><strong>Total a Liquidar:</strong> ${formatARS(totalHoras * worker.valor_hora_ars)}</p>
                     </div>
                 </body>
