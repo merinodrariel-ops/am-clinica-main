@@ -3,6 +3,7 @@
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { awardAchievement, updateGoalProgressByCode } from './worker-portal';
+import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
 
 function getAdminClient() {
     return createAdminClient(
@@ -74,6 +75,41 @@ function normalizeEstado(raw: string | null | undefined): LiquidacionResult['est
     return 'pending';
 }
 
+function normalizeText(value?: string | null) {
+    return (value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+}
+
+async function getHourlyDefaults(admin: ReturnType<typeof getAdminClient>) {
+    const { data } = await admin
+        .from('liquidacion_hour_values')
+        .select('cleaning_hour_value, staff_general_hour_value')
+        .eq('id', 1)
+        .maybeSingle();
+
+    return {
+        cleaningHourValue: Number(data?.cleaning_hour_value || 0),
+        staffGeneralHourValue: Number(data?.staff_general_hour_value || 0),
+    };
+}
+
+function getEffectiveHourlyRate(
+    personal: { valor_hora_ars?: number | null; area?: string | null; rol?: string | null },
+    defaults: { cleaningHourValue: number; staffGeneralHourValue: number }
+) {
+    const directValue = Number(personal.valor_hora_ars || 0);
+    if (directValue > 0) return directValue;
+
+    const area = normalizeText(personal.area);
+    const rol = normalizeText(personal.rol);
+    const isCleaning = area.includes('limpieza') || rol.includes('limpieza');
+
+    return isCleaning ? defaults.cleaningHourValue : defaults.staffGeneralHourValue;
+}
+
 const ESTADO_DB_CANDIDATES: Record<LiquidacionResult['estado'], string[]> = {
     // Legacy DB in this project currently accepts Spanish states
     pending: ['Pendiente', 'pending', 'pendiente'],
@@ -101,6 +137,8 @@ export interface LiquidacionAdminRow {
     valor_hora_ars: number;
     liquidacion?: LiquidacionResult;
     tiene_pendientes: boolean;
+    total_horas?: number;
+    total_proyectado?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,9 +224,12 @@ export async function generateLiquidacion(
             .in('estado', ['Registrado', 'Observado', 'Resuelto', 'pending', 'observado', 'approved']);
 
         totalHoras = (logs || []).reduce((s, l) => s + Number(l.horas || 0), 0);
-        const valorHora = Number(worker.valor_hora_ars || 0);
+        const hourlyDefaults = await getHourlyDefaults(admin);
+        const valorHora = getEffectiveHourlyRate(worker, hourlyDefaults);
         valorHoraSnapshot = valorHora;
-        totalArs = Math.round(totalHoras * valorHora * 100) / 100;
+
+        // Apply multipliers (holidays/weekends)
+        totalArs = Math.round(calculateAdjustedEarnings(logs || [], valorHora, worker.area || '') * 100) / 100;
 
         breakdown = {
             registros: (logs || []).map(l => ({
@@ -199,6 +240,7 @@ export async function generateLiquidacion(
             })),
             total_horas: totalHoras,
             valor_hora_ars: valorHora,
+            valor_hora_origen: Number(worker.valor_hora_ars || 0) > 0 ? 'personal' : 'configuracion_global',
             total_ars: totalArs,
         };
     }
@@ -367,7 +409,7 @@ export async function registrarMensualidadFija(formData: FormData): Promise<{ su
             total_ars: totalArs,
             total_usd: totalUsd,
             total_horas: 0,
-            valor_hora_snapshot: null,
+            valor_hora_snapshot: 0,
             tc_bna_venta: tcLiquidacion,
             tc_liquidacion: tcLiquidacion,
             prestaciones_validadas: 0,
@@ -488,7 +530,7 @@ export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
             total_ars: totalArs,
             total_usd: totalUsd,
             total_horas: 0,
-            valor_hora_snapshot: null,
+            valor_hora_snapshot: 0,
             tc_bna_venta: tcLiquidacion,
             tc_liquidacion: tcLiquidacion,
             prestaciones_validadas: 0,
@@ -717,6 +759,26 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
         return [];
     }
 
+    // Fetch all logs for the month to calculate projections
+    const [year, month] = mesDate.split('-').map(Number);
+    const startDate = `${mesDate}`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${mesDate.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`;
+
+    const { data: logsData } = await admin
+        .from('registro_horas')
+        .select('personal_id, fecha, horas')
+        .gte('fecha', startDate)
+        .lte('fecha', endDate)
+        .in('estado', ['Registrado', 'Observado', 'Resuelto', 'pending', 'observado', 'approved']);
+
+    const logsByWorker = new Map<string, any[]>();
+    (logsData || []).forEach(log => {
+        const list = logsByWorker.get(log.personal_id) || [];
+        list.push(log);
+        logsByWorker.set(log.personal_id, list);
+    });
+
     const userIds = workersData
         .map((w) => w.user_id)
         .filter((id): id is string => Boolean(id));
@@ -728,13 +790,10 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             .in('id', userIds)
         : { data: [], error: null };
 
-    if (profileRoles.error) {
-        console.error('Error loading profile roles for liquidaciones:', profileRoles.error);
-    }
-
     const roleByUserId = new Map((profileRoles.data || []).map((p) => [p.id, p.categoria]));
-
     const liqMap = new Map((liquidacionesData || []).map(l => [l.personal_id, l]));
+
+    const hourlyDefaults = await getHourlyDefaults(admin);
 
     return workersData.map(w => {
         const liq = liqMap.get(w.id);
@@ -744,7 +803,13 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
                 estado: normalizeEstado(liq.estado),
             } as LiquidacionResult)
             : undefined;
+
         const isDoctor = w.tipo === 'odontologo' || w.tipo === 'profesional';
+        const workerLogs = logsByWorker.get(w.id) || [];
+        const totalHoras = workerLogs.reduce((s, l) => s + Number(l.horas || 0), 0);
+        const effectiveValorHora = getEffectiveHourlyRate(w, hourlyDefaults);
+        const totalProyectado = calculateAdjustedEarnings(workerLogs, effectiveValorHora, w.area || '');
+
         return {
             personal_id: w.id,
             nombre: w.nombre,
@@ -758,11 +823,13 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
                 : (w.empresas_prestadoras?.nombre || null),
             tipo: w.tipo || 'prestador',
             modelo_pago: isDoctor ? 'prestacion_usd' : 'hora_ars',
-            valor_hora_ars: w.valor_hora_ars || 0,
+            valor_hora_ars: effectiveValorHora,
             liquidacion: liquidacionNormalizada,
             tiene_pendientes: Boolean(
                 liquidacionNormalizada && Number(liquidacionNormalizada.prestaciones_pendientes) > 0
             ),
+            total_horas: totalHoras,
+            total_proyectado: totalProyectado
         };
     });
 }

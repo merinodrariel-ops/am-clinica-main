@@ -1,4 +1,4 @@
-import { getWorkerById, getWorkerAchievements, getWorkerLiquidations, getWorkerXP, getAllGoals, getGoalProgress } from '@/app/actions/worker-portal';
+import { getWorkerById, getWorkerAchievements, getWorkerLiquidations, getWorkerXP, getAllGoals, getGoalProgress, getWorkerMonthlyStats } from '@/app/actions/worker-portal';
 import { notFound } from 'next/navigation';
 import StaffDetailView from '@/components/admin/StaffDetailView';
 

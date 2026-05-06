@@ -23,6 +23,8 @@ import {
     MotivoObservado,
 } from './types';
 import { calculateWorkedHours } from './attendance-utils';
+import { summarizeCriticalObservedLeaders, type ObservadoLeaderRow } from './observados-summary';
+import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
 
 // ==========================================
 // MÉTODOS DE CATEGORÍAS (NEW)
@@ -67,6 +69,30 @@ export async function deleteCategoria(id: string) {
 }
 
 const getSupabase = () => createClient();
+
+async function getHourlyDefaults() {
+    const { data } = await getSupabase()
+        .from('liquidacion_hour_values')
+        .select('cleaning_hour_value, staff_general_hour_value')
+        .eq('id', 1)
+        .maybeSingle();
+
+    return {
+        cleaningHourValue: Number(data?.cleaning_hour_value || 0),
+        staffGeneralHourValue: Number(data?.staff_general_hour_value || 0),
+    };
+}
+
+function getEffectiveHourlyRate(personal: { valor_hora_ars?: number | null; area?: string | null; rol?: string | null }, defaults: { cleaningHourValue: number; staffGeneralHourValue: number }) {
+    const directValue = Number(personal.valor_hora_ars || 0);
+    if (directValue > 0) return directValue;
+
+    const area = (personal.area || '').toLowerCase();
+    const rol = (personal.rol || '').toLowerCase();
+    return area.includes('limpieza') || rol.includes('limpieza')
+        ? defaults.cleaningHourValue
+        : defaults.staffGeneralHourValue;
+}
 
 function normalizeWhatsAppE164(value?: string | null): string | null {
     if (!value) return null;
@@ -1126,27 +1152,29 @@ export async function generarLiquidacion(
     // Get total hours for the month
     const { data: horas } = await getSupabase()
         .from('registro_horas')
-        .select('horas')
+        .select('fecha, horas')
         .eq('personal_id', personalId)
         .gte('fecha', startDate)
         .lte('fecha', endDateStr);
 
     const totalHoras = horas?.reduce((sum: number, h: { horas: number }) => sum + h.horas, 0) || 0;
-    const totalArs = totalHoras * personal.valor_hora_ars;
+    const hourlyDefaults = await getHourlyDefaults();
+    const effectiveValorHora = getEffectiveHourlyRate(personal, hourlyDefaults);
+    const totalArs = calculateAdjustedEarnings(horas || [], effectiveValorHora, personal.area || '');
     const totalUsd = tcBna ? totalArs / tcBna : undefined;
 
     const { data, error } = await getSupabase()
         .from('liquidaciones_mensuales')
-        .insert({
+        .upsert({
             personal_id: personalId,
             mes: startDate,
             total_horas: totalHoras,
-            valor_hora_snapshot: personal.valor_hora_ars,
+            valor_hora_snapshot: effectiveValorHora,
             total_ars: totalArs,
             tc_liquidacion: tcBna,
             total_usd: totalUsd,
             estado: 'Pendiente',
-        })
+        }, { onConflict: 'personal_id,mes' })
         .select()
         .single();
 
@@ -1387,9 +1415,20 @@ export async function getObservadosCriticalLeaders(
     mes?: string,
     limit = 3
 ): Promise<Array<{ personal_id: string; nombre: string; apellido: string; critical_count: number }>> {
+    type ObservadoCriticalSourceRow = {
+        personal_id: string | null;
+        created_at?: string | null;
+        fecha: string;
+    };
+    type PersonalNameRow = {
+        id: string;
+        nombre?: string | null;
+        apellido?: string | null;
+    };
+
     let query = getSupabase()
         .from('registro_horas')
-        .select('personal_id, created_at, fecha, personal(nombre, apellido)')
+        .select('personal_id, created_at, fecha')
         .in('estado', ['Observado', 'observado']);
 
     if (mes) {
@@ -1401,46 +1440,46 @@ export async function getObservadosCriticalLeaders(
 
     const { data, error } = await query;
     if (error || !data) {
-        if (error) console.error('Error fetching observados critical leaders:', error);
+        if (error) {
+            console.warn('No se pudo cargar el ranking de observados críticos:', error.message || error.code || 'sin detalle');
+        }
         return [];
     }
 
-    const criticalThreshold = Date.now() - 48 * 60 * 60 * 1000;
-    const grouped = new Map<string, { personal_id: string; nombre: string; apellido: string; critical_count: number }>();
+    const sourceRows = data as ObservadoCriticalSourceRow[];
+    const personalIds = Array.from(new Set(
+        sourceRows
+            .map((row) => row.personal_id)
+            .filter((personalId): personalId is string => Boolean(personalId))
+    ));
+    const personalById = new Map<string, { nombre?: string | null; apellido?: string | null }>();
 
-    data.forEach((row: any) => {
-        const typed = row as {
-            personal_id: string;
-            created_at?: string;
-            fecha: string;
-            personal?: { nombre?: string; apellido?: string | null } | Array<{ nombre?: string; apellido?: string | null }>;
-        };
+    if (personalIds.length > 0) {
+        const { data: personalData, error: personalError } = await getSupabase()
+            .from('personal')
+            .select('id, nombre, apellido')
+            .in('id', personalIds);
 
-        const parsed = new Date(typed.created_at || typed.fecha);
-        const createdAtMs = Number.isNaN(parsed.getTime())
-            ? new Date(`${typed.fecha}T00:00:00`).getTime()
-            : parsed.getTime();
-
-        if (createdAtMs > criticalThreshold) return;
-
-        const person = Array.isArray(typed.personal) ? typed.personal[0] : typed.personal;
-        const current = grouped.get(typed.personal_id);
-        if (current) {
-            current.critical_count += 1;
-            return;
+        if (!personalError && personalData) {
+            (personalData as PersonalNameRow[]).forEach((person) => {
+                personalById.set(person.id, {
+                    nombre: person.nombre,
+                    apellido: person.apellido,
+                });
+            });
         }
+    }
 
-        grouped.set(typed.personal_id, {
-            personal_id: typed.personal_id,
-            nombre: person?.nombre || 'Sin nombre',
-            apellido: person?.apellido || '',
-            critical_count: 1,
-        });
-    });
+    const rows = sourceRows
+        .filter((row): row is ObservadoCriticalSourceRow & { personal_id: string } => Boolean(row.personal_id))
+        .map((row): ObservadoLeaderRow => ({
+            personal_id: row.personal_id,
+            created_at: row.created_at,
+            fecha: row.fecha,
+            personal: personalById.get(row.personal_id) || null,
+        }));
 
-    return Array.from(grouped.values())
-        .sort((a, b) => b.critical_count - a.critical_count)
-        .slice(0, Math.max(1, limit));
+    return summarizeCriticalObservedLeaders(rows, { limit });
 }
 
 export async function resolverRegistro(

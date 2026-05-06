@@ -26,11 +26,8 @@ export default async function CommanderView() {
 
     const totalArs = rows.reduce((s, r) => {
         if (r.liquidacion) return s + Number(r.liquidacion.total_ars || 0);
-        // If no liquidation, calculate projection for staff (horas)
-        if (r.modelo_pago === 'horas') {
-            return s + (Number(r.total_horas || 0) * (r.valor_hora_ars || 0));
-        }
-        return s;
+        // Use the pre-calculated projection from the server action
+        return s + (r.total_proyectado || 0);
     }, 0);
     const pendientes = rows.filter(r => r.liquidacion?.estado === 'pending').length;
     const pagadas = rows.filter(r => r.liquidacion?.estado === 'paid').length;

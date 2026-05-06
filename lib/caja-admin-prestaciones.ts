@@ -199,12 +199,13 @@ export async function generarLiquidacionProfesional(
         .reduce((sum, p) => sum + (p.monto_honorarios || 0), 0);
 
     // Check existing or create new liquidation
-    const { data: existing } = await supabase
+    const { data: existingRows } = await supabase
         .from('liquidaciones_mensuales')
         .select('id')
         .eq('personal_id', personalId)
         .eq('mes', startDate)
-        .maybeSingle();
+        .limit(1);
+    const existing = existingRows?.[0] ?? null;
 
     let liquidacionId = existing?.id;
 

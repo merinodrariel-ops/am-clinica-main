@@ -119,7 +119,7 @@ export interface Personal {
     apellido?: string;
     tipo: 'prestador' | 'odontologo' | 'profesional';
     area: string;
-    rol: string;
+    rol?: string;
     email?: string;
     whatsapp?: string;
     documento?: string;

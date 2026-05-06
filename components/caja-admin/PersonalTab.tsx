@@ -77,6 +77,7 @@ import { registrarMensualidadFija } from '@/app/actions/liquidaciones';
 import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
 import { eliminarPrestacion, updatePrestacionRealizada } from '@/app/actions/prestaciones';
 import { useAuth } from '@/contexts/AuthContext';
+import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
 import { formatDateForLocale, getLocalISODate, toDateInputValue } from '@/lib/local-date';
 
 interface Props {
@@ -361,6 +362,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             : Number(hourConfig.staffGeneralHourValue || 0);
     }
 
+    function getEffectiveHourValue(p: Personal) {
+        const personalValue = Number(p.valor_hora_ars || 0);
+        return personalValue > 0 ? personalValue : getConfiguredHourValue(p);
+    }
+
     function mesLabel(ym: string) {
         const [year, month] = ym.split('-');
         const monthName = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][Number(month) - 1] || ym;
@@ -383,6 +389,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         try {
             const rows = await getRegistroHoras({ personalId: p.id });
             setHoursDashboardRows(rows);
+            const latestMonthWithRows = rows
+                .map((row) => row.fecha?.slice(0, 7))
+                .filter((value): value is string => Boolean(value && /^\d{4}-\d{2}$/.test(value)))
+                .sort((a, b) => b.localeCompare(a))[0];
+            setHoursDashboardMes(latestMonthWithRows || mesActual);
         } finally {
             setHoursDashboardLoading(false);
         }
@@ -390,25 +401,34 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
     function downloadHoursDashboardCsv(p: Personal, rows: RegistroHoras[]) {
         const headers = ['Prestador', 'Mes', 'Fecha', 'Ingreso', 'Egreso', 'Horas', 'Total Fila', 'Estado', 'Observaciones'];
-        const valorHora = p.valor_hora_ars || 0;
+        const valorHora = getEffectiveHourValue(p);
         const csvRows = rows
             .filter((row) => row.fecha.startsWith(hoursDashboardMes))
             .slice()
             .sort((a, b) => a.fecha.localeCompare(b.fecha))
-            .map((row) => [
-                `${p.nombre} ${p.apellido || ''}`.trim(),
-                row.fecha.slice(0, 7),
-                row.fecha,
-                row.hora_ingreso || '',
-                row.hora_egreso || '',
-                row.horas,
-                row.horas * valorHora,
-                isResolvedRegistro(row) ? 'Resuelto' : row.estado,
-                row.observaciones || '',
-            ]);
+            .map((row) => {
+                const rowEarnings = calculateAdjustedEarnings([row], valorHora, p.area || '', p.rol || '');
+                return [
+                    `${p.nombre} ${p.apellido || ''}`.trim(),
+                    row.fecha.slice(0, 7),
+                    row.fecha,
+                    row.hora_ingreso || '',
+                    row.hora_egreso || '',
+                    row.horas,
+                    rowEarnings,
+                    isResolvedRegistro(row) ? 'Resuelto' : row.estado,
+                    row.observaciones || '',
+                ];
+            });
 
         const totalHoras = csvRows.reduce((sum, r) => sum + Number(r[5]), 0);
-        csvRows.push(['TOTAL', '', '', '', '', totalHoras, totalHoras * valorHora, '', '']);
+        const totalEarnings = calculateAdjustedEarnings(
+            rows.filter((row) => row.fecha.startsWith(hoursDashboardMes)),
+            valorHora,
+            p.area || '',
+            p.rol || ''
+        );
+        csvRows.push(['TOTAL', '', '', '', '', totalHoras, totalEarnings, '', '']);
 
         const csv = [
             headers.join(','),
@@ -431,6 +451,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             .filter((row) => row.fecha.startsWith(hoursDashboardMes))
             .sort((a, b) => a.fecha.localeCompare(b.fecha));
         const total = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
+        const valorHora = getEffectiveHourValue(p);
+        const totalEarnings = calculateAdjustedEarnings(monthRows, valorHora, p.area || '', p.rol || '');
         const pending = monthRows.filter(isObservedRegistro).length;
         const resolved = monthRows.filter(isResolvedRegistro).length;
         const detailRows = monthRows.map((row) => `
@@ -470,7 +492,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     <div class="cards">
                         <div class="card"><div class="value">${monthRows.length}</div><div class="label">Días cargados</div></div>
                         <div class="card"><div class="value">${Math.round(total * 10) / 10}h</div><div class="label">Total horas</div></div>
-                        <div class="card"><div class="value" style="color: #10b981;">$${(total * (p.valor_hora_ars || 0)).toLocaleString('es-AR')}</div><div class="label">Total a Liquidar</div></div>
+                        <div class="card"><div class="value" style="color: #10b981;">$${totalEarnings.toLocaleString('es-AR')}</div><div class="label">Total a Liquidar</div></div>
                         <div class="card"><div class="value">${pending}</div><div class="label">Pendientes</div></div>
                         <div class="card"><div class="value">${resolved}</div><div class="label">Corregidos</div></div>
                     </div>
@@ -478,17 +500,19 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                         <thead>
                             <tr><th>Fecha</th><th>Ingreso</th><th>Egreso</th><th>Horas</th><th>Total</th><th>Estado</th><th>Observaciones</th></tr>
                         </thead>
-                        <tbody>${monthRows.map((row) => `
+                        <tbody>${monthRows.map((row) => {
+                            const rowEarnings = calculateAdjustedEarnings([row], valorHora, p.area || '', p.rol || '');
+                            return `
                             <tr>
                                 <td>${row.fecha}</td>
                                 <td>${row.hora_ingreso || '-'}</td>
                                 <td>${row.hora_egreso || '-'}</td>
                                 <td>${Number(row.horas || 0).toFixed(1)}h</td>
-                                <td>$${(Number(row.horas || 0) * (p.valor_hora_ars || 0)).toLocaleString('es-AR')}</td>
+                                <td>$${rowEarnings.toLocaleString('es-AR')}</td>
                                 <td>${isResolvedRegistro(row) ? 'Resuelto' : row.estado}</td>
                                 <td>${row.observaciones || ''}</td>
                             </tr>
-                        `).join('') || '<tr><td colspan="7">Sin registros para este mes.</td></tr>'}</tbody>
+                        `}).join('') || '<tr><td colspan="7">Sin registros para este mes.</td></tr>'}</tbody>
                     </table>
                 </body>
             </html>
@@ -3356,6 +3380,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 .filter((row) => row.fecha.startsWith(hoursDashboardMes))
                                 .sort((a, b) => a.fecha.localeCompare(b.fecha));
                             const totalMonthHours = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
+                            const effectiveHourValue = getEffectiveHourValue(p);
+                            const totalMonthEarnings = calculateAdjustedEarnings(monthRows, effectiveHourValue, p.area || '', p.rol || '');
                             const pendingMonth = monthRows.filter(isObservedRegistro).length;
                             const resolvedMonth = monthRows.filter(isResolvedRegistro).length;
                             const monthlyMap = new Map<string, { mes: string; dias: number; horas: number; pendientes: number; resueltos: number }>();
@@ -3474,7 +3500,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 {[
                                                     { label: 'Días cargados', value: monthRows.length, color: 'text-blue-500' },
                                                     { label: 'Horas del mes', value: `${Math.round(totalMonthHours * 10) / 10}h`, color: 'text-teal-500' },
-                                                    { label: 'Total Estimado', value: `$${(totalMonthHours * (p.valor_hora_ars || 0)).toLocaleString('es-AR')}`, color: 'text-emerald-500 font-black' },
+                                                    { label: 'Total Estimado', value: `$${totalMonthEarnings.toLocaleString('es-AR')}`, color: 'text-emerald-500 font-black' },
                                                     { label: 'Pendientes', value: pendingMonth, color: pendingMonth > 0 ? 'text-amber-500' : 'text-slate-400' },
                                                     { label: 'Corregidos', value: resolvedMonth, color: 'text-emerald-500' },
                                                 ].map((item) => (

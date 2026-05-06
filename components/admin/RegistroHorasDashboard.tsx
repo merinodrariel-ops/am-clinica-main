@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { Clock, TrendingUp, Users, ChevronLeft, ChevronRight, RefreshCw, X, Download, Printer } from 'lucide-react';
 import { getResumenHorasMes, getRegistrosHorasMes, editarRegistroHoras, ResumenMes, ResumenPrestador, RegistroHoras } from '@/app/actions/registro-horas';
@@ -84,6 +85,89 @@ export default function RegistroHorasDashboard() {
         ? resumen.total_horas - resumenPrev.total_horas
         : null;
 
+    function exportExcel() {
+        if (!resumen) return;
+        const data = resumen.prestadores.map(p => {
+            const prev = resumenPrev?.prestadores.find(x => x.personal_id === p.personal_id);
+            return {
+                Prestador: p.apellido ? `${p.apellido}, ${p.nombre}` : p.nombre,
+                'Días trabajados': p.dias,
+                [`Horas ${mesLabel(prevMes(mes))}`]: prev?.total_horas ?? '',
+                [`Horas ${mesLabel(mes)}`]: p.total_horas,
+                'Horas extra': p.horas_extra || '',
+                'Promedio h/día': p.prom_horas_dia,
+                'Costo estimado (ARS)': p.costo_total ?? '',
+                'Valor hora (ARS)': p.valor_hora_ars ?? '',
+                'Horas base': p.horas_base ?? '',
+                'Horario': p.hora_ingreso_min && p.hora_egreso_max ? `${p.hora_ingreso_min} – ${p.hora_egreso_max}` : '',
+            };
+        });
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, mesLabel(mes));
+        XLSX.writeFile(wb, `horas_${mes}.xlsx`);
+    }
+
+    function exportPdf() {
+        if (!resumen) return;
+        const mesL = mesLabel(mes);
+        const prevL = mesLabel(prevMes(mes));
+        const totalCosto = resumen.prestadores.reduce((s, p) => s + (p.costo_total ?? 0), 0);
+        const rows = resumen.prestadores.map(p => {
+            const prev = resumenPrev?.prestadores.find(x => x.personal_id === p.personal_id);
+            const dif = prev ? p.total_horas - prev.total_horas : null;
+            const costo = p.costo_total !== null ? `$${p.costo_total.toLocaleString('es-AR')}` : '—';
+            const difStr = dif === null ? '—' : `${dif >= 0 ? '+' : ''}${Math.round(dif * 10) / 10}h`;
+            return `<tr>
+                <td>${p.apellido ? `${p.apellido}, ${p.nombre}` : p.nombre}</td>
+                <td style="text-align:center">${p.dias}</td>
+                <td style="text-align:right">${prev ? `${prev.total_horas}h` : '—'}</td>
+                <td style="text-align:right"><strong>${p.total_horas}h</strong>${p.horas_extra > 0 ? ` <small style="color:#d97706">+${p.horas_extra}h ext</small>` : ''}</td>
+                <td style="text-align:right">${difStr}</td>
+                <td style="text-align:right">${p.prom_horas_dia}h</td>
+                <td style="text-align:right">${costo}</td>
+                <td style="text-align:center;font-size:11px;font-family:monospace">${p.hora_ingreso_min && p.hora_egreso_max ? `${p.hora_ingreso_min}–${p.hora_egreso_max}` : '—'}</td>
+            </tr>`;
+        }).join('');
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Horas ${mesL}</title>
+        <style>
+            body{font-family:system-ui,sans-serif;font-size:12px;color:#1e293b;margin:24px}
+            h1{font-size:18px;margin:0 0 4px}p.sub{color:#64748b;font-size:11px;margin:0 0 16px}
+            table{width:100%;border-collapse:collapse}
+            th{background:#1e293b;color:#fff;padding:6px 8px;text-align:left;font-size:11px}
+            th:not(:first-child){text-align:right}th:nth-child(2){text-align:center}th:last-child{text-align:center}
+            td{padding:5px 8px;border-bottom:1px solid #e2e8f0}
+            tr:hover td{background:#f8fafc}
+            tfoot td{font-weight:700;background:#f1f5f9;border-top:2px solid #334155}
+            @media print{body{margin:0}}
+        </style></head><body>
+        <h1>Informe de Horas — ${mesL}</h1>
+        <p class="sub">Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+        <table>
+            <thead><tr>
+                <th>Prestador</th><th style="text-align:center">Días</th>
+                <th style="text-align:right">${prevL}</th><th style="text-align:right">${mesL}</th>
+                <th style="text-align:right">Dif.</th><th style="text-align:right">Prom/día</th>
+                <th style="text-align:right">Costo ARS</th><th style="text-align:center">Horario</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr>
+                <td>TOTAL</td><td style="text-align:center">${resumen.total_dias_persona}</td>
+                <td style="text-align:right">${resumenPrev ? `${resumenPrev.total_horas}h` : '—'}</td>
+                <td style="text-align:right">${resumen.total_horas}h</td>
+                <td colspan="3" />
+                <td style="text-align:right">${totalCosto > 0 ? `$${totalCosto.toLocaleString('es-AR')}` : '—'}</td>
+                <td />
+            </tr></tfoot>
+        </table>
+        </body></html>`;
+        const w = window.open('', '_blank', 'width=1000,height=700');
+        if (!w) return;
+        w.document.write(html);
+        w.document.close();
+        w.print();
+    }
+
     async function openDetallePrestador(prestador: ResumenPrestador) {
         const personalId = prestador.personal_id;
         setDetalleModalPrestador(prestador);
@@ -161,14 +245,34 @@ export default function RegistroHorasDashboard() {
                         <p className="text-xs text-slate-400">Comparación mes a mes · datos importados de Prosoft</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
-                    <button onClick={() => setMes(prevMes(mes))} className="text-slate-400 hover:text-white transition-colors">
-                        <ChevronLeft size={16} />
-                    </button>
-                    <span className="text-sm font-medium text-white min-w-[80px] text-center">{mesLabel(mes)}</span>
-                    <button onClick={() => setMes(nextMes(mes))} className="text-slate-400 hover:text-white transition-colors">
-                        <ChevronRight size={16} />
-                    </button>
+                <div className="flex items-center gap-2">
+                    {resumen && resumen.prestadores.length > 0 && (
+                        <>
+                            <button
+                                onClick={exportExcel}
+                                title="Exportar Excel"
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 bg-slate-900 border border-slate-700 rounded-xl hover:bg-emerald-600/20 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors"
+                            >
+                                <Download size={13} /> Excel
+                            </button>
+                            <button
+                                onClick={exportPdf}
+                                title="Exportar PDF"
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 bg-slate-900 border border-slate-700 rounded-xl hover:bg-red-600/20 hover:border-red-500/50 hover:text-red-300 transition-colors"
+                            >
+                                <Printer size={13} /> PDF
+                            </button>
+                        </>
+                    )}
+                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
+                        <button onClick={() => setMes(prevMes(mes))} className="text-slate-400 hover:text-white transition-colors">
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span className="text-sm font-medium text-white min-w-[80px] text-center">{mesLabel(mes)}</span>
+                        <button onClick={() => setMes(nextMes(mes))} className="text-slate-400 hover:text-white transition-colors">
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
