@@ -30,6 +30,7 @@ interface StaffDetailViewProps {
     totalXP: number;
     goals: ProviderGoal[];
     progressList: GoalProgress[];
+    currentStats?: any;
 }
 
 export default function StaffDetailView({
@@ -38,7 +39,8 @@ export default function StaffDetailView({
     liquidations,
     totalXP,
     goals,
-    progressList
+    progressList,
+    currentStats
 }: StaffDetailViewProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<'perfil' | 'contratos'>('perfil');
@@ -206,12 +208,13 @@ export default function StaffDetailView({
                     <div className="grid grid-cols-2 gap-4">
                         {[
                             { label: 'Valor/hora', value: `$${(worker.valor_hora_ars || 0).toLocaleString()}` },
+                            { label: 'Mes actual (Est.)', value: `$${(currentStats?.total_earnings || 0).toLocaleString()}`, highlight: true },
                             { label: 'Ingresó', value: worker.fecha_ingreso ? new Date(worker.fecha_ingreso + 'T12:00:00').toLocaleDateString('es-AR') : '---' },
                             { label: 'Último pago', value: worker.ultimo_pago_fecha ? new Date(worker.ultimo_pago_fecha + 'T12:00:00').toLocaleDateString('es-AR') : '---' },
-                        ].map(({ label, value }) => (
-                            <div key={label} className="bg-slate-950/40 rounded-xl p-3">
-                                <p className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">{label}</p>
-                                <p className="font-mono font-bold text-white mt-1">{value}</p>
+                        ].map(({ label, value, highlight }) => (
+                            <div key={label} className={`rounded-xl p-3 ${highlight ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-slate-950/40'}`}>
+                                <p className={`text-[10px] font-bold uppercase tracking-wider ${highlight ? 'text-emerald-400' : 'text-slate-600'}`}>{label}</p>
+                                <p className={`font-mono font-bold mt-1 ${highlight ? 'text-emerald-300' : 'text-white'}`}>{value}</p>
                             </div>
                         ))}
                     </div>

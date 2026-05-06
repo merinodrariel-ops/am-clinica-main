@@ -24,7 +24,14 @@ export default async function CommanderView() {
 
     const rows = await getLiquidacionesAdmin(mes);
 
-    const totalArs = rows.reduce((s, r) => s + Number(r.liquidacion?.total_ars || 0), 0);
+    const totalArs = rows.reduce((s, r) => {
+        if (r.liquidacion) return s + Number(r.liquidacion.total_ars || 0);
+        // If no liquidation, calculate projection for staff (horas)
+        if (r.modelo_pago === 'horas') {
+            return s + (Number(r.total_horas || 0) * (r.valor_hora_ars || 0));
+        }
+        return s;
+    }, 0);
     const pendientes = rows.filter(r => r.liquidacion?.estado === 'pending').length;
     const pagadas = rows.filter(r => r.liquidacion?.estado === 'paid').length;
     const sinGenerar = rows.filter(r => !r.liquidacion).length;

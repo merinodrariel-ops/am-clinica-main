@@ -457,21 +457,26 @@ export async function getWorkerMonthlyStats(personalId: string, month: number, y
     const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
     const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    const [logs, achievements] = await Promise.all([
+    const supabase = await createClient();
+    const [logsResult, achievements, workerResult] = await Promise.all([
         getWorkerLogs(personalId, startDate, endDate),
         getWorkerAchievements(personalId),
+        supabase.from(TableNames.Profiles).select('valor_hora_ars').eq('id', personalId).single()
     ]);
 
+    const logs = logsResult || [];
+    const valor_hora_ars = workerResult.data?.valor_hora_ars || 0;
     const totalHours = logs.reduce((sum, log) => sum + Number(log.horas || 0), 0);
     const totalXP = achievements.reduce((sum, wa: any) => sum + (wa.achievement?.xp_reward || 0), 0);
 
     return {
-        total_earnings: 0, // real value from liquidaciones
+        total_earnings: totalHours * valor_hora_ars,
         hours_worked: totalHours,
         tasks_completed: logs.length,
         badges_earned: achievements.length,
         total_xp: totalXP,
         period: `${year}-${month}`,
+        valor_hora_ars
     };
 }
 

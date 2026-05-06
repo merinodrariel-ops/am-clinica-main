@@ -199,7 +199,25 @@ export default async function WorkerDashboard() {
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-slate-500 text-sm">Aún no hay liquidaciones registradas.</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Periodo Actual</p>
+                                    <p className="text-lg font-bold text-white">
+                                        {today.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Monto Estimado</p>
+                                    <p className="text-lg font-bold text-emerald-400">${(stats as any).total_earnings.toLocaleString() || '---'}</p>
+                                    <p className="text-[10px] text-slate-500 mt-1">${(stats as any).valor_hora_ars}/h</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Estado</p>
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-slate-500/10 text-slate-500 border border-slate-500/20">
+                                        Proyectado
+                                    </span>
+                                </div>
+                            </div>
                         )}
                     </div>
 

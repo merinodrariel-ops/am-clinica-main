@@ -1878,7 +1878,7 @@ export default function LiquidacionesPage() {
                 Modelo: row.liquidacion?.modelo_pago || row.modelo_pago,
                 'Horas Totales': row.liquidacion?.total_horas || 0,
                 'Valor Hora': row.liquidacion?.valor_hora_snapshot || row.valor_hora_ars || 0,
-                'Total ARS': Number(row.liquidacion?.total_ars || 0),
+                'Total ARS': Number(row.liquidacion?.total_ars || (row.modelo_pago === 'horas' ? (Number(row.total_horas || 0) * (row.valor_hora_ars || 0)) : 0)),
                 'Total USD': Number(row.liquidacion?.total_usd || 0),
                 'TC': row.liquidacion?.tc_liquidacion || row.liquidacion?.tc_bna_venta || tcBna || 0,
             }));
@@ -2578,7 +2578,10 @@ export default function LiquidacionesPage() {
                                                                 )}
                                                             </div>
                                                         ) : (
-                                                            <span className="text-slate-600 text-xs">—</span>
+                                                            <div>
+                                                                <p className="font-semibold text-emerald-400/80">{formatARS(Number(row.total_horas || 0) * (row.valor_hora_ars || 0))}</p>
+                                                                <p className="text-[10px] text-slate-500 italic">estimado</p>
+                                                            </div>
                                                         )}
                                                     </td>
 
