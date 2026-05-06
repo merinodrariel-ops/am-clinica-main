@@ -329,7 +329,7 @@ export async function editarRegistroHoras(
         .from('registro_horas')
         .update({
             ...input.cambios,
-            estado: 'Resuelto',
+            estado: 'approved',
             observaciones: `[CORREGIDO] ${input.motivo}`,
         })
         .eq('id', input.registroId);

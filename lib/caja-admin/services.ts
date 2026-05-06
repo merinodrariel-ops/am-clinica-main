@@ -1036,7 +1036,7 @@ export async function registrarHoras(
             hora_ingreso: horaIngreso,
             hora_egreso: horaEgreso,
             salida_dia_siguiente: salidaDiaSiguiente,
-            estado: 'Registrado'
+            estado: 'approved'
         });
 
     if (error) {
@@ -1342,7 +1342,7 @@ export async function getRegistrosObservados(options: {
 
     const { data, error } = await query;
     if (error) {
-        console.error('Error fetching observados:', error);
+        console.error('Error fetching observados:', error.message, error.code, error.details);
         return [];
     }
     return data || [];

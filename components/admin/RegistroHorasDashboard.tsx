@@ -108,64 +108,85 @@ export default function RegistroHorasDashboard() {
         XLSX.writeFile(wb, `horas_${mes}.xlsx`);
     }
 
-    function exportPdf() {
+    async function exportPdf() {
         if (!resumen) return;
         const mesL = mesLabel(mes);
         const prevL = mesLabel(prevMes(mes));
         const totalCosto = resumen.prestadores.reduce((s, p) => s + (p.costo_total ?? 0), 0);
-        const rows = resumen.prestadores.map(p => {
+
+        const { jsPDF } = await import('jspdf');
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 14;
+        let y = 16;
+
+        const drawHeader = () => {
+            doc.setFillColor(15, 23, 42);
+            doc.rect(0, 0, pageWidth, 28, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text(`AM Clínica · Informe de horas ${mesL}`, margin, 12);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.text(`Comparativo contra ${prevL}`, margin, 20);
+            doc.text(`Generado ${new Date().toLocaleDateString('es-AR')}`, pageWidth - margin, 20, { align: 'right' });
+            y = 38;
+        };
+
+        const ensureSpace = (needed = 8) => {
+            if (y + needed <= pageHeight - 14) return;
+            doc.addPage();
+            drawHeader();
+        };
+
+        drawHeader();
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Total horas: ${resumen.total_horas}h`, margin, y);
+        doc.text(`Días-persona: ${resumen.total_dias_persona}`, margin + 56, y);
+        doc.text(`Costo estimado: ${totalCosto > 0 ? `$${Math.round(totalCosto).toLocaleString('es-AR')}` : '-'}`, margin + 112, y);
+        y += 10;
+
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        doc.setFillColor(30, 41, 59);
+        doc.rect(margin, y, pageWidth - margin * 2, 8, 'F');
+        doc.text('Prestador', margin + 3, y + 5);
+        doc.text('Días', margin + 86, y + 5);
+        doc.text(prevL, margin + 108, y + 5);
+        doc.text(mesL, margin + 138, y + 5);
+        doc.text('Dif.', margin + 168, y + 5);
+        doc.text('Prom/día', margin + 190, y + 5);
+        doc.text('Costo ARS', margin + 220, y + 5);
+        doc.text('Horario', margin + 252, y + 5);
+        y += 10;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        resumen.prestadores.forEach((p) => {
+            ensureSpace(8);
             const prev = resumenPrev?.prestadores.find(x => x.personal_id === p.personal_id);
             const dif = prev ? p.total_horas - prev.total_horas : null;
-            const costo = p.costo_total !== null ? `$${p.costo_total.toLocaleString('es-AR')}` : '—';
-            const difStr = dif === null ? '—' : `${dif >= 0 ? '+' : ''}${Math.round(dif * 10) / 10}h`;
-            return `<tr>
-                <td>${p.apellido ? `${p.apellido}, ${p.nombre}` : p.nombre}</td>
-                <td style="text-align:center">${p.dias}</td>
-                <td style="text-align:right">${prev ? `${prev.total_horas}h` : '—'}</td>
-                <td style="text-align:right"><strong>${p.total_horas}h</strong>${p.horas_extra > 0 ? ` <small style="color:#d97706">+${p.horas_extra}h ext</small>` : ''}</td>
-                <td style="text-align:right">${difStr}</td>
-                <td style="text-align:right">${p.prom_horas_dia}h</td>
-                <td style="text-align:right">${costo}</td>
-                <td style="text-align:center;font-size:11px;font-family:monospace">${p.hora_ingreso_min && p.hora_egreso_max ? `${p.hora_ingreso_min}–${p.hora_egreso_max}` : '—'}</td>
-            </tr>`;
-        }).join('');
-        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Horas ${mesL}</title>
-        <style>
-            body{font-family:system-ui,sans-serif;font-size:12px;color:#1e293b;margin:24px}
-            h1{font-size:18px;margin:0 0 4px}p.sub{color:#64748b;font-size:11px;margin:0 0 16px}
-            table{width:100%;border-collapse:collapse}
-            th{background:#1e293b;color:#fff;padding:6px 8px;text-align:left;font-size:11px}
-            th:not(:first-child){text-align:right}th:nth-child(2){text-align:center}th:last-child{text-align:center}
-            td{padding:5px 8px;border-bottom:1px solid #e2e8f0}
-            tr:hover td{background:#f8fafc}
-            tfoot td{font-weight:700;background:#f1f5f9;border-top:2px solid #334155}
-            @media print{body{margin:0}}
-        </style></head><body>
-        <h1>Informe de Horas — ${mesL}</h1>
-        <p class="sub">Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-        <table>
-            <thead><tr>
-                <th>Prestador</th><th style="text-align:center">Días</th>
-                <th style="text-align:right">${prevL}</th><th style="text-align:right">${mesL}</th>
-                <th style="text-align:right">Dif.</th><th style="text-align:right">Prom/día</th>
-                <th style="text-align:right">Costo ARS</th><th style="text-align:center">Horario</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-            <tfoot><tr>
-                <td>TOTAL</td><td style="text-align:center">${resumen.total_dias_persona}</td>
-                <td style="text-align:right">${resumenPrev ? `${resumenPrev.total_horas}h` : '—'}</td>
-                <td style="text-align:right">${resumen.total_horas}h</td>
-                <td colspan="3" />
-                <td style="text-align:right">${totalCosto > 0 ? `$${totalCosto.toLocaleString('es-AR')}` : '—'}</td>
-                <td />
-            </tr></tfoot>
-        </table>
-        </body></html>`;
-        const w = window.open('', '_blank', 'width=1000,height=700');
-        if (!w) return;
-        w.document.write(html);
-        w.document.close();
-        w.print();
+            const difStr = dif === null ? '-' : `${dif >= 0 ? '+' : ''}${Math.round(dif * 10) / 10}h`;
+            const costo = p.costo_total !== null ? `$${Math.round(p.costo_total).toLocaleString('es-AR')}` : '-';
+            const nombre = p.apellido ? `${p.apellido}, ${p.nombre}` : p.nombre;
+            doc.setDrawColor(226, 232, 240);
+            doc.line(margin, y + 7, pageWidth - margin, y + 7);
+            doc.text(doc.splitTextToSize(nombre, 78)[0] || nombre, margin + 3, y + 5);
+            doc.text(String(p.dias), margin + 88, y + 5);
+            doc.text(prev ? `${prev.total_horas}h` : '-', margin + 108, y + 5);
+            doc.text(`${p.total_horas}h`, margin + 138, y + 5);
+            doc.text(difStr, margin + 168, y + 5);
+            doc.text(`${p.prom_horas_dia}h`, margin + 190, y + 5);
+            doc.text(costo, margin + 220, y + 5);
+            doc.text(p.hora_ingreso_min && p.hora_egreso_max ? `${p.hora_ingreso_min}-${p.hora_egreso_max}` : '-', margin + 252, y + 5);
+            y += 8;
+        });
+
+        doc.save(`informe_horas_${mes}.pdf`);
     }
 
     async function openDetallePrestador(prestador: ResumenPrestador) {

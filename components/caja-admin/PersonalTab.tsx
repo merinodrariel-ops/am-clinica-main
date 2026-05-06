@@ -378,7 +378,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     }
 
     function isResolvedRegistro(reg: RegistroHoras) {
-        return String(reg.estado || '').toLowerCase() === 'resuelto' || reg.observaciones?.startsWith('[CORREGIDO]');
+        const status = String(reg.estado || '').toLowerCase();
+        return status === 'approved' || status === 'resuelto' || reg.observaciones?.startsWith('[CORREGIDO]');
     }
 
     async function openHoursDashboard(p: Personal) {
@@ -446,7 +447,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         URL.revokeObjectURL(url);
     }
 
-    function printHoursDashboard(p: Personal, rows: RegistroHoras[]) {
+    async function printHoursDashboard(p: Personal, rows: RegistroHoras[]) {
         const monthRows = rows
             .filter((row) => row.fecha.startsWith(hoursDashboardMes))
             .sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -455,71 +456,108 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const totalEarnings = calculateAdjustedEarnings(monthRows, valorHora, p.area || '', p.rol || '');
         const pending = monthRows.filter(isObservedRegistro).length;
         const resolved = monthRows.filter(isResolvedRegistro).length;
-        const detailRows = monthRows.map((row) => `
-            <tr>
-                <td>${row.fecha}</td>
-                <td>${row.hora_ingreso || '-'}</td>
-                <td>${row.hora_egreso || '-'}</td>
-                <td>${Number(row.horas || 0).toFixed(1)}h</td>
-                <td>${isResolvedRegistro(row) ? 'Resuelto' : row.estado}</td>
-                <td>${row.observaciones || ''}</td>
-            </tr>
-        `).join('');
 
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
-        printWindow.document.write(`
-            <html>
-                <head>
-                    <title>Informe de horas - ${p.nombre} ${p.apellido || ''}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; color: #111827; padding: 28px; }
-                        h1 { margin: 0 0 4px; font-size: 22px; }
-                        p { margin: 0; color: #4b5563; }
-                        .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 22px 0; }
-                        @media print { .cards { grid-template-columns: repeat(5, 1fr); } }
-                        .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; }
-                        .value { font-size: 18px; font-weight: 700; color: #0f766e; }
-                        .label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
-                        th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
-        th { background: #f3f4f6; color: #374151; }
-                    </style>
-                </head>
-                <body>
-                    <h1>Informe de horas</h1>
-                    <p>${p.nombre} ${p.apellido || ''} · ${mesLabel(hoursDashboardMes)}</p>
-                    <div class="cards">
-                        <div class="card"><div class="value">${monthRows.length}</div><div class="label">Días cargados</div></div>
-                        <div class="card"><div class="value">${Math.round(total * 10) / 10}h</div><div class="label">Total horas</div></div>
-                        <div class="card"><div class="value" style="color: #10b981;">$${totalEarnings.toLocaleString('es-AR')}</div><div class="label">Total a Liquidar</div></div>
-                        <div class="card"><div class="value">${pending}</div><div class="label">Pendientes</div></div>
-                        <div class="card"><div class="value">${resolved}</div><div class="label">Corregidos</div></div>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr><th>Fecha</th><th>Ingreso</th><th>Egreso</th><th>Horas</th><th>Total</th><th>Estado</th><th>Observaciones</th></tr>
-                        </thead>
-                        <tbody>${monthRows.map((row) => {
-                            const rowEarnings = calculateAdjustedEarnings([row], valorHora, p.area || '', p.rol || '');
-                            return `
-                            <tr>
-                                <td>${row.fecha}</td>
-                                <td>${row.hora_ingreso || '-'}</td>
-                                <td>${row.hora_egreso || '-'}</td>
-                                <td>${Number(row.horas || 0).toFixed(1)}h</td>
-                                <td>$${rowEarnings.toLocaleString('es-AR')}</td>
-                                <td>${isResolvedRegistro(row) ? 'Resuelto' : row.estado}</td>
-                                <td>${row.observaciones || ''}</td>
-                            </tr>
-                        `}).join('') || '<tr><td colspan="7">Sin registros para este mes.</td></tr>'}</tbody>
-                    </table>
-                </body>
-            </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
+        const { jsPDF } = await import('jspdf');
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 14;
+        let y = 16;
+
+        const drawHeader = () => {
+            doc.setFillColor(15, 23, 42);
+            doc.rect(0, 0, pageWidth, 28, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text('AM Clínica · Informe mensual de horas', margin, 12);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.text(`${p.nombre} ${p.apellido || ''} · ${mesLabel(hoursDashboardMes)}`, margin, 20);
+            doc.text(`Generado ${new Date().toLocaleDateString('es-AR')}`, pageWidth - margin, 20, { align: 'right' });
+            y = 38;
+        };
+
+        const ensureSpace = (needed = 10) => {
+            if (y + needed <= pageHeight - 14) return;
+            doc.addPage();
+            drawHeader();
+        };
+
+        drawHeader();
+
+        const cards = [
+            ['Días cargados', String(monthRows.length)],
+            ['Total horas', `${Math.round(total * 10) / 10}h`],
+            ['Total a liquidar', `$${Math.round(totalEarnings).toLocaleString('es-AR')}`],
+            ['Valor hora', `$${valorHora.toLocaleString('es-AR')}`],
+            ['Pendientes', String(pending)],
+            ['Corregidos', String(resolved)],
+        ];
+
+        const cardWidth = (pageWidth - margin * 2 - 10) / 3;
+        cards.forEach(([label, value], index) => {
+            const col = index % 3;
+            const row = Math.floor(index / 3);
+            const x = margin + col * (cardWidth + 5);
+            const cy = y + row * 18;
+            doc.setDrawColor(226, 232, 240);
+            doc.setFillColor(248, 250, 252);
+            doc.roundedRect(x, cy, cardWidth, 14, 2, 2, 'FD');
+            doc.setTextColor(71, 85, 105);
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'normal');
+            doc.text(label.toUpperCase(), x + 4, cy + 5);
+            doc.setTextColor(label === 'Total a liquidar' ? 5 : 15, label === 'Total a liquidar' ? 150 : 23, label === 'Total a liquidar' ? 105 : 42);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text(value, x + 4, cy + 11);
+        });
+
+        y += 42;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.setFillColor(30, 41, 59);
+        doc.rect(margin, y, pageWidth - margin * 2, 8, 'F');
+        doc.text('Fecha', margin + 3, y + 5);
+        doc.text('Ingreso', margin + 33, y + 5);
+        doc.text('Egreso', margin + 58, y + 5);
+        doc.text('Horas', margin + 83, y + 5);
+        doc.text('Total', margin + 108, y + 5);
+        doc.text('Estado', margin + 138, y + 5);
+        doc.text('Observaciones', margin + 166, y + 5);
+        y += 10;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(15, 23, 42);
+
+        if (monthRows.length === 0) {
+            doc.text('Sin registros para este mes.', margin + 3, y + 6);
+        }
+
+        monthRows.forEach((row) => {
+            ensureSpace(9);
+            const rowEarnings = calculateAdjustedEarnings([row], valorHora, p.area || '', p.rol || '');
+            const status = isResolvedRegistro(row) ? 'Resuelto' : isObservedRegistro(row) ? 'Pendiente' : 'OK';
+            const notes = doc.splitTextToSize(row.observaciones || row.motivo_observado || '-', 104).slice(0, 2);
+            const rowHeight = Math.max(8, notes.length * 4 + 2);
+            ensureSpace(rowHeight);
+            doc.setDrawColor(226, 232, 240);
+            doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
+            doc.text(row.fecha, margin + 3, y + 5);
+            doc.text(row.hora_ingreso || '-', margin + 33, y + 5);
+            doc.text(row.hora_egreso || '-', margin + 58, y + 5);
+            doc.text(`${Number(row.horas || 0).toFixed(1)}h`, margin + 83, y + 5);
+            doc.text(`$${Math.round(rowEarnings).toLocaleString('es-AR')}`, margin + 108, y + 5);
+            doc.text(status, margin + 138, y + 5);
+            doc.text(notes, margin + 166, y + 5);
+            y += rowHeight;
+        });
+
+        const filename = `informe_horas_${sanitizeFilePart(`${p.nombre}_${p.apellido || ''}`)}_${hoursDashboardMes}.pdf`;
+        doc.save(filename);
     }
 
     function sanitizeFilePart(value: string) {
@@ -3429,7 +3467,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
                                             >
                                                 <FileText className="w-4 h-4" />
-                                                PDF / imprimir
+                                                Descargar PDF
                                             </button>
                                             <button
                                                 type="button"

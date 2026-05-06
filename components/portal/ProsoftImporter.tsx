@@ -177,7 +177,7 @@ function isObservedStatus(status: string | null | undefined) {
 
 function isResolvedRecord(row: RegistroHoras) {
     const status = String(row.estado || '').toLowerCase();
-    return status === 'resuelto' || row.observaciones?.startsWith('[CORREGIDO]');
+    return status === 'approved' || status === 'resuelto' || row.observaciones?.startsWith('[CORREGIDO]');
 }
 
 export default function ProsoftImporter({ mes }: { mes?: string }) {
