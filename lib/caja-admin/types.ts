@@ -242,6 +242,9 @@ export interface LiquidacionMensual {
     tc_liquidacion?: number;
     total_usd?: number;
     estado: 'Pendiente' | 'Pagado' | 'Anulado';
+    fecha_pago?: string | null;
+    observaciones?: string | null;
+    breakdown?: Record<string, unknown> | null;
 }
 
 export interface ReporteSummary {

@@ -266,6 +266,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [mensualidadPersonal, setMensualidadPersonal] = useState<Personal | null>(null);
     const [mensualidadSaving, setMensualidadSaving] = useState(false);
     const [mensualidadComprobante, setMensualidadComprobante] = useState<File | null>(null);
+    const [mensualidadLiquidaciones, setMensualidadLiquidaciones] = useState<LiquidacionMensual[]>([]);
+    const [mensualidadLoading, setMensualidadLoading] = useState(false);
     const [mensualidadForm, setMensualidadForm] = useState({
         mes: mesActual,
         monto: 0,
@@ -1107,10 +1109,45 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             });
     }
 
-    function openMensualidadForm(p: Personal) {
+    function getLiquidacionMonth(liq: LiquidacionMensual) {
+        return String(liq.mes || '').slice(0, 7);
+    }
+
+    function getLiquidacionEstadoLabel(liq: LiquidacionMensual) {
+        const estado = String(liq.estado || '').toLowerCase();
+        if (estado === 'paid' || estado === 'pagado') return 'Pagado';
+        if (estado === 'rejected' || estado === 'anulado') return 'Anulado';
+        if (estado === 'approved' || estado === 'aprobado') return 'Aprobado';
+        return 'Pendiente';
+    }
+
+    function getLiquidacionBreakdown(liq: LiquidacionMensual) {
+        return liq.breakdown && typeof liq.breakdown === 'object' && !Array.isArray(liq.breakdown)
+            ? liq.breakdown as Record<string, unknown>
+            : {};
+    }
+
+    function getLiquidacionOrigenLabel(liq: LiquidacionMensual) {
+        const breakdown = getLiquidacionBreakdown(liq);
+        if (breakdown.origen === 'caja_admin_movimientos') return 'Caja administración';
+        if (breakdown.tipo === 'mensualidad_fija') return 'Mensualidad fija';
+        return 'Liquidación mensual';
+    }
+
+    function getLiquidacionComprobanteLabel(liq: LiquidacionMensual) {
+        const breakdown = getLiquidacionBreakdown(liq);
+        const name = breakdown.comprobante_nombre;
+        if (typeof name === 'string' && name.trim()) return name;
+        const url = breakdown.comprobante_url;
+        if (typeof url === 'string' && url.trim()) return 'Comprobante adjunto';
+        return '';
+    }
+
+    async function openMensualidadForm(p: Personal) {
         const amount = Number(p.monto_mensual || 0);
         setMensualidadPersonal(p);
         setMensualidadComprobante(null);
+        setMensualidadLiquidaciones([]);
         setMensualidadForm({
             mes: mesActual,
             monto: amount > 0 ? amount : 250,
@@ -1118,6 +1155,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             fechaPago: getLocalISODate(),
             observaciones: '',
         });
+        setMensualidadLoading(true);
+        try {
+            const rows = await getLiquidaciones({ personalId: p.id });
+            setMensualidadLiquidaciones(rows);
+        } catch (error) {
+            console.error('Error loading monthly provider liquidations:', error);
+            toast.error('No se pudo cargar el historial mensual');
+        } finally {
+            setMensualidadLoading(false);
+        }
     }
 
     async function handleSubmitMensualidad() {
@@ -1147,9 +1194,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             }
 
             toast.success('Mensualidad registrada');
-            setMensualidadPersonal(null);
             setMensualidadComprobante(null);
             await loadData();
+            if (mensualidadPersonal) {
+                const rows = await getLiquidaciones({ personalId: mensualidadPersonal.id });
+                setMensualidadLiquidaciones(rows);
+            }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'No se pudo registrar la mensualidad');
         } finally {
@@ -3255,9 +3305,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     >
                                                         <div className="flex items-center gap-2 font-bold uppercase tracking-tight text-sm">
                                                             <DollarSign className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                                            Cargar Mensualidad
+                                                            Dashboard Mensual
                                                         </div>
-                                                        <span className="text-[10px] opacity-70 font-medium">Mensualidad fija</span>
+                                                        <span className="text-[10px] opacity-70 font-medium">Pagos, comprobantes e historial</span>
                                                     </Button>
                                                 );
                                             }
@@ -3277,13 +3327,19 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
                         onClick={e => e.stopPropagation()}
                     >
                         {(() => {
                             const p = mensualidadPersonal;
                             const nombre = `${p.nombre} ${p.apellido || ''}`.trim();
-                            const liquidacionMes = liquidaciones.find(l => l.personal_id === p.id && String(l.mes).startsWith(mensualidadForm.mes));
+                            const sourceLiquidaciones = mensualidadLiquidaciones.length > 0
+                                ? mensualidadLiquidaciones
+                                : liquidaciones.filter(l => l.personal_id === p.id);
+                            const liquidacionMes = sourceLiquidaciones.find(l => getLiquidacionMonth(l) === mensualidadForm.mes);
+                            const liquidacionesMensuales = sourceLiquidaciones
+                                .slice()
+                                .sort((a, b) => String(b.mes || '').localeCompare(String(a.mes || '')));
                             const estimatedArs = mensualidadForm.moneda === 'ARS'
                                 ? mensualidadForm.monto
                                 : mensualidadForm.monto * (tcBna || 0);
@@ -3373,17 +3429,94 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         <div className="mb-4 grid gap-3 sm:grid-cols-3">
                                             <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                                                 <p className="text-xs font-semibold uppercase text-slate-400">Estado mes</p>
-                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">{liquidacionMes ? 'Ya tiene registro' : 'Sin registrar'}</p>
+                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">
+                                                    {liquidacionMes ? getLiquidacionEstadoLabel(liquidacionMes) : 'Sin registrar'}
+                                                </p>
                                             </div>
                                             <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                                                 <p className="text-xs font-semibold uppercase text-slate-400">Total USD</p>
-                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">USD {estimatedUsd.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</p>
+                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">
+                                                    USD {Number(liquidacionMes?.total_usd ?? estimatedUsd).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                </p>
                                             </div>
                                             <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                                                 <p className="text-xs font-semibold uppercase text-slate-400">Total ARS</p>
-                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">$ {estimatedArs.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
+                                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">
+                                                    $ {Number(liquidacionMes?.total_ars ?? estimatedArs).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                                                </p>
                                             </div>
                                         </div>
+
+                                        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                                            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Historial mensual sincronizado</p>
+                                                    <p className="text-xs text-slate-500">Pagos registrados desde caja administración y mensualidades directas.</p>
+                                                </div>
+                                                <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">
+                                                    {liquidacionesMensuales.length} registro{liquidacionesMensuales.length === 1 ? '' : 's'}
+                                                </span>
+                                            </div>
+                                            {mensualidadLoading ? (
+                                                <div className="px-4 py-8 text-center text-sm text-slate-500">Cargando historial...</div>
+                                            ) : liquidacionesMensuales.length === 0 ? (
+                                                <div className="px-4 py-8 text-center text-sm text-slate-500">
+                                                    Todavía no hay pagos mensuales sincronizados para este prestador.
+                                                </div>
+                                            ) : (
+                                                <div className="max-h-72 overflow-y-auto">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-950">
+                                                            <tr className="border-b border-slate-200 dark:border-slate-800">
+                                                                <th className="px-4 py-2 text-left font-medium">Mes</th>
+                                                                <th className="px-3 py-2 text-left font-medium">Estado</th>
+                                                                <th className="px-3 py-2 text-right font-medium">USD</th>
+                                                                <th className="px-3 py-2 text-right font-medium">ARS</th>
+                                                                <th className="px-3 py-2 text-left font-medium">Pago</th>
+                                                                <th className="px-4 py-2 text-left font-medium">Origen</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                            {liquidacionesMensuales.map((liq) => {
+                                                                const estadoLabel = getLiquidacionEstadoLabel(liq);
+                                                                const comprobante = getLiquidacionComprobanteLabel(liq);
+                                                                return (
+                                                                    <tr key={liq.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                                        <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-100">{mesLabel(getLiquidacionMonth(liq))}</td>
+                                                                        <td className="px-3 py-2.5">
+                                                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                                                                estadoLabel === 'Pagado'
+                                                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                                                                    : estadoLabel === 'Anulado'
+                                                                                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+                                                                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                                                            }`}>
+                                                                                {estadoLabel}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-3 py-2.5 text-right font-mono text-slate-700 dark:text-slate-200">
+                                                                            {liq.total_usd ? `USD ${Number(liq.total_usd).toLocaleString('es-AR', { maximumFractionDigits: 2 })}` : '-'}
+                                                                        </td>
+                                                                        <td className="px-3 py-2.5 text-right font-mono text-slate-700 dark:text-slate-200">
+                                                                            $ {Number(liq.total_ars || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                                                                        </td>
+                                                                        <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">
+                                                                            {liq.fecha_pago ? formatDateForLocale(liq.fecha_pago) : '-'}
+                                                                            {comprobante && <div className="mt-0.5 text-[10px] text-violet-500">{comprobante}</div>}
+                                                                        </td>
+                                                                        <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">
+                                                                            {getLiquidacionOrigenLabel(liq)}
+                                                                            {liq.observaciones && <div className="mt-0.5 max-w-[220px] truncate text-[10px]" title={liq.observaciones}>{liq.observaciones}</div>}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                             <Button variant="outline" onClick={() => setMensualidadPersonal(null)} disabled={mensualidadSaving}>
                                                 Cancelar
