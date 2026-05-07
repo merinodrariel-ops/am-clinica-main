@@ -940,7 +940,7 @@ export async function importProsoftData(
 
         for (const reg of fila.registros) {
             const requiereRevision = Boolean(reg.incompleto || reg.requiereRevision);
-            const estado = requiereRevision ? 'observado' : 'approved';
+            const estado = requiereRevision ? 'Observado' : 'Registrado';
             const motivoObservado = requiereRevision ? (reg.motivoObservado || 'Otro') : null;
 
             let observaciones = requiereRevision
@@ -1152,7 +1152,7 @@ export async function importProsoftPreviewSafe(
 
             for (const reg of fila.registros) {
                 const requiereRevision = Boolean(reg.incompleto || reg.requiereRevision);
-                const estado = requiereRevision ? 'observado' : 'approved';
+                const estado = requiereRevision ? 'Observado' : 'Registrado';
                 const motivoObservado = requiereRevision ? (reg.motivoObservado || 'Otro') : null;
 
                 let observaciones = requiereRevision

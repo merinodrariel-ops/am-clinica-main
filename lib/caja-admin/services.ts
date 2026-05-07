@@ -1036,7 +1036,7 @@ export async function registrarHoras(
             hora_ingreso: horaIngreso,
             hora_egreso: horaEgreso,
             salida_dia_siguiente: salidaDiaSiguiente,
-            estado: 'approved'
+            estado: 'Registrado'
         });
 
     if (error) {
@@ -1511,7 +1511,7 @@ export async function resolverRegistro(
     const { error: updateError } = await getSupabase()
         .from('registro_horas')
         .update({
-            estado: 'approved',
+            estado: 'Registrado',
             hora_ingreso: data.hora_ingreso || current.hora_ingreso,
             hora_egreso: data.hora_egreso || current.hora_egreso,
             salida_dia_siguiente: data.salida_dia_siguiente ?? current.salida_dia_siguiente ?? false,
@@ -1576,7 +1576,7 @@ export async function resolverRegistro(
         usuario: data.resuelto_por,
         campo_modificado: 'estado',
         valor_anterior: current.estado,
-        valor_nuevo: 'approved',
+        valor_nuevo: 'Registrado',
         motivo: data.nota_resolucion,
         metodo_verificacion: data.metodo_verificacion,
         evidencia_url: data.evidencia_url,
