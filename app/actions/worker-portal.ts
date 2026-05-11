@@ -679,6 +679,23 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
 
     if (linkError) throw new Error(linkError.message);
 
+    const authUserId = linkData.user?.id;
+    if (authUserId) {
+        await adminSupabase.from('profiles').upsert({
+            id: authUserId,
+            email: worker.email,
+            full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
+            categoria: authRole,
+            estado: 'invitado',
+            invitation_sent_at: new Date().toISOString(),
+        });
+
+        await adminSupabase
+            .from('personal')
+            .update({ user_id: authUserId, categoria: authRole })
+            .eq('id', workerId);
+    }
+
     const actionLink = linkData.properties?.action_link;
     if (actionLink) {
         const emailResult = await EmailService.sendInvitation(
