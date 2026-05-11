@@ -52,6 +52,7 @@ import {
     updateRegistroHoras,
     eliminarRegistroHoras,
     calculateWorkedHours,
+    inferSalidaDiaSiguiente,
     generarLiquidacion,
     countObservadosPendientes,
     createPersonal,
@@ -460,28 +461,60 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const resolved = monthRows.filter(isResolvedRegistro).length;
 
         const { jsPDF } = await import('jspdf');
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const logoDataUrl = await loadPublicImageDataUrl('/am-logo.png');
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 14;
-        let y = 16;
+        let y = 17;
 
         const drawHeader = () => {
-            doc.setFillColor(15, 23, 42);
-            doc.rect(0, 0, pageWidth, 28, 'F');
-            doc.setTextColor(255, 255, 255);
+            doc.setFillColor(248, 250, 252);
+            doc.rect(0, 0, pageWidth, 40, 'F');
+            doc.setDrawColor(20, 184, 166);
+            doc.setLineWidth(1);
+            doc.line(margin, 39, pageWidth - margin, 39);
+
+            if (logoDataUrl) {
+                doc.addImage(logoDataUrl, 'PNG', margin, 9, 20, 20);
+            } else {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(16);
+                doc.setTextColor(20, 184, 166);
+                doc.text('AM', margin, 22);
+            }
+
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(16);
-            doc.text('AM Clínica · Informe mensual de horas', margin, 12);
+            doc.setFontSize(12);
+            doc.setTextColor(15, 23, 42);
+            doc.text('AM Estética Dental', margin + 25, 17);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.text('Puerto Madero · Buenos Aires', margin + 25, 22);
+            doc.text('Resumen mensual de horas y liquidación', margin + 25, 27);
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(15);
+            doc.setTextColor(15, 23, 42);
+            doc.text('Informe de horas', pageWidth - margin, 17, { align: 'right' });
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
-            doc.text(`${p.nombre} ${p.apellido || ''} · ${mesLabel(hoursDashboardMes)}`, margin, 20);
-            doc.text(`Generado ${new Date().toLocaleDateString('es-AR')}`, pageWidth - margin, 20, { align: 'right' });
-            y = 38;
+            doc.setTextColor(71, 85, 105);
+            doc.text(`${p.nombre} ${p.apellido || ''} · ${mesLabel(hoursDashboardMes)}`, pageWidth - margin, 24, { align: 'right' });
+            doc.setFontSize(8);
+            doc.text(`Emitido ${formatDateForLocale(getLocalISODate(), 'es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, pageWidth - margin, 30, { align: 'right' });
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(54);
+            doc.setTextColor(241, 245, 249);
+            doc.text('AM', pageWidth / 2, pageHeight / 2 + 18, { align: 'center', angle: -18 });
+
+            y = 51;
         };
 
         const ensureSpace = (needed = 10) => {
-            if (y + needed <= pageHeight - 14) return;
+            if (y + needed <= pageHeight - 18) return;
             doc.addPage();
             drawHeader();
         };
@@ -497,16 +530,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             ['Corregidos', String(resolved)],
         ];
 
-        const cardWidth = (pageWidth - margin * 2 - 10) / 3;
+        const cardWidth = (pageWidth - margin * 2 - 5) / 2;
         cards.forEach(([label, value], index) => {
-            const col = index % 3;
-            const row = Math.floor(index / 3);
+            const col = index % 2;
+            const row = Math.floor(index / 2);
             const x = margin + col * (cardWidth + 5);
-            const cy = y + row * 18;
+            const cy = y + row * 17;
             doc.setDrawColor(226, 232, 240);
-            doc.setFillColor(248, 250, 252);
-            doc.roundedRect(x, cy, cardWidth, 14, 2, 2, 'FD');
-            doc.setTextColor(71, 85, 105);
+            doc.setFillColor(255, 255, 255);
+            doc.roundedRect(x, cy, cardWidth, 13, 2, 2, 'FD');
+            doc.setTextColor(100, 116, 139);
             doc.setFontSize(7);
             doc.setFont('helvetica', 'normal');
             doc.text(label.toUpperCase(), x + 4, cy + 5);
@@ -516,19 +549,18 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             doc.text(value, x + 4, cy + 11);
         });
 
-        y += 42;
+        y += 59;
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(255, 255, 255);
-        doc.setFillColor(30, 41, 59);
+        doc.setTextColor(15, 118, 110);
+        doc.setFillColor(240, 253, 250);
         doc.rect(margin, y, pageWidth - margin * 2, 8, 'F');
         doc.text('Fecha', margin + 3, y + 5);
-        doc.text('Ingreso', margin + 33, y + 5);
-        doc.text('Egreso', margin + 58, y + 5);
-        doc.text('Horas', margin + 83, y + 5);
-        doc.text('Total', margin + 108, y + 5);
-        doc.text('Estado', margin + 138, y + 5);
-        doc.text('Observaciones', margin + 166, y + 5);
+        doc.text('Horario', margin + 30, y + 5);
+        doc.text('Horas', margin + 69, y + 5);
+        doc.text('Total', margin + 92, y + 5);
+        doc.text('Estado', margin + 124, y + 5);
+        doc.text('Observaciones', margin + 148, y + 5);
         y += 10;
 
         doc.setFont('helvetica', 'normal');
@@ -540,23 +572,33 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         }
 
         monthRows.forEach((row) => {
-            ensureSpace(9);
             const rowEarnings = calculateAdjustedEarnings([row], valorHora, p.area || '', p.rol || '');
             const status = isResolvedRegistro(row) ? 'Resuelto' : isObservedRegistro(row) ? 'Pendiente' : 'OK';
-            const notes = doc.splitTextToSize(row.observaciones || row.motivo_observado || '-', 104).slice(0, 2);
+            const notes = doc.splitTextToSize(row.observaciones || row.motivo_observado || '-', 44).slice(0, 2);
             const rowHeight = Math.max(8, notes.length * 4 + 2);
             ensureSpace(rowHeight);
             doc.setDrawColor(226, 232, 240);
             doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
-            doc.text(row.fecha, margin + 3, y + 5);
-            doc.text(row.hora_ingreso || '-', margin + 33, y + 5);
-            doc.text(row.hora_egreso || '-', margin + 58, y + 5);
-            doc.text(`${Number(row.horas || 0).toFixed(1)}h`, margin + 83, y + 5);
-            doc.text(`$${Math.round(rowEarnings).toLocaleString('es-AR')}`, margin + 108, y + 5);
-            doc.text(status, margin + 138, y + 5);
-            doc.text(notes, margin + 166, y + 5);
+            doc.text(formatDateForLocale(row.fecha, 'es-AR', { day: '2-digit', month: '2-digit' }), margin + 3, y + 5);
+            doc.text(`${row.hora_ingreso || '-'} - ${row.hora_egreso || '-'}`, margin + 30, y + 5);
+            doc.text(`${Number(row.horas || 0).toFixed(1)}h`, margin + 69, y + 5);
+            doc.text(`$${Math.round(rowEarnings).toLocaleString('es-AR')}`, margin + 92, y + 5);
+            doc.text(status, margin + 124, y + 5);
+            doc.text(notes, margin + 148, y + 5);
             y += rowHeight;
         });
+
+        const totalPages = doc.getNumberOfPages();
+        for (let page = 1; page <= totalPages; page += 1) {
+            doc.setPage(page);
+            doc.setDrawColor(226, 232, 240);
+            doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(100, 116, 139);
+            doc.text('AM Estética Dental · Informe interno de liquidaciones', margin, pageHeight - 7);
+            doc.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+        }
 
         const filename = `informe_horas_${sanitizeFilePart(`${p.nombre}_${p.apellido || ''}`)}_${hoursDashboardMes}.pdf`;
         doc.save(filename);
@@ -679,7 +721,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const fileName = `prestaciones_${sanitizeFilePart(prestador)}_${mes}.pdf`;
         const { jsPDF } = await import('jspdf');
         const logoDataUrl = await loadPublicImageDataUrl('/am-logo.png');
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 14;
@@ -734,7 +776,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
 
         y = 51;
 
-        const cardWidth = (pageWidth - margin * 2 - 9) / 4;
+        const cardWidth = (pageWidth - margin * 2 - 5) / 2;
         const cards = [
             ['Prestaciones', String(monthRows.length)],
             ['Items resumidos', String(groupedRows.length)],
@@ -743,29 +785,31 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         ];
 
         cards.forEach(([label, value], index) => {
-            const x = margin + index * (cardWidth + 3);
+            const col = index % 2;
+            const row = Math.floor(index / 2);
+            const x = margin + col * (cardWidth + 5);
+            const cy = y + row * 18;
             doc.setFillColor(255, 255, 255);
             doc.setDrawColor(226, 232, 240);
-            doc.roundedRect(x, y, cardWidth, 18, 2, 2, 'FD');
+            doc.roundedRect(x, cy, cardWidth, 15, 2, 2, 'FD');
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(index >= 2 ? 4 : 15, index >= 2 ? 120 : 23, index >= 2 ? 87 : 42);
-            doc.text(value, x + 4, y + 7);
+            doc.text(value, x + 4, cy + 7);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7);
             doc.setTextColor(100, 116, 139);
-            doc.text(label.toUpperCase(), x + 4, y + 14);
+            doc.text(label.toUpperCase(), x + 4, cy + 13);
         });
-        y += 28;
+        y += 42;
 
         const columns = [
-            { label: 'Fecha', x: margin, width: 24 },
-            { label: 'Paciente', x: margin + 27, width: 48 },
-            { label: 'Prestacion', x: margin + 78, width: 82 },
-            { label: 'Cant.', x: margin + 163, width: 15 },
-            { label: 'Moneda', x: margin + 181, width: 18 },
-            { label: 'Honorarios', x: margin + 202, width: 32 },
-            { label: 'Estado', x: margin + 237, width: 32 },
+            { label: 'Fecha', x: margin, width: 19 },
+            { label: 'Paciente', x: margin + 23, width: 35 },
+            { label: 'Prestación', x: margin + 62, width: 48 },
+            { label: 'Cant.', x: margin + 114, width: 13 },
+            { label: 'Mon.', x: margin + 131, width: 14 },
+            { label: 'Honorarios', x: margin + 150, width: 29 },
         ];
 
         const drawHeader = () => {
@@ -791,7 +835,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 String(group.cantidad),
                 group.moneda_cobro,
                 group.total_honorarios.toLocaleString('es-AR', { maximumFractionDigits: 2 }),
-                group.estado_pago || '',
             ];
             const splitValues = values.map((value, index) => doc.splitTextToSize(value, columns[index].width));
             const rowHeight = Math.max(7, Math.max(...splitValues.map(lines => lines.length)) * 4 + 2);
@@ -964,11 +1007,10 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             const calculated = calculateWorkedHours({
                 horaIngreso: horasForm.hora_ingreso,
                 horaEgreso: horasForm.hora_egreso,
-                salidaDiaSiguiente: horasForm.salida_dia_siguiente
             });
             setHorasForm(prev => ({ ...prev, horas: calculated }));
         }
-    }, [horasForm.hora_ingreso, horasForm.hora_egreso, horasForm.salida_dia_siguiente]);
+    }, [horasForm.hora_ingreso, horasForm.hora_egreso]);
 
     function openEditForm(p: Personal) {
         setEditingPersonal(p);
@@ -1261,7 +1303,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             horasForm.observaciones || undefined,
             horasForm.hora_ingreso || undefined,
             horasForm.hora_egreso || undefined,
-            horasForm.salida_dia_siguiente
+            inferSalidaDiaSiguiente(horasForm.hora_ingreso, horasForm.hora_egreso)
         );
 
         if (result.success) {
@@ -1290,7 +1332,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const result = await updateRegistroHoras(editingHorasRegistro.id, {
             hora_ingreso: horasEditForm.hora_ingreso,
             hora_egreso: horasEditForm.hora_egreso,
-            salida_dia_siguiente: horasEditForm.salida_dia_siguiente,
+            salida_dia_siguiente: inferSalidaDiaSiguiente(horasEditForm.hora_ingreso, horasEditForm.hora_egreso),
             observaciones: horasEditForm.observaciones,
             fecha: horasEditForm.fecha,
             horas: horasEditForm.horas
@@ -3859,7 +3901,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 const newHoras = calculateWorkedHours({
                                                     horaIngreso: newIngreso,
                                                     horaEgreso: horasForm.hora_egreso,
-                                                    salidaDiaSiguiente: horasForm.salida_dia_siguiente
                                                 });
                                                 setHorasForm({ ...horasForm, hora_ingreso: newIngreso, horas: newHoras });
                                             }}
@@ -3879,29 +3920,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     const newHoras = calculateWorkedHours({
                                                         horaIngreso: horasForm.hora_ingreso,
                                                         horaEgreso: newEgreso,
-                                                        salidaDiaSiguiente: horasForm.salida_dia_siguiente
                                                     });
                                                     setHorasForm({ ...horasForm, hora_egreso: newEgreso, horas: newHoras });
                                                 }}
                                                 className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                             />
-                                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={horasForm.salida_dia_siguiente}
-                                                    onChange={(e) => {
-                                                        const newVal = e.target.checked;
-                                                        const newHoras = calculateWorkedHours({
-                                                            horaIngreso: horasForm.hora_ingreso,
-                                                            horaEgreso: horasForm.hora_egreso,
-                                                            salidaDiaSiguiente: newVal
-                                                        });
-                                                        setHorasForm({ ...horasForm, salida_dia_siguiente: newVal, horas: newHoras });
-                                                    }}
-                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                />
-                                                <span className="text-xs text-slate-500 font-medium">Sale el día siguiente</span>
-                                            </label>
                                         </div>
                                     </div>
 
@@ -4164,7 +4187,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 const newHoras = calculateWorkedHours({
                                                     horaIngreso: newIngreso,
                                                     horaEgreso: horasEditForm.hora_egreso,
-                                                    salidaDiaSiguiente: horasEditForm.salida_dia_siguiente
                                                 });
                                                 setHorasEditForm({ ...horasEditForm, hora_ingreso: newIngreso, horas: newHoras });
                                             }}
@@ -4182,29 +4204,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     const newHoras = calculateWorkedHours({
                                                         horaIngreso: horasEditForm.hora_ingreso,
                                                         horaEgreso: newEgreso,
-                                                        salidaDiaSiguiente: horasEditForm.salida_dia_siguiente
                                                     });
                                                     setHorasEditForm({ ...horasEditForm, hora_egreso: newEgreso, horas: newHoras });
                                                 }}
                                                 className="w-full px-4 py-3 rounded-2xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 transition-all font-mono text-lg"
                                             />
-                                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={horasEditForm.salida_dia_siguiente}
-                                                    onChange={(e) => {
-                                                        const newVal = e.target.checked;
-                                                        const newHoras = calculateWorkedHours({
-                                                            horaIngreso: horasEditForm.hora_ingreso,
-                                                            horaEgreso: horasEditForm.hora_egreso,
-                                                            salidaDiaSiguiente: newVal
-                                                        });
-                                                        setHorasEditForm({ ...horasEditForm, salida_dia_siguiente: newVal, horas: newHoras });
-                                                    }}
-                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shadow-sm transition-all"
-                                                />
-                                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Sale el día siguiente</span>
-                                            </label>
                                         </div>
                                     </div>
                                 </div>

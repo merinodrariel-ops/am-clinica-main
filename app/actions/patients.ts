@@ -22,6 +22,54 @@ export interface ListPatientsFilters {
     offset?: number;
 }
 
+function normalizePatientText(value: string | null | undefined): string {
+    return (value || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+}
+
+function sanitizeDocumento(value: unknown): string | undefined {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw) return undefined;
+
+    const normalized = normalizePatientText(raw).replace(/[\s._-]+/g, '');
+    const placeholders = new Set([
+        'dni',
+        'udni',
+        'sindni',
+        'nodni',
+        'notiene',
+        'pendiente',
+        'provisorio',
+        'provisoria',
+        'desconocido',
+        'desconocida',
+        'xxx',
+        'xxxx',
+    ]);
+
+    if (placeholders.has(normalized) || /^0+$/.test(normalized)) return undefined;
+
+    return raw;
+}
+
+function namesLookLikeSamePatient(existing: Paciente, incoming: Partial<Paciente>): boolean {
+    const existingNombre = normalizePatientText(existing.nombre);
+    const existingApellido = normalizePatientText(existing.apellido);
+    const incomingNombre = normalizePatientText(incoming.nombre);
+    const incomingApellido = normalizePatientText(incoming.apellido);
+
+    if (!incomingNombre || !incomingApellido) return false;
+    return existingNombre === incomingNombre && existingApellido === incomingApellido;
+}
+
+function patientDisplayName(patient: Pick<Paciente, 'nombre' | 'apellido'>): string {
+    return `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'otro paciente';
+}
+
 export async function listPatientsAction(filters: ListPatientsFilters = {}) {
     try {
         const supabase = await createClient();
@@ -127,7 +175,14 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
 export async function upsertPatientAction(patientData: Partial<Paciente>): Promise<UpsertPatientResult> {
     try {
         const supabase = await createClient();
-        console.log('Starting upsertPatientAction', patientData.email, patientData.documento);
+        const cleanedPatientData: Partial<Paciente> = {
+            ...patientData,
+            documento: sanitizeDocumento(patientData.documento),
+            email: typeof patientData.email === 'string' && patientData.email.trim()
+                ? patientData.email.trim().toLowerCase()
+                : undefined,
+        };
+        console.log('Starting upsertPatientAction', cleanedPatientData.email, cleanedPatientData.documento);
 
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -147,27 +202,50 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
         let existingId: string | null = null;
         let existingData: Paciente | null = null;
 
-        const { data: duplicates, error: searchError } = await supabase
-            .from('pacientes')
-            .select('*')
-            .eq('is_deleted', false)
-            .or(`documento.eq.${patientData.documento || 'nonexistent'},email.eq.${patientData.email || 'nonexistent'}`);
+        const duplicateFilters: string[] = [];
+        if (cleanedPatientData.documento) {
+            duplicateFilters.push(`documento.eq.${cleanedPatientData.documento}`);
+        } else if (cleanedPatientData.email) {
+            duplicateFilters.push(`email.eq.${cleanedPatientData.email}`);
+        }
 
-        if (searchError) throw new Error(searchError.message);
+        let duplicates: Paciente[] = [];
+        if (duplicateFilters.length > 0) {
+            const { data, error: searchError } = await supabase
+                .from('pacientes')
+                .select('*')
+                .eq('is_deleted', false)
+                .or(duplicateFilters.join(','));
+
+            if (searchError) throw new Error(searchError.message);
+            duplicates = (data || []) as Paciente[];
+        }
 
         const normalization = (s: string | undefined | null) => s?.toString().trim().toLowerCase() || '';
 
-        if (patientData.documento) {
-            const byDni = duplicates?.find(p => normalization(p.documento) === normalization(patientData.documento));
+        if (cleanedPatientData.documento) {
+            const byDni = duplicates?.find(p => normalization(p.documento) === normalization(cleanedPatientData.documento));
             if (byDni) {
+                if (!namesLookLikeSamePatient(byDni, cleanedPatientData)) {
+                    return {
+                        success: false,
+                        error: `Ese DNI ya está asociado a ${patientDisplayName(byDni)}. Revisá el documento o editá esa ficha si corresponde.`,
+                    };
+                }
                 existingId = byDni.id_paciente;
                 existingData = byDni as Paciente;
             }
         }
 
-        if (!existingId && patientData.email) {
-            const byEmail = duplicates?.find(p => normalization(p.email) === normalization(patientData.email));
+        if (!existingId && !cleanedPatientData.documento && cleanedPatientData.email) {
+            const byEmail = duplicates?.find(p => normalization(p.email) === normalization(cleanedPatientData.email));
             if (byEmail) {
+                if (!namesLookLikeSamePatient(byEmail, cleanedPatientData)) {
+                    return {
+                        success: false,
+                        error: 'Ese email ya está asociado a otra ficha. Para una ficha provisoria dejá el email vacío hasta confirmar los datos reales.',
+                    };
+                }
                 existingId = byEmail.id_paciente;
                 existingData = byEmail as Paciente;
             }
@@ -184,7 +262,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             ];
 
             for (const key of fields) {
-                const newValue = patientData[key];
+                const newValue = cleanedPatientData[key];
                 const oldValue = existingData[key];
                 if (newValue !== undefined && newValue !== null && newValue !== '') {
                     if (newValue !== oldValue) {
@@ -224,7 +302,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             }
         } else {
             const newPatientData = {
-                ...patientData,
+                ...cleanedPatientData,
                 fecha_alta: new Date().toISOString(),
                 is_deleted: false,
                 welcome_email_sent: false
@@ -257,7 +335,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
                 console.error('Error Drive:', driveErr);
             }
 
-            if (patientData.consentimiento_comunicacion && created.email) {
+            if (cleanedPatientData.consentimiento_comunicacion && created.email) {
                 try {
                     const emailResult = await sendWelcomeEmailAction(
                         `${created.nombre} ${created.apellido}`,

@@ -124,12 +124,16 @@ function CajaAdminContent() {
 
     async function loadObservadosSummary() {
         const mes = currentMes();
-        const [summary, leaders] = await Promise.all([
+        const [summaryResult, leadersResult] = await Promise.allSettled([
             getObservadosSlaSummary(mes),
             getObservadosCriticalLeaders(mes, 3),
         ]);
-        setObservadosSummary(summary);
-        setObservadosCriticalLeaders(leaders);
+        setObservadosSummary(
+            summaryResult.status === 'fulfilled'
+                ? summaryResult.value
+                : { total: 0, warn: 0, critical: 0 }
+        );
+        setObservadosCriticalLeaders(leadersResult.status === 'fulfilled' ? leadersResult.value : []);
     }
 
     function renderTab() {

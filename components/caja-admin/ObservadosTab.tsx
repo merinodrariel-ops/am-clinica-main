@@ -155,7 +155,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
         setResolucionForm({
             hora_ingreso: registro.hora_ingreso || '',
             hora_egreso: registro.hora_egreso || '',
-            salida_dia_siguiente: registro.salida_dia_siguiente || inferSalidaDiaSiguiente(registro.hora_ingreso, registro.hora_egreso),
+            salida_dia_siguiente: inferSalidaDiaSiguiente(registro.hora_ingreso, registro.hora_egreso),
             nota_resolucion: '',
             metodo_verificacion: undefined,
             evidencia_url: '',
@@ -180,7 +180,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
         const result = await resolverRegistro(selectedRegistro.id, {
             hora_ingreso: resolucionForm.hora_ingreso || undefined,
             hora_egreso: resolucionForm.hora_egreso || undefined,
-            salida_dia_siguiente: resolucionForm.salida_dia_siguiente ?? false,
+            salida_dia_siguiente: inferSalidaDiaSiguiente(resolucionForm.hora_ingreso, resolucionForm.hora_egreso),
             nota_resolucion: resolucionForm.nota_resolucion,
             metodo_verificacion: resolucionForm.metodo_verificacion,
             evidencia_url: resolucionForm.evidencia_url || undefined,
@@ -484,25 +484,6 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                             className="w-full px-4 py-2 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
                                         />
                                     </div>
-                                </div>
-
-                                <div className="rounded-xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/80 dark:bg-indigo-900/10 px-4 py-3">
-                                    <label className="flex items-start gap-3 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(resolucionForm.salida_dia_siguiente)}
-                                            onChange={(e) => setResolucionForm({ ...resolucionForm, salida_dia_siguiente: e.target.checked })}
-                                            className="mt-0.5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <div>
-                                            <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
-                                                La salida corresponde al día siguiente
-                                            </p>
-                                            <p className="text-xs text-indigo-700/80 dark:text-indigo-300/80 mt-1">
-                                                Úsalo para turnos que terminan después de medianoche, por ejemplo 20:00 a 01:00.
-                                            </p>
-                                        </div>
-                                    </label>
                                 </div>
 
                                 <div>

@@ -11,8 +11,9 @@ test('calculateWorkedHours handles overnight shifts automatically', () => {
     assert.equal(calculateWorkedHours({ horaIngreso: '20:00', horaEgreso: '01:00' }), 5);
 });
 
-test('calculateWorkedHours respects explicit next-day exit flag', () => {
-    assert.equal(calculateWorkedHours({ horaIngreso: '23:30', horaEgreso: '00:30', salidaDiaSiguiente: true }), 1);
+test('calculateWorkedHours ignores explicit next-day flag when exit is later same day', () => {
+    assert.equal(calculateWorkedHours({ horaIngreso: '05:06', horaEgreso: '08:06', salidaDiaSiguiente: true }), 3);
+    assert.equal(calculateWorkedHours({ horaIngreso: '09:32', horaEgreso: '11:32', salidaDiaSiguiente: true }), 2);
 });
 
 test('inferSalidaDiaSiguiente detects exits after midnight', () => {

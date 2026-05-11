@@ -11,7 +11,7 @@ export function calculateWorkedHours(input: {
     const inMinutes = inH * 60 + inM;
     let outMinutes = outH * 60 + outM;
 
-    if (input.salidaDiaSiguiente || outMinutes < inMinutes) {
+    if (outMinutes < inMinutes) {
         outMinutes += 24 * 60;
     }
 

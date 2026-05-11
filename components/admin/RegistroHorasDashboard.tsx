@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { Clock, TrendingUp, Users, ChevronLeft, ChevronRight, RefreshCw, X, Download, Printer } from 'lucide-react';
 import { getResumenHorasMes, getRegistrosHorasMes, editarRegistroHoras, ResumenMes, ResumenPrestador, RegistroHoras } from '@/app/actions/registro-horas';
-import { calculateWorkedHours } from '@/lib/caja-admin/attendance-utils';
+import { calculateWorkedHours, inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
 import { toast } from 'sonner';
 
 function mesLabel(ym: string) {
@@ -29,6 +29,22 @@ function nextMes(ym: string) {
 function currentMes() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+async function loadPublicImageDataUrl(src: string): Promise<string | null> {
+    try {
+        const response = await fetch(src);
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        return await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+        });
+    } catch {
+        return null;
+    }
 }
 
 const COLORS = [
@@ -115,24 +131,51 @@ export default function RegistroHorasDashboard() {
         const totalCosto = resumen.prestadores.reduce((s, p) => s + (p.costo_total ?? 0), 0);
 
         const { jsPDF } = await import('jspdf');
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const logoDataUrl = await loadPublicImageDataUrl('/am-logo.png');
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 14;
-        let y = 16;
+        let y = 17;
 
         const drawHeader = () => {
-            doc.setFillColor(15, 23, 42);
-            doc.rect(0, 0, pageWidth, 28, 'F');
-            doc.setTextColor(255, 255, 255);
+            doc.setFillColor(248, 250, 252);
+            doc.rect(0, 0, pageWidth, 40, 'F');
+            doc.setDrawColor(20, 184, 166);
+            doc.setLineWidth(1);
+            doc.line(margin, 39, pageWidth - margin, 39);
+            if (logoDataUrl) {
+                doc.addImage(logoDataUrl, 'PNG', margin, 9, 20, 20);
+            } else {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(16);
+                doc.setTextColor(20, 184, 166);
+                doc.text('AM', margin, 22);
+            }
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(16);
-            doc.text(`AM Clínica · Informe de horas ${mesL}`, margin, 12);
+            doc.setFontSize(12);
+            doc.setTextColor(15, 23, 42);
+            doc.text('AM Estética Dental', margin + 25, 17);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.text('Puerto Madero · Buenos Aires', margin + 25, 22);
+            doc.text('Resumen mensual de horas y liquidación', margin + 25, 27);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(15);
+            doc.setTextColor(15, 23, 42);
+            doc.text('Informe de horas', pageWidth - margin, 17, { align: 'right' });
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
-            doc.text(`Comparativo contra ${prevL}`, margin, 20);
-            doc.text(`Generado ${new Date().toLocaleDateString('es-AR')}`, pageWidth - margin, 20, { align: 'right' });
-            y = 38;
+            doc.setTextColor(71, 85, 105);
+            doc.text(`${mesL} · vs ${prevL}`, pageWidth - margin, 24, { align: 'right' });
+            doc.setFontSize(8);
+            doc.text(`Emitido ${new Date().toLocaleDateString('es-AR')}`, pageWidth - margin, 30, { align: 'right' });
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(54);
+            doc.setTextColor(241, 245, 249);
+            doc.text('AM', pageWidth / 2, pageHeight / 2 + 18, { align: 'center', angle: -18 });
+            y = 51;
         };
 
         const ensureSpace = (needed = 8) => {
@@ -152,16 +195,15 @@ export default function RegistroHorasDashboard() {
 
         doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
-        doc.setFillColor(30, 41, 59);
+        doc.setTextColor(15, 118, 110);
+        doc.setFillColor(240, 253, 250);
         doc.rect(margin, y, pageWidth - margin * 2, 8, 'F');
         doc.text('Prestador', margin + 3, y + 5);
-        doc.text('Días', margin + 86, y + 5);
-        doc.text(prevL, margin + 108, y + 5);
-        doc.text(mesL, margin + 138, y + 5);
-        doc.text('Dif.', margin + 168, y + 5);
-        doc.text('Prom/día', margin + 190, y + 5);
-        doc.text('Costo ARS', margin + 220, y + 5);
-        doc.text('Horario', margin + 252, y + 5);
+        doc.text('Días', margin + 64, y + 5);
+        doc.text(prevL, margin + 82, y + 5);
+        doc.text(mesL, margin + 108, y + 5);
+        doc.text('Dif.', margin + 134, y + 5);
+        doc.text('Costo', margin + 151, y + 5);
         y += 10;
 
         doc.setFont('helvetica', 'normal');
@@ -175,16 +217,26 @@ export default function RegistroHorasDashboard() {
             const nombre = p.apellido ? `${p.apellido}, ${p.nombre}` : p.nombre;
             doc.setDrawColor(226, 232, 240);
             doc.line(margin, y + 7, pageWidth - margin, y + 7);
-            doc.text(doc.splitTextToSize(nombre, 78)[0] || nombre, margin + 3, y + 5);
-            doc.text(String(p.dias), margin + 88, y + 5);
-            doc.text(prev ? `${prev.total_horas}h` : '-', margin + 108, y + 5);
-            doc.text(`${p.total_horas}h`, margin + 138, y + 5);
-            doc.text(difStr, margin + 168, y + 5);
-            doc.text(`${p.prom_horas_dia}h`, margin + 190, y + 5);
-            doc.text(costo, margin + 220, y + 5);
-            doc.text(p.hora_ingreso_min && p.hora_egreso_max ? `${p.hora_ingreso_min}-${p.hora_egreso_max}` : '-', margin + 252, y + 5);
+            doc.text(doc.splitTextToSize(nombre, 58)[0] || nombre, margin + 3, y + 5);
+            doc.text(String(p.dias), margin + 66, y + 5);
+            doc.text(prev ? `${prev.total_horas}h` : '-', margin + 82, y + 5);
+            doc.text(`${p.total_horas}h`, margin + 108, y + 5);
+            doc.text(difStr, margin + 134, y + 5);
+            doc.text(costo, margin + 151, y + 5);
             y += 8;
         });
+
+        const totalPages = doc.getNumberOfPages();
+        for (let page = 1; page <= totalPages; page += 1) {
+            doc.setPage(page);
+            doc.setDrawColor(226, 232, 240);
+            doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(100, 116, 139);
+            doc.text('AM Estética Dental · Informe interno de liquidaciones', margin, pageHeight - 7);
+            doc.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+        }
 
         doc.save(`informe_horas_${mes}.pdf`);
     }
@@ -218,8 +270,8 @@ export default function RegistroHorasDashboard() {
             const horas = calculateWorkedHours({
                 horaIngreso: editForm.hora_ingreso,
                 horaEgreso: editForm.hora_egreso,
-                salidaDiaSiguiente: editForm.salida_dia_siguiente
             });
+            const salidaDiaSiguiente = inferSalidaDiaSiguiente(editForm.hora_ingreso, editForm.hora_egreso);
 
             const res = await editarRegistroHoras({
                 registroId: editingRegistro.id,
@@ -227,7 +279,7 @@ export default function RegistroHorasDashboard() {
                 cambios: {
                     hora_ingreso: editForm.hora_ingreso,
                     hora_egreso: editForm.hora_egreso,
-                    salida_dia_siguiente: editForm.salida_dia_siguiente,
+                    salida_dia_siguiente: salidaDiaSiguiente,
                     horas
                 }
             });
@@ -618,28 +670,12 @@ export default function RegistroHorasDashboard() {
                                 </div>
                             </div>
 
-                            <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={editForm.salida_dia_siguiente}
-                                        onChange={e => setEditForm(prev => ({ ...prev, salida_dia_siguiente: e.target.checked }))}
-                                        className="rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-offset-slate-900"
-                                    />
-                                    <div>
-                                        <p className="text-sm font-medium text-blue-200">Salida al día siguiente</p>
-                                        <p className="text-[11px] text-blue-400/70">Marca esto si el turno cruza la medianoche.</p>
-                                    </div>
-                                </label>
-                            </div>
-
                             <div className="flex items-center justify-between px-1 text-slate-400">
                                 <span className="text-xs">Cálculo estimado:</span>
                                 <span className="text-sm font-bold text-white">
                                     {calculateWorkedHours({
                                         horaIngreso: editForm.hora_ingreso,
                                         horaEgreso: editForm.hora_egreso,
-                                        salidaDiaSiguiente: editForm.salida_dia_siguiente
                                     })}h
                                 </span>
                             </div>

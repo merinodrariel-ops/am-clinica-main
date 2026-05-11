@@ -5053,14 +5053,14 @@ export default function PhotoStudioModal({
                         <button
                             onClick={() => setToolsHidden(false)}
                             title="Mostrar herramientas"
-                            className="hidden md:flex items-center justify-center w-6 border-l border-white/10 bg-black/20 hover:bg-white/5 transition-colors flex-shrink-0 text-white/30 hover:text-white/60"
+                            className="hidden md:flex items-center justify-center w-8 border-l border-white/10 bg-black/20 hover:bg-white/5 transition-colors flex-shrink-0 text-white/30 hover:text-white/60"
                         >
-                            <PanelRightOpen size={13} />
+                            <PanelRightOpen size={18} />
                         </button>
                     )}
 
                     {/* Tools panel — right side on desktop */}
-                    <div className={`${toolsHidden ? '!hidden' : ''} hidden md:flex flex-col w-64 border-l border-white/10 overflow-y-auto flex-shrink-0 bg-black/20`}>
+                    <div className={`${toolsHidden ? '!hidden' : ''} hidden md:flex flex-col w-80 2xl:w-96 border-l border-white/10 overflow-y-auto flex-shrink-0 bg-black/20`}>
                         {smileMode ? (
                             <SmileDesignPanel
                                 state={smileDesign.state}
@@ -5221,16 +5221,16 @@ export default function PhotoStudioModal({
                         ) : (
                         <>
                         {/* Panel header — just the hide button, title is already inside ToolsPanel */}
-                        <div className="flex items-center justify-end px-4 pt-3 pb-0 flex-shrink-0">
-                            <button
-                                onClick={() => setToolsHidden(true)}
-                                className="flex items-center gap-1 text-white/30 hover:text-white/70 text-xs transition-colors"
-                            >
-                                <PanelRightClose size={13} />
-                                Ocultar
-                            </button>
-                        </div>
-                        <div className="flex flex-col gap-5 p-4 pt-2 overflow-y-auto flex-1">
+	                        <div className="flex items-center justify-end px-5 pt-4 pb-0 flex-shrink-0">
+	                            <button
+	                                onClick={() => setToolsHidden(true)}
+	                                className="flex items-center gap-1.5 text-white/40 hover:text-white/80 text-sm font-medium transition-colors"
+	                            >
+	                                <PanelRightClose size={18} />
+	                                Ocultar
+	                            </button>
+	                        </div>
+	                        <div className="flex flex-col gap-6 p-5 pt-3 overflow-y-auto flex-1">
                         <ToolsPanel
                             rotation={canvasActive && canvasSelectedId
                                 ? (canvasLayers.find(l => l.id === canvasSelectedId)?.rotation ?? 0)
@@ -6069,15 +6069,15 @@ function ToolsPanel({
 }: ToolsPanelProps) {
     return (
         <>
-            <div className="flex items-center justify-between mb-1">
-                <p className="text-white/30 text-[10px] font-bold uppercase tracking-widest translate-y-0.5">Herramientas</p>
+            <div className="flex items-center justify-between mb-2">
+                <p className="text-white/45 text-sm font-bold uppercase tracking-wider">Herramientas</p>
                 {(canvasSelectedId || drawMode === 'selected' || drawMode === 'editing' || multiSelectedCount > 0) && (
                     <button
                         onClick={onDeleteSelection}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all text-[10px] font-bold uppercase"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all text-xs font-bold uppercase"
                         title="Eliminar selección"
                     >
-                        <Trash2 size={12} /> Eliminar
+                        <Trash2 size={16} /> Eliminar
                     </button>
                 )}
             </div>
@@ -6085,24 +6085,24 @@ function ToolsPanel({
             {/* Rotate */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-white/70 text-[10px] font-bold uppercase tracking-wider">
-                        <RotateCcw size={13} />
+                    <div className="flex items-center gap-2 text-white/75 text-sm font-bold uppercase tracking-wider">
+                        <RotateCcw size={18} />
                         Rotación
                     </div>
-                    <span className="bg-white/10 px-1.5 py-0.5 rounded font-mono text-[10px] text-white/70">
+                    <span className="bg-white/10 px-2 py-1 rounded font-mono text-xs text-white/75">
                         {rotation > 0 ? `+${rotation.toFixed(1)}°` : `${rotation.toFixed(1)}°`}
                     </span>
                 </div>
 
-                <div className="space-y-4 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="space-y-4 bg-white/5 p-4 rounded-xl border border-white/5">
                     {/* Fine adjustment */}
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                            <p className="text-[10px] text-white/30 uppercase tracking-tighter font-semibold">Ajuste fino</p>
+                            <p className="text-xs text-white/45 uppercase tracking-wide font-semibold">Ajuste fino</p>
                             {rotation !== 0 && (
                                 <button
                                     onClick={() => setRotation(0)}
-                                    className="text-[9px] text-[#C9A96E] hover:text-[#C9A96E]/80 transition-colors font-bold uppercase"
+                                    className="text-xs text-[#C9A96E] hover:text-[#C9A96E]/80 transition-colors font-bold uppercase"
                                 >
                                     Reset
                                 </button>
@@ -6119,31 +6119,31 @@ function ToolsPanel({
 
                     {/* Presets */}
                     <div className="space-y-2">
-                        <p className="text-[10px] text-white/30 uppercase tracking-tighter font-semibold">Presets rápidos</p>
+                        <p className="text-xs text-white/45 uppercase tracking-wide font-semibold">Presets rápidos</p>
                         <div className="grid grid-cols-3 gap-1.5">
                             <button
                                 onClick={() => { onPushHistory(); setRotation((r: number) => { let n = r - 90; return n < -180 ? n + 360 : n; }); }}
-                                className="flex flex-col items-center gap-1 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
+                                className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar -90°"
                             >
-                                <RotateCcw size={12} className="text-white/40 group-hover:text-white" />
-                                <span className="text-[9px] text-white/30 group-hover:text-white font-bold">-90°</span>
+                                <RotateCcw size={18} className="text-white/50 group-hover:text-white" />
+                                <span className="text-xs text-white/40 group-hover:text-white font-bold">-90°</span>
                             </button>
                             <button
                                 onClick={() => { onPushHistory(); setRotation((r: number) => { let n = r + 90; return n > 180 ? n - 360 : n; }); }}
-                                className="flex flex-col items-center gap-1 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
+                                className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar +90°"
                             >
-                                <RotateCw size={12} className="text-white/40 group-hover:text-white" />
-                                <span className="text-[9px] text-white/30 group-hover:text-white font-bold">+90°</span>
+                                <RotateCw size={18} className="text-white/50 group-hover:text-white" />
+                                <span className="text-xs text-white/40 group-hover:text-white font-bold">+90°</span>
                             </button>
                             <button
                                 onClick={() => { onPushHistory(); setRotation((r: number) => (r > 0 ? r - 180 : r + 180)); }}
-                                className="flex flex-col items-center gap-1 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
+                                className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Voltear 180°"
                             >
-                                <ArrowLeftRight size={12} className="rotate-90 text-white/40 group-hover:text-white" />
-                                <span className="text-[9px] text-white/30 group-hover:text-white font-bold">180°</span>
+                                <ArrowLeftRight size={18} className="rotate-90 text-white/50 group-hover:text-white" />
+                                <span className="text-xs text-white/40 group-hover:text-white font-bold">180°</span>
                             </button>
                         </div>
                     </div>
@@ -6152,13 +6152,13 @@ function ToolsPanel({
                 <div className="flex items-center justify-center">
                     <button
                         onClick={() => setShowGrid(v => !v)}
-                        className={`flex items-center justify-center gap-1.5 w-full py-2 rounded-lg transition-all text-xs font-medium border ${
+                        className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all text-sm font-semibold border ${
                             isGridVisible
                                 ? 'bg-[#C9A96E]/10 text-[#C9A96E] border-[#C9A96E]/30 shadow-lg shadow-[#C9A96E]/10'
                                 : 'bg-white/5 text-white/40 hover:text-white/60 border-white/5 hover:bg-white/10'
                         }`}
                     >
-                        <Grid size={13} />
+                        <Grid size={18} />
                         {isGridVisible ? 'Ocultar Grilla' : 'Alinear con Grilla'}
                     </button>
                 </div>
@@ -6167,11 +6167,11 @@ function ToolsPanel({
             {/* Brightness */}
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
-                        <Sun size={13} className="text-yellow-400" />
+                    <div className="flex items-center gap-2 text-white/75 text-sm font-semibold">
+                        <Sun size={18} className="text-yellow-400" />
                         Brillo
                     </div>
-                    <span className="text-white/40 text-xs">{brightness}%</span>
+                    <span className="text-white/50 text-sm">{brightness}%</span>
                 </div>
                 <input
                     type="range" min={0} max={200} step={1}
@@ -6183,37 +6183,37 @@ function ToolsPanel({
 
             {/* Crop */}
             <div className="space-y-2">
-                <p className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
-                    <CropIcon size={13} /> Recortar
+                <p className="flex items-center gap-2 text-white/75 text-sm font-semibold">
+                    <CropIcon size={18} /> Recortar
                 </p>
                 {canvasActive ? (
                     // Canvas mode: crop operates on the selected layer, not the main photo
                     canvasSelectedId ? (
                         <button
                             onClick={onEnterCropMode}
-                            className="w-full py-2 rounded-lg bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-colors flex items-center justify-center gap-1.5"
+                            className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
                         >
-                            <CropIcon size={13} /> Recortar capa seleccionada
+                            <CropIcon size={20} /> Recortar capa seleccionada
                         </button>
                     ) : (
-                        <p className="text-white/30 text-xs text-center py-1">
+                        <p className="text-white/45 text-sm text-center py-2">
                             Seleccioná una foto del lienzo para recortarla
                         </p>
                     )
                 ) : cropActive ? (
                     <>
-                        <p className="text-white/30 text-xs">
+                        <p className="text-white/45 text-sm">
                             Seleccioná el área a conservar.
                         </p>
                         <button
                             onClick={onConfirmCrop}
-                            className="w-full py-2 rounded-lg bg-blue-600 text-white text-sm font-medium transition-colors hover:bg-blue-500 flex items-center justify-center gap-1.5"
+                            className="w-full py-3 rounded-xl bg-blue-600 text-white text-base font-semibold transition-colors hover:bg-blue-500 flex items-center justify-center gap-2"
                         >
-                            <Check size={13} /> Confirmar recorte
+                            <Check size={20} /> Confirmar recorte
                         </button>
                         <button
                             onClick={onCancelCrop}
-                            className="w-full py-1.5 rounded-lg text-white/40 text-xs hover:text-white/70 transition-colors"
+                            className="w-full py-2 rounded-lg text-white/50 text-sm hover:text-white/80 transition-colors"
                         >
                             Cancelar
                         </button>
@@ -6221,9 +6221,9 @@ function ToolsPanel({
                 ) : (
                     <button
                         onClick={onEnterCropMode}
-                        className="w-full py-2 rounded-lg bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-colors flex items-center justify-center gap-1.5"
+                        className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
                     >
-                        <CropIcon size={13} />
+                        <CropIcon size={20} />
                         {hasPriorCrop ? 'Reajustar recorte' : 'Activar recorte'}
                     </button>
                 )}
@@ -6231,28 +6231,28 @@ function ToolsPanel({
 
             {/* Spot healing */}
             <div className="space-y-2">
-                <p className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
-                    <Zap size={13} className="text-cyan-300" /> Corrector
+                <p className="flex items-center gap-2 text-white/75 text-sm font-semibold">
+                    <Zap size={18} className="text-cyan-300" /> Corrector
                 </p>
                 <button
                     onClick={() => onSetHealMode(!healMode)}
                     disabled={canvasActive && !canvasSelectedId}
-                    className={`w-full py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                    className={`w-full py-3 rounded-xl text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
                         healMode
                             ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-300/30'
                             : 'bg-white/10 text-white/70 hover:bg-white/15'
                     }`}
                 >
-                    <Zap size={14} /> {healMode ? 'Corrector activo' : 'Activar corrector'}
+                    <Zap size={20} /> {healMode ? 'Corrector activo' : 'Activar corrector'}
                 </button>
                 {canvasActive && !canvasSelectedId && (
-                    <p className="text-white/30 text-xs text-center py-1">
+                    <p className="text-white/45 text-sm text-center py-2">
                         Seleccioná una foto del lienzo para corregirla
                     </p>
                 )}
                 {healMode && (
                     <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
-                        <p className="text-white/35 text-[10px] uppercase tracking-wider">Tamaño</p>
+                        <p className="text-white/45 text-xs uppercase tracking-wider">Tamaño</p>
                         <div className="flex items-center gap-2">
                             <input
                                 type="range" min={6} max={90} step={2}
@@ -6260,9 +6260,9 @@ function ToolsPanel({
                                 onChange={e => onSetHealSize(Number(e.target.value))}
                                 className="flex-1 accent-cyan-300"
                             />
-                            <span className="text-white/40 text-xs w-7">{healSize}</span>
+                            <span className="text-white/50 text-sm w-8">{healSize}</span>
                         </div>
-                        <p className="text-white/25 text-[10px]">
+                        <p className="text-white/35 text-xs">
                             Pintá sobre lunares, bordes o manchas para mimetizar con el entorno.
                         </p>
                     </div>
@@ -6271,17 +6271,17 @@ function ToolsPanel({
 
             {/* Background removal */}
             <div className="space-y-2">
-                <p className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
-                    <Wand2 size={13} className="text-violet-400" /> Fondo
+                <p className="flex items-center gap-2 text-white/75 text-sm font-semibold">
+                    <Wand2 size={18} className="text-violet-400" /> Fondo
                 </p>
                 {bgProcessing ? (
                     <>
-                        <div className="flex items-center gap-2 text-violet-300 text-xs">
-                            <Loader2 size={13} className="animate-spin" /> Removiendo fondo...
+                        <div className="flex items-center gap-2 text-violet-300 text-sm">
+                            <Loader2 size={18} className="animate-spin" /> Removiendo fondo...
                         </div>
                         <button
                             onClick={onCancelBg}
-                            className="w-full py-1.5 rounded-lg bg-white/10 text-white/50 text-xs hover:text-white/70 transition-colors"
+                            className="w-full py-2 rounded-lg bg-white/10 text-white/60 text-sm hover:text-white/80 transition-colors"
                         >
                             Cancelar
                         </button>
@@ -6290,13 +6290,13 @@ function ToolsPanel({
                     <button
                         onClick={onRemoveBg}
                         disabled={canvasActive ? !canvasSelectedId : bgDone}
-                        className="w-full py-2 rounded-lg bg-violet-600/30 text-violet-300 text-sm hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="w-full py-3 rounded-xl bg-violet-600/30 text-violet-200 text-base font-semibold hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {canvasActive
-                            ? <><Wand2 size={14} /> Remover fondo de capa</>
+                            ? <><Wand2 size={20} /> Remover fondo de capa</>
                             : bgDone
-                                ? <><Check size={14} /> Fondo removido</>
-                                : <><Wand2 size={14} /> Remover fondo</>
+                                ? <><Check size={20} /> Fondo removido</>
+                                : <><Wand2 size={20} /> Remover fondo</>
                         }
                     </button>
                 )}
@@ -6305,7 +6305,7 @@ function ToolsPanel({
                 {bgDone && !bgProcessing && (
                     <button
                         onClick={onUndoBg}
-                        className="w-full py-1.5 rounded-lg text-white/40 text-xs hover:text-white/70 transition-colors"
+                        className="w-full py-2 rounded-lg text-white/50 text-sm hover:text-white/80 transition-colors"
                     >
                         Deshacer remoción de fondo
                     </button>
@@ -6314,11 +6314,11 @@ function ToolsPanel({
                 {/* Brush editing controls */}
                 {bgDone && !bgProcessing && (
                     <div className="space-y-2 pt-1 border-t border-white/10">
-                        <p className="text-white/40 text-xs">Corrección de máscara:</p>
+                        <p className="text-white/50 text-sm">Corrección de máscara:</p>
                         {brushMode === null ? (
                             <button
                                 onClick={() => onSetBrushMode('restore')}
-                                className="w-full py-2 rounded-lg bg-white/10 text-white/70 text-sm hover:bg-white/15 transition-colors flex items-center justify-center gap-1.5"
+                                className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
                             >
                                 Editar máscara
                             </button>
@@ -6327,30 +6327,30 @@ function ToolsPanel({
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => onSetBrushMode('restore')}
-                                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${brushMode === 'restore' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/60 hover:bg-white/15'}`}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${brushMode === 'restore' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'}`}
                                     >
                                         Restaurar
                                     </button>
                                     <button
                                         onClick={() => onSetBrushMode('erase')}
-                                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${brushMode === 'erase' ? 'bg-red-600 text-white' : 'bg-white/10 text-white/60 hover:bg-white/15'}`}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${brushMode === 'erase' ? 'bg-red-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'}`}
                                     >
                                         Borrar más
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-white/40 text-xs w-12">Tamaño</span>
+                                    <span className="text-white/50 text-sm w-16">Tamaño</span>
                                     <input
                                         type="range" min={5} max={120} step={5}
                                         value={brushSize}
                                         onChange={e => onSetBrushSize(Number(e.target.value))}
                                         className="flex-1 accent-white/70"
                                     />
-                                    <span className="text-white/40 text-xs w-6">{brushSize}</span>
+                                    <span className="text-white/50 text-sm w-8">{brushSize}</span>
                                 </div>
                                 <button
                                     onClick={() => onSetBrushMode(null)}
-                                    className="w-full py-1.5 rounded-lg bg-[#C9A96E]/20 text-[#C9A96E] text-xs hover:bg-[#C9A96E]/30 transition-colors"
+                                    className="w-full py-2 rounded-lg bg-[#C9A96E]/20 text-[#C9A96E] text-sm font-semibold hover:bg-[#C9A96E]/30 transition-colors"
                                 >
                                     Terminar edición
                                 </button>
@@ -6362,7 +6362,7 @@ function ToolsPanel({
                 {/* Background color selector — only visible after bg removed */}
                 {bgDone && !bgProcessing && (
                     <div className="space-y-1.5">
-                        <p className="text-white/40 text-xs">Reemplazar con:</p>
+                        <p className="text-white/50 text-sm">Reemplazar con:</p>
                         <div className="flex gap-2">
                             {([
                                 { value: 'transparent', label: '▥', title: 'Transparente', cls: 'bg-white/10' },
@@ -6373,7 +6373,7 @@ function ToolsPanel({
                                     key={opt.value}
                                     onClick={() => setBgColor(opt.value)}
                                     title={opt.title}
-                                    className={`flex-1 py-2 rounded-lg text-sm border-2 transition-all ${opt.cls} ${
+                                    className={`flex-1 py-3 rounded-lg text-base border-2 transition-all ${opt.cls} ${
                                         bgColor === opt.value
                                             ? 'border-[#C9A96E] scale-105'
                                             : 'border-transparent hover:border-white/20'
@@ -6386,15 +6386,15 @@ function ToolsPanel({
                         <div className="flex gap-2 mt-1">
                             <button
                                 onClick={onUndoBg}
-                                className="flex-1 py-2 rounded-lg bg-white/10 text-white/60 text-sm hover:bg-white/20 transition-colors flex items-center justify-center gap-1.5"
+                                className="flex-1 py-3 rounded-xl bg-white/10 text-white/70 text-sm font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
                             >
-                                <X size={14} /> Cancelar
+                                <X size={18} /> Cancelar
                             </button>
                             <button
                                 onClick={onConfirmBg}
-                                className="flex-1 py-2 rounded-lg bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
+                                className="flex-1 py-3 rounded-xl bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
                             >
-                                <Check size={14} /> Confirmar
+                                <Check size={18} /> Confirmar
                             </button>
                         </div>
                     </div>
@@ -6404,28 +6404,28 @@ function ToolsPanel({
             {/* ── Trazo (Smile Design) ── */}
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
-                        <PenLine size={13} />
+                    <div className="flex items-center gap-2 text-white/75 text-sm font-semibold">
+                        <PenLine size={18} />
                         Trazo
                     </div>
                     <button
                         onClick={onToggleDrawVisible}
                         title={drawVisible ? 'Ocultar trazo' : 'Mostrar trazo'}
-                        className="p-1 rounded text-white/40 hover:text-white/70 transition-colors"
+                        className="p-1.5 rounded text-white/50 hover:text-white/80 transition-colors"
                     >
-                        {drawVisible ? <Eye size={13} /> : <EyeOff size={13} />}
+                        {drawVisible ? <Eye size={18} /> : <EyeOff size={18} />}
                     </button>
                 </div>
 
                 <button
                     onClick={() => onSetDrawMode(drawMode === 'idle' ? 'drawing' : 'idle')}
-                    className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-base font-semibold transition-colors ${
                         drawMode !== 'idle'
                             ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/30'
                             : 'bg-white/5 text-white/50 hover:text-white/80 border border-white/10'
                     }`}
                 >
-                    <PenLine size={12} />
+                    <PenLine size={20} />
                     {drawMode === 'drawing'
                         ? '● Dibujando — clic aquí para detener'
                         : drawMode === 'selected' ? 'Forma seleccionada'
@@ -6442,7 +6442,7 @@ function ToolsPanel({
                                     key={c}
                                     onClick={() => onSetDrawColor(c)}
                                     title={c}
-                                    className={`w-6 h-6 rounded-full border-2 transition-all ${
+                                    className={`w-8 h-8 rounded-full border-2 transition-all ${
                                         drawColor === c ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'
                                     }`}
                                     style={{ backgroundColor: hex }}
@@ -6453,7 +6453,7 @@ function ToolsPanel({
                 )}
 
                 {/* Stroke style selector */}
-                <div className="grid grid-cols-5 gap-1">
+                <div className="grid grid-cols-5 gap-1.5">
                     {([
                         { id: 'taper',    label: 'Taper',    title: 'Taper — fino en puntas, grueso en medio' },
                         { id: 'velocity', label: 'Firma',    title: 'Firma — rápido=fino, lento=grueso' },
@@ -6465,7 +6465,7 @@ function ToolsPanel({
                             key={opt.id}
                             title={opt.title}
                             onClick={() => onSetStrokeStyle(opt.id)}
-                            className={`py-1 rounded text-[10px] font-medium transition-all border ${
+                            className={`py-2 rounded-lg text-xs font-semibold transition-all border ${
                                 strokeStyle === opt.id
                                     ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/40'
                                     : 'bg-white/5 text-white/40 border-white/10 hover:text-white/70 hover:border-white/20'
@@ -6480,15 +6480,15 @@ function ToolsPanel({
                     <div className="flex gap-1.5">
                         <button
                             onClick={onUndoLastDrawPoint}
-                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs bg-white/5 text-white/50 hover:text-white/80 transition-colors border border-white/10"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-sm bg-white/5 text-white/60 hover:text-white/90 transition-colors border border-white/10"
                         >
-                            <Undo2 size={11} /> Deshacer
+                            <Undo2 size={16} /> Deshacer
                         </button>
                         <button
                             onClick={onClearDraw}
-                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs bg-white/5 text-white/50 hover:text-red-400 transition-colors border border-white/10"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-sm bg-white/5 text-white/60 hover:text-red-400 transition-colors border border-white/10"
                         >
-                            <X size={11} /> Borrar todo
+                            <X size={16} /> Borrar todo
                         </button>
                     </div>
                 )}
@@ -6497,45 +6497,45 @@ function ToolsPanel({
                 {multiSelectedCount >= 2 && (
                     <button
                         onClick={onGroupShapes}
-                        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/40 hover:bg-[#C9A96E]/30 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/40 hover:bg-[#C9A96E]/30 transition-colors"
                     >
                         Agrupar {multiSelectedCount} formas
                     </button>
                 )}
                 {multiSelectedCount >= 1 && multiSelectedCount < 2 && (
-                    <p className="text-white/30 text-[10px]">Cmd+clic en más formas para seleccionar</p>
+                    <p className="text-white/40 text-xs">Cmd+clic en más formas para seleccionar</p>
                 )}
 
                 {/* Ungroup button */}
                 {selectedShapeIsGroup && (
                     <button
                         onClick={onUngroupShape}
-                        className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs bg-white/5 text-white/50 hover:text-white/80 border border-white/10 transition-colors"
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm bg-white/5 text-white/60 hover:text-white/90 border border-white/10 transition-colors"
                     >
                         Desagrupar
                     </button>
                 )}
 
                 {drawMode === 'drawing' && currentPointCount > 0 && (
-                    <p className="text-white/25 text-[10px]">
+                    <p className="text-white/35 text-xs">
                         {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic para terminar abierto · clic en el primer punto para cerrar
                     </p>
                 )}
                 {(drawMode === 'selected' || drawMode === 'editing') && (
                     <button
                         onClick={onFlipHorizontal}
-                        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs bg-white/5 text-white/60 hover:text-white/90 border border-white/10 hover:border-white/20 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm bg-white/5 text-white/70 hover:text-white/90 border border-white/10 hover:border-white/20 transition-colors"
                     >
-                        <ArrowLeftRight size={12} /> Voltear horizontal
+                        <ArrowLeftRight size={18} /> Voltear horizontal
                     </button>
                 )}
                 {drawMode === 'selected' && (
-                    <p className="text-white/25 text-[10px]">
+                    <p className="text-white/35 text-xs">
                         Esquinas: arrastrar=escalar · Cmd+arrastrar=rotar · mover · doble clic=editar · Cmd+C/V=copiar
                     </p>
                 )}
                 {drawMode === 'editing' && (
-                    <p className="text-white/25 text-[10px]">
+                    <p className="text-white/35 text-xs">
                         Arrastrá puntos · doble clic en punto para curva/esquina · doble clic afuera para salir
                     </p>
                 )}
@@ -6543,28 +6543,28 @@ function ToolsPanel({
 
             {/* ── Texto ── */}
             <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-white/70 text-xs font-medium">
-                    <Type size={13} />
+                <div className="flex items-center gap-2 text-white/75 text-sm font-semibold">
+                    <Type size={18} />
                     Texto
                 </div>
                 <button
                     onClick={onToggleTextTool}
-                    className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-base font-semibold transition-colors ${
                         textToolActive
                             ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/30'
                             : 'bg-white/5 text-white/50 hover:text-white/80 border border-white/10'
                     }`}
                 >
-                    <Type size={12} />
+                    <Type size={20} />
                     {textToolActive ? 'Texto activo — clic para escribir' : 'Agregar texto'}
                 </button>
                 {textToolActive && (
-                    <p className="text-white/25 text-[10px]">
+                    <p className="text-white/40 text-xs">
                         Clic = crear · clic en texto = editar · mantener+arrastrar = mover · Enter o Esc = confirmar
                     </p>
                 )}
                 {textAnnotationCount > 0 && (
-                    <p className="text-white/30 text-[10px]">
+                    <p className="text-white/45 text-xs">
                         {textAnnotationCount} texto{textAnnotationCount !== 1 ? 's' : ''}
                     </p>
                 )}
@@ -6572,12 +6572,12 @@ function ToolsPanel({
 
             {/* ── Lienzo (Canvas mode) ── */}
             {canvasActive && (
-                <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[#C9A96E] text-xs font-semibold uppercase tracking-widest">
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-[#C9A96E] text-sm font-semibold uppercase tracking-widest">
                         <span>⊞</span> Lienzo
                     </div>
-                    <p className="text-white/30 text-[10px]">Proporción</p>
-                    <div className="grid grid-cols-2 gap-1">
+                    <p className="text-white/45 text-xs">Proporción</p>
+                    <div className="grid grid-cols-2 gap-1.5">
                         {([
                             { value: '1:1', label: '1:1', sub: 'Instagram' },
                             { value: '4:5', label: '4:5', sub: 'Portrait' },
@@ -6587,19 +6587,19 @@ function ToolsPanel({
                             <button
                                 key={opt.value}
                                 onClick={() => onCanvasRatioChange(opt.value)}
-                                className={`flex flex-col items-center py-1.5 rounded-lg border text-xs transition-all ${
+                                className={`flex flex-col items-center py-2 rounded-lg border text-sm transition-all ${
                                     canvasRatio === opt.value
                                         ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/40'
                                         : 'bg-white/5 text-white/50 border-white/10 hover:text-white/80'
                                 }`}
                             >
                                 <span className="font-semibold">{opt.label}</span>
-                                <span className="text-[9px] opacity-60">{opt.sub}</span>
+                                <span className="text-xs opacity-65">{opt.sub}</span>
                             </button>
                         ))}
                     </div>
                     {canvasLayerCount > 0 && (
-                        <div className="flex items-center justify-between text-[10px] text-white/30 mt-1">
+                        <div className="flex items-center justify-between text-xs text-white/45 mt-1">
                             <span>{canvasLayerCount} capa{canvasLayerCount !== 1 ? 's' : ''}</span>
                             <button
                                 onClick={onClearCanvasLayers}
@@ -6612,7 +6612,7 @@ function ToolsPanel({
                     {/* Canvas background color */}
                     {onSetCanvasBgColor && (
                         <div className="mb-3">
-                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1.5">Fondo</p>
+                            <p className="text-white/50 text-xs uppercase tracking-wider mb-1.5">Fondo</p>
                             <div className="flex gap-1.5">
                                 {[
                                     { value: '#ffffff', label: '⬜', title: 'Blanco' },
@@ -6623,7 +6623,7 @@ function ToolsPanel({
                                         key={opt.value}
                                         onClick={() => onSetCanvasBgColor(opt.value)}
                                         title={opt.title}
-                                        className={`flex-1 py-1.5 rounded text-sm border transition-all ${
+                                        className={`flex-1 py-2 rounded-lg text-base border transition-all ${
                                             (canvasBgColor ?? '#ffffff') === opt.value
                                                 ? 'border-[#C9A96E] bg-white/10'
                                                 : 'border-white/10 hover:border-white/30'
@@ -6635,7 +6635,7 @@ function ToolsPanel({
                             </div>
                         </div>
                     )}
-                    <p className="text-white/20 text-[10px]">Arrastrá fotos al lienzo · clic derecho en capa para opciones</p>
+                    <p className="text-white/35 text-xs">Arrastrá fotos al lienzo · clic derecho en capa para opciones</p>
                 </div>
             )}
 
@@ -6644,13 +6644,13 @@ function ToolsPanel({
             <button
                 onClick={onUndo}
                 disabled={historyCount === 0}
-                className="w-full py-2 rounded-lg border border-white/10 text-white/60 text-xs hover:text-white/80 hover:border-white/20 transition-colors disabled:opacity-25 flex items-center justify-center gap-1.5"
+                className="w-full py-3 rounded-xl border border-white/10 text-white/70 text-sm font-semibold hover:text-white/90 hover:border-white/20 transition-colors disabled:opacity-25 flex items-center justify-center gap-2"
             >
-                <Undo2 size={13} /> Deshacer (Ctrl+Z)
+                <Undo2 size={18} /> Deshacer (Ctrl+Z)
             </button>
             <button
                 onClick={onReset}
-                className="w-full py-2 rounded-lg border border-white/10 text-white/40 text-xs hover:text-white/70 hover:border-white/20 transition-colors"
+                className="w-full py-3 rounded-xl border border-white/10 text-white/55 text-sm font-semibold hover:text-white/80 hover:border-white/20 transition-colors"
             >
                 Resetear todo
             </button>

@@ -22,7 +22,7 @@ import {
     type CajaAdminCategoria,
     MotivoObservado,
 } from './types';
-import { calculateWorkedHours } from './attendance-utils';
+import { calculateWorkedHours, inferSalidaDiaSiguiente } from './attendance-utils';
 import { summarizeCriticalObservedLeaders, type ObservadoLeaderRow } from './observados-summary';
 import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
 
@@ -1026,16 +1026,21 @@ export async function registrarHoras(
     horaEgreso?: string,
     salidaDiaSiguiente?: boolean
 ): Promise<{ success: boolean; error?: string }> {
+    const resolvedSalidaDiaSiguiente = inferSalidaDiaSiguiente(horaIngreso, horaEgreso);
+    const resolvedHoras = horaIngreso && horaEgreso
+        ? calculateWorkedHours({ horaIngreso, horaEgreso })
+        : horas;
+
     const { error } = await getSupabase()
         .from('registro_horas')
         .insert({
             personal_id: personalId,
             fecha,
-            horas,
+            horas: resolvedHoras,
             observaciones,
             hora_ingreso: horaIngreso,
             hora_egreso: horaEgreso,
-            salida_dia_siguiente: salidaDiaSiguiente,
+            salida_dia_siguiente: resolvedSalidaDiaSiguiente,
             estado: 'Registrado'
         });
 
@@ -1056,9 +1061,21 @@ export async function updateRegistroHoras(
         salida_dia_siguiente?: boolean;
     }
 ): Promise<{ success: boolean; error?: string }> {
+    const normalizedUpdates = { ...updates };
+    if (normalizedUpdates.hora_ingreso && normalizedUpdates.hora_egreso) {
+        normalizedUpdates.horas = calculateWorkedHours({
+            horaIngreso: normalizedUpdates.hora_ingreso,
+            horaEgreso: normalizedUpdates.hora_egreso,
+        });
+        normalizedUpdates.salida_dia_siguiente = inferSalidaDiaSiguiente(
+            normalizedUpdates.hora_ingreso,
+            normalizedUpdates.hora_egreso
+        );
+    }
+
     const { error } = await getSupabase()
         .from('registro_horas')
-        .update(updates)
+        .update(normalizedUpdates)
         .eq('id', id);
 
     if (error) {
@@ -1367,48 +1384,51 @@ export async function countObservadosPendientes(mes?: string): Promise<number> {
 }
 
 export async function getObservadosSlaSummary(mes?: string): Promise<{ total: number; warn: number; critical: number }> {
-    let query = getSupabase()
-        .from('registro_horas')
-        .select('id, created_at, fecha')
-        .in('estado', ['Observado', 'observado']);
+    try {
+        let query = getSupabase()
+            .from('registro_horas')
+            .select('id, created_at, fecha')
+            .in('estado', ['Observado', 'observado']);
 
-    if (mes) {
-        const startDate = `${mes}-01`;
-        const [year, month] = mes.split('-').map(Number);
-        const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
-        query = query.gte('fecha', startDate).lt('fecha', firstDayNextMonth);
-    }
+        if (mes) {
+            const startDate = `${mes}-01`;
+            const [year, month] = mes.split('-').map(Number);
+            const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
+            query = query.gte('fecha', startDate).lt('fecha', firstDayNextMonth);
+        }
 
-    const { data, error } = await query;
-    if (error || !data) {
-        if (error) console.error('Error fetching observados SLA summary:', error.message, error.code, error.details);
+        const { data, error } = await query;
+        if (error || !data) {
+            return { total: 0, warn: 0, critical: 0 };
+        }
+
+        const now = Date.now();
+        const warnThreshold = now - 24 * 60 * 60 * 1000;
+        const criticalThreshold = now - 48 * 60 * 60 * 1000;
+
+        let warn = 0;
+        let critical = 0;
+
+        data.forEach((row: any) => {
+            const parsed = new Date((row as { created_at?: string; fecha: string }).created_at || (row as { fecha: string }).fecha);
+            const createdAtMs = Number.isNaN(parsed.getTime())
+                ? new Date(`${(row as { fecha: string }).fecha}T00:00:00`).getTime()
+                : parsed.getTime();
+
+            if (createdAtMs <= criticalThreshold) {
+                critical += 1;
+                return;
+            }
+
+            if (createdAtMs <= warnThreshold) {
+                warn += 1;
+            }
+        });
+
+        return { total: data.length, warn, critical };
+    } catch {
         return { total: 0, warn: 0, critical: 0 };
     }
-
-    const now = Date.now();
-    const warnThreshold = now - 24 * 60 * 60 * 1000;
-    const criticalThreshold = now - 48 * 60 * 60 * 1000;
-
-    let warn = 0;
-    let critical = 0;
-
-    data.forEach((row: any) => {
-        const parsed = new Date((row as { created_at?: string; fecha: string }).created_at || (row as { fecha: string }).fecha);
-        const createdAtMs = Number.isNaN(parsed.getTime())
-            ? new Date(`${(row as { fecha: string }).fecha}T00:00:00`).getTime()
-            : parsed.getTime();
-
-        if (createdAtMs <= criticalThreshold) {
-            critical += 1;
-            return;
-        }
-
-        if (createdAtMs <= warnThreshold) {
-            warn += 1;
-        }
-    });
-
-    return { total: data.length, warn, critical };
 }
 
 export async function getObservadosCriticalLeaders(
@@ -1426,60 +1446,61 @@ export async function getObservadosCriticalLeaders(
         apellido?: string | null;
     };
 
-    let query = getSupabase()
-        .from('registro_horas')
-        .select('personal_id, created_at, fecha')
-        .in('estado', ['Observado', 'observado']);
+    try {
+        let query = getSupabase()
+            .from('registro_horas')
+            .select('personal_id, created_at, fecha')
+            .in('estado', ['Observado', 'observado']);
 
-    if (mes) {
-        const startDate = `${mes}-01`;
-        const [year, month] = mes.split('-').map(Number);
-        const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
-        query = query.gte('fecha', startDate).lt('fecha', firstDayNextMonth);
-    }
-
-    const { data, error } = await query;
-    if (error || !data) {
-        if (error) {
-            console.warn('No se pudo cargar el ranking de observados críticos:', error.message || error.code || 'sin detalle');
+        if (mes) {
+            const startDate = `${mes}-01`;
+            const [year, month] = mes.split('-').map(Number);
+            const firstDayNextMonth = new Date(year, month, 1).toISOString().split('T')[0];
+            query = query.gte('fecha', startDate).lt('fecha', firstDayNextMonth);
         }
+
+        const { data, error } = await query;
+        if (error || !data) {
+            return [];
+        }
+
+        const sourceRows = data as ObservadoCriticalSourceRow[];
+        const personalIds = Array.from(new Set(
+            sourceRows
+                .map((row) => row.personal_id)
+                .filter((personalId): personalId is string => Boolean(personalId))
+        ));
+        const personalById = new Map<string, { nombre?: string | null; apellido?: string | null }>();
+
+        if (personalIds.length > 0) {
+            const { data: personalData, error: personalError } = await getSupabase()
+                .from('personal')
+                .select('id, nombre, apellido')
+                .in('id', personalIds);
+
+            if (!personalError && personalData) {
+                (personalData as PersonalNameRow[]).forEach((person) => {
+                    personalById.set(person.id, {
+                        nombre: person.nombre,
+                        apellido: person.apellido,
+                    });
+                });
+            }
+        }
+
+        const rows = sourceRows
+            .filter((row): row is ObservadoCriticalSourceRow & { personal_id: string } => Boolean(row.personal_id))
+            .map((row): ObservadoLeaderRow => ({
+                personal_id: row.personal_id,
+                created_at: row.created_at,
+                fecha: row.fecha,
+                personal: personalById.get(row.personal_id) || null,
+            }));
+
+        return summarizeCriticalObservedLeaders(rows, { limit });
+    } catch {
         return [];
     }
-
-    const sourceRows = data as ObservadoCriticalSourceRow[];
-    const personalIds = Array.from(new Set(
-        sourceRows
-            .map((row) => row.personal_id)
-            .filter((personalId): personalId is string => Boolean(personalId))
-    ));
-    const personalById = new Map<string, { nombre?: string | null; apellido?: string | null }>();
-
-    if (personalIds.length > 0) {
-        const { data: personalData, error: personalError } = await getSupabase()
-            .from('personal')
-            .select('id, nombre, apellido')
-            .in('id', personalIds);
-
-        if (!personalError && personalData) {
-            (personalData as PersonalNameRow[]).forEach((person) => {
-                personalById.set(person.id, {
-                    nombre: person.nombre,
-                    apellido: person.apellido,
-                });
-            });
-        }
-    }
-
-    const rows = sourceRows
-        .filter((row): row is ObservadoCriticalSourceRow & { personal_id: string } => Boolean(row.personal_id))
-        .map((row): ObservadoLeaderRow => ({
-            personal_id: row.personal_id,
-            created_at: row.created_at,
-            fecha: row.fecha,
-            personal: personalById.get(row.personal_id) || null,
-        }));
-
-    return summarizeCriticalObservedLeaders(rows, { limit });
 }
 
 export async function resolverRegistro(
@@ -1497,13 +1518,16 @@ export async function resolverRegistro(
         return { success: false, error: 'Registro no encontrado' };
     }
 
+    const nextHoraIngreso = data.hora_ingreso || current.hora_ingreso;
+    const nextHoraEgreso = data.hora_egreso || current.hora_egreso;
+    const salidaDiaSiguiente = inferSalidaDiaSiguiente(nextHoraIngreso, nextHoraEgreso);
+
     // Calculate new hours if times provided
     let newHoras = current.horas;
-    if (data.hora_ingreso && data.hora_egreso) {
+    if (nextHoraIngreso && nextHoraEgreso) {
         newHoras = calculateWorkedHours({
-            horaIngreso: data.hora_ingreso,
-            horaEgreso: data.hora_egreso,
-            salidaDiaSiguiente: data.salida_dia_siguiente,
+            horaIngreso: nextHoraIngreso,
+            horaEgreso: nextHoraEgreso,
         });
     }
 
@@ -1512,9 +1536,9 @@ export async function resolverRegistro(
         .from('registro_horas')
         .update({
             estado: 'Registrado',
-            hora_ingreso: data.hora_ingreso || current.hora_ingreso,
-            hora_egreso: data.hora_egreso || current.hora_egreso,
-            salida_dia_siguiente: data.salida_dia_siguiente ?? current.salida_dia_siguiente ?? false,
+            hora_ingreso: nextHoraIngreso,
+            hora_egreso: nextHoraEgreso,
+            salida_dia_siguiente: salidaDiaSiguiente,
             horas: newHoras,
             nota_resolucion: data.nota_resolucion,
             metodo_verificacion: data.metodo_verificacion,
