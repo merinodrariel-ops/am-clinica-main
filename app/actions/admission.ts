@@ -83,6 +83,39 @@ const normalizeDni = (value?: string | null) => (value || '').replace(/\D/g, '')
 
 const safeFilterValue = (value: string) => value.replace(/[(),]/g, '');
 
+function sanitizeAdmissionDni(value?: string | null): string {
+    const raw = (value || '').trim();
+    if (!raw) return '';
+
+    const normalizedText = raw
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s._-]+/g, '');
+
+    const placeholders = new Set([
+        'dni',
+        'udni',
+        'sindni',
+        'nodni',
+        'notiene',
+        'pendiente',
+        'provisorio',
+        'provisoria',
+        'desconocido',
+        'desconocida',
+        'xxx',
+        'xxxx',
+    ]);
+
+    if (placeholders.has(normalizedText)) return '';
+
+    const digits = normalizeDni(raw);
+    if (!digits || /^0+$/.test(digits)) return '';
+    return digits;
+}
+
 function composeClinicalNotes(data: AdmissionSubmission) {
     const sections: string[] = [];
 
@@ -391,7 +424,7 @@ export async function checkAdmissionIdentityAction(params: {
 }) {
     try {
         const supabase = getAdmissionSupabase();
-        const dni = normalizeDni(params.dni);
+        const dni = sanitizeAdmissionDni(params.dni);
         const email = normalize(params.email);
 
         if (!dni && !email) {
@@ -399,8 +432,14 @@ export async function checkAdmissionIdentityAction(params: {
         }
 
         const filters: string[] = [];
-        if (dni) filters.push(`documento.ilike.%${safeFilterValue(dni)}%`);
-        if (email) filters.push(`email.eq.${safeFilterValue(email)}`);
+        if (dni) {
+            filters.push(`documento.eq.${safeFilterValue(dni)}`);
+            if (params.dni && params.dni.trim() !== dni) {
+                filters.push(`documento.eq.${safeFilterValue(params.dni.trim())}`);
+            }
+        } else if (email) {
+            filters.push(`email.eq.${safeFilterValue(email)}`);
+        }
 
         let query = supabase
             .from('pacientes')
@@ -417,9 +456,8 @@ export async function checkAdmissionIdentityAction(params: {
         if (error) return { success: false, exists: false, patient: null, error: error.message };
 
         const exactMatch = (data || []).find((patient) => {
-            const byDni = dni && normalizeDni(patient.documento) === dni;
-            const byEmail = email && normalize(patient.email) === email;
-            return Boolean(byDni || byEmail);
+            if (dni) return normalizeDni(patient.documento) === dni;
+            return Boolean(email && normalize(patient.email) === email);
         }) as AdmissionIdentityMatch | undefined;
 
         return {
