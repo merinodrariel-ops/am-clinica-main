@@ -202,6 +202,7 @@ export default function ProsoftImporter({ mes }: { mes?: string }) {
     const [showMappings, setShowMappings] = useState(false);
     const [editingMapping, setEditingMapping] = useState<string | null>(null); // raw_name being edited
     const [editValue, setEditValue] = useState<string>(''); // personalId for edit
+    const [filterPersonalId, setFilterPersonalId] = useState<string>(''); // '' = todos
     const [showConfig, setShowConfig] = useState(true);
     const [calculationPrompt, setCalculationPrompt] = useState(DEFAULT_CALCULATION_PROMPT);
     const [maxReviewHours, setMaxReviewHours] = useState('14');
@@ -361,7 +362,7 @@ export default function ProsoftImporter({ mes }: { mes?: string }) {
         if (!preview) return;
         setImporting(true);
         try {
-            const importResult = await importProsoftPreviewSafe(preview, true);
+            const importResult = await importProsoftPreviewSafe(preview, true, filterPersonalId || undefined);
             if (!importResult.success) {
                 toast.error(importResult.error);
                 return;
@@ -1239,10 +1240,29 @@ export default function ProsoftImporter({ mes }: { mes?: string }) {
                     </div>
 
                     {/* Import button */}
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs text-slate-400">
-                            Se importarán los registros de <strong className="text-white">{matchedRows.length}</strong> prestadores para <strong className="text-white">{mesLabel(preview.mes)}</strong>
-                        </p>
+                    <div className="flex flex-wrap items-center gap-3 justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs text-slate-400">
+                                {filterPersonalId
+                                    ? <>Importar solo: <strong className="text-amber-300">{matchedRows.find(r => r.personalId === filterPersonalId)?.rawName || filterPersonalId}</strong></>
+                                    : <>Se importarán <strong className="text-white">{matchedRows.length}</strong> prestadores para <strong className="text-white">{mesLabel(preview.mes)}</strong></>
+                                }
+                            </p>
+                            {matchedRows.length > 1 && (
+                                <select
+                                    value={filterPersonalId}
+                                    onChange={e => setFilterPersonalId(e.target.value)}
+                                    className="text-xs bg-slate-800 border border-slate-700 text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                >
+                                    <option value="">Todos los prestadores</option>
+                                    {matchedRows.map(r => (
+                                        <option key={r.personalId} value={r.personalId ?? ''}>
+                                            {r.rawName}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
                         <button
                             onClick={handleImport}
                             disabled={importing || matchedRows.length === 0}
@@ -1252,7 +1272,7 @@ export default function ProsoftImporter({ mes }: { mes?: string }) {
                                 ? <RefreshCw size={14} className="animate-spin" />
                                 : <Upload size={14} />
                             }
-                            Confirmar importación
+                            {filterPersonalId ? 'Importar solo esta persona' : 'Confirmar importación'}
                         </button>
                     </div>
                 </div>

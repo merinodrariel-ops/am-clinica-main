@@ -1131,7 +1131,8 @@ export async function previewProsoftFileSafe(
 
 export async function importProsoftPreviewSafe(
     preview: ProsoftPreview,
-    onlyMatched = true
+    onlyMatched = true,
+    personalIdFilter?: string
 ): Promise<ActionResult<ImportResult>> {
     try {
         const normalizedPreview = normalizePreviewRows(preview);
@@ -1140,9 +1141,13 @@ export async function importProsoftPreviewSafe(
         let skipped = 0;
         const errors: string[] = [];
 
-        const filasToImport = onlyMatched
+        let filasToImport = onlyMatched
             ? normalizedPreview.filas.filter(f => f.personalId)
             : normalizedPreview.filas;
+
+        if (personalIdFilter) {
+            filasToImport = filasToImport.filter(f => f.personalId === personalIdFilter);
+        }
 
         for (const fila of filasToImport) {
             if (!fila.personalId) {

@@ -1649,15 +1649,19 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     }
 
     function getEffectiveModeloPago(p: Personal): 'horas' | 'prestaciones' | 'mensual' {
+        // Explicitly saved value always wins over area/role inference
         if (p.modelo_pago === 'mensual') return 'mensual';
+        if (p.modelo_pago === 'horas') return 'horas';
+        if (p.modelo_pago === 'prestaciones') return 'prestaciones';
 
+        // Only infer when modelo_pago is null/empty (never been set explicitly)
         const inferred = inferModeloFromContext(p.tipo, p.area, p.rol);
         if (inferred) return inferred;
 
         const configured = getAreaConfiguredModelo(p.area);
         if (configured) return configured;
 
-        return p.modelo_pago || 'horas';
+        return 'horas';
     }
 
     function getSuggestedModeloPagoForForm(tipo: CreatePersonalInput['tipo'], areaName: string) {
