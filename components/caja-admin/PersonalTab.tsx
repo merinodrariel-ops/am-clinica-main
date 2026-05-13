@@ -926,6 +926,17 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         return `https://wa.me/${normalized.replace(/\D/g, '')}`;
     }
 
+    function safeHref(url?: string | null): string | undefined {
+        if (!url) return undefined;
+        try {
+            const parsed = new URL(url);
+            if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return url;
+        } catch {
+            // ignore malformed URLs
+        }
+        return undefined;
+    }
+
     async function loadData() {
         setLoading(true);
         try {
@@ -2330,9 +2341,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     Guarda primero el prestador para habilitar el adjunto.
                                                 </p>
                                             )}
-                                            {formData.poliza_url && (
+                                            {safeHref(formData.poliza_url) && (
                                                 <a
-                                                    href={formData.poliza_url}
+                                                    href={safeHref(formData.poliza_url)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="mt-2 inline-flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-700"
@@ -2729,9 +2740,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             onChange={e => setPrestacionForm(f => ({ ...f, slides_url: e.target.value }))}
                                             placeholder="Se auto-completa al elegir paciente"
                                         />
-                                        {prestacionForm.slides_url && (
+                                        {safeHref(prestacionForm.slides_url) && (
                                             <a
-                                                href={prestacionForm.slides_url}
+                                                href={safeHref(prestacionForm.slides_url)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="px-3 py-2 text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 rounded-xl hover:bg-emerald-100 transition-colors whitespace-nowrap"
@@ -3054,8 +3065,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                                             : `${group.cantidad} registros`}
                                                                                     </p>
                                                                                 )}
-                                                                                {canEditSingle && firstRow.slides_url && (
-                                                                                    <a href={firstRow.slides_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-500 hover:underline">HC ↗</a>
+                                                                                {canEditSingle && safeHref(firstRow.slides_url) && (
+                                                                                    <a href={safeHref(firstRow.slides_url)} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-500 hover:underline">HC ↗</a>
                                                                                 )}
                                                                             </div>
                                                                             {canEditSingle ? (
