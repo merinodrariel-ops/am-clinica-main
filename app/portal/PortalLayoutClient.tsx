@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
     LayoutDashboard,
+    CalendarDays,
     Target,
     DollarSign,
     Users,
@@ -16,6 +17,7 @@ import {
 
 const NAV_ITEMS = [
     { href: '/portal/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/portal/agenda', icon: CalendarDays, label: 'Mi Agenda' },
     { href: '/portal/prestaciones', icon: Stethoscope, label: 'Mis Prestaciones' },
     { href: '/portal/goals', icon: Target, label: 'Objetivos' },
     { href: '/portal/liquidation', icon: DollarSign, label: 'Liquidaciones' },

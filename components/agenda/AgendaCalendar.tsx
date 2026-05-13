@@ -14,12 +14,13 @@ import type {
     EventSourceFuncArg,
 } from '@fullcalendar/core';
 import { getAppointments, updateAppointment, deleteAppointment, getDoctors, getTomorrowAppointments, sendBulkWhatsAppConfirmations, getAgendaBlocks } from '@/app/actions/agenda';
+import { createDoctorAgendaShareLink } from '@/app/actions/doctor-agenda';
 import type { TomorrowAppointment, AgendaBlock } from '@/app/actions/agenda';
 import AgendaBlockModal from './AgendaBlockModal';
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus, BanIcon, AlertTriangle } from 'lucide-react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus, BanIcon, AlertTriangle, Share2 } from 'lucide-react';
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -136,6 +137,13 @@ function getDoctorColor(doctorId: string, doctors: Doctor[]): string {
     return DOCTOR_COLORS[idx >= 0 ? idx % DOCTOR_COLORS.length : 0];
 }
 
+function localISODate(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export default function AgendaCalendar() {
     const calendarRef = useRef<FullCalendar>(null);
     const [modalOpen, setModalOpen] = useState(false);
@@ -159,6 +167,7 @@ export default function AgendaCalendar() {
     const [tomorrowApts, setTomorrowApts] = useState<TomorrowAppointment[]>([]);
     const [tomorrowLoading, setTomorrowLoading] = useState(false);
     const [tomorrowSending, setTomorrowSending] = useState(false);
+    const [shareLoading, setShareLoading] = useState(false);
     const [tomorrowResult, setTomorrowResult] = useState<{ sent: number; failed: number; noPhone: number } | null>(null);
     const [selectedAptIds, setSelectedAptIds] = useState<Set<string>>(new Set());
     const [agendaBlocks, setAgendaBlocks] = useState<AgendaBlock[]>([]);
@@ -168,6 +177,42 @@ export default function AgendaCalendar() {
     const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; start: Date; end: Date } | null>(null);
     const { canEdit: canEditModule } = useAuth();
     const router = useRouter();
+
+    const handleShareDoctorAgenda = async () => {
+        if (!canEdit || shareLoading) return;
+        if (activeDoctorIds.has('all') || activeDoctorIds.size !== 1) {
+            toast.error('Seleccioná un solo doctor para compartir su agenda');
+            return;
+        }
+
+        const doctorId = Array.from(activeDoctorIds)[0];
+        const selectedDoctor = doctors.find(d => d.id === doctorId);
+        const referenceDate = viewMode === 'resource'
+            ? resourceDate
+            : (calendarRef.current?.getApi().getDate() || new Date());
+        const date = localISODate(referenceDate);
+
+        setShareLoading(true);
+        try {
+            const result = await createDoctorAgendaShareLink(doctorId, date);
+            if (!result.success) {
+                toast.error(result.error);
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(result.url);
+                toast.success(`Link copiado: agenda de ${selectedDoctor?.full_name || 'doctor'} para ${date}`);
+            } catch {
+                window.prompt('Copiá este link para compartir la agenda', result.url);
+                toast.success(`Link generado: agenda de ${selectedDoctor?.full_name || 'doctor'} para ${date}`);
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo compartir la agenda');
+        } finally {
+            setShareLoading(false);
+        }
+    };
 
     // Load doctors for filter bar
     useEffect(() => {
@@ -674,6 +719,17 @@ export default function AgendaCalendar() {
 
                 {/* Bulk confirm + Block buttons */}
                 <div className="ml-auto flex items-center gap-2">
+                    {canEdit && (
+                        <button
+                            onClick={handleShareDoctorAgenda}
+                            disabled={shareLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all disabled:opacity-50"
+                            title="Copiar link temporal con la agenda mínima del doctor seleccionado"
+                        >
+                            <Share2 size={13} />
+                            {shareLoading ? 'Copiando...' : 'Compartir agenda'}
+                        </button>
+                    )}
                     {canEdit && (
                         <button
                             onClick={() => {

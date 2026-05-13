@@ -120,6 +120,13 @@ export default async function WorkerDashboard() {
                 </div>
 
                 <div className="flex items-center gap-2 self-start md:self-center">
+                    <Link
+                        href="/portal/agenda"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] md:text-[11px] font-bold text-indigo-300 uppercase tracking-widest hover:bg-indigo-500/20 transition-colors"
+                    >
+                        <Calendar size={13} />
+                        Mi Agenda
+                    </Link>
                     <div className="px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-[10px] md:text-[11px] font-bold text-indigo-400 uppercase tracking-widest">
                         {worker.categoria}
                     </div>
