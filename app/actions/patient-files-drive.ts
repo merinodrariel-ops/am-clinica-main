@@ -220,6 +220,9 @@ export async function createPatientDriveFolderAction(
 
 // ─── Fotos order persistence ────────────────────────────────────────────────
 
+const DRIVE_WRITE_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
+const DRIVE_ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
+
 /** Returns the saved photo order for a patient: { [folderId]: [fileId, ...] } */
 export async function getPatientFotosOrder(patientId: string): Promise<Record<string, string[]>> {
     const { data } = await supabase
@@ -234,7 +237,8 @@ export async function getPatientFotosOrder(patientId: string): Promise<Record<st
 export async function saveFotosOrderAction(
     patientId: string,
     folderId: string,
-    orderedIds: string[]
+    orderedIds: string[],
+    coverFileId?: string | null
 ): Promise<{ error?: string }> {
     try {
         const supabaseServer = await createServerClient();
@@ -250,9 +254,20 @@ export async function saveFotosOrderAction(
 
         const merged = { ...(current?.fotos_order as Record<string, string[]> ?? {}), [folderId]: orderedIds };
 
+        if (coverFileId !== undefined && coverFileId !== null && (!coverFileId || !DRIVE_ID_RE.test(coverFileId))) {
+            return { error: 'ID de portada inválido' };
+        }
+
+        const updatePayload: { fotos_order: Record<string, string[]>; foto_perfil_url?: string | null } = {
+            fotos_order: merged,
+        };
+        if (coverFileId !== undefined) {
+            updatePayload.foto_perfil_url = coverFileId;
+        }
+
         const { error } = await supabase
             .from('pacientes')
-            .update({ fotos_order: merged })
+            .update(updatePayload)
             .eq('id_paciente', patientId);
 
         if (error) return { error: error.message };
@@ -268,9 +283,6 @@ export async function saveFotosOrderAction(
  * Upload an edited photo blob (via FormData) to a specific Drive folder.
  * The client sends a FormData with key "file" containing the Blob.
  */
-const DRIVE_WRITE_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
-const DRIVE_ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
-
 export async function uploadEditedPhotoAction(
     folderId: string,
     fileName: string,

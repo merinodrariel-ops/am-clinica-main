@@ -102,6 +102,10 @@ function buildPatientPrefix(patientName: string, folderDisplayName: string): str
     return `${patientSlug}_am-clinica_${folderSlug}`;
 }
 
+function isPhotoCoverFolder(folderName: string): boolean {
+    return /foto|video/i.test(folderName);
+}
+
 function extractFolderIdFromUrl(url: string | null | undefined): string | null {
     if (!url) return null;
     const folderMatch = url.match(/folders\/([a-zA-Z0-9_-]{25,})/);
@@ -162,9 +166,17 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         if (oldIdx === -1 || newIdx === -1) return;
         const reordered = arrayMove(folder.files, oldIdx, newIdx);
         const ids = reordered.map(f => f.id);
+        const coverFileId =
+            isPhotoCoverFolder(folder.displayName) && reordered[0]?.mimeType.startsWith('image/')
+                ? reordered[0].id
+                : undefined;
         setFolders(prev => prev.map(f => f.id === folderId ? { ...f, files: reordered } : f));
         setFotosOrder(prev => ({ ...prev, [folderId]: ids }));
-        void saveFotosOrderAction(patientId, folderId, ids);
+        void saveFotosOrderAction(patientId, folderId, ids, coverFileId).then(result => {
+            if (result.error) {
+                toast.error(`No se pudo guardar la portada: ${result.error}`);
+            }
+        });
     }
 
     async function handleDeleteFile(file: DriveFile) {
@@ -621,6 +633,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     const isOpen = openFolders.has(folder.id);
                     const isDropTarget = isGlobalDragging && effectiveGlobalDropFolderId === folder.id;
                     const isLoading = loadingFolders.has(folder.id);
+                    const isCoverFolder = isPhotoCoverFolder(folder.displayName);
 
                     return (
                         <motion.div
@@ -709,7 +722,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                                 <SortableFileCard
                                                                     key={file.id}
                                                                     file={file}
-                                                                    isPortada={idx === 0 && file.mimeType.startsWith('image/')}
+                                                                    isPortada={isCoverFolder && idx === 0 && file.mimeType.startsWith('image/')}
                                                                     onPreview={f => openPreview(f, folder.id)}
                                                                     onDelete={canUpload ? handleDeleteFile : undefined}
                                                                     onShare={handleShareFile}
