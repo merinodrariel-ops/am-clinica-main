@@ -79,10 +79,10 @@ export default function PatientPortalAccess() {
                             >
                                 <div className="text-center mb-10">
                                     <h1 className="text-3xl font-black text-white tracking-tight mb-3">
-                                        Hola de nuevo.
+                                        Acceso a tu portal
                                     </h1>
                                     <p className="text-slate-400 text-sm leading-relaxed max-w-[280px] mx-auto font-medium">
-                                        Ingresá tu email para que te enviemos un acceso directo a tu historial.
+                                        Ingresá tu email y te enviamos un enlace seguro para entrar sin contraseña.
                                     </p>
                                 </div>
 
@@ -121,18 +121,18 @@ export default function PatientPortalAccess() {
                                         className="w-full group/btn relative flex items-center justify-center gap-3 bg-white text-slate-950 font-black py-5 rounded-3xl transition-all active:scale-[0.98] overflow-hidden shadow-[0_12px_24px_rgba(255,255,255,0.1)]"
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-white/40 to-blue-400/0 opacity-0 group-hover/btn:opacity-100 group-hover/btn:animate-[shimmer_1.5s_infinite] pointer-events-none" />
-                                        <span className="relative">Recibir Enlace Mágico</span>
+                                        <span className="relative">Enviar acceso por email</span>
                                         <ArrowRight size={18} className="relative group-hover/btn:translate-x-1 transition-transform" />
                                     </button>
                                 </form>
 
                                 <div className="mt-12 pt-8 border-t border-white/[0.05] text-center">
-                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-4">¿No tenés cuenta?</p>
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-4">¿Todavía no completaste admisión?</p>
                                     <Link
                                         href="https://am-clinica-admision.vercel.app/"
                                         className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-6 text-sm font-semibold text-white transition-all hover:bg-slate-800"
                                     >
-                                        Registrarme como Paciente
+                                        Completar admisión
                                     </Link>
                                 </div>
                             </motion.div>

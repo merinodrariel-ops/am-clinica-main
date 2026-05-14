@@ -60,6 +60,8 @@ export async function updateSession(request: NextRequest) {
         path === '/agenda-compartida' ||
         path === '/mi-portal' ||
         path.startsWith('/mi-portal/') ||
+        path === '/mi-clinica' ||
+        path.startsWith('/mi-clinica/') ||
         path.startsWith('/sonrisa/comparador') ||
         path === '/privacy-policy' ||
         path === '/terms' ||

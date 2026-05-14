@@ -19,11 +19,13 @@ interface PremiumWelcomeEmailProps {
   patientName: string;
 }
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://amesteticadental.com";
+const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://am-clinica-main.vercel.app").replace(/\/$/, "");
 
 export const PremiumWelcomeEmail = ({
   patientName = "Ariel",
 }: PremiumWelcomeEmailProps) => {
+  const portalAccessUrl = `${appUrl}/mi-portal`;
+
   return (
     <Html>
       <Head />
@@ -92,7 +94,7 @@ export const PremiumWelcomeEmail = ({
             <Section className="text-center mt-[48px] mb-[32px]">
               <Button
                 className="bg-brand rounded-2xl text-white text-[16px] font-bold no-underline text-center px-8 py-4 shadow-lg shadow-brand/20"
-                href={appUrl}
+                href={portalAccessUrl}
               >
                 Acceder a mi Portal
               </Button>
@@ -103,7 +105,7 @@ export const PremiumWelcomeEmail = ({
             {/* Footer */}
             <Section className="px-[20px] mb-[32px]">
                <Text className="text-slate-500 text-[12px] leading-[20px] text-center italic">
-                Estamos ubicados en San Isidro, Buenos Aires. Comprometidos con la excelencia clínica y tecnológica.
+                Estamos ubicados en Puerto Madero, Buenos Aires. Comprometidos con la excelencia clínica y tecnológica.
                </Text>
                <div className="flex justify-center gap-4 mt-6">
                  <Link href="https://instagram.com/amesteticadental" className="text-slate-400 text-[11px] font-bold uppercase no-underline tracking-widest">Instagram</Link>
