@@ -14,7 +14,7 @@ import type {
     EventSourceFuncArg,
 } from '@fullcalendar/core';
 import { getAppointments, updateAppointment, deleteAppointment, getDoctors, getTomorrowAppointments, sendBulkWhatsAppConfirmations, getAgendaBlocks } from '@/app/actions/agenda';
-import { createDoctorAgendaShareLink } from '@/app/actions/doctor-agenda';
+import { createDoctorAgendaRangeShareLink, createDoctorAgendaShareLink } from '@/app/actions/doctor-agenda';
 import type { TomorrowAppointment, AgendaBlock } from '@/app/actions/agenda';
 import AgendaBlockModal from './AgendaBlockModal';
 import NewAppointmentModal from './NewAppointmentModal';
@@ -178,7 +178,7 @@ export default function AgendaCalendar() {
     const { canEdit: canEditModule } = useAuth();
     const router = useRouter();
 
-    const handleShareDoctorAgenda = async () => {
+    const handleShareDoctorAgenda = async (mode: 'day' | 'range' = 'day') => {
         if (!canEdit || shareLoading) return;
         if (activeDoctorIds.has('all') || activeDoctorIds.size !== 1) {
             toast.error('Seleccioná un solo doctor para compartir su agenda');
@@ -194,18 +194,24 @@ export default function AgendaCalendar() {
 
         setShareLoading(true);
         try {
-            const result = await createDoctorAgendaShareLink(doctorId, date);
+            const result = mode === 'range'
+                ? await createDoctorAgendaRangeShareLink(doctorId, date, 60)
+                : await createDoctorAgendaShareLink(doctorId, date);
             if (!result.success) {
                 toast.error(result.error);
                 return;
             }
 
+            const label = mode === 'range'
+                ? `agenda de 60 días de ${selectedDoctor?.full_name || 'doctor'}`
+                : `agenda de ${selectedDoctor?.full_name || 'doctor'} para ${date}`;
+
             try {
                 await navigator.clipboard.writeText(result.url);
-                toast.success(`Link copiado: agenda de ${selectedDoctor?.full_name || 'doctor'} para ${date}`);
+                toast.success(`Link copiado: ${label}`);
             } catch {
                 window.prompt('Copiá este link para compartir la agenda', result.url);
-                toast.success(`Link generado: agenda de ${selectedDoctor?.full_name || 'doctor'} para ${date}`);
+                toast.success(`Link generado: ${label}`);
             }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'No se pudo compartir la agenda');
@@ -721,13 +727,24 @@ export default function AgendaCalendar() {
                 <div className="ml-auto flex items-center gap-2">
                     {canEdit && (
                         <button
-                            onClick={handleShareDoctorAgenda}
+                            onClick={() => handleShareDoctorAgenda('day')}
                             disabled={shareLoading}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all disabled:opacity-50"
                             title="Copiar link temporal con la agenda mínima del doctor seleccionado"
                         >
                             <Share2 size={13} />
                             {shareLoading ? 'Copiando...' : 'Compartir agenda'}
+                        </button>
+                    )}
+                    {canEdit && (
+                        <button
+                            onClick={() => handleShareDoctorAgenda('range')}
+                            disabled={shareLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all disabled:opacity-50"
+                            title="Copiar link de los próximos 60 días del doctor seleccionado"
+                        >
+                            <CalendarPlus size={13} />
+                            Agenda 60 días
                         </button>
                     )}
                     {canEdit && (
