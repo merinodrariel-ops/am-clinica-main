@@ -63,7 +63,7 @@ export default function Home() {
               href="/login"
               className="px-5 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700"
             >
-              Acceder con Google
+              Ingresar con email
             </Link>
             <Link
               href="/privacy-policy"
