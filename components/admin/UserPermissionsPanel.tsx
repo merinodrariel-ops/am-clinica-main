@@ -53,9 +53,11 @@ export default function UserPermissionsPanel({ categoria, overrides, onChange }:
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                 categoryDefault === 'full'
                                     ? 'bg-emerald-900/50 text-emerald-400'
+                                    : categoryDefault === 'read'
+                                        ? 'bg-sky-900/50 text-sky-300'
                                     : 'bg-zinc-700 text-zinc-400'
                             }`}>
-                                {categoryDefault === 'full' ? 'Completo' : 'Sin acceso'}
+                                {categoryDefault === 'full' ? 'Completo' : categoryDefault === 'read' ? 'Solo lectura' : 'Sin acceso'}
                             </span>
                         </div>
 

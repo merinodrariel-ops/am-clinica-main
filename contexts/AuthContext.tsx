@@ -192,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // 'inherit' falls through to category default
         }
         const cat = effectiveCategoria || 'partner_viewer';
-        return getCategoryDefault(cat, key) === 'full' ? 'full' : 'none';
+        return getCategoryDefault(cat, key);
     };
 
     // Permission Logic (Simplified Default Rule)

@@ -27,7 +27,7 @@ export type ModuleKey = typeof MODULE_DEFINITIONS[number]['key'];
  * Pure function: returns the default access for a given categoria + module key.
  * This mirrors (and centralizes) the logic from AuthContext.canEdit().
  */
-export function getCategoryDefault(categoria: string, moduleKey: string): 'full' | 'none' {
+export function getCategoryDefault(categoria: string, moduleKey: string): 'full' | 'read' | 'none' {
     if (categoria === 'owner') return 'full';
 
     // Financial modules: only admin has full access by default
@@ -46,8 +46,8 @@ export function getCategoryDefault(categoria: string, moduleKey: string): 'full'
     // Operational modules — most roles have access
     const OPERATIONAL = ['agenda', 'patients', 'todos', 'recalls', 'inventario', 'workflows'];
     if (OPERATIONAL.includes(moduleKey)) {
-        // partner_viewer has no edit rights to anything
-        if (categoria === 'partner_viewer') return 'none';
+        // partner_viewer has visibility, but no edit rights by default
+        if (categoria === 'partner_viewer') return 'read';
         return 'full';
     }
 

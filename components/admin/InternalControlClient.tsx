@@ -301,7 +301,9 @@ export default function InternalControlClient({ initialUsers, initialEvents }: {
                                                     <div className="flex items-center justify-between gap-3">
                                                         <div>
                                                             <p className="text-sm font-semibold text-white">{module.label}</p>
-                                                            <p className="text-xs text-zinc-500">Rol: {defaultAccess === 'full' ? 'Completo' : 'Sin acceso'}</p>
+                                                            <p className="text-xs text-zinc-500">
+                                                                Rol: {defaultAccess === 'full' ? 'Completo' : defaultAccess === 'read' ? 'Solo lectura' : 'Sin acceso'}
+                                                            </p>
                                                         </div>
                                                         <select
                                                             value={override}
