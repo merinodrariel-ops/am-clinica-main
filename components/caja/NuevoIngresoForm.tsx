@@ -129,6 +129,7 @@ interface FormData {
     cuota_nro: number;
     cuotas_total: number;
     es_inicio_financiacion: boolean;
+    financ_adelanto_previo_usd: number;
     financ_saldo_usd: number;
     financ_cuotas_total: number;
     financ_fecha_inicio: string;
@@ -196,6 +197,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         cuota_nro: 1,
         cuotas_total: 1,
         es_inicio_financiacion: false,
+        financ_adelanto_previo_usd: 0,
         financ_saldo_usd: 0,
         financ_cuotas_total: 6,
         financ_fecha_inicio: getNextMonthISODate(),
@@ -487,6 +489,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             }
 
             const totalUsdEquiv = useMultiplePayments ? getMixedUsdTotal(activeSplits) : calculateUsdEquivalent();
+            const adelantoPrevioUsd = Math.max(0, formData.financ_adelanto_previo_usd || 0);
+            const adelantoTotalUsd = adelantoPrevioUsd + totalUsdEquiv;
             const financInstallmentUsd = formData.financ_cuotas_total > 0
                 ? Math.round((formData.financ_saldo_usd / formData.financ_cuotas_total) * 100) / 100
                 : 0;
@@ -499,7 +503,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             const financingObservation = formData.es_inicio_financiacion
                 ? [
                     '[INICIO FINANCIACION]',
-                    `Adelanto recibido: USD ${totalUsdEquiv.toFixed(2)}`,
+                    adelantoPrevioUsd > 0 ? `Seña previa: USD ${adelantoPrevioUsd.toFixed(2)}` : '',
+                    `Pago actual para adelanto: USD ${totalUsdEquiv.toFixed(2)}`,
+                    `Adelanto total contractual: USD ${adelantoTotalUsd.toFixed(2)}`,
                     `Saldo financiado: USD ${formData.financ_saldo_usd.toFixed(2)}`,
                     `Plan: ${formData.financ_cuotas_total} cuotas de USD ${financInstallmentUsd.toFixed(2)}`,
                     `Primera cuota: ${formData.financ_fecha_inicio}`,
@@ -579,7 +585,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     montoCuotaUsd: financInstallmentUsd,
                     fechaInicio: formData.financ_fecha_inicio,
                     notas: [
-                        `Plan iniciado desde Caja Recepción con adelanto de USD ${totalUsdEquiv.toFixed(2)}.`,
+                        `Plan iniciado desde Caja Recepción. Seña previa: USD ${adelantoPrevioUsd.toFixed(2)}. Pago actual para completar adelanto: USD ${totalUsdEquiv.toFixed(2)}. Adelanto total contractual: USD ${adelantoTotalUsd.toFixed(2)}.`,
                         `El adelanto no cuenta como cuota; las cuotas comienzan el ${formData.financ_fecha_inicio}.`,
                         financScheduleText ? `Cronograma pactado: ${financScheduleText}.` : '',
                         cleanedObservation,
@@ -711,6 +717,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             cuota_nro: 1,
             cuotas_total: 1,
             es_inicio_financiacion: false,
+            financ_adelanto_previo_usd: 0,
             financ_saldo_usd: 0,
             financ_cuotas_total: 6,
             financ_fecha_inicio: getNextMonthISODate(),
@@ -1186,6 +1193,25 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         <div className="mt-5 space-y-4">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
+                                                    <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Seña previa USD</label>
+                                                    <MoneyInput
+                                                        value={formData.financ_adelanto_previo_usd}
+                                                        onChange={(val) => setFormData(prev => ({ ...prev, financ_adelanto_previo_usd: val }))}
+                                                        className="w-full h-11 bg-white dark:bg-gray-900 border-emerald-100 dark:border-emerald-900 font-bold"
+                                                        placeholder="1000"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Pago actual adelanto USD</label>
+                                                    <div className="h-11 rounded-xl bg-white dark:bg-gray-900 border border-emerald-100 dark:border-emerald-900 px-3 flex items-center justify-end">
+                                                        <span className="text-sm font-black text-emerald-900 dark:text-emerald-100 tabular-nums">
+                                                            USD {currentTotalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
                                                     <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Saldo a financiar USD</label>
                                                     <MoneyInput
                                                         value={formData.financ_saldo_usd}
@@ -1226,10 +1252,20 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                 </div>
                                             </div>
                                             <div className="rounded-xl bg-white/80 dark:bg-gray-900/60 border border-emerald-100 dark:border-emerald-900/50 p-3 flex justify-between gap-3 text-xs">
-                                                <span className="text-emerald-800 dark:text-emerald-200 font-bold">El ingreso actual queda como adelanto.</span>
-                                                <span className="text-emerald-900 dark:text-emerald-100 font-black tabular-nums">
-                                                    Cuota: USD {formData.financ_cuotas_total > 0 ? (formData.financ_saldo_usd / formData.financ_cuotas_total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
-                                                </span>
+                                                <div>
+                                                    <p className="text-emerald-800 dark:text-emerald-200 font-bold">El ingreso actual completa el adelanto.</p>
+                                                    <p className="text-[10px] text-emerald-700/70 dark:text-emerald-300/70 font-bold">
+                                                        Adelanto total: seña previa + pago actual
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-emerald-900 dark:text-emerald-100 font-black tabular-nums">
+                                                        Adelanto USD {(formData.financ_adelanto_previo_usd + currentTotalUsd).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                    <p className="text-emerald-900 dark:text-emerald-100 font-black tabular-nums">
+                                                        Cuota USD {formData.financ_cuotas_total > 0 ? (formData.financ_saldo_usd / formData.financ_cuotas_total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                                                    </p>
+                                                </div>
                                             </div>
                                             {buildInstallmentSchedule(
                                                 formData.financ_fecha_inicio,
@@ -1508,7 +1544,19 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             <span className="text-[9px] font-black text-emerald-700 uppercase">Inicio de financiación</span>
                                             <span className="font-black text-emerald-800 dark:text-emerald-200 text-[10px] uppercase">Adelanto de tratamiento</span>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-2 text-[10px]">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px]">
+                                            <div>
+                                                <p className="text-emerald-700/60 font-black uppercase">Seña previa</p>
+                                                <p className="font-black text-emerald-900 dark:text-emerald-100">USD {formData.financ_adelanto_previo_usd.toLocaleString('es-AR')}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-emerald-700/60 font-black uppercase">Pago actual</p>
+                                                <p className="font-black text-emerald-900 dark:text-emerald-100">USD {currentTotalUsd.toLocaleString('es-AR')}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-emerald-700/60 font-black uppercase">Adelanto total</p>
+                                                <p className="font-black text-emerald-900 dark:text-emerald-100">USD {(formData.financ_adelanto_previo_usd + currentTotalUsd).toLocaleString('es-AR')}</p>
+                                            </div>
                                             <div>
                                                 <p className="text-emerald-700/60 font-black uppercase">Saldo</p>
                                                 <p className="font-black text-emerald-900 dark:text-emerald-100">USD {formData.financ_saldo_usd.toLocaleString('es-AR')}</p>
