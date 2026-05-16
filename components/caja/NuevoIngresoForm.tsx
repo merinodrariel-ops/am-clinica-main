@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon, Plus, Trash2, Layout } from 'lucide-react';
+import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon, Plus, Trash2, Layout, CreditCard } from 'lucide-react';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -20,7 +20,7 @@ import { getLocalISODate } from '@/lib/local-date';
 import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
-import { syncPagoCuotaAction } from '@/app/actions/financiacion-cuotas';
+import { crearPlanFinanciacionAction, syncPagoCuotaAction } from '@/app/actions/financiacion-cuotas';
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface Paciente {
@@ -80,6 +80,13 @@ function makeUuid() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function getNextMonthISODate(fromDate?: string) {
+    const base = fromDate ? new Date(`${fromDate}T12:00:00`) : new Date();
+    if (Number.isNaN(base.getTime())) return getLocalISODate();
+    base.setMonth(base.getMonth() + 1);
+    return base.toISOString().slice(0, 10);
+}
+
 interface FormData {
     paciente_id: string;
     paciente_nombre: string;
@@ -99,6 +106,11 @@ interface FormData {
     es_cuota: boolean;
     cuota_nro: number;
     cuotas_total: number;
+    es_inicio_financiacion: boolean;
+    financ_saldo_usd: number;
+    financ_cuotas_total: number;
+    financ_fecha_inicio: string;
+    financ_tratamiento: string;
     presupuesto_ref: string;
     comprobante_url?: string;
 }
@@ -161,6 +173,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         es_cuota: false,
         cuota_nro: 1,
         cuotas_total: 1,
+        es_inicio_financiacion: false,
+        financ_saldo_usd: 0,
+        financ_cuotas_total: 6,
+        financ_fecha_inicio: getNextMonthISODate(),
+        financ_tratamiento: '',
         presupuesto_ref: '',
         comprobante_url: '',
     });
@@ -342,6 +359,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     setFormData(prev => ({
                         ...prev,
                         es_cuota: true,
+                        es_inicio_financiacion: false,
                         cuota_nro: nextQuota,
                         cuotas_total: cuotasTotal,
                     }));
@@ -408,6 +426,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             return;
         }
 
+        if (formData.es_inicio_financiacion) {
+            if (formData.financ_saldo_usd <= 0 || formData.financ_cuotas_total <= 0 || !formData.financ_fecha_inicio) {
+                alert('Completá saldo a financiar, cantidad de cuotas y fecha de primera cuota.');
+                return;
+            }
+        }
+
         try {
             setSaving(true);
             const { data: { user } } = await supabase.auth.getUser();
@@ -440,6 +465,19 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             }
 
             const totalUsdEquiv = useMultiplePayments ? getMixedUsdTotal(activeSplits) : calculateUsdEquivalent();
+            const financInstallmentUsd = formData.financ_cuotas_total > 0
+                ? Math.round((formData.financ_saldo_usd / formData.financ_cuotas_total) * 100) / 100
+                : 0;
+            const financingObservation = formData.es_inicio_financiacion
+                ? [
+                    '[INICIO FINANCIACION]',
+                    `Adelanto recibido: USD ${totalUsdEquiv.toFixed(2)}`,
+                    `Saldo financiado: USD ${formData.financ_saldo_usd.toFixed(2)}`,
+                    `Plan: ${formData.financ_cuotas_total} cuotas de USD ${financInstallmentUsd.toFixed(2)}`,
+                    `Primera cuota: ${formData.financ_fecha_inicio}`,
+                    cleanedObservation,
+                ].filter(Boolean).join(' · ')
+                : cleanedObservation;
 
             // 3. Prepare Payloads
             // We'll insert one row per active payment split to have clean accounting by method/channel
@@ -457,15 +495,15 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     metodo_pago: split.metodo_pago,
                     canal_destino: split.canal_destino,
                     estado: formData.estado,
-                    observaciones: isFirst ? cleanedObservation : `(Pago Mixto ${index + 1}/${activeSplits.length}) ${cleanedObservation}`,
+                    observaciones: isFirst ? financingObservation : `(Pago Mixto ${index + 1}/${activeSplits.length}) ${financingObservation}`,
                     usd_equivalente: usdEquiv,
                     tipo_comprobante: formData.tipo_comprobante,
                     fecha_movimiento: fechaMovimiento,
                     created_by: user.id,
                     comprobante_url: formData.comprobante_url || null,
                     // Add cuota details if present
-                    cuota_nro: formData.cuota_nro,
-                    cuotas_total: formData.cuotas_total,
+                    cuota_nro: formData.es_cuota ? formData.cuota_nro : null,
+                    cuotas_total: formData.es_cuota ? formData.cuotas_total : null,
                     tc_bna_venta: bnaRate,
                     tc_fuente: 'MANUAL',
                     split_group_id: splitGroupId,
@@ -502,13 +540,36 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 });
             }
 
+            if (formData.es_inicio_financiacion) {
+                const result = await crearPlanFinanciacionAction({
+                    pacienteId: formData.paciente_id,
+                    pacienteNombre: formData.paciente_nombre,
+                    tratamiento: formData.financ_tratamiento.trim() || conceptoFinal,
+                    montoTotalUsd: formData.financ_saldo_usd,
+                    cuotasTotal: formData.financ_cuotas_total,
+                    montoCuotaUsd: financInstallmentUsd,
+                    fechaInicio: formData.financ_fecha_inicio,
+                    notas: [
+                        `Plan iniciado desde Caja Recepción con adelanto de USD ${totalUsdEquiv.toFixed(2)}.`,
+                        `El adelanto no cuenta como cuota; las cuotas comienzan el ${formData.financ_fecha_inicio}.`,
+                        cleanedObservation,
+                    ].filter(Boolean).join(' '),
+                });
+
+                if (!result.success) {
+                    alert(`El pago se registró, pero no se pudo crear el plan de financiación: ${result.error || 'Error desconocido'}`);
+                }
+            }
+
             // 8. Generate Receipt (Using Canvas)
             try {
                 const canvas = receiptCanvasRef.current;
                 if (canvas) {
                     const cuotaInfo = formData.es_cuota
                         ? `${formData.cuota_nro}/${formData.cuotas_total}`
-                        : undefined;
+                        : formData.es_inicio_financiacion
+                            ? `Adelanto financiación · cuotas desde ${formData.financ_fecha_inicio}`
+                            : undefined;
 
                     const receiptMetodo = useMultiplePayments
                         ? activeSplits.map(s => s.metodo_pago).join('/')
@@ -619,6 +680,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             es_cuota: false,
             cuota_nro: 1,
             cuotas_total: 1,
+            es_inicio_financiacion: false,
+            financ_saldo_usd: 0,
+            financ_cuotas_total: 6,
+            financ_fecha_inicio: getNextMonthISODate(),
+            financ_tratamiento: '',
             presupuesto_ref: '',
         });
         setConceptoSearch('');
@@ -1031,6 +1097,138 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         </div>
                                     )}
                                 </div>
+
+                                <div className="mt-4 rounded-2xl border-2 border-emerald-200/60 bg-emerald-50/40 dark:bg-emerald-900/10 dark:border-emerald-900/30 p-5 shadow-sm">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
+                                                <CreditCard size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-black text-emerald-900 dark:text-emerald-200 uppercase tracking-widest">Financiación</p>
+                                                <p className="text-[10px] text-emerald-700/70 dark:text-emerald-300/70 font-medium">Usalo para iniciar un plan con adelanto o cobrar una cuota existente.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                const nextValue = !formData.es_inicio_financiacion;
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    es_inicio_financiacion: nextValue,
+                                                    es_cuota: nextValue ? false : prev.es_cuota,
+                                                    concepto_nombre: nextValue && !prev.concepto_nombre ? 'Adelanto financiación' : prev.concepto_nombre,
+                                                    categoria: nextValue && !prev.categoria ? 'Financiación' : prev.categoria,
+                                                    financ_fecha_inicio: prev.financ_fecha_inicio || getNextMonthISODate(fechaMovimiento),
+                                                }));
+                                            }}
+                                            className={clsx(
+                                                'px-3 py-3 rounded-xl text-[9px] font-black uppercase tracking-tighter border-2 transition-all h-auto text-left justify-start shadow-sm',
+                                                formData.es_inicio_financiacion
+                                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                                    : 'bg-white text-emerald-900 border-emerald-100 hover:bg-emerald-50'
+                                            )}
+                                        >
+                                            {formData.es_inicio_financiacion ? '✓ ' : ''}Inicio con adelanto
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({
+                                                ...prev,
+                                                es_cuota: !prev.es_cuota,
+                                                es_inicio_financiacion: !prev.es_cuota ? false : prev.es_inicio_financiacion,
+                                            }))}
+                                            className={clsx(
+                                                'px-3 py-3 rounded-xl text-[9px] font-black uppercase tracking-tighter border-2 transition-all h-auto text-left justify-start shadow-sm',
+                                                formData.es_cuota
+                                                    ? 'bg-blue-600 text-white border-blue-600'
+                                                    : 'bg-white text-blue-900 border-blue-100 hover:bg-blue-50'
+                                            )}
+                                        >
+                                            {formData.es_cuota ? '✓ ' : ''}Pago de cuota
+                                        </Button>
+                                    </div>
+
+                                    {formData.es_inicio_financiacion && (
+                                        <div className="mt-5 space-y-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Saldo a financiar USD</label>
+                                                    <MoneyInput
+                                                        value={formData.financ_saldo_usd}
+                                                        onChange={(val) => setFormData(prev => ({ ...prev, financ_saldo_usd: val }))}
+                                                        className="w-full h-11 bg-white dark:bg-gray-900 border-emerald-100 dark:border-emerald-900 font-bold"
+                                                        placeholder="10000"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Cantidad de cuotas</label>
+                                                    <Input
+                                                        type="number"
+                                                        min={1}
+                                                        value={formData.financ_cuotas_total}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, financ_cuotas_total: Math.max(1, Number(e.target.value) || 1) }))}
+                                                        className="h-11 bg-white dark:bg-gray-900 border-emerald-100 dark:border-emerald-900 font-bold"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Primera cuota</label>
+                                                    <Input
+                                                        type="date"
+                                                        value={formData.financ_fecha_inicio}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, financ_fecha_inicio: e.target.value }))}
+                                                        className="h-11 bg-white dark:bg-gray-900 border-emerald-100 dark:border-emerald-900 font-bold"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Tratamiento</label>
+                                                    <Input
+                                                        value={formData.financ_tratamiento}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, financ_tratamiento: e.target.value }))}
+                                                        className="h-11 bg-white dark:bg-gray-900 border-emerald-100 dark:border-emerald-900 font-bold"
+                                                        placeholder={formData.concepto_nombre || 'Tratamiento financiado'}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl bg-white/80 dark:bg-gray-900/60 border border-emerald-100 dark:border-emerald-900/50 p-3 flex justify-between gap-3 text-xs">
+                                                <span className="text-emerald-800 dark:text-emerald-200 font-bold">El ingreso actual queda como adelanto.</span>
+                                                <span className="text-emerald-900 dark:text-emerald-100 font-black tabular-nums">
+                                                    Cuota: USD {formData.financ_cuotas_total > 0 ? (formData.financ_saldo_usd / formData.financ_cuotas_total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {formData.es_cuota && (
+                                        <div className="mt-5 grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-blue-800 dark:text-blue-200 uppercase tracking-widest mb-1">Cuota nro.</label>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    value={formData.cuota_nro}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, cuota_nro: Math.max(1, Number(e.target.value) || 1) }))}
+                                                    className="h-11 bg-white dark:bg-gray-900 border-blue-100 dark:border-blue-900 font-bold"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-blue-800 dark:text-blue-200 uppercase tracking-widest mb-1">Total cuotas</label>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    value={formData.cuotas_total}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, cuotas_total: Math.max(1, Number(e.target.value) || 1) }))}
+                                                    className="h-11 bg-white dark:bg-gray-900 border-blue-100 dark:border-blue-900 font-bold"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
 
@@ -1249,6 +1447,36 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         <span className="text-[9px] font-black text-amber-600 uppercase">Workflow Clínico</span>
                                         <span className="font-black text-amber-700 text-[10px] uppercase">
                                             {formData.sena_tipos.map(getSenaWorkflowLabel).filter(Boolean).join(' + ')}
+                                        </span>
+                                    </div>
+                                )}
+                                {formData.es_inicio_financiacion && (
+                                    <div className="space-y-2 py-3 px-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[9px] font-black text-emerald-700 uppercase">Inicio de financiación</span>
+                                            <span className="font-black text-emerald-800 dark:text-emerald-200 text-[10px] uppercase">Adelanto de tratamiento</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-[10px]">
+                                            <div>
+                                                <p className="text-emerald-700/60 font-black uppercase">Saldo</p>
+                                                <p className="font-black text-emerald-900 dark:text-emerald-100">USD {formData.financ_saldo_usd.toLocaleString('es-AR')}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-emerald-700/60 font-black uppercase">Cuotas</p>
+                                                <p className="font-black text-emerald-900 dark:text-emerald-100">{formData.financ_cuotas_total}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-emerald-700/60 font-black uppercase">Primera</p>
+                                                <p className="font-black text-emerald-900 dark:text-emerald-100">{formData.financ_fecha_inicio}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.es_cuota && (
+                                    <div className="flex justify-between items-center py-2 px-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                        <span className="text-[9px] font-black text-blue-600 uppercase">Pago de financiación</span>
+                                        <span className="font-black text-blue-700 text-[10px] uppercase">
+                                            Cuota {formData.cuota_nro}/{formData.cuotas_total}
                                         </span>
                                     </div>
                                 )}
