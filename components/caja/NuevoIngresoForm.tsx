@@ -132,6 +132,7 @@ interface FormData {
     financ_adelanto_previo_usd: number;
     financ_saldo_usd: number;
     financ_cuotas_total: number;
+    financ_monto_cuota_usd: number;
     financ_fecha_inicio: string;
     financ_tratamiento: string;
     presupuesto_ref: string;
@@ -200,6 +201,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         financ_adelanto_previo_usd: 0,
         financ_saldo_usd: 0,
         financ_cuotas_total: 6,
+        financ_monto_cuota_usd: 0,
         financ_fecha_inicio: getNextMonthISODate(),
         financ_tratamiento: '',
         presupuesto_ref: '',
@@ -451,8 +453,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         }
 
         if (formData.es_inicio_financiacion) {
-            if (formData.financ_saldo_usd <= 0 || formData.financ_cuotas_total <= 0 || !formData.financ_fecha_inicio) {
-                alert('Completá saldo a financiar, cantidad de cuotas y fecha de primera cuota.');
+            if (formData.financ_saldo_usd <= 0 || formData.financ_cuotas_total <= 0 || formData.financ_monto_cuota_usd <= 0 || !formData.financ_fecha_inicio) {
+                alert('Completá saldo a financiar, cantidad de cuotas, valor de cuota y fecha de primera cuota.');
                 return;
             }
         }
@@ -491,9 +493,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             const totalUsdEquiv = useMultiplePayments ? getMixedUsdTotal(activeSplits) : calculateUsdEquivalent();
             const adelantoPrevioUsd = Math.max(0, formData.financ_adelanto_previo_usd || 0);
             const adelantoTotalUsd = adelantoPrevioUsd + totalUsdEquiv;
-            const financInstallmentUsd = formData.financ_cuotas_total > 0
-                ? Math.round((formData.financ_saldo_usd / formData.financ_cuotas_total) * 100) / 100
-                : 0;
+            const financInstallmentUsd = Math.round(Math.max(0, formData.financ_monto_cuota_usd || 0) * 100) / 100;
             const financSchedule = buildInstallmentSchedule(
                 formData.financ_fecha_inicio,
                 formData.financ_cuotas_total,
@@ -507,7 +507,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     `Pago actual para adelanto: USD ${totalUsdEquiv.toFixed(2)}`,
                     `Adelanto total contractual: USD ${adelantoTotalUsd.toFixed(2)}`,
                     `Saldo financiado: USD ${formData.financ_saldo_usd.toFixed(2)}`,
-                    `Plan: ${formData.financ_cuotas_total} cuotas de USD ${financInstallmentUsd.toFixed(2)}`,
+                    `Plan firmado: ${formData.financ_cuotas_total} cuotas de USD ${financInstallmentUsd.toFixed(2)}`,
                     `Primera cuota: ${formData.financ_fecha_inicio}`,
                     financScheduleText ? `Cronograma: ${financScheduleText}` : '',
                     cleanedObservation,
@@ -720,6 +720,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             financ_adelanto_previo_usd: 0,
             financ_saldo_usd: 0,
             financ_cuotas_total: 6,
+            financ_monto_cuota_usd: 0,
             financ_fecha_inicio: getNextMonthISODate(),
             financ_tratamiento: '',
             presupuesto_ref: '',
@@ -1233,6 +1234,23 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
+                                                    <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Valor cuota firmada USD</label>
+                                                    <MoneyInput
+                                                        value={formData.financ_monto_cuota_usd}
+                                                        onChange={(val) => setFormData(prev => ({ ...prev, financ_monto_cuota_usd: val }))}
+                                                        className="w-full h-11 bg-white dark:bg-gray-900 border-emerald-100 dark:border-emerald-900 font-bold"
+                                                        placeholder="917"
+                                                    />
+                                                </div>
+                                                <div className="rounded-xl bg-emerald-100/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 px-3 py-2">
+                                                    <p className="text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest">Según contrato</p>
+                                                    <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 font-bold mt-1">
+                                                        Cargá el valor final pactado. El sistema no divide ni recalcula intereses.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
                                                     <label className="block text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-1">Primera cuota</label>
                                                     <Input
                                                         type="date"
@@ -1263,14 +1281,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                         Adelanto USD {(formData.financ_adelanto_previo_usd + currentTotalUsd).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </p>
                                                     <p className="text-emerald-900 dark:text-emerald-100 font-black tabular-nums">
-                                                        Cuota USD {formData.financ_cuotas_total > 0 ? (formData.financ_saldo_usd / formData.financ_cuotas_total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                                                        Cuota USD {formData.financ_monto_cuota_usd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </p>
                                                 </div>
                                             </div>
                                             {buildInstallmentSchedule(
                                                 formData.financ_fecha_inicio,
                                                 formData.financ_cuotas_total,
-                                                formData.financ_cuotas_total > 0 ? Math.round((formData.financ_saldo_usd / formData.financ_cuotas_total) * 100) / 100 : 0,
+                                                formData.financ_monto_cuota_usd,
                                             ).length > 0 && (
                                                 <div className="rounded-xl bg-white/80 dark:bg-gray-900/60 border border-emerald-100 dark:border-emerald-900/50 p-3">
                                                     <p className="text-[10px] font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-widest mb-2">Cronograma de cuotas</p>
@@ -1278,7 +1296,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                         {buildInstallmentSchedule(
                                                             formData.financ_fecha_inicio,
                                                             formData.financ_cuotas_total,
-                                                            formData.financ_cuotas_total > 0 ? Math.round((formData.financ_saldo_usd / formData.financ_cuotas_total) * 100) / 100 : 0,
+                                                            formData.financ_monto_cuota_usd,
                                                         ).map(cuota => (
                                                             <div key={cuota.nro} className="flex justify-between gap-2 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/30 px-3 py-2 text-[10px]">
                                                                 <span className="font-black text-emerald-900 dark:text-emerald-100">Cuota {cuota.nro}</span>
@@ -1566,6 +1584,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                 <p className="font-black text-emerald-900 dark:text-emerald-100">{formData.financ_cuotas_total}</p>
                                             </div>
                                             <div>
+                                                <p className="text-emerald-700/60 font-black uppercase">Valor cuota</p>
+                                                <p className="font-black text-emerald-900 dark:text-emerald-100">USD {formData.financ_monto_cuota_usd.toLocaleString('es-AR')}</p>
+                                            </div>
+                                            <div>
                                                 <p className="text-emerald-700/60 font-black uppercase">Primera</p>
                                                 <p className="font-black text-emerald-900 dark:text-emerald-100">{formData.financ_fecha_inicio}</p>
                                             </div>
@@ -1576,7 +1598,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                 {buildInstallmentSchedule(
                                                     formData.financ_fecha_inicio,
                                                     formData.financ_cuotas_total,
-                                                    formData.financ_cuotas_total > 0 ? Math.round((formData.financ_saldo_usd / formData.financ_cuotas_total) * 100) / 100 : 0,
+                                                    formData.financ_monto_cuota_usd,
                                                 ).slice(0, 4).map(cuota => (
                                                     <p key={cuota.nro} className="text-[10px] font-bold text-emerald-900 dark:text-emerald-100">
                                                         Cuota {cuota.nro}: {cuota.fecha} · USD {cuota.montoUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
