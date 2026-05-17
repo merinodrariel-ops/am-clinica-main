@@ -50,8 +50,6 @@ import NuevaPrestacionModal from './NuevaPrestacionModal';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
 import { getPatientInventoryMaterials, type PatientMaterialRecord } from '@/app/actions/inventory-stock';
 import {
-    calculateFinancingBreakdown,
-    DEFAULT_MONTHLY_INTEREST_PCT,
     FINANCING_INSTALLMENT_OPTIONS,
     FINANCING_UPFRONT_OPTIONS,
 } from '@/lib/financial-engine';
@@ -226,37 +224,30 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
         notas: '',
     });
 
-    function getPlanPreview(monto: string, anticipoPct: string, cuotas: string) {
-        const m = parseFloat(monto);
-        const c = parseInt(cuotas);
-        const a = parseInt(anticipoPct);
-        if (m > 0 && c > 0 && [30, 50].includes(a) && [3, 6, 12].includes(c)) {
-            return calculateFinancingBreakdown({ totalUsd: m, upfrontPct: a, installments: c, monthlyInterestPct: DEFAULT_MONTHLY_INTEREST_PCT });
-        }
-        return null;
-    }
-
     async function handleCrearPlan() {
         setCrearPlanError(null);
         const monto = parseFloat(planForm.montoTratamientoUsd);
         const cuotas = parseInt(planForm.cuotasTotal);
+        const montoCuota = parseFloat(planForm.montoCuotaUsd);
         const anticipoPct = parseInt(planForm.anticipoPct);
-        const preview = getPlanPreview(planForm.montoTratamientoUsd, planForm.anticipoPct, planForm.cuotasTotal);
-        if (!planForm.tratamiento || isNaN(monto) || monto <= 0 || ![30, 50].includes(anticipoPct) || !preview || !planForm.fechaInicio) {
+        if (!planForm.tratamiento || isNaN(monto) || monto <= 0 || ![30, 50].includes(anticipoPct) || isNaN(cuotas) || cuotas <= 0 || isNaN(montoCuota) || montoCuota <= 0 || !planForm.fechaInicio) {
             setCrearPlanError('Completá todos los campos requeridos.');
             return;
         }
+        const anticipoUsd = Math.round(monto * (anticipoPct / 100) * 100) / 100;
+        const capitalFinanciadoUsd = Math.max(0, Math.round((monto - anticipoUsd) * 100) / 100);
+        const totalFinanciadoFirmadoUsd = Math.round(montoCuota * cuotas * 100) / 100;
         setCreandoPlan(true);
         try {
             const result = await crearPlanFinanciacionAction({
                 pacienteId: patient.id_paciente,
                 pacienteNombre: `${patient.nombre} ${patient.apellido}`.trim(),
                 tratamiento: planForm.tratamiento,
-                montoTotalUsd: preview.financedTotalUsd,
+                montoTotalUsd: totalFinanciadoFirmadoUsd,
                 cuotasTotal: cuotas,
-                montoCuotaUsd: preview.installmentUsd,
+                montoCuotaUsd: montoCuota,
                 fechaInicio: planForm.fechaInicio,
-                notas: planForm.notas || `Monto total: USD ${preview.totalUsd.toFixed(2)} · Anticipo ${preview.upfrontPct}%: USD ${preview.upfrontUsd.toFixed(2)} · Saldo financiado: USD ${preview.financedPrincipalUsd.toFixed(2)}`,
+                notas: planForm.notas || `Monto total tratamiento: USD ${monto.toFixed(2)} · Anticipo ${anticipoPct}%: USD ${anticipoUsd.toFixed(2)} · Capital financiado: USD ${capitalFinanciadoUsd.toFixed(2)} · Plan firmado: ${cuotas} cuotas de USD ${montoCuota.toFixed(2)} · Total financiado firmado: USD ${totalFinanciadoFirmadoUsd.toFixed(2)}`,
             });
             if (result.success) {
                 setShowCrearPlan(false);
@@ -1197,14 +1188,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     min="0"
                                     step="0.01"
                                     value={planForm.montoTratamientoUsd}
-                                    onChange={e => {
-                                        const monto = e.target.value;
-                                        setPlanForm(p => ({
-                                            ...p,
-                                            montoTratamientoUsd: monto,
-                                            montoCuotaUsd: getPlanPreview(monto, p.anticipoPct, p.cuotasTotal)?.installmentUsd.toFixed(2) || '',
-                                        }));
-                                    }}
+                                    onChange={e => setPlanForm(p => ({ ...p, montoTratamientoUsd: e.target.value }))}
                                     placeholder="0.00"
                                     className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
                                 />
@@ -1220,7 +1204,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             onClick={() => setPlanForm(p => ({
                                                 ...p,
                                                 anticipoPct: String(option),
-                                                montoCuotaUsd: getPlanPreview(p.montoTratamientoUsd, String(option), p.cuotasTotal)?.installmentUsd.toFixed(2) || '',
                                             }))}
                                             className={`py-2 rounded-lg text-sm font-medium transition-all ${
                                                 planForm.anticipoPct === String(option)
@@ -1247,7 +1230,6 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 setPlanForm(p => ({
                                                     ...p,
                                                     cuotasTotal: cuotas,
-                                                    montoCuotaUsd: getPlanPreview(p.montoTratamientoUsd, p.anticipoPct, cuotas)?.installmentUsd.toFixed(2) || '',
                                                 }));
                                             }}
                                             className={`py-2 rounded-lg text-sm font-medium transition-all ${
@@ -1263,58 +1245,22 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             </div>
 
                             <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 text-sm space-y-1">
-                                <div className="flex justify-between gap-3">
-                                    <span className="text-gray-500">TNA</span>
-                                    <span className="font-medium text-gray-900 dark:text-white">18% anual</span>
-                                </div>
-                                <div className="flex justify-between gap-3">
-                                    <span className="text-gray-500">Tasa mensual</span>
-                                    <span className="font-medium text-gray-900 dark:text-white">{DEFAULT_MONTHLY_INTEREST_PCT}%</span>
-                                </div>
-                                <p className="text-xs text-gray-500 pt-1">Financiación sujeta a evaluación y preaprobación de cada caso.</p>
+                                <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">Valor de cuota según contrato</p>
+                                <p className="text-xs text-gray-500 pt-1">Cargá manualmente el valor firmado. El sistema no calcula intereses ni divide el saldo.</p>
                             </div>
 
-                            {/* Preview en vivo */}
-                            {(() => {
-                                const bd = getPlanPreview(planForm.montoTratamientoUsd, planForm.anticipoPct, planForm.cuotasTotal);
-                                const c = parseInt(planForm.cuotasTotal);
-                                if (bd && c > 0) {
-                                    return (
-                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 space-y-2">
-                                            <div className="text-center pb-2 border-b border-emerald-200 dark:border-emerald-800">
-                                                <p className="text-xs text-gray-500 mb-0.5">Cuota mensual</p>
-                                                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
-                                                    USD {bd.installmentUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </p>
-                                                <p className="text-xs text-gray-500">por {c} {c === 1 ? 'mes' : 'meses'}</p>
-                                            </div>
-                                            <div className="space-y-1 text-sm">
-                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                                    <span>Monto total</span>
-                                                    <span>USD {bd.totalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                                    <span>Anticipo hoy</span>
-                                                    <span>USD {bd.upfrontUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                                    <span>Saldo financiado</span>
-                                                    <span>USD {bd.financedPrincipalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                                    <span>Interés (TNA 18%)</span>
-                                                    <span>USD {bd.totalInterestUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="flex justify-between font-medium text-gray-900 dark:text-white border-t border-emerald-200 dark:border-emerald-800 pt-1">
-                                                    <span>Total financiado</span>
-                                                    <span>USD {bd.financedTotalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            })()}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Valor de cuota firmada (USD) *</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={planForm.montoCuotaUsd}
+                                    onChange={e => setPlanForm(p => ({ ...p, montoCuotaUsd: e.target.value }))}
+                                    placeholder="Ej: 917"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                />
+                            </div>
 
                             {/* Fecha y notas */}
                             <div>
