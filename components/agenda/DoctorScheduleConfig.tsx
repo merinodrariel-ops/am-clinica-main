@@ -53,6 +53,15 @@ interface DailyAgendaSetting {
     send_time: string;
 }
 
+type SupabaseLikeError = { code?: string; message?: string } | null;
+
+function isMissingDailyAgendaSettingsTable(error: SupabaseLikeError) {
+    if (!error) return false;
+    return error.code === '42P01'
+        || error.code === 'PGRST205'
+        || /doctor_daily_agenda_settings|relation .* does not exist|could not find/i.test(error.message || '');
+}
+
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const CHANNELS = [
     { value: 'email', label: 'Email' },
@@ -238,15 +247,41 @@ export default function DoctorScheduleConfig() {
             setRules((data ?? []) as NotificationRule[]);
         }
         async function loadDailySettings() {
-            const { data } = await supabase
+            const [{ data: settingsData, error: settingsError }, { data: personalData }] = await Promise.all([
+                supabase
                 .from('doctor_daily_agenda_settings')
-                .select('*');
+                    .select('*'),
+                supabase
+                    .from('personal')
+                    .select('user_id, email, whatsapp')
+                    .eq('activo', true)
+                    .not('user_id', 'is', null),
+            ]);
+
             const byDoctor: Record<string, DailyAgendaSetting> = {};
-            for (const row of (data ?? []) as DailyAgendaSetting[]) {
-                byDoctor[row.doctor_id] = {
-                    doctor_id: row.doctor_id,
+
+            for (const row of (personalData ?? []) as { user_id: string; email: string | null; whatsapp: string | null }[]) {
+                byDoctor[row.user_id] = {
+                    doctor_id: row.user_id,
                     email: row.email ?? '',
                     whatsapp: row.whatsapp ?? '',
+                    send_email: true,
+                    send_whatsapp: true,
+                    is_active: true,
+                    send_time: '08:00',
+                };
+            }
+
+            if (settingsError && !isMissingDailyAgendaSettingsTable(settingsError)) {
+                console.error('Error loading daily agenda settings:', settingsError);
+            }
+
+            for (const row of (settingsData ?? []) as DailyAgendaSetting[]) {
+                byDoctor[row.doctor_id] = {
+                    ...byDoctor[row.doctor_id],
+                    doctor_id: row.doctor_id,
+                    email: row.email ?? byDoctor[row.doctor_id]?.email ?? '',
+                    whatsapp: row.whatsapp ?? byDoctor[row.doctor_id]?.whatsapp ?? '',
                     send_email: row.send_email ?? true,
                     send_whatsapp: row.send_whatsapp ?? true,
                     is_active: row.is_active ?? true,
@@ -352,6 +387,17 @@ export default function DoctorScheduleConfig() {
         setSavingDaily(true);
         try {
             const setting = getDailySetting(activeDoctorId);
+
+            const { error: personalError } = await supabase
+                .from('personal')
+                .update({
+                    email: setting.email.trim() || null,
+                    whatsapp: setting.whatsapp.trim() || null,
+                })
+                .eq('user_id', activeDoctorId);
+
+            if (personalError) throw personalError;
+
             const { error } = await supabase
                 .from('doctor_daily_agenda_settings')
                 .upsert({
@@ -364,8 +410,9 @@ export default function DoctorScheduleConfig() {
                     send_time: setting.send_time || '08:00',
                 }, { onConflict: 'doctor_id' });
 
-            if (error) throw error;
-            toast.success('Agenda diaria automática guardada');
+            if (error && !isMissingDailyAgendaSettingsTable(error)) throw error;
+
+            toast.success(error ? 'Contacto diario guardado en el legajo del doctor' : 'Agenda diaria automática guardada');
         } catch (err) {
             console.error(err);
             toast.error('Error al guardar agenda diaria automática');
@@ -555,7 +602,7 @@ export default function DoctorScheduleConfig() {
 
                                     <div className="lg:col-span-3 flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
                                         <p className="text-xs text-gray-400">
-                                            El cron de Vercel corre todos los días a las 08:00 de Argentina. La hora queda registrada para uso operativo.
+                                            El cron de Vercel corre todos los días a las 08:00 de Argentina. Si la configuración avanzada no está migrada, se usa el email y WhatsApp del legajo de Personal.
                                         </p>
                                         <button
                                             onClick={saveDailySetting}
