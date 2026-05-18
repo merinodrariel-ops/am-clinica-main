@@ -308,6 +308,47 @@ async function sendWhatsApp(ctx: AppointmentNotificationContext): Promise<{ succ
   }
 }
 
+export async function sendWhatsAppMessage(
+  recipientPhone: string,
+  body: string
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+  const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+  const FROM_WA = process.env.TWILIO_WHATSAPP_FROM ?? 'whatsapp:+14155238886';
+
+  if (!ACCOUNT_SID || !AUTH_TOKEN) {
+    console.warn('[AM-Scheduler] Twilio credentials not configured — skipping WhatsApp');
+    return { success: false, error: 'Twilio not configured' };
+  }
+
+  const phone = recipientPhone.replace(/\D/g, '');
+  const e164 = phone.startsWith('54') ? `+${phone}` : `+54${phone}`;
+
+  try {
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${Buffer.from(`${ACCOUNT_SID}:${AUTH_TOKEN}`).toString('base64')}`,
+        },
+        body: new URLSearchParams({
+          From: FROM_WA,
+          To: `whatsapp:${e164}`,
+          Body: body,
+        }),
+      }
+    );
+
+    const json = await response.json() as { sid?: string; message?: string };
+    if (!response.ok) return { success: false, error: json.message ?? 'Twilio error' };
+    return { success: true, id: json.sid };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+}
+
 // ─── Log to Supabase ──────────────────────────────────────────────────────────
 
 async function logNotification(

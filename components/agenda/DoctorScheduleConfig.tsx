@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { getDoctors } from '@/app/actions/agenda';
-import { Save, Plus, Trash2, Loader2, Bell, Clock, UserCircle2 } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, Bell, Clock, UserCircle2, Mail, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,6 +41,16 @@ interface NotificationRule {
     channel: string;
     template_key: string;
     is_active: boolean;
+}
+
+interface DailyAgendaSetting {
+    doctor_id: string;
+    email: string;
+    whatsapp: string;
+    send_email: boolean;
+    send_whatsapp: boolean;
+    is_active: boolean;
+    send_time: string;
 }
 
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -206,9 +216,11 @@ export default function DoctorScheduleConfig() {
     const [activeDoctorId, setActiveDoctorId] = useState<string>('');
     const [schedules, setSchedules] = useState<DoctorSchedule[]>([]);
     const [rules, setRules] = useState<NotificationRule[]>([]);
+    const [dailySettings, setDailySettings] = useState<Record<string, DailyAgendaSetting>>({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [savingRules, setSavingRules] = useState(false);
+    const [savingDaily, setSavingDaily] = useState(false);
 
     const supabase = createClient();
 
@@ -225,7 +237,25 @@ export default function DoctorScheduleConfig() {
                 .order('trigger_offset_hours');
             setRules((data ?? []) as NotificationRule[]);
         }
-        Promise.all([loadDoctors(), loadRules()]).then(() => setLoading(false));
+        async function loadDailySettings() {
+            const { data } = await supabase
+                .from('doctor_daily_agenda_settings')
+                .select('*');
+            const byDoctor: Record<string, DailyAgendaSetting> = {};
+            for (const row of (data ?? []) as DailyAgendaSetting[]) {
+                byDoctor[row.doctor_id] = {
+                    doctor_id: row.doctor_id,
+                    email: row.email ?? '',
+                    whatsapp: row.whatsapp ?? '',
+                    send_email: row.send_email ?? true,
+                    send_whatsapp: row.send_whatsapp ?? true,
+                    is_active: row.is_active ?? true,
+                    send_time: row.send_time ?? '08:00',
+                };
+            }
+            setDailySettings(byDoctor);
+        }
+        Promise.all([loadDoctors(), loadRules(), loadDailySettings()]).then(() => setLoading(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -291,6 +321,56 @@ export default function DoctorScheduleConfig() {
             toast.error('Error al guardar reglas');
         } finally {
             setSavingRules(false);
+        }
+    };
+
+    const getDailySetting = (doctorId: string): DailyAgendaSetting => (
+        dailySettings[doctorId] ?? {
+            doctor_id: doctorId,
+            email: '',
+            whatsapp: '',
+            send_email: true,
+            send_whatsapp: true,
+            is_active: true,
+            send_time: '08:00',
+        }
+    );
+
+    const updateDailySetting = (doctorId: string, patch: Partial<DailyAgendaSetting>) => {
+        setDailySettings(prev => ({
+            ...prev,
+            [doctorId]: {
+                ...getDailySetting(doctorId),
+                ...patch,
+                doctor_id: doctorId,
+            },
+        }));
+    };
+
+    const saveDailySetting = async () => {
+        if (!activeDoctorId) return;
+        setSavingDaily(true);
+        try {
+            const setting = getDailySetting(activeDoctorId);
+            const { error } = await supabase
+                .from('doctor_daily_agenda_settings')
+                .upsert({
+                    doctor_id: activeDoctorId,
+                    email: setting.email.trim() || null,
+                    whatsapp: setting.whatsapp.trim() || null,
+                    send_email: setting.send_email,
+                    send_whatsapp: setting.send_whatsapp,
+                    is_active: setting.is_active,
+                    send_time: setting.send_time || '08:00',
+                }, { onConflict: 'doctor_id' });
+
+            if (error) throw error;
+            toast.success('Agenda diaria automática guardada');
+        } catch (err) {
+            console.error(err);
+            toast.error('Error al guardar agenda diaria automática');
+        } finally {
+            setSavingDaily(false);
         }
     };
 
@@ -382,6 +462,113 @@ export default function DoctorScheduleConfig() {
                                 Guardar horarios
                             </button>
                         </div>
+                    </div>
+                )}
+            </section>
+
+            {/* ── Daily Agenda Delivery ─────────────────────────────── */}
+            <section>
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <Mail size={18} className="text-blue-600" />
+                        <div>
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                                Agenda diaria automática
+                            </h2>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                Envío diario a primera hora por email y WhatsApp con la agenda del día de cada doctor.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {activeDoctorId && (
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
+                        {(() => {
+                            const setting = getDailySetting(activeDoctorId);
+                            return (
+                                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_130px] gap-4 items-end">
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                                            <Mail size={12} /> Email destino
+                                        </label>
+                                        <input
+                                            type="email"
+                                            value={setting.email}
+                                            onChange={e => updateDailySetting(activeDoctorId, { email: e.target.value })}
+                                            placeholder="doctor@email.com"
+                                            className="w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                        />
+                                        <label className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                                            <input
+                                                type="checkbox"
+                                                checked={setting.send_email}
+                                                onChange={e => updateDailySetting(activeDoctorId, { send_email: e.target.checked })}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            Enviar agenda por email
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                                            <MessageCircle size={12} /> WhatsApp destino
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            value={setting.whatsapp}
+                                            onChange={e => updateDailySetting(activeDoctorId, { whatsapp: e.target.value })}
+                                            placeholder="+549..."
+                                            className="w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                        />
+                                        <label className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                                            <input
+                                                type="checkbox"
+                                                checked={setting.send_whatsapp}
+                                                onChange={e => updateDailySetting(activeDoctorId, { send_whatsapp: e.target.checked })}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            Enviar agenda por WhatsApp
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                                            Hora referencia
+                                        </label>
+                                        <input
+                                            type="time"
+                                            value={setting.send_time}
+                                            onChange={e => updateDailySetting(activeDoctorId, { send_time: e.target.value })}
+                                            className="w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                        />
+                                        <label className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                                            <input
+                                                type="checkbox"
+                                                checked={setting.is_active}
+                                                onChange={e => updateDailySetting(activeDoctorId, { is_active: e.target.checked })}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            Activo
+                                        </label>
+                                    </div>
+
+                                    <div className="lg:col-span-3 flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
+                                        <p className="text-xs text-gray-400">
+                                            El cron de Vercel corre todos los días a las 08:00 de Argentina. La hora queda registrada para uso operativo.
+                                        </p>
+                                        <button
+                                            onClick={saveDailySetting}
+                                            disabled={savingDaily}
+                                            className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60"
+                                        >
+                                            {savingDaily ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                            Guardar envío diario
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </section>
