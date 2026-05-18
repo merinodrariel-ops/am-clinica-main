@@ -5,6 +5,8 @@ import { EmailService } from '@/lib/email-service';
 import { getLocalISODate } from '@/lib/local-date';
 import { sendWhatsAppMessage } from '@/lib/am-scheduler/notification-service';
 
+const DAILY_AGENDA_REPLY_TO = process.env.DAILY_AGENDA_REPLY_TO || 'drarielmerino@gmail.com';
+
 type DoctorStaffRow = {
   id: string;
   user_id: string | null;
@@ -320,6 +322,7 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
         to: email,
         subject: `Agenda de hoy · ${formatDateLong(date)} — AM Clínica`,
         html: renderAgendaHtml({ doctorName: name, date, appointments: doctorAppointments }),
+        replyTo: DAILY_AGENDA_REPLY_TO,
         idempotencyKey: `doctor-daily-agenda:${doctorId}:${date}:email:${email}`,
       });
       result.email = response.success ? 'sent' : 'failed';
