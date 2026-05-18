@@ -66,8 +66,8 @@ function dayBounds(date: string) {
 }
 
 function formatDateLong(date: string) {
-  const [year, month, day] = date.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('es-AR', {
+  const argentinaNoon = new Date(`${date}T12:00:00-03:00`);
+  return argentinaNoon.toLocaleDateString('es-AR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
