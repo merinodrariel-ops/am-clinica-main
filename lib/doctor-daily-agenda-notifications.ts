@@ -116,6 +116,13 @@ function normalizePhone(value?: string | null) {
   return phone || null;
 }
 
+function isMissingRelationError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return error.code === '42P01'
+    || error.code === 'PGRST205'
+    || /doctor_daily_agenda_settings|relation .* does not exist|could not find/i.test(error.message || '');
+}
+
 function renderAgendaHtml(input: {
   doctorName: string;
   date: string;
@@ -240,7 +247,7 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
     throw new Error(`No se pudieron cargar doctores: ${staffError.message}`);
   }
 
-  if (settingsError && settingsError.code !== '42P01') {
+  if (settingsError && !isMissingRelationError(settingsError)) {
     throw new Error(`No se pudo cargar configuración de agenda diaria: ${settingsError.message}`);
   }
 
