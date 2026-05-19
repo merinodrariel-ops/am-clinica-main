@@ -7,6 +7,7 @@ import { sendWhatsAppMessage } from '@/lib/am-scheduler/notification-service';
 
 const DAILY_AGENDA_FROM = process.env.DAILY_AGENDA_FROM || 'AM Turnos <turnos@amesteticadental.com>';
 const DAILY_AGENDA_REPLY_TO = process.env.DAILY_AGENDA_REPLY_TO || 'drarielmerino@gmail.com';
+const TURNOS_WHATSAPP_URL = 'https://wa.link/zolb52';
 
 type DoctorStaffRow = {
   id: string;
@@ -173,8 +174,20 @@ function renderAgendaHtml(input: {
         </table>
       `}
 
-      <p style="font-size:12px;color:#9ca3af;margin-top:28px;">
-        Este email fue generado automáticamente a primera hora. Si un turno cambia después del envío, revisar la agenda online.
+      <div style="margin-top:28px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:18px 20px;">
+        <p style="font-size:14px;line-height:1.5;color:#1f2937;margin:0 0 14px;">
+          Este es un email automático enviado a primera hora con la agenda cargada hasta ese momento.
+          Ante cualquier eventualidad, duda o cambio de último momento, corroborá siempre con Turnos.
+        </p>
+        <a href="${TURNOS_WHATSAPP_URL}"
+          style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;
+                 padding:11px 18px;border-radius:10px;font-weight:700;font-size:14px;">
+          Corroborar por WhatsApp de turnos
+        </a>
+      </div>
+
+      <p style="font-size:12px;color:#9ca3af;margin-top:18px;">
+        WhatsApp de turnos: <a href="${TURNOS_WHATSAPP_URL}" style="color:#2563eb;text-decoration:none;">${TURNOS_WHATSAPP_URL}</a>
       </p>
     </div>`;
 }
@@ -185,8 +198,9 @@ function renderAgendaWhatsApp(input: {
   appointments: AppointmentRow[];
 }) {
   const header = `*AM Clínica · Agenda de hoy*\n${input.doctorName}\n${formatDateLong(input.date)}`;
+  const footer = `Este mensaje es automático y refleja la agenda cargada a primera hora. Ante cualquier eventualidad, duda o cambio de último momento, corroborá siempre con Turnos:\n${TURNOS_WHATSAPP_URL}`;
   if (input.appointments.length === 0) {
-    return `${header}\n\nNo hay turnos cargados para hoy.`;
+    return `${header}\n\nNo hay turnos cargados para hoy.\n\n${footer}`;
   }
 
   const lines = input.appointments.map((apt) => {
@@ -195,7 +209,7 @@ function renderAgendaWhatsApp(input: {
     return `• ${time} · ${patientName(apt)}${type}`;
   });
 
-  return `${header}\n\n${lines.join('\n')}\n\nSi hay cambios posteriores, revisar la agenda online.`;
+  return `${header}\n\n${lines.join('\n')}\n\n${footer}`;
 }
 
 async function logDelivery(input: {
