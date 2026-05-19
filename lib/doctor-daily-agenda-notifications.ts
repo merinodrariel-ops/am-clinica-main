@@ -240,8 +240,63 @@ async function logDelivery(input: {
     });
 
   if (error) {
-    console.warn('[daily-agenda] delivery log skipped:', error.message);
+    if (!isMissingRelationError(error)) {
+      console.warn('[daily-agenda] delivery log skipped:', error.message);
+      return;
+    }
+
+    const { error: fallbackError } = await supabase.from('notification_logs').insert({
+      appointment_id: null,
+      rule_id: null,
+      channel: input.channel,
+      recipient_email: input.channel === 'email' ? input.recipient : null,
+      recipient_phone: input.channel === 'whatsapp' ? input.recipient : null,
+      template_key: 'doctor_daily_agenda',
+      payload: {
+        doctorId: input.doctorId,
+        agendaDate: input.date,
+        appointmentCount: input.appointmentCount,
+      },
+      status: input.status,
+      provider_id: input.providerId ?? null,
+      error_message: input.error ?? null,
+      sent_at: input.status === 'sent' ? new Date().toISOString() : null,
+    });
+
+    if (fallbackError) {
+      console.warn('[daily-agenda] notification_logs fallback skipped:', fallbackError.message);
+    }
   }
+}
+
+async function alreadySentToday(input: {
+  date: string;
+  channel: 'email' | 'whatsapp';
+  recipient: string;
+}) {
+  const supabase = createAdminClient();
+  const { start, end } = dayBounds(input.date);
+  let query = supabase
+    .from('notification_logs')
+    .select('id')
+    .eq('template_key', 'doctor_daily_agenda')
+    .eq('channel', input.channel)
+    .eq('status', 'sent')
+    .gte('created_at', new Date(start).toISOString())
+    .lte('created_at', new Date(end).toISOString())
+    .limit(1);
+
+  query = input.channel === 'email'
+    ? query.eq('recipient_email', input.recipient)
+    : query.eq('recipient_phone', input.recipient);
+
+  const { data, error } = await query;
+  if (error) {
+    console.warn('[daily-agenda] duplicate check skipped:', error.message);
+    return false;
+  }
+
+  return Boolean(data?.length);
 }
 
 export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
@@ -333,31 +388,41 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
     const result: DeliveryResult = { doctorId, doctorName: name, appointments: doctorAppointments.length, errors: [] };
 
     if (shouldEmail && email) {
-      const response = await EmailService.send({
-        from: DAILY_AGENDA_FROM,
-        to: email,
-        subject: `Agenda de hoy · ${formatDateLong(date)} — AM Clínica`,
-        html: renderAgendaHtml({ doctorName: name, date, appointments: doctorAppointments }),
-        replyTo: DAILY_AGENDA_REPLY_TO,
-        idempotencyKey: `doctor-daily-agenda:${doctorId}:${date}:email:${email}`,
-      });
-      result.email = response.success ? 'sent' : 'failed';
-      if (!response.success) result.errors.push(String((response as any).error || 'Error enviando email'));
-      await logDelivery({
-        doctorId,
-        date,
-        channel: 'email',
-        recipient: email,
-        status: result.email,
-        appointmentCount: doctorAppointments.length,
-        providerId: (response as any).id,
-        error: response.success ? null : String((response as any).error || 'Error enviando email'),
-      });
+      if (await alreadySentToday({ date, channel: 'email', recipient: email })) {
+        result.email = 'skipped';
+      } else {
+        const response = await EmailService.send({
+          from: DAILY_AGENDA_FROM,
+          to: email,
+          subject: `Agenda de hoy · ${formatDateLong(date)} — AM Clínica`,
+          html: renderAgendaHtml({ doctorName: name, date, appointments: doctorAppointments }),
+          replyTo: DAILY_AGENDA_REPLY_TO,
+          idempotencyKey: `doctor-daily-agenda:${doctorId}:${date}:email:${email}`,
+        });
+        result.email = response.success ? 'sent' : 'failed';
+        if (!response.success) result.errors.push(String((response as any).error || 'Error enviando email'));
+        await logDelivery({
+          doctorId,
+          date,
+          channel: 'email',
+          recipient: email,
+          status: result.email,
+          appointmentCount: doctorAppointments.length,
+          providerId: (response as any).id,
+          error: response.success ? null : String((response as any).error || 'Error enviando email'),
+        });
+      }
     } else {
       result.email = 'skipped';
     }
 
     if (shouldWhatsApp && whatsapp) {
+      if (await alreadySentToday({ date, channel: 'whatsapp', recipient: whatsapp })) {
+        result.whatsapp = 'skipped';
+        results.push(result);
+        continue;
+      }
+
       const response = await sendWhatsAppMessage(whatsapp, renderAgendaWhatsApp({ doctorName: name, date, appointments: doctorAppointments }));
       result.whatsapp = response.success ? 'sent' : 'failed';
       if (!response.success) result.errors.push(String(response.error || 'Error enviando WhatsApp'));
