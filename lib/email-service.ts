@@ -21,6 +21,7 @@ export const EmailService = {
      * Sends a generic email using Resend.
      */
     async send({
+        from,
         to,
         subject,
         html,
@@ -30,6 +31,7 @@ export const EmailService = {
         replyTo,
         idempotencyKey
     }: {
+        from?: string;
         to: string | string[];
         subject: string;
         html: string;
@@ -40,6 +42,7 @@ export const EmailService = {
         idempotencyKey?: string;
     }) {
         return sendResendEmail({
+            from,
             to,
             subject,
             html,

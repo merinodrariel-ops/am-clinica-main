@@ -7,6 +7,7 @@ interface EmailAttachment {
 }
 
 interface SendResendEmailInput {
+    from?: string;
     to: string | string[];
     subject: string;
     html: string;
@@ -34,7 +35,7 @@ export async function sendResendEmail(input: SendResendEmailInput) {
 
     try {
         const { data, error } = await resend.emails.send({
-            from: fromEmail,
+            from: input.from ?? fromEmail,
             to: Array.isArray(input.to) ? input.to : [input.to],
             subject: input.subject,
             html: input.html,
