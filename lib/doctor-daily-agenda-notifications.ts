@@ -1,5 +1,6 @@
 import 'server-only';
 
+import crypto from 'crypto';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { EmailService } from '@/lib/email-service';
 import { getLocalISODate } from '@/lib/local-date';
@@ -212,6 +213,23 @@ function renderAgendaWhatsApp(input: {
   return `${header}\n\n${lines.join('\n')}\n\n${footer}`;
 }
 
+function buildAgendaFingerprint(appointments: AppointmentRow[]) {
+  const payload = appointments.map((apt) => ({
+    id: apt.id,
+    start: apt.start_time,
+    end: apt.end_time,
+    status: apt.status || '',
+    type: apt.type || '',
+    patient: patientName(apt),
+  }));
+
+  return crypto
+    .createHash('sha1')
+    .update(JSON.stringify(payload))
+    .digest('hex')
+    .slice(0, 12);
+}
+
 async function logDelivery(input: {
   doctorId: string;
   date: string;
@@ -299,7 +317,7 @@ async function alreadySentToday(input: {
   return Boolean(data?.length);
 }
 
-export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
+export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?: { forceEmail?: string }) {
   const supabase = createAdminClient();
   const { start, end } = dayBounds(date);
 
@@ -323,6 +341,7 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
     throw new Error(`No se pudo cargar configuración de agenda diaria: ${settingsError.message}`);
   }
 
+  const forceEmail = options?.forceEmail?.trim().toLowerCase() || null;
   const staff = ((staffRows || []) as DoctorStaffRow[]).filter(row => row.user_id);
   const doctorIds = staff.map(row => row.user_id!).filter(Boolean);
   if (doctorIds.length === 0) return { date, sent: 0, failed: 0, skipped: 0, doctors: [] as DeliveryResult[] };
@@ -350,7 +369,16 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
   const settingsByDoctor = new Map(((settingsRows || []) as DailyAgendaSetting[]).map(setting => [setting.doctor_id, setting]));
   const appointmentsByDoctor = new Map<string, AppointmentRow[]>();
 
-  for (const apt of ((appointments || []) as (AppointmentRow & { doctor_id: string | null })[])) {
+  const rawApts = (appointments || []) as (AppointmentRow & { doctor_id: string | null })[];
+  console.log(`[daily-agenda] date=${date} staff=${staff.length} raw_appointments=${rawApts.length} doctorIds=[${doctorIds.join(',')}]`);
+
+  const appointmentDoctorIds = new Set(rawApts.map(a => a.doctor_id).filter(Boolean));
+  const missingFromApts = doctorIds.filter(id => !appointmentDoctorIds.has(id));
+  if (missingFromApts.length > 0) {
+    console.warn(`[daily-agenda] doctors with no appointments in query result (possible UUID mismatch): [${missingFromApts.join(',')}]`);
+  }
+
+  for (const apt of rawApts) {
     if (!apt.doctor_id) continue;
     if (!appointmentsByDoctor.has(apt.doctor_id)) appointmentsByDoctor.set(apt.doctor_id, []);
     appointmentsByDoctor.get(apt.doctor_id)!.push(apt);
@@ -376,6 +404,7 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
     const name = doctorName(row, profilesById.get(doctorId));
     const profile = profilesById.get(doctorId);
     const doctorAppointments = appointmentsByDoctor.get(doctorId) || [];
+    const agendaFingerprint = buildAgendaFingerprint(doctorAppointments);
     const email = normalizeEmail(
       setting?.email
       || row.email
@@ -386,9 +415,19 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
     const shouldEmail = setting?.send_email ?? true;
     const shouldWhatsApp = setting?.send_whatsapp ?? true;
     const result: DeliveryResult = { doctorId, doctorName: name, appointments: doctorAppointments.length, errors: [] };
+    console.log(`[daily-agenda] doctor="${name}" id=${doctorId} appointments=${doctorAppointments.length} email=${email || 'none'} shouldEmail=${shouldEmail}`);
+
+    // When forceEmail is set, skip every doctor except the target
+    if (forceEmail && email !== forceEmail) {
+      result.email = 'skipped';
+      result.whatsapp = 'skipped';
+      results.push(result);
+      continue;
+    }
 
     if (shouldEmail && email) {
-      if (await alreadySentToday({ date, channel: 'email', recipient: email })) {
+      const skipDupeCheck = forceEmail !== null;
+      if (!skipDupeCheck && await alreadySentToday({ date, channel: 'email', recipient: email })) {
         result.email = 'skipped';
       } else {
         const response = await EmailService.send({
@@ -397,7 +436,7 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate()) {
           subject: `Agenda de hoy · ${formatDateLong(date)} — AM Clínica`,
           html: renderAgendaHtml({ doctorName: name, date, appointments: doctorAppointments }),
           replyTo: DAILY_AGENDA_REPLY_TO,
-          idempotencyKey: `doctor-daily-agenda:${doctorId}:${date}:email:${email}`,
+          idempotencyKey: `doctor-daily-agenda:${doctorId}:${date}:email:${email}:${agendaFingerprint}`,
         });
         result.email = response.success ? 'sent' : 'failed';
         if (!response.success) result.errors.push(String((response as any).error || 'Error enviando email'));
