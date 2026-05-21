@@ -8,6 +8,7 @@ import { sendWhatsAppMessage } from '@/lib/am-scheduler/notification-service';
 
 const DAILY_AGENDA_FROM = process.env.DAILY_AGENDA_FROM || 'AM Turnos <turnos@amesteticadental.com>';
 const DAILY_AGENDA_REPLY_TO = process.env.DAILY_AGENDA_REPLY_TO || 'drarielmerino@gmail.com';
+const ARIEL_DAILY_AGENDA_EMAIL = process.env.ARIEL_DAILY_AGENDA_EMAIL || 'drarielmerino@gmail.com';
 const TURNOS_WHATSAPP_URL = 'https://wa.link/zolb52';
 
 type DoctorStaffRow = {
@@ -119,6 +120,20 @@ function normalizeEmail(value?: string | null) {
 function normalizePhone(value?: string | null) {
   const phone = value?.trim();
   return phone || null;
+}
+
+function resolveDailyAgendaEmail(input: {
+  settingEmail?: string | null;
+  staffEmail?: string | null;
+  profileEmail?: string | null;
+  doctorName: string;
+  profile?: DoctorProfile;
+}) {
+  if (isArielMerino(input.doctorName, input.profile)) {
+    return normalizeEmail(input.settingEmail || ARIEL_DAILY_AGENDA_EMAIL);
+  }
+
+  return normalizeEmail(input.settingEmail || input.staffEmail || input.profileEmail);
 }
 
 function isMissingRelationError(error: { code?: string; message?: string } | null) {
@@ -405,12 +420,13 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?:
     const profile = profilesById.get(doctorId);
     const doctorAppointments = appointmentsByDoctor.get(doctorId) || [];
     const agendaFingerprint = buildAgendaFingerprint(doctorAppointments);
-    const email = normalizeEmail(
-      setting?.email
-      || row.email
-      || profile?.email
-      || (isArielMerino(name, profile) ? 'doctor.arielmerinopersonal@gmail.com' : null)
-    );
+    const email = resolveDailyAgendaEmail({
+      settingEmail: setting?.email,
+      staffEmail: row.email,
+      profileEmail: profile?.email,
+      doctorName: name,
+      profile,
+    });
     const whatsapp = normalizePhone(setting?.whatsapp || row.whatsapp);
     const shouldEmail = setting?.send_email ?? true;
     const shouldWhatsApp = setting?.send_whatsapp ?? true;
@@ -439,7 +455,9 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?:
           idempotencyKey: `doctor-daily-agenda:${doctorId}:${date}:email:${email}:${agendaFingerprint}`,
         });
         result.email = response.success ? 'sent' : 'failed';
-        if (!response.success) result.errors.push(String((response as any).error || 'Error enviando email'));
+        const responseError = 'error' in response ? response.error : null;
+        const responseId = 'id' in response ? response.id : null;
+        if (!response.success) result.errors.push(String(responseError || 'Error enviando email'));
         await logDelivery({
           doctorId,
           date,
@@ -447,8 +465,8 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?:
           recipient: email,
           status: result.email,
           appointmentCount: doctorAppointments.length,
-          providerId: (response as any).id,
-          error: response.success ? null : String((response as any).error || 'Error enviando email'),
+          providerId: responseId,
+          error: response.success ? null : String(responseError || 'Error enviando email'),
         });
       }
     } else {

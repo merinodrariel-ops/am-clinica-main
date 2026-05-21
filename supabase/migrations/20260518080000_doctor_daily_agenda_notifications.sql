@@ -105,7 +105,7 @@ INSERT INTO public.doctor_daily_agenda_settings (
 )
 SELECT
   pr.id,
-  'doctor.arielmerinopersonal@gmail.com',
+  'drarielmerino@gmail.com',
   TRUE,
   TRUE,
   TRUE
