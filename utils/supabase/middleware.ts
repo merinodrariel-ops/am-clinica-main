@@ -63,10 +63,12 @@ export async function updateSession(request: NextRequest) {
         path === '/mi-clinica' ||
         path.startsWith('/mi-clinica/') ||
         path.startsWith('/sonrisa/comparador') ||
+        path.startsWith('/sonrisa/simulador') ||
         path === '/privacy-policy' ||
         path === '/terms' ||
         path.startsWith('/forgot-password') ||
         path.startsWith('/api/patient-portal/') ||
+        path.startsWith('/api/smile-design/') ||
         path.startsWith('/api/public-booking') ||
         path === '/api/agenda/daily-summary' ||
         path.startsWith('/api/workflows/') ||

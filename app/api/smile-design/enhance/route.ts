@@ -130,7 +130,8 @@ ${anatomyLines.length > 0 ? `AJUSTES FINOS SOLICITADOS:\n${anatomyLines.join('\n
     } catch (err: unknown) {
         console.error('[smile-design/enhance] ERROR:', err);
         const msg = err instanceof Error ? err.message : String(err);
-        const detail = err instanceof Error && (err as any).status ? ` [status=${(err as any).status}]` : '';
+        const maybeStatusError = err as { status?: unknown };
+        const detail = err instanceof Error && maybeStatusError.status ? ` [status=${maybeStatusError.status}]` : '';
         console.error('[smile-design/enhance] msg:', msg + detail);
         if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('limit: 0')) {
             return NextResponse.json({ error: 'Quota de generación de imágenes agotada. Activá la facturación en Google Cloud Console.', billing: true }, { status: 429 });
