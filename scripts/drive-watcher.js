@@ -292,6 +292,31 @@ function handleExocadSymlink(projectPath, patient, projectName) {
 }
 
 /**
+ * Escanea recursivamente un directorio buscando archivos que cumplan con una expresión regular
+ */
+function getFilesRecursively(dir, filterRegex) {
+    let results = [];
+    if (!fs.existsSync(dir)) return results;
+    
+    const list = fs.readdirSync(dir);
+    list.forEach(file => {
+        const filePath = path.join(dir, file);
+        const stat = fs.lstatSync(filePath);
+        
+        if (stat.isDirectory()) {
+            if (!file.startsWith('.')) {
+                results = results.concat(getFilesRecursively(filePath, filterRegex));
+            }
+        } else if (stat.isFile() || stat.isSymbolicLink()) {
+            if (filterRegex.test(file)) {
+                results.push(filePath);
+            }
+        }
+    });
+    return results;
+}
+
+/**
  * Escanea y clasifica todos los archivos de la raíz
  * @param {boolean} dryRun - Si es true, solo simula y escribe el reporte sin mover nada
  */
@@ -420,6 +445,65 @@ async function organizeDrive(dryRun = true) {
                     if (!dryRun) {
                         safeMove(pItemPath, POR_CLASIFICAR_DIR, pItem);
                     }
+                }
+            }
+        }
+    }
+
+    // 3. Escanear POR_CLASIFICAR recursivamente por archivos de presentación (.gslides o .pptx)
+    if (fs.existsSync(POR_CLASIFICAR_DIR)) {
+        const presentationFiles = getFilesRecursively(POR_CLASIFICAR_DIR, /\.(gslides|pptx)$/i);
+        for (const itemPath of presentationFiles) {
+            const item = path.basename(itemPath);
+            
+            // Evitar procesar archivos que ya estén dentro de la estructura de PACIENTES (por si acaso el path se cruzó)
+            if (itemPath.includes('/PACIENTES/')) {
+                continue;
+            }
+
+            // Intentar emparejar con base de datos primero
+            let patient = matchPatient(item);
+            
+            if (patient) {
+                const subfolder = SUBFOLDERS.DOCUMENTOS;
+                const destRel = `PACIENTES/${patient.apellido}, ${patient.nombre}/${subfolder}`;
+                report.mapped.push({ src: path.relative(DRIVE_ROOT, itemPath), dest: destRel, type: 'File' });
+
+                if (!dryRun) {
+                    const patientPath = ensurePatientFolders(patient);
+                    const destDir = path.join(patientPath, subfolder);
+                    safeMove(itemPath, destDir, item);
+                }
+            } else {
+                // Si no está en Supabase, extraemos el nombre clínico del archivo
+                let parsedName = item.replace(/\.gslides$/i, '').replace(/\.pptx$/i, '');
+                parsedName = parsedName.replace(/^(copia de\s*)+/i, '');
+                parsedName = parsedName.replace(/^(caso paciente:\s*)+/i, '');
+                parsedName = parsedName.replace(/^(presentacion\s*)+/i, '');
+                parsedName = parsedName.trim();
+
+                // Formatear a "Apellido, Nombre" si es Nombre Apellido (dos palabras sin coma)
+                if (!parsedName.includes(',')) {
+                    const words = parsedName.split(/\s+/);
+                    if (words.length === 2) {
+                        parsedName = `${words[1]}, ${words[0]}`;
+                    }
+                }
+
+                // Crear un objeto paciente ficticio para usar nuestras funciones de carpetas
+                const tempPatient = {
+                    apellido: parsedName.split(',')[0].trim(),
+                    nombre: parsedName.split(',')[1] ? parsedName.split(',')[1].trim() : parsedName.trim()
+                };
+
+                const subfolder = SUBFOLDERS.DOCUMENTOS;
+                const destRel = `PACIENTES/${tempPatient.apellido}, ${tempPatient.nombre}/${subfolder}`;
+                report.mapped.push({ src: path.relative(DRIVE_ROOT, itemPath), dest: destRel, type: 'File (Ficticio/Nuevo)' });
+
+                if (!dryRun) {
+                    const patientPath = ensurePatientFolders(tempPatient);
+                    const destDir = path.join(patientPath, subfolder);
+                    safeMove(itemPath, destDir, item);
                 }
             }
         }
