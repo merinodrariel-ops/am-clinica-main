@@ -70,9 +70,53 @@ function patientDisplayName(patient: Pick<Paciente, 'nombre' | 'apellido'>): str
     return `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'otro paciente';
 }
 
+function getSearchTokens(search?: string): string[] {
+    return normalizePatientText(search)
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter(Boolean);
+}
+
+function escapeSupabaseSearchTerm(term: string): string {
+    return term.replace(/[%_,]/g, '\\$&');
+}
+
+function buildSearchOrClause(tokens: string[]): string {
+    const terms = Array.from(new Set([tokens.join(' '), ...tokens])).filter(Boolean);
+    return terms
+        .flatMap((rawTerm) => {
+            const term = `%${escapeSupabaseSearchTerm(rawTerm)}%`;
+            return [
+                `apellido.ilike.${term}`,
+                `nombre.ilike.${term}`,
+                `email.ilike.${term}`,
+                `documento.ilike.${term}`,
+                `whatsapp.ilike.${term}`,
+            ];
+        })
+        .join(',');
+}
+
+function patientMatchesSearch(patient: Paciente, tokens: string[]): boolean {
+    if (!tokens.length) return true;
+
+    const haystack = normalizePatientText([
+        patient.apellido,
+        patient.nombre,
+        `${patient.apellido || ''} ${patient.nombre || ''}`,
+        `${patient.nombre || ''} ${patient.apellido || ''}`,
+        patient.email,
+        patient.documento,
+        patient.whatsapp,
+    ].filter(Boolean).join(' '));
+
+    return tokens.every((token) => haystack.includes(token));
+}
+
 export async function listPatientsAction(filters: ListPatientsFilters = {}) {
     try {
         const supabase = await createClient();
+        const searchTokens = getSearchTokens(filters.search);
 
         let query = supabase
             .from('pacientes')
@@ -80,27 +124,34 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             .eq('is_deleted', false)
             .order('fecha_alta', { ascending: false });
 
-        if (filters.search) {
-            const term = `%${filters.search}%`;
-            query = query.or(`apellido.ilike.${term},nombre.ilike.${term},email.ilike.${term},documento.ilike.${term},whatsapp.ilike.${term}`);
+        if (searchTokens.length) {
+            query = query.or(buildSearchOrClause(searchTokens));
         }
 
         if (filters.estado) {
             query = query.eq('estado_paciente', filters.estado);
         }
 
-        if (filters.limit) {
+        if (filters.limit && searchTokens.length <= 1) {
             query = query.limit(filters.limit);
         }
 
-        if (filters.offset) {
+        if (filters.offset && searchTokens.length <= 1) {
             query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
         }
 
         const { data, error } = await query;
         if (error) throw error;
 
-        const patients = (data || []) as Paciente[];
+        let patients = (data || []) as Paciente[];
+        if (searchTokens.length > 1) {
+            const offset = filters.offset || 0;
+            const limit = filters.limit || patients.length;
+            patients = patients
+                .filter((patient) => patientMatchesSearch(patient, searchTokens))
+                .slice(offset, offset + limit);
+        }
+
         if (!patients.length) {
             return { success: true, data: patients };
         }
@@ -147,23 +198,30 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
 export async function getPatientsCountAction(filters: ListPatientsFilters = {}) {
     try {
         const supabase = await createClient();
+        const searchTokens = getSearchTokens(filters.search);
 
         let query = supabase
             .from('pacientes')
-            .select('*', { count: 'exact', head: true })
+            .select(searchTokens.length > 1 ? '*' : '*', { count: 'exact', head: searchTokens.length <= 1 })
             .eq('is_deleted', false);
 
-        if (filters.search) {
-            const term = `%${filters.search}%`;
-            query = query.or(`apellido.ilike.${term},nombre.ilike.${term},email.ilike.${term},documento.ilike.${term},whatsapp.ilike.${term}`);
+        if (searchTokens.length) {
+            query = query.or(buildSearchOrClause(searchTokens));
         }
 
         if (filters.estado) {
             query = query.eq('estado_paciente', filters.estado);
         }
 
-        const { count, error } = await query;
+        const { data, count, error } = await query;
         if (error) throw error;
+
+        if (searchTokens.length > 1) {
+            return {
+                success: true,
+                count: ((data || []) as Paciente[]).filter((patient) => patientMatchesSearch(patient, searchTokens)).length,
+            };
+        }
 
         return { success: true, count: count || 0 };
     } catch (error) {
@@ -261,12 +319,13 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
                 'whatsapp_pais_code', 'whatsapp_numero', 'email_local', 'email_dominio'
             ];
 
+            const mutableUpdates = updates as Record<string, unknown>;
             for (const key of fields) {
                 const newValue = cleanedPatientData[key];
                 const oldValue = existingData[key];
                 if (newValue !== undefined && newValue !== null && newValue !== '') {
                     if (newValue !== oldValue) {
-                        (updates as any)[key] = newValue;
+                        mutableUpdates[key] = newValue;
                         hasChanges = true;
                     }
                 }
