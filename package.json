@@ -7,7 +7,10 @@
     "dev:open": "sh ./scripts/dev-open.sh",
     "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "drive:simulate": "node scripts/drive-watcher.js",
+    "drive:organize": "node scripts/drive-watcher.js --organize",
+    "drive:watch": "node scripts/drive-watcher.js --watch"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
