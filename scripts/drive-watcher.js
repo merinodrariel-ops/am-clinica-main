@@ -395,6 +395,36 @@ async function organizeDrive(dryRun = true) {
         }
     }
 
+    // 2. Escanear archivos sueltos directamente dentro de la carpeta PACIENTES
+    if (fs.existsSync(PACIENTES_DIR)) {
+        const patientItems = fs.readdirSync(PACIENTES_DIR);
+        for (const pItem of patientItems) {
+            const pItemPath = path.join(PACIENTES_DIR, pItem);
+            const stat = fs.lstatSync(pItemPath);
+
+            // Solo nos interesan los archivos sueltos (no las carpetas de pacientes)
+            if (stat.isFile() || stat.isSymbolicLink()) {
+                const patient = matchPatient(pItem);
+                if (patient) {
+                    const subfolder = getTargetSubfolder(pItem);
+                    const destRel = `PACIENTES/${patient.apellido}, ${patient.nombre}/${subfolder}`;
+                    report.mapped.push({ src: `PACIENTES/${pItem}`, dest: destRel, type: 'File' });
+
+                    if (!dryRun) {
+                        const patientPath = ensurePatientFolders(patient);
+                        const destDir = path.join(patientPath, subfolder);
+                        safeMove(pItemPath, destDir, pItem);
+                    }
+                } else {
+                    report.unmapped.push({ src: `PACIENTES/${pItem}`, reason: 'Nombre de paciente no detectado en archivo suelto de PACIENTES', type: 'File' });
+                    if (!dryRun) {
+                        safeMove(pItemPath, POR_CLASIFICAR_DIR, pItem);
+                    }
+                }
+            }
+        }
+    }
+
     // Escribir reporte en scratch/simulacion_orden.md
     const scratchDir = path.join(__dirname, '../scratch');
     if (!fs.existsSync(scratchDir)) {
