@@ -10,7 +10,9 @@
     "lint": "eslint",
     "drive:simulate": "node scripts/drive-watcher.js",
     "drive:organize": "node scripts/drive-watcher.js --organize",
-    "drive:watch": "node scripts/drive-watcher.js --watch"
+    "drive:watch": "node scripts/drive-watcher.js --watch",
+    "mcp:am-clinica": "tsx mcp/am-clinica/server.ts",
+    "test:mcp:am-clinica": "tsx --test mcp/am-clinica/core.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -24,6 +26,7 @@
     "@fullcalendar/timegrid": "^6.1.20",
     "@google/genai": "^1.42.0",
     "@imgly/background-removal": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@notionhq/client": "^5.6.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
