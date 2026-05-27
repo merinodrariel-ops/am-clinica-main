@@ -14,7 +14,7 @@ import type {
     EventSourceFuncArg,
 } from '@fullcalendar/core';
 import { getAppointments, updateAppointment, deleteAppointment, getDoctors, getTomorrowAppointments, sendBulkWhatsAppConfirmations, getAgendaBlocks } from '@/app/actions/agenda';
-import { createDoctorAgendaRangeShareLink, createDoctorAgendaShareLink } from '@/app/actions/doctor-agenda';
+import { createAllDoctorsAgendaShareLink, createDoctorAgendaRangeShareLink, createDoctorAgendaShareLink } from '@/app/actions/doctor-agenda';
 import type { TomorrowAppointment, AgendaBlock } from '@/app/actions/agenda';
 import AgendaBlockModal from './AgendaBlockModal';
 import NewAppointmentModal from './NewAppointmentModal';
@@ -168,6 +168,7 @@ export default function AgendaCalendar() {
     const [tomorrowLoading, setTomorrowLoading] = useState(false);
     const [tomorrowSending, setTomorrowSending] = useState(false);
     const [shareLoading, setShareLoading] = useState(false);
+    const [shareMenuOpen, setShareMenuOpen] = useState(false);
     const [tomorrowResult, setTomorrowResult] = useState<{ sent: number; failed: number; noPhone: number } | null>(null);
     const [selectedAptIds, setSelectedAptIds] = useState<Set<string>>(new Set());
     const [agendaBlocks, setAgendaBlocks] = useState<AgendaBlock[]>([]);
@@ -178,33 +179,31 @@ export default function AgendaCalendar() {
     const { canEdit: canEditModule } = useAuth();
     const router = useRouter();
 
-    const handleShareDoctorAgenda = async (mode: 'day' | 'range' = 'day') => {
+    const handleShareAgenda = async (target: { scope: 'all' } | { scope: 'doctor'; doctorId: string; doctorName: string }, mode: 'day' | 'range' = 'day') => {
         if (!canEdit || shareLoading) return;
-        if (activeDoctorIds.has('all') || activeDoctorIds.size !== 1) {
-            toast.error('Seleccioná un solo doctor para compartir su agenda');
-            return;
-        }
-
-        const doctorId = Array.from(activeDoctorIds)[0];
-        const selectedDoctor = doctors.find(d => d.id === doctorId);
         const referenceDate = viewMode === 'resource'
             ? resourceDate
             : (calendarRef.current?.getApi().getDate() || new Date());
         const date = localISODate(referenceDate);
 
         setShareLoading(true);
+        setShareMenuOpen(false);
         try {
-            const result = mode === 'range'
-                ? await createDoctorAgendaRangeShareLink(doctorId, date, 60)
-                : await createDoctorAgendaShareLink(doctorId, date);
+            const result = target.scope === 'all'
+                ? await createAllDoctorsAgendaShareLink(date, mode === 'range' ? 30 : 1)
+                : mode === 'range'
+                    ? await createDoctorAgendaRangeShareLink(target.doctorId, date, 60)
+                    : await createDoctorAgendaShareLink(target.doctorId, date);
             if (!result.success) {
                 toast.error(result.error);
                 return;
             }
 
-            const label = mode === 'range'
-                ? `agenda de 60 días de ${selectedDoctor?.full_name || 'doctor'}`
-                : `agenda de ${selectedDoctor?.full_name || 'doctor'} para ${date}`;
+            const label = target.scope === 'all'
+                ? (mode === 'range' ? 'toda la agenda de 30 días' : `toda la agenda para ${date}`)
+                : mode === 'range'
+                    ? `agenda de 60 días de ${target.doctorName}`
+                    : `agenda de ${target.doctorName} para ${date}`;
 
             try {
                 await navigator.clipboard.writeText(result.url);
@@ -218,6 +217,22 @@ export default function AgendaCalendar() {
         } finally {
             setShareLoading(false);
         }
+    };
+
+    const handleShareSelectedDoctorRange = () => {
+        if (activeDoctorIds.has('all') || activeDoctorIds.size !== 1) {
+            toast.error('Seleccioná un solo doctor para compartir 60 días');
+            return;
+        }
+
+        const doctorId = Array.from(activeDoctorIds)[0];
+        const selectedDoctor = doctors.find(d => d.id === doctorId);
+        if (!selectedDoctor) {
+            toast.error('No se encontró el doctor seleccionado');
+            return;
+        }
+
+        void handleShareAgenda({ scope: 'doctor', doctorId, doctorName: selectedDoctor.full_name }, 'range');
     };
 
     // Load doctors for filter bar
@@ -486,7 +501,7 @@ export default function AgendaCalendar() {
             };
             const blockEvents: EventInput[] = blocks.map(block => {
                 const typeLabel = BLOCK_TYPE_LABELS[block.block_type] ?? 'Bloqueado';
-                const doctorName = (block.doctor as any)?.full_name;
+                const doctorName = block.doctor?.full_name;
                 const titleParts = [
                     '🚫 ' + typeLabel,
                     block.reason ? block.reason : null,
@@ -726,19 +741,56 @@ export default function AgendaCalendar() {
                 {/* Bulk confirm + Block buttons */}
                 <div className="ml-auto flex items-center gap-2">
                     {canEdit && (
-                        <button
-                            onClick={() => handleShareDoctorAgenda('day')}
-                            disabled={shareLoading}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all disabled:opacity-50"
-                            title="Copiar link temporal con la agenda mínima del doctor seleccionado"
-                        >
-                            <Share2 size={13} />
-                            {shareLoading ? 'Copiando...' : 'Compartir agenda'}
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={() => setShareMenuOpen(open => !open)}
+                                disabled={shareLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all disabled:opacity-50"
+                                title="Copiar link temporal con una vista mínima de agenda"
+                            >
+                                <Share2 size={13} />
+                                {shareLoading ? 'Copiando...' : 'Compartir agenda'}
+                                <ChevronDown size={12} />
+                            </button>
+                            {shareMenuOpen && (
+                                <>
+                                    <button
+                                        type="button"
+                                        aria-label="Cerrar opciones de compartir"
+                                        className="fixed inset-0 z-40 cursor-default"
+                                        onClick={() => setShareMenuOpen(false)}
+                                    />
+                                    <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                                        <button
+                                            onClick={() => void handleShareAgenda({ scope: 'all' })}
+                                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-gray-800 hover:bg-indigo-50 dark:text-gray-100 dark:hover:bg-indigo-950/40"
+                                        >
+                                            <Calendar size={14} className="text-indigo-500" />
+                                            Compartir toda la agenda
+                                        </button>
+                                        <div className="border-t border-gray-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:border-gray-800">
+                                            Por doctor
+                                        </div>
+                                        <div className="max-h-72 overflow-y-auto py-1">
+                                            {doctors.map((doctor) => (
+                                                <button
+                                                    key={doctor.id}
+                                                    onClick={() => void handleShareAgenda({ scope: 'doctor', doctorId: doctor.id, doctorName: doctor.full_name })}
+                                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                                                >
+                                                    <Users size={13} className="text-gray-400" />
+                                                    {doctor.full_name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     )}
                     {canEdit && (
                         <button
-                            onClick={() => handleShareDoctorAgenda('range')}
+                            onClick={handleShareSelectedDoctorRange}
                             disabled={shareLoading}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all disabled:opacity-50"
                             title="Copiar link de los próximos 60 días del doctor seleccionado"
@@ -1078,7 +1130,11 @@ export default function AgendaCalendar() {
                                             onChange={() => {
                                                 setSelectedAptIds(prev => {
                                                     const next = new Set(prev);
-                                                    next.has(apt.id) ? next.delete(apt.id) : next.add(apt.id);
+                                                    if (next.has(apt.id)) {
+                                                        next.delete(apt.id);
+                                                    } else {
+                                                        next.add(apt.id);
+                                                    }
                                                     return next;
                                                 });
                                             }}

@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { getAgendaFromShareToken } from '@/app/actions/doctor-agenda';
-import MinimalAgendaDay, { MinimalAgendaRange } from '@/components/portal/MinimalAgendaDay';
+import MinimalAgendaDay, { MinimalAgendaRange, MinimalAllDoctorsAgenda } from '@/components/portal/MinimalAgendaDay';
 
 export default async function SharedAgendaPage({
     searchParams,
@@ -25,7 +25,9 @@ export default async function SharedAgendaPage({
 
     return (
         <main className="min-h-screen bg-[#0a0a0f] px-4 py-8 text-slate-100">
-            {result.mode === 'range' ? (
+            {result.mode === 'all' ? (
+                <MinimalAllDoctorsAgenda agenda={result.agenda} />
+            ) : result.mode === 'range' ? (
                 <MinimalAgendaRange agenda={result.agenda} />
             ) : (
                 <MinimalAgendaDay agenda={result.agenda} shared />

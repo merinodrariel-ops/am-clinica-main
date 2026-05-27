@@ -46,8 +46,20 @@ export type DoctorAgendaShare = {
     days: DoctorAgendaDay[];
 };
 
+export type AllDoctorsAgendaDay = {
+    date: string;
+    doctors: DoctorAgendaDay[];
+};
+
+export type AllDoctorsAgendaShare = {
+    startDate: string;
+    endDate: string;
+    days: AllDoctorsAgendaDay[];
+};
+
 type SharePayload = {
-    doctorId: string;
+    scope?: 'doctor' | 'all';
+    doctorId?: string;
     date: string;
     exp: number;
     mode?: 'day' | 'range';
@@ -143,6 +155,30 @@ function mapAgendaRow(row: AgendaRow): MinimalDoctorAppointment {
     };
 }
 
+function normalizeDoctorName(value?: string | null) {
+    return value?.trim() || 'Profesional';
+}
+
+function getDoctorIdsFromAgendaRows(rows: { doctor_id?: string | null }[]) {
+    return Array.from(new Set(rows.map(row => row.doctor_id).filter((id): id is string => Boolean(id))));
+}
+
+async function getDoctorNameMap(admin: ReturnType<typeof getAdminClient>, doctorIds: string[]) {
+    if (doctorIds.length === 0) return new Map<string, string>();
+
+    const { data, error } = await admin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', doctorIds);
+
+    if (error) {
+        console.error('[getDoctorNameMap] profiles error:', error);
+        return new Map<string, string>();
+    }
+
+    return new Map((data || []).map(row => [row.id, normalizeDoctorName(row.full_name)]));
+}
+
 export async function getMinimalDoctorAgendaDay(doctorId: string, date?: string | null): Promise<DoctorAgendaDay> {
     const safeDate = normalizeDateInput(date);
     const { start, end } = dayBounds(safeDate);
@@ -175,7 +211,7 @@ export async function getMinimalDoctorAgendaDay(doctorId: string, date?: string 
 
     return {
         doctorId,
-        doctorName: profile?.full_name || 'Profesional',
+        doctorName: normalizeDoctorName(profile?.full_name),
         date: safeDate,
         appointments: ((appointments || []) as AgendaRow[]).map(mapAgendaRow),
     };
@@ -208,7 +244,7 @@ export async function getMinimalDoctorAgendaRange(
             .order('start_time', { ascending: true }),
     ]);
 
-    const doctorName = profile?.full_name || 'Profesional';
+    const doctorName = normalizeDoctorName(profile?.full_name);
     const dayMap = new Map<string, MinimalDoctorAppointment[]>();
 
     if (error) {
@@ -234,6 +270,64 @@ export async function getMinimalDoctorAgendaRange(
     return {
         doctorId,
         doctorName,
+        startDate: safeStartDate,
+        endDate: safeEndDate,
+        days: groupedDays,
+    };
+}
+
+export async function getMinimalAllDoctorsAgendaRange(
+    startDate?: string | null,
+    days?: number | null
+): Promise<AllDoctorsAgendaShare> {
+    const safeStartDate = normalizeDateInput(startDate);
+    const rangeDays = clampRangeDays(days);
+    const safeEndDate = addDays(safeStartDate, rangeDays - 1);
+    const admin = getAdminClient();
+    const { start } = dayBounds(safeStartDate);
+    const { end } = dayBounds(safeEndDate);
+
+    const { data: appointments, error } = await admin
+        .from('agenda_appointments')
+        .select('id, title, doctor_id, start_time, end_time, status, type, patient_data:patient_id(nombre, apellido)')
+        .not('doctor_id', 'is', null)
+        .gte('start_time', start)
+        .lte('start_time', end)
+        .order('start_time', { ascending: true });
+
+    if (error) {
+        console.error('[getMinimalAllDoctorsAgendaRange] agenda error:', error);
+    }
+
+    const rows = ((appointments || []) as (AgendaRow & { doctor_id: string | null })[]);
+    const doctorNameMap = await getDoctorNameMap(admin, getDoctorIdsFromAgendaRows(rows));
+    const dayDoctorMap = new Map<string, Map<string, MinimalDoctorAppointment[]>>();
+
+    for (const row of rows) {
+        if (!row.doctor_id) continue;
+        const date = getLocalISODate(new Date(row.start_time));
+        if (!dayDoctorMap.has(date)) dayDoctorMap.set(date, new Map());
+        const doctorMap = dayDoctorMap.get(date)!;
+        if (!doctorMap.has(row.doctor_id)) doctorMap.set(row.doctor_id, []);
+        doctorMap.get(row.doctor_id)!.push(mapAgendaRow(row));
+    }
+
+    const groupedDays: AllDoctorsAgendaDay[] = Array.from({ length: rangeDays }, (_, index) => {
+        const date = addDays(safeStartDate, index);
+        const doctorMap = dayDoctorMap.get(date) || new Map<string, MinimalDoctorAppointment[]>();
+        const doctors = Array.from(doctorMap.entries())
+            .map(([doctorId, doctorAppointments]) => ({
+                doctorId,
+                doctorName: doctorNameMap.get(doctorId) || 'Profesional',
+                date,
+                appointments: doctorAppointments,
+            }))
+            .sort((a, b) => a.doctorName.localeCompare(b.doctorName, 'es'));
+
+        return { date, doctors };
+    });
+
+    return {
         startDate: safeStartDate,
         endDate: safeEndDate,
         days: groupedDays,
@@ -322,6 +416,41 @@ export async function createDoctorAgendaRangeShareLink(doctorId: string, date?: 
     };
 }
 
+export async function createAllDoctorsAgendaShareLink(date?: string | null, days = 1) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false as const, error: 'No autenticado' };
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (!ALLOWED_SHARE_CATEGORIES.has(profile?.categoria || '')) {
+        return { success: false as const, error: 'No tenés permisos para compartir agendas' };
+    }
+
+    const safeDate = normalizeDateInput(date);
+    const rangeDays = Math.max(1, Math.min(30, Math.round(days)));
+    const payload: SharePayload = {
+        scope: 'all',
+        date: safeDate,
+        mode: rangeDays > 1 ? 'range' : 'day',
+        days: rangeDays,
+        exp: Math.floor(Date.now() / 1000) + (rangeDays > 1 ? 7 * 24 * 60 * 60 : 48 * 60 * 60),
+    };
+    const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+    const token = `${encodedPayload}.${signPayload(encodedPayload)}`;
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica-main.vercel.app').replace(/\/$/, '');
+
+    return {
+        success: true as const,
+        url: `${baseUrl}/agenda-compartida?t=${encodeURIComponent(token)}`,
+        expiresAt: new Date(payload.exp * 1000).toISOString(),
+    };
+}
+
 export async function getAgendaFromShareToken(token?: string | null) {
     if (!token || !token.includes('.')) {
         return { success: false as const, error: 'Link inválido' };
@@ -345,7 +474,16 @@ export async function getAgendaFromShareToken(token?: string | null) {
         return { success: false as const, error: 'Link inválido' };
     }
 
-    if (!payload.doctorId || !payload.date || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
+    if (!payload.date || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
+        return { success: false as const, error: 'Link vencido o inválido' };
+    }
+
+    if (payload.scope === 'all') {
+        const agenda = await getMinimalAllDoctorsAgendaRange(payload.date, payload.days || 1);
+        return { success: true as const, mode: 'all' as const, agenda, expiresAt: new Date(payload.exp * 1000).toISOString() };
+    }
+
+    if (!payload.doctorId) {
         return { success: false as const, error: 'Link vencido o inválido' };
     }
 

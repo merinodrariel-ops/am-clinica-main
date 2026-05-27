@@ -1,5 +1,5 @@
 import { CalendarDays, Clock, Stethoscope } from 'lucide-react';
-import type { DoctorAgendaDay, DoctorAgendaShare, MinimalDoctorAppointment } from '@/app/actions/doctor-agenda';
+import type { AllDoctorsAgendaShare, DoctorAgendaDay, DoctorAgendaShare, MinimalDoctorAppointment } from '@/app/actions/doctor-agenda';
 import { formatDateForLocale } from '@/lib/local-date';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
@@ -146,6 +146,90 @@ export function MinimalAgendaRange({ agenda }: { agenda: DoctorAgendaShare }) {
                             </div>
                             {day.appointments.map(appointment => (
                                 <AppointmentCard key={appointment.id} appointment={appointment} />
+                            ))}
+                        </section>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export function MinimalAllDoctorsAgenda({ agenda }: { agenda: AllDoctorsAgendaShare }) {
+    const totalAppointments = agenda.days.reduce((sum, day) => (
+        sum + day.doctors.reduce((doctorSum, doctor) => doctorSum + doctor.appointments.length, 0)
+    ), 0);
+    const daysWithAppointments = agenda.days.filter(day => day.doctors.some(doctor => doctor.appointments.length > 0));
+    const isSingleDay = agenda.startDate === agenda.endDate;
+
+    return (
+        <div className="mx-auto max-w-5xl space-y-8">
+            <div className="rounded-3xl border border-slate-800/70 bg-gradient-to-br from-slate-900 to-slate-950 p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-indigo-300">
+                            Agenda compartida
+                        </p>
+                        <h1 className="mt-2 text-3xl font-black tracking-tight text-white">
+                            Toda la agenda
+                        </h1>
+                        <p className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-400">
+                            <CalendarDays size={16} />
+                            {isSingleDay ? (
+                                formatDateForLocale(agenda.startDate, 'es-AR', {
+                                    weekday: 'long',
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric',
+                                })
+                            ) : (
+                                <>
+                                    {formatDateForLocale(agenda.startDate, 'es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    {' '}→{' '}
+                                    {formatDateForLocale(agenda.endDate, 'es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </>
+                            )}
+                        </p>
+                    </div>
+                    <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-5 py-3 text-right">
+                        <p className="text-3xl font-black text-white">{totalAppointments}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Turnos</p>
+                    </div>
+                </div>
+            </div>
+
+            {daysWithAppointments.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-800 p-12 text-center">
+                    <CalendarDays size={34} className="mx-auto mb-3 text-slate-700" />
+                    <p className="font-semibold text-slate-400">No hay turnos en este período.</p>
+                </div>
+            ) : (
+                <div className="space-y-10">
+                    {daysWithAppointments.map(day => (
+                        <section key={day.date} className="space-y-4">
+                            {!isSingleDay && (
+                                <div className="border-b border-slate-800 pb-2">
+                                    <h2 className="font-black text-white">
+                                        {formatDateForLocale(day.date, 'es-AR', {
+                                            weekday: 'long',
+                                            day: 'numeric',
+                                            month: 'long',
+                                        })}
+                                    </h2>
+                                </div>
+                            )}
+                            {day.doctors.map(doctor => (
+                                <div key={`${day.date}-${doctor.doctorId}`} className="space-y-3">
+                                    <div className="flex items-center justify-between border-b border-slate-800/70 pb-2">
+                                        <h3 className="font-black text-white">{doctor.doctorName}</h3>
+                                        <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-slate-400">
+                                            {doctor.appointments.length} turno{doctor.appointments.length === 1 ? '' : 's'}
+                                        </span>
+                                    </div>
+                                    {doctor.appointments.map(appointment => (
+                                        <AppointmentCard key={appointment.id} appointment={appointment} />
+                                    ))}
+                                </div>
                             ))}
                         </section>
                     ))}
