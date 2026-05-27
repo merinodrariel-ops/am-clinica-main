@@ -144,6 +144,15 @@ function localISODate(date: Date) {
     return `${year}-${month}-${day}`;
 }
 
+function startOfLocalWeek(date: Date) {
+    const weekStart = new Date(date);
+    const day = weekStart.getDay();
+    const offset = day === 0 ? -6 : 1 - day;
+    weekStart.setDate(weekStart.getDate() + offset);
+    weekStart.setHours(0, 0, 0, 0);
+    return weekStart;
+}
+
 export default function AgendaCalendar() {
     const calendarRef = useRef<FullCalendar>(null);
     const [modalOpen, setModalOpen] = useState(false);
@@ -184,13 +193,15 @@ export default function AgendaCalendar() {
         const referenceDate = viewMode === 'resource'
             ? resourceDate
             : (calendarRef.current?.getApi().getDate() || new Date());
-        const date = localISODate(referenceDate);
+        const date = target.scope === 'all'
+            ? localISODate(startOfLocalWeek(referenceDate))
+            : localISODate(referenceDate);
 
         setShareLoading(true);
         setShareMenuOpen(false);
         try {
             const result = target.scope === 'all'
-                ? await createAllDoctorsAgendaShareLink(date, mode === 'range' ? 30 : 1)
+                ? await createAllDoctorsAgendaShareLink(date, 7)
                 : mode === 'range'
                     ? await createDoctorAgendaRangeShareLink(target.doctorId, date, 60)
                     : await createDoctorAgendaShareLink(target.doctorId, date);
@@ -200,7 +211,7 @@ export default function AgendaCalendar() {
             }
 
             const label = target.scope === 'all'
-                ? (mode === 'range' ? 'toda la agenda de 30 días' : `toda la agenda para ${date}`)
+                ? `toda la agenda semanal desde ${date}`
                 : mode === 'range'
                     ? `agenda de 60 días de ${target.doctorName}`
                     : `agenda de ${target.doctorName} para ${date}`;
@@ -766,7 +777,7 @@ export default function AgendaCalendar() {
                                             className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-gray-800 hover:bg-indigo-50 dark:text-gray-100 dark:hover:bg-indigo-950/40"
                                         >
                                             <Calendar size={14} className="text-indigo-500" />
-                                            Compartir toda la agenda
+                                            Compartir toda la agenda semanal
                                         </button>
                                         <div className="border-t border-gray-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:border-gray-800">
                                             Por doctor
