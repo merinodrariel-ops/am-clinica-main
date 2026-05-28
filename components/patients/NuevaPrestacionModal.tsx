@@ -9,7 +9,7 @@ import { createHistoriaClinicaEntry } from '@/app/actions/patients';
 interface NuevaPresentacionModalProps {
     patientId: string;
     profesional: string;
-    onSaved: (entry: { id: string; fecha: string; profesional: string; tratamiento_realizado: string }) => void;
+    onSaved: (entry: { id: string; fecha: string; profesional: string; tratamiento_realizado: string; observaciones_clinicas?: string | null; proximo_control?: string | null }) => void;
     onClose: () => void;
 }
 
@@ -17,7 +17,7 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
     const todayIso = new Date().toISOString().split('T')[0];
 
     const [fecha, setFecha] = useState(todayIso);
-    const [tratamiento, setTratamiento] = useState('');
+    const [historiaTexto, setHistoriaTexto] = useState('');
     const [saving, setSaving] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
 
@@ -41,7 +41,7 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
             return;
         }
 
-        finalTranscriptRef.current = tratamiento;
+        finalTranscriptRef.current = historiaTexto;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const recognition = new SR() as any;
@@ -64,15 +64,15 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
             if (newFinals) {
                 finalTranscriptRef.current = (finalTranscriptRef.current + ' ' + newFinals).trim();
             }
-            setTratamiento((finalTranscriptRef.current + (interimText ? ' ' + interimText : '')).trim());
+            setHistoriaTexto((finalTranscriptRef.current + (interimText ? ' ' + interimText : '')).trim());
         };
 
         recognition.onend = () => {
-            setTratamiento(finalTranscriptRef.current);
+            setHistoriaTexto(finalTranscriptRef.current);
             setIsRecording(false);
         };
         recognition.onerror = () => {
-            setTratamiento(finalTranscriptRef.current);
+            setHistoriaTexto(finalTranscriptRef.current);
             setIsRecording(false);
         };
 
@@ -82,8 +82,8 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
     }
 
     async function handleSave() {
-        if (!tratamiento.trim()) {
-            toast.error('Escribí o dictá el tratamiento realizado');
+        if (!historiaTexto.trim()) {
+            toast.error('Escribí o dictá la historia clínica');
             return;
         }
         setSaving(true);
@@ -95,14 +95,14 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
             paciente_id: patientId,
             fecha,
             profesional,
-            tratamiento_realizado: tratamiento.trim(),
+            historia_texto: historiaTexto.trim(),
         });
         if (result.error) {
             toast.error(`Error al guardar: ${result.error}`);
             setSaving(false);
             return;
         }
-        toast.success('Presentación guardada');
+        toast.success('Historia clínica guardada');
         onSaved(result.data!);
         onClose();
     }
@@ -126,7 +126,7 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Nueva Prestación</h3>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Nueva entrada clínica</h3>
                         <button
                             onClick={onClose}
                             className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
@@ -150,11 +150,11 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
                             />
                         </div>
 
-                        {/* Tratamiento realizado + dictado */}
+                        {/* Historia clínica libre + dictado */}
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <label className="text-xs font-semibold text-gray-500 dark:text-white/50 uppercase tracking-wide">
-                                    Tratamiento realizado
+                                    Historia clínica libre
                                 </label>
                                 <button
                                     type="button"
@@ -172,10 +172,10 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
                                 </button>
                             </div>
                             <textarea
-                                value={tratamiento}
-                                onChange={e => setTratamiento(e.target.value)}
-                                rows={6}
-                                placeholder={isRecording ? 'Escuchando...' : 'Describí el tratamiento realizado hoy...'}
+                                value={historiaTexto}
+                                onChange={e => setHistoriaTexto(e.target.value)}
+                                rows={10}
+                                placeholder={isRecording ? 'Escuchando...' : 'Escribí libremente lo que se hizo hoy, evolución, indicaciones, materiales, próximos pasos...'}
                                 className={`w-full px-3 py-2.5 rounded-lg border text-sm resize-none focus:outline-none focus:ring-2 transition-colors bg-white dark:bg-white/5 text-gray-900 dark:text-white ${
                                     isRecording
                                         ? 'border-red-300 dark:border-red-500/50 focus:ring-red-300'
@@ -202,11 +202,11 @@ export default function NuevaPrestacionModal({ patientId, profesional, onSaved, 
                         </button>
                         <button
                             onClick={handleSave}
-                            disabled={saving || !tratamiento.trim()}
+                            disabled={saving || !historiaTexto.trim()}
                             className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                         >
                             {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                            Guardar presentación
+                            Guardar historia clínica
                         </button>
                     </div>
                 </motion.div>

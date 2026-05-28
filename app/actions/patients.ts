@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { Paciente, softDeletePaciente, updatePaciente } from '@/lib/patients';
+import { buildFreeTextHistoriaEntry } from '@/lib/clinical-history';
 
 import { syncPatientToSheet } from '@/lib/google-sheets';
 import { sendWelcomeEmailAction } from '@/app/actions/email';
@@ -453,14 +454,20 @@ export async function createHistoriaClinicaEntry(entry: {
     paciente_id: string;
     fecha: string;
     profesional: string;
-    tratamiento_realizado: string;
+    tratamiento_realizado?: string;
+    historia_texto?: string;
     motivo_consulta?: string;
     observaciones_clinicas?: string;
-}): Promise<{ data?: { id: string; fecha: string; profesional: string; tratamiento_realizado: string }; error?: string }> {
+    proximo_control?: string;
+}): Promise<{ data?: { id: string; fecha: string; profesional: string; tratamiento_realizado: string; observaciones_clinicas?: string | null; proximo_control?: string | null }; error?: string }> {
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { error: 'No autenticado' };
+
+        const freeTextEntry = buildFreeTextHistoriaEntry({
+            text: entry.historia_texto ?? entry.observaciones_clinicas ?? entry.tratamiento_realizado ?? '',
+        });
 
         const { data, error } = await supabase
             .from('historia_clinica')
@@ -468,15 +475,16 @@ export async function createHistoriaClinicaEntry(entry: {
                 paciente_id: entry.paciente_id,
                 fecha: entry.fecha,
                 profesional: entry.profesional,
-                tratamiento_realizado: entry.tratamiento_realizado,
+                tratamiento_realizado: entry.tratamiento_realizado?.trim() || freeTextEntry.tratamiento_realizado,
                 ...(entry.motivo_consulta ? { motivo_consulta: entry.motivo_consulta } : {}),
-                ...(entry.observaciones_clinicas ? { observaciones_clinicas: entry.observaciones_clinicas } : {}),
+                observaciones_clinicas: entry.observaciones_clinicas?.trim() || freeTextEntry.observaciones_clinicas,
+                ...(entry.proximo_control ? { proximo_control: entry.proximo_control } : {}),
             })
-            .select('id, fecha, profesional, tratamiento_realizado')
+            .select('id, fecha, profesional, tratamiento_realizado, observaciones_clinicas, proximo_control')
             .single();
 
         if (error) return { error: error.message };
-        return { data: data as { id: string; fecha: string; profesional: string; tratamiento_realizado: string } };
+        return { data: data as { id: string; fecha: string; profesional: string; tratamiento_realizado: string; observaciones_clinicas?: string | null; proximo_control?: string | null } };
     } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) };
     }

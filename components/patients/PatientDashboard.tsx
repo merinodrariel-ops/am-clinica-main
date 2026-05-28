@@ -598,7 +598,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
                             >
                                 <Plus className="w-4 h-4" />
-                                Nueva Evolución
+                                Nueva entrada clínica
                             </button>
                         </div>
 
@@ -640,9 +640,14 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                 <p className="text-sm">{entry.diagnostico}</p>
                                             </div>
                                         )}
-                                        {entry.tratamiento_realizado && (
+                                        {entry.observaciones_clinicas ? (
                                             <div>
-                                                <span className="text-xs text-gray-500">Tratamiento:</span>
+                                                <span className="text-xs text-gray-500">Entrada clínica:</span>
+                                                <p className="whitespace-pre-wrap text-sm leading-6">{entry.observaciones_clinicas}</p>
+                                            </div>
+                                        ) : entry.tratamiento_realizado && (
+                                            <div>
+                                                <span className="text-xs text-gray-500">Entrada clínica:</span>
                                                 <p className="text-sm">{entry.tratamiento_realizado}</p>
                                             </div>
                                         )}
