@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Layout, Trash2, Users, Wallet, Loader2, MapPin, Star } from 'lucide-react';
+import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Trash2, Users, Wallet, Loader2, MapPin, Star } from 'lucide-react';
 import { ComprobanteLink } from '@/components/caja/ComprobanteLink';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,8 +67,6 @@ interface Stats {
     traspasoNetoMesUsd: number;
     porMetodo: Record<string, number>;
     porCategoria: Record<string, number>;
-    movimientosHoy: number;
-    pendientes: number;
     totalPacientes: number;
     nuevosPacientes: number;
 }
@@ -83,9 +81,9 @@ interface Movimiento {
         id_paciente: string;
         whatsapp?: string | null;
         email?: string | null;
-        financ_estado?: string;
-        financ_monto_total?: number;
-        financ_cuotas_total?: number;
+        financ_estado?: string | null;
+        financ_monto_total?: number | null;
+        financ_cuotas_total?: number | null;
     };
     concepto_nombre: string;
     categoria: string | null;
@@ -103,6 +101,30 @@ interface Movimiento {
     split_group_id?: string | null;
     // Populated client-side when grouping multipago splits for display
     _splitSiblings?: Movimiento[];
+}
+
+interface TransferenciaCajaRaw {
+    id: string;
+    fecha_hora: string;
+    tipo_transferencia: string;
+    motivo?: string | null;
+    caja_origen: string;
+    caja_destino?: string | null;
+    monto: number | string;
+    moneda: string;
+    estado?: string | null;
+    usd_equivalente: number | string;
+}
+
+interface PacienteLookup {
+    id_paciente: string;
+    nombre: string;
+    apellido: string;
+    whatsapp?: string | null;
+    email?: string | null;
+    financ_estado?: string | null;
+    financ_monto_total?: number | null;
+    financ_cuotas_total?: number | null;
 }
 
 interface BnaRate {
@@ -215,10 +237,6 @@ const HELP_LINKS = {
     whatsapp: 'https://wa.link/zolb52',
     google_opinion: 'https://g.page/r/CQ3df5Xn-J6oEBM/review'
 };
-
-const GOOGLE_REVIEW_LINK = HELP_LINKS.google_opinion;
-
-import { Suspense } from 'react';
 
 function CajaRecepcionContent() {
     const searchParams = useSearchParams();
@@ -379,7 +397,7 @@ function CajaRecepcionContent() {
 
             // Add transfers adapted to Movimiento interface
             if (transRaw) {
-                const transMovs: Movimiento[] = transRaw.map((t: any) => ({
+                const transMovs: Movimiento[] = (transRaw as TransferenciaCajaRaw[]).map((t) => ({
                     id: t.id,
                     fecha_hora: t.fecha_hora,
                     fecha_movimiento: t.fecha_hora.split('T')[0],
@@ -418,7 +436,7 @@ function CajaRecepcionContent() {
                                 if (concepto.includes('cierre') || concepto.includes('inicio')) return m;
 
                                 // Try to find a patient whose name + apellido or vice versa is in concepto_nombre
-                                const found = allPacientes.find((p: any) => {
+                                const found = (allPacientes as PacienteLookup[]).find((p) => {
                                     const fullName = `${p.nombre} ${p.apellido}`.toLowerCase();
                                     const reverseName = `${p.apellido} ${p.nombre}`.toLowerCase();
                                     const lastName = p.apellido.toLowerCase();
@@ -468,20 +486,7 @@ function CajaRecepcionContent() {
 
             setAperturaAudit((aperturaRaw as AperturaAudit | null) || null);
 
-            // Calculate stats - GROSS INCOME (Ingresos Brutos)
-            // We only sum positive amounts for \"Ingresos\". Negative amounts are \"Egresos\" or \"Transfers\".
-            const movsForStats = movMesRaw as unknown as Movimiento[] || []; // Keep using original movs for income stats to avoid double counting transfers as income?
-            // Actually, the user wants transfers to be visible.
-            // Stats should probably still reflect real income.
-
-            const pagados = allMovs.filter((m) => m.estado !== 'anulado');
-
-            const pagadosHoy = pagados.filter(m => {
-                const datePart = m.fecha_movimiento || m.fecha_hora.split('T')[0];
-                return datePart === today;
-            });
-
-            // Sum only positive values for Inkome - using standard movements only for "Ingresos"
+            // Calculate income cards from standard movements only so transfers do not inflate revenue.
             const standardPagados = (movMesRaw as unknown as Movimiento[] || []).filter(m => m.estado !== 'anulado');
             const standardPagadosHoy = standardPagados.filter(m => {
                 const datePart = m.fecha_movimiento || m.fecha_hora.split('T')[0];
@@ -491,7 +496,6 @@ function CajaRecepcionContent() {
             const totalDiaUsd = standardPagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
             const totalMesUsd = standardPagados.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
 
-            const pendientes = allMovs.filter((m) => m.estado === 'pendiente');
             const transferSummary = await getTransferenciasResumenMes(mesActual);
 
             const { count: totalCount } = await supabase
@@ -512,8 +516,6 @@ function CajaRecepcionContent() {
                 traspasoNetoMesUsd: transferSummary.traspasoNetoUsd,
                 porMetodo: {},
                 porCategoria: {},
-                movimientosHoy: pagadosHoy.length,
-                pendientes: pendientes.length,
                 totalPacientes: totalCount || 0,
                 nuevosPacientes: newCount || 0,
             });
@@ -1200,14 +1202,12 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
                         {[
-                            { label: 'Ingresos Hoy', value: stats?.totalDiaUsd, icon: DollarSign, color: 'teal', sub: 'Hoy', privacy: true },
-                            { label: 'Ingresos Mes', value: stats?.totalMesUsd, icon: TrendingUp, color: 'blue', sub: 'Mes', privacy: true },
-                            { label: 'Retiros Mes', value: stats?.retirosMesUsd, icon: Wallet, color: 'amber', sub: 'No operativo', privacy: true },
-                            { label: 'Traspaso Neto Mes', value: stats?.traspasoNetoMesUsd, icon: ArrowRightLeft, color: 'indigo', sub: 'Entre cajas', privacy: true },
-                            { label: 'Operaciones', value: stats?.movimientosHoy, icon: CreditCard, color: 'indigo', sub: 'Hoy', privacy: false },
-                            { label: 'Pendientes', value: stats?.pendientes, icon: Clock, color: 'amber', sub: 'Action', privacy: false, alert: (stats?.pendientes || 0) > 0 }
+                            { label: 'Ingresos Hoy', value: stats?.totalDiaUsd, icon: DollarSign, color: 'teal', privacy: true },
+                            { label: 'Ingresos Mes', value: stats?.totalMesUsd, icon: TrendingUp, color: 'blue', privacy: true },
+                            { label: 'Retiros Mes', value: stats?.retirosMesUsd, icon: Wallet, color: 'amber', privacy: true },
+                            { label: 'Traspaso Neto Mes', value: stats?.traspasoNetoMesUsd, icon: ArrowRightLeft, color: 'indigo', privacy: true },
                         ].map((card, i) => (
                             <div key={i} className="glass-card p-6 rounded-3xl border-white/5 hover:border-white/10 transition-all group overflow-hidden">
                                 <div className="flex items-center justify-between mb-4">
@@ -1220,19 +1220,10 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     )}>
                                         <card.icon size={24} />
                                     </div>
-                                    {card.alert && (
-                                        <span className="flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-amber-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                                        </span>
-                                    )}
                                 </div>
                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 truncate">{card.label}</p>
                                 <p className="text-2xl sm:text-3xl font-black text-white truncate" title={String(card.value || 0)}>
-                                    {card.privacy
-                                        ? formatPrivacy(formatCurrency(Number(card.value) || 0, 'USD'))
-                                        : card.value || 0
-                                    }
+                                    {formatPrivacy(formatCurrency(Number(card.value) || 0, 'USD'))}
                                 </p>
                             </div>
                         ))}
