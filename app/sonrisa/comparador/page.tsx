@@ -1,9 +1,15 @@
 'use client';
 
-import { useMemo, Suspense } from 'react';
+import { useMemo, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageCircle, Sparkles, Star } from 'lucide-react';
+import { MessageCircle, Sparkles, Star, Image, Box } from 'lucide-react';
 import { ImageComparator } from '@/components/patients/ImageComparator';
+import dynamic from 'next/dynamic';
+
+const ThreeSmileViewer = dynamic(
+    () => import('@/components/patients/ThreeSmileViewer').then((mod) => mod.ThreeSmileViewer),
+    { ssr: false, loading: () => <div className="h-[420px] bg-slate-950 rounded-3xl border border-slate-800 animate-pulse flex items-center justify-center text-slate-500 text-xs">Cargando simulador dental 3D...</div> }
+);
 
 const GOOGLE_REVIEW_LINK = 'https://g.page/r/CQ3df5Xn-J6oEBM/review';
 
@@ -12,6 +18,7 @@ function SmileComparisonContent() {
     const before = searchParams.get('before') || '';
     const after = searchParams.get('after') || '';
     const patient = searchParams.get('patient') || 'Paciente';
+    const [activeTab, setActiveTab] = useState<'photos' | 'smile3d'>('photos');
 
     const whatsappUrl = useMemo(() => {
         const message = `Gracias por confiar en AM Clinica Dental. Gracias por darnos la oportunidad de cambiar tu vida a traves de tu sonrisa. Si queres, podes dejarnos tu referencia aca: ${GOOGLE_REVIEW_LINK}`;
@@ -34,37 +41,74 @@ function SmileComparisonContent() {
     return (
         <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100 px-4 py-8">
             <div className="mx-auto max-w-4xl space-y-6">
-                <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 text-center">
+                
+                <div className="rounded-3xl border border-slate-700/80 bg-slate-900/80 p-6 text-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-2xl" />
                     <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-500/20 text-teal-300">
                         <Sparkles className="h-6 w-6" />
                     </div>
-                    <h1 className="text-3xl font-bold">Gracias por confiar en AM Clinica Dental</h1>
-                    <p className="mt-2 text-sm text-slate-300">
-                        {patient}, gracias por darnos la oportunidad de cambiar tu vida a traves de tu sonrisa.
+                    <h1 className="text-3xl font-black tracking-tight text-white">Gracias por confiar en AM Clínica</h1>
+                    <p className="mt-2 text-sm text-slate-350 max-w-lg mx-auto">
+                        {patient}, es un privilegio acompañarte en este camino y ayudarte a transformar tu seguridad a través del diseño digital de tu sonrisa.
                     </p>
                 </div>
 
-                <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-4">
-                    <ImageComparator beforeImage={before} afterImage={after} orientation="horizontal" />
+                <div className="flex justify-center">
+                    <div className="bg-slate-900/90 border border-slate-750 p-1.5 rounded-2xl flex gap-1 shadow-lg">
+                        <button
+                            onClick={() => setActiveTab('photos')}
+                            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center gap-2 ${
+                                activeTab === 'photos'
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'text-slate-400 hover:text-white'
+                            }`}
+                        >
+                            <Image className="w-4 h-4" />
+                            Comparador de Fotos
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('smile3d')}
+                            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center gap-2 ${
+                                activeTab === 'smile3d'
+                                    ? 'bg-teal-600 text-white shadow-md'
+                                    : 'text-slate-400 hover:text-white'
+                            }`}
+                        >
+                            <Box className="w-4 h-4" />
+                            Simulador 3D Digital
+                        </button>
+                    </div>
                 </div>
 
-                <div className="rounded-3xl border border-slate-700 bg-slate-900/80 p-6 text-center">
-                    <p className="text-sm text-slate-300">Si tu experiencia fue positiva, tu referencia nos ayuda muchísimo.</p>
-                    <div className="mt-4 flex flex-col justify-center gap-3 sm:flex-row">
+                <div className="rounded-3xl border border-slate-700/80 bg-slate-900/80 p-4 shadow-xl">
+                    {activeTab === 'photos' ? (
+                        <div className="animate-fadeIn">
+                            <ImageComparator beforeImage={before} afterImage={after} orientation="horizontal" />
+                        </div>
+                    ) : (
+                        <div className="animate-fadeIn">
+                            <ThreeSmileViewer />
+                        </div>
+                    )}
+                </div>
+
+                <div className="rounded-3xl border border-slate-700/80 bg-slate-900/80 p-6 text-center shadow-lg relative">
+                    <p className="text-sm text-slate-300">Si tu experiencia y tu nueva sonrisa te han gustado, tu opinión nos ayuda muchísimo.</p>
+                    <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
                         <a
                             href={GOOGLE_REVIEW_LINK}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-500"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-500 px-6 py-3 text-sm font-bold text-white transition-all shadow-lg shadow-teal-600/10 transform active:scale-98"
                         >
                             <Star className="h-4 w-4" />
-                            Dejar referencia en Google
+                            Dejar reseña en Google
                         </a>
                         <a
                             href={whatsappUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-green-400/30 bg-green-500/10 px-4 py-2.5 text-sm font-semibold text-green-300 hover:bg-green-500/20"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-green-400/30 bg-green-500/10 hover:bg-green-500/20 px-6 py-3 text-sm font-bold text-green-300 transition-all active:scale-98"
                         >
                             <MessageCircle className="h-4 w-4" />
                             Compartir por WhatsApp
@@ -78,7 +122,7 @@ function SmileComparisonContent() {
 
 export default function SmileComparisonPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">Cargando...</div>}>
+        <Suspense fallback={<div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">Cargando experiencia...</div>}>
             <SmileComparisonContent />
         </Suspense>
     );
