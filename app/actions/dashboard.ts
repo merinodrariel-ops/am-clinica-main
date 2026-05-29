@@ -1,7 +1,7 @@
 'use server';
 
 import { createAdminClient } from '@/utils/supabase/admin';
-import { getCobroMensualFinanciacionUsd } from '@/lib/dashboard';
+import { getFinanciacionMensualResumen } from '@/lib/dashboard';
 import type { DashboardStats, OwnerDashboardStats, PlanFinanciacionDashboard, ReferralStat } from '@/lib/dashboard';
 
 type PrimeraConsultaRow = {
@@ -219,11 +219,11 @@ export async function getOwnerDashboardStatsAction(
 
         const { data: financData } = await supabase
             .from('planes_financiacion')
-            .select('id, paciente_nombre, tratamiento, cuotas_total, cuotas_pagadas, monto_cuota_usd, saldo_restante_usd, estado')
+            .select('id, paciente_nombre, tratamiento, cuotas_total, cuotas_pagadas, monto_cuota_usd, saldo_restante_usd, fecha_inicio, estado')
             .eq('estado', 'En curso');
 
         const planesFinanciacion = (financData || []) as PlanFinanciacionDashboard[];
-        const cobroMensualFinanciacionUsd = getCobroMensualFinanciacionUsd(planesFinanciacion);
+        const financiacionMensual = getFinanciacionMensualResumen(planesFinanciacion, new Date(year, month, 1));
 
         return {
             totalPacientes: totalPacientes || 0,
@@ -235,12 +235,14 @@ export async function getOwnerDashboardStatsAction(
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
             personasEnFinanciacion: planesFinanciacion.length,
-            cobroMensualFinanciacionUsd: Math.round(cobroMensualFinanciacionUsd),
+            cobroMensualFinanciacionUsd: Math.round(financiacionMensual.programadoUsd),
+            financiacionMensualCobradoUsd: Math.round(financiacionMensual.cobradoUsd),
+            financiacionMensualPendienteUsd: Math.round(financiacionMensual.pendienteUsd),
             deudaTotalUsd: Math.round(planesFinanciacion.reduce((sum, p) => sum + (Number(p.saldo_restante_usd) || 0), 0)),
             planesFinanciacion,
         };
     } catch (error) {
         console.error('getOwnerDashboardStatsAction:', error);
-        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], limpiezasMensual: [], ingresosMesUsd: 0, egresosMesUsd: 0, personasEnFinanciacion: 0, cobroMensualFinanciacionUsd: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
+        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], limpiezasMensual: [], ingresosMesUsd: 0, egresosMesUsd: 0, personasEnFinanciacion: 0, cobroMensualFinanciacionUsd: 0, financiacionMensualCobradoUsd: 0, financiacionMensualPendienteUsd: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
     }
 }

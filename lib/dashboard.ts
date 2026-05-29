@@ -162,6 +162,8 @@ export interface OwnerDashboardStats {
     egresosMesUsd: number;
     personasEnFinanciacion: number;
     cobroMensualFinanciacionUsd: number;
+    financiacionMensualCobradoUsd: number;
+    financiacionMensualPendienteUsd: number;
     deudaTotalUsd: number;
     planesFinanciacion: PlanFinanciacionDashboard[];
 }
@@ -174,6 +176,7 @@ export interface PlanFinanciacionDashboard {
     cuotas_pagadas: number;
     monto_cuota_usd: number;
     saldo_restante_usd: number;
+    fecha_inicio?: string | null;
     estado: string;
 }
 
@@ -181,6 +184,58 @@ export function getCobroMensualFinanciacionUsd(planes: PlanFinanciacionDashboard
     return planes
         .filter((plan) => Number(plan.cuotas_pagadas || 0) < Number(plan.cuotas_total || 0))
         .reduce((sum, plan) => sum + (Number(plan.monto_cuota_usd) || 0), 0);
+}
+
+export interface FinanciacionMensualResumen {
+    programadoUsd: number;
+    cobradoUsd: number;
+    pendienteUsd: number;
+}
+
+function parseDateOnlyLocal(date: string | null | undefined): Date | null {
+    if (!date) return null;
+    const [yearRaw, monthRaw, dayRaw] = date.split('T')[0].split('-').map(Number);
+    if (!yearRaw || !monthRaw || !dayRaw) return null;
+    return new Date(yearRaw, monthRaw - 1, dayRaw);
+}
+
+function getInstallmentNumberForMonth(plan: PlanFinanciacionDashboard, targetDate: Date): number | null {
+    const startDate = parseDateOnlyLocal(plan.fecha_inicio);
+    if (!startDate) return null;
+    return ((targetDate.getFullYear() - startDate.getFullYear()) * 12) + (targetDate.getMonth() - startDate.getMonth()) + 1;
+}
+
+function isPlanScheduledForMonth(plan: PlanFinanciacionDashboard, targetDate: Date): boolean {
+    const totalInstallments = Number(plan.cuotas_total || 0);
+
+    const installmentNumber = getInstallmentNumberForMonth(plan, targetDate);
+    if (installmentNumber === null) return true;
+    return installmentNumber >= 1 && installmentNumber <= totalInstallments;
+}
+
+export function getFinanciacionMensualResumen(
+    planes: PlanFinanciacionDashboard[] = [],
+    targetDate = new Date(),
+): FinanciacionMensualResumen {
+    const programadoUsd = getCobroMensualFinanciacionUsd(planes);
+    const cobradoUsd = planes.reduce((sum, plan) => {
+        const totalInstallments = Number(plan.cuotas_total || 0);
+        const paidInstallments = Number(plan.cuotas_pagadas || 0);
+        if (paidInstallments >= totalInstallments) return sum;
+        if (!isPlanScheduledForMonth(plan, targetDate)) return sum;
+
+        const monthlyAmount = Number(plan.monto_cuota_usd) || 0;
+        const installmentNumber = getInstallmentNumberForMonth(plan, targetDate);
+        const isCollectedForMonth = installmentNumber !== null && paidInstallments >= installmentNumber;
+
+        return isCollectedForMonth ? sum + monthlyAmount : sum;
+    }, 0);
+
+    return {
+        programadoUsd,
+        cobradoUsd,
+        pendienteUsd: Math.max(0, programadoUsd - cobradoUsd),
+    };
 }
 
 export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
@@ -285,12 +340,12 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
         // 5 & 6. Financing plans — active count + total debt
         const { data: financData } = await supabase
             .from('planes_financiacion')
-            .select('id, paciente_nombre, tratamiento, cuotas_total, cuotas_pagadas, monto_cuota_usd, saldo_restante_usd, estado')
+            .select('id, paciente_nombre, tratamiento, cuotas_total, cuotas_pagadas, monto_cuota_usd, saldo_restante_usd, fecha_inicio, estado')
             .eq('estado', 'En curso');
 
         const planesFinanciacion = (financData || []) as PlanFinanciacionDashboard[];
         const personasEnFinanciacion = planesFinanciacion.length;
-        const cobroMensualFinanciacionUsd = getCobroMensualFinanciacionUsd(planesFinanciacion);
+        const financiacionMensual = getFinanciacionMensualResumen(planesFinanciacion, new Date(year, month, 1));
         const deudaTotalUsd = financData?.reduce(
             (sum: number, p: { saldo_restante_usd: unknown }) => sum + (Number(p.saldo_restante_usd) || 0), 0
         ) || 0;
@@ -305,7 +360,9 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
             personasEnFinanciacion,
-            cobroMensualFinanciacionUsd: Math.round(cobroMensualFinanciacionUsd),
+            cobroMensualFinanciacionUsd: Math.round(financiacionMensual.programadoUsd),
+            financiacionMensualCobradoUsd: Math.round(financiacionMensual.cobradoUsd),
+            financiacionMensualPendienteUsd: Math.round(financiacionMensual.pendienteUsd),
             deudaTotalUsd: Math.round(deudaTotalUsd),
             planesFinanciacion,
         };
@@ -322,6 +379,8 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             egresosMesUsd: 0,
             personasEnFinanciacion: 0,
             cobroMensualFinanciacionUsd: 0,
+            financiacionMensualCobradoUsd: 0,
+            financiacionMensualPendienteUsd: 0,
             deudaTotalUsd: 0,
             planesFinanciacion: [],
         };

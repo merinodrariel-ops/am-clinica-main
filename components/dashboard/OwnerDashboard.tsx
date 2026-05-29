@@ -269,6 +269,11 @@ interface KpiCardProps {
     value: string | number;
     secondaryValue?: string;
     secondaryLabel?: string;
+    supportingMetrics?: Array<{
+        label: string;
+        value: string;
+        color?: string;
+    }>;
     subtitle?: string;
     gradient: string;
     iconBg: string;
@@ -294,6 +299,7 @@ function KpiCard({
     value,
     secondaryValue,
     secondaryLabel,
+    supportingMetrics,
     subtitle,
     gradient,
     iconBg,
@@ -405,6 +411,18 @@ function KpiCard({
                         <p className="text-xs mt-1.5 text-slate-500">
                             {subtitle}
                         </p>
+                    )}
+                    {supportingMetrics && supportingMetrics.length > 0 && (
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                            {supportingMetrics.map((metric) => (
+                                <div key={metric.label} className="rounded-lg border border-white/5 bg-black/25 px-2.5 py-2">
+                                    <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">{metric.label}</p>
+                                    <p className="mt-1 text-sm font-bold leading-none" style={{ color: metric.color || 'hsl(210 20% 85%)' }}>
+                                        {metric.value}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
             </div>
@@ -836,11 +854,23 @@ export default function OwnerDashboard() {
         'en-financiacion': {
             id: 'en-financiacion',
             icon: CreditCard,
-            label: 'En Financiación',
-            value: `${stats.personasEnFinanciacion} personas`,
-            secondaryValue: `$${stats.cobroMensualFinanciacionUsd.toLocaleString()} USD/mes`,
-            secondaryLabel: 'Cobro esperado',
-            subtitle: isCurrentMonth ? 'Cuotas activas a cobrar el próximo mes' : 'Estado actual (no varía por mes)',
+            label: 'Financiación mensual',
+            value: `$${stats.cobroMensualFinanciacionUsd.toLocaleString()} USD/mes`,
+            secondaryValue: `${stats.personasEnFinanciacion} personas`,
+            secondaryLabel: 'Activas',
+            subtitle: isCurrentMonth ? 'Programados del mes' : `Programados de ${selectedMonthLabel}`,
+            supportingMetrics: [
+                {
+                    label: 'Cobrado',
+                    value: `$${stats.financiacionMensualCobradoUsd.toLocaleString()} USD`,
+                    color: 'hsl(150 80% 50%)',
+                },
+                {
+                    label: 'Pendiente',
+                    value: `$${stats.financiacionMensualPendienteUsd.toLocaleString()} USD`,
+                    color: 'hsl(35 95% 60%)',
+                },
+            ],
             gradient: 'linear-gradient(135deg, hsl(270 67% 55%), hsl(285 65% 50%))',
             iconBg: 'hsla(270, 67%, 55%, 0.15)',
             iconColor: 'hsl(270 67% 65%)',
