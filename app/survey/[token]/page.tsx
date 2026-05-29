@@ -53,6 +53,26 @@ function SurveyPageContent() {
         return;
       }
 
+      // BYPASS PARA TESTING CON TOKENS FICTICIOS
+      if (token === 'test-token-google-review' || token === 'dummy-token') {
+        setNombre('Dr. Ariel Merino');
+        setEmail('drarielmerino@gmail.com');
+        
+        const ratingParam = searchParams.get('rating');
+        const initialRating = ratingParam ? parseInt(ratingParam) : null;
+        
+        if (initialRating && initialRating >= 1 && initialRating <= 5) {
+          setRating(initialRating);
+          if (initialRating >= 4) {
+            setRedirecting(true);
+            window.location.href = GOOGLE_REVIEW_URL;
+            return;
+          }
+        }
+        setLoading(false);
+        return;
+      }
+
       try {
         // Query relacional en Supabase para obtener la encuesta, paciente y doctor
         const { data: survey, error: surveyErr } = await supabase
@@ -146,6 +166,16 @@ function SurveyPageContent() {
   // Manejar el click en las estrellas de forma interactiva en pantalla
   async function handleRatingClick(selectedRating: number) {
     setRating(selectedRating);
+
+    // Bypass para testing de tokens ficticios
+    if (token === 'test-token-google-review' || token === 'dummy-token') {
+      if (selectedRating >= 4) {
+        setRedirecting(true);
+        window.location.href = GOOGLE_REVIEW_URL;
+      }
+      return;
+    }
+
     try {
       await supabase
         .from('satisfaction_surveys')
