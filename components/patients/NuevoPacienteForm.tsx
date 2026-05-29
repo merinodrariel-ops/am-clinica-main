@@ -56,6 +56,7 @@ const CIUDADES = [
 
 const ESTADOS = [
     { value: 'Activo', label: 'Activo', color: 'green' },
+    { value: 'Pendiente formulario', label: 'Pendiente formulario', color: 'amber' },
     { value: 'En tratamiento', label: 'En tratamiento', color: 'blue' },
     { value: 'Alta', label: 'Alta', color: 'purple' },
     { value: 'Inactivo', label: 'Inactivo', color: 'gray' },
@@ -64,6 +65,7 @@ const ESTADOS = [
 const ORIGENES = [
     'Formulario',
     'Recepción',
+    'Paciente propio profesional',
     'Staff',
     'Importación',
 ];

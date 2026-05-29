@@ -95,21 +95,39 @@ export async function createAppointment(formData: FormData) {
     const type = formData.get('type') as string || 'consulta';
     const notes = formData.get('notes') as string;
 
-    const { error } = await supabase.from('agenda_appointments').insert({
-        title,
-        patient_id: patientId ? patientId : null,
-        doctor_id: doctorId ? doctorId : null,
-        start_time: startTime,
-        end_time: endTime,
-        status,
-        type,
-        notes,
-        created_by: user.id
-    });
+    if (type !== 'recordatorio_interno' && !patientId) {
+        return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
+    }
+
+    const { data: newApt, error } = await supabase
+        .from('agenda_appointments')
+        .insert({
+            title,
+            patient_id: patientId ? patientId : null,
+            doctor_id: doctorId ? doctorId : null,
+            start_time: startTime,
+            end_time: endTime,
+            status,
+            type,
+            notes,
+            created_by: user.id
+        })
+        .select('id')
+        .single();
 
     if (error) {
         console.error('Error creating appointment:', error);
         return { success: false, error: error.message };
+    }
+
+    // Outbound Google Calendar Sync
+    if (newApt?.id) {
+        try {
+            const { createGoogleEvent } = await import('@/lib/am-scheduler/google-calendar-outbound');
+            await createGoogleEvent(newApt.id);
+        } catch (syncErr) {
+            console.error('[GoogleSync] Outbound sync failed during creation:', syncErr);
+        }
     }
 
     revalidatePath('/agenda');
@@ -129,6 +147,10 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     delete safeUpdates.created_by;
     delete safeUpdates.is_primera_vez;
 
+    if (safeUpdates.type !== 'recordatorio_interno' && safeUpdates.patient_id === null) {
+        return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
+    }
+
     const adminClient = getAdminClient();
 
     const { error } = await adminClient
@@ -142,6 +164,14 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     if (error) {
         console.error('Error updating appointment:', error);
         return { success: false, error: error.message };
+    }
+
+    // Outbound Google Calendar Sync
+    try {
+        const { updateGoogleEvent } = await import('@/lib/am-scheduler/google-calendar-outbound');
+        await updateGoogleEvent(id);
+    } catch (syncErr) {
+        console.error('[GoogleSync] Outbound sync failed during update:', syncErr);
     }
 
     // Post-update hooks: primera visita + auto-recalls al completar
@@ -257,7 +287,24 @@ export async function deleteAppointment(id: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autenticado' };
 
-    const { error } = await getAdminClient()
+    const adminClient = getAdminClient();
+
+    // Fetch external_id before deleting
+    let externalId: string | null = null;
+    try {
+        const { data: apt } = await adminClient
+            .from('agenda_appointments')
+            .select('external_id')
+            .eq('id', id)
+            .single();
+        if (apt) {
+            externalId = apt.external_id;
+        }
+    } catch (err) {
+        console.error('[GoogleSync] Failed to fetch external_id before deletion:', err);
+    }
+
+    const { error } = await adminClient
         .from('agenda_appointments')
         .delete()
         .eq('id', id);
@@ -265,6 +312,16 @@ export async function deleteAppointment(id: string) {
     if (error) {
         console.error('Error deleting appointment:', error);
         return { success: false, error: error.message };
+    }
+
+    // Outbound Google Calendar Sync
+    if (externalId) {
+        try {
+            const { deleteGoogleEvent } = await import('@/lib/am-scheduler/google-calendar-outbound');
+            await deleteGoogleEvent(externalId);
+        } catch (syncErr) {
+            console.error('[GoogleSync] Outbound sync failed during deletion:', syncErr);
+        }
     }
 
     revalidatePath('/agenda');
@@ -275,7 +332,7 @@ export async function searchPatients(query: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from('pacientes')
-        .select('id_paciente, nombre, apellido, whatsapp')
+        .select('id_paciente, nombre, apellido, whatsapp, estado_paciente, origen_registro')
         .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`)
         .eq('is_deleted', false)
         .limit(10);
@@ -285,10 +342,19 @@ export async function searchPatients(query: string) {
         return [];
     }
 
-    return (data || []).map((p: { id_paciente: string; nombre: string; apellido: string; whatsapp: string | null }) => ({
+    return (data || []).map((p: {
+        id_paciente: string;
+        nombre: string;
+        apellido: string;
+        whatsapp: string | null;
+        estado_paciente: string | null;
+        origen_registro: string | null;
+    }) => ({
         id: p.id_paciente,
         full_name: `${p.nombre} ${p.apellido}`,
-        phone: p.whatsapp || ''
+        phone: p.whatsapp || '',
+        status: p.estado_paciente || null,
+        origin: p.origen_registro || null,
     }));
 }
 
@@ -427,6 +493,20 @@ export async function reassignDoctorBulk(
         return { success: false, error: error.message, updatedCount: 0 };
     }
 
+    // Outbound Google Calendar Sync for bulk reassignment
+    if (data && data.length > 0) {
+        try {
+            const { updateGoogleEvent } = await import('@/lib/am-scheduler/google-calendar-outbound');
+            // Sync asynchronously in parallel without blocking response
+            Promise.allSettled(data.map(apt => updateGoogleEvent(apt.id)))
+                .then(results => {
+                    console.log(`[GoogleSync] Bulk reassignment sync complete. Results:`, results);
+                });
+        } catch (syncErr) {
+            console.error('[GoogleSync] Outbound sync setup failed during bulk reassignment:', syncErr);
+        }
+    }
+
     revalidatePath('/agenda');
     return { success: true, updatedCount: data?.length || 0 };
 }
@@ -496,7 +576,11 @@ export async function sendBulkWhatsAppConfirmations(
             startTime: apt.start_time,
             endTime: apt.start_time,
         });
-        result.success ? sent++ : failed++;
+        if (result.success) {
+            sent++;
+        } else {
+            failed++;
+        }
     }
 
     return { sent, failed, noPhone };

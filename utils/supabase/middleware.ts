@@ -67,6 +67,7 @@ export async function updateSession(request: NextRequest) {
         path === '/privacy-policy' ||
         path === '/terms' ||
         path.startsWith('/forgot-password') ||
+        path.startsWith('/survey') ||
         path.startsWith('/api/patient-portal/') ||
         path.startsWith('/api/smile-design/') ||
         path.startsWith('/api/public-booking') ||

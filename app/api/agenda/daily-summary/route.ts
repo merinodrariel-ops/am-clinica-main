@@ -16,13 +16,14 @@ async function handler(req: NextRequest) {
 
   const url = new URL(req.url);
   const date = url.searchParams.get('date') || getLocalISODate();
+  const forceEmail = url.searchParams.get('force') || undefined;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: 'Fecha inválida. Usar YYYY-MM-DD.' }, { status: 400 });
   }
 
   try {
-    const result = await sendDailyDoctorAgendas(date);
+    const result = await sendDailyDoctorAgendas(date, { forceEmail });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     console.error('[daily-summary] failed:', error);

@@ -7,8 +7,8 @@ import { getLocalISODate } from '@/lib/local-date';
 import { sendWhatsAppMessage } from '@/lib/am-scheduler/notification-service';
 
 const DAILY_AGENDA_FROM = process.env.DAILY_AGENDA_FROM || 'AM Turnos <turnos@amesteticadental.com>';
-const DAILY_AGENDA_REPLY_TO = process.env.DAILY_AGENDA_REPLY_TO || 'drarielmerino@gmail.com';
-const ARIEL_DAILY_AGENDA_EMAIL = process.env.ARIEL_DAILY_AGENDA_EMAIL || 'drarielmerino@gmail.com';
+const DAILY_AGENDA_REPLY_TO = process.env.DAILY_AGENDA_REPLY_TO || 'dr.arielmerinopersonal@gmail.com';
+const ARIEL_DAILY_AGENDA_EMAIL = process.env.ARIEL_DAILY_AGENDA_EMAIL || 'dr.arielmerinopersonal@gmail.com';
 const TURNOS_WHATSAPP_URL = 'https://wa.link/zolb52';
 
 type DoctorStaffRow = {

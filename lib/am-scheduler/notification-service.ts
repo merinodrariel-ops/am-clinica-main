@@ -246,7 +246,27 @@ export function renderTemplate(
 async function sendEmail(ctx: AppointmentNotificationContext): Promise<{ success: boolean; id?: string; error?: string }> {
   if (!ctx.patientEmail) return { success: false, error: 'No email address' };
 
-  const { subject, html } = renderTemplate(ctx.templateKey, ctx);
+  let html: string;
+  let subject: string;
+
+  if (ctx.templateKey === 'survey_first_visit') {
+    try {
+      const { render } = await import('@react-email/render');
+      const { SurveyFirstVisitEmail } = await import('@/emails/SurveyFirstVisit');
+      html = await render(SurveyFirstVisitEmail({
+        patientName: ctx.patientName,
+        surveyToken: ctx.surveyToken ?? '',
+      }));
+      subject = `¿Cómo fue tu primera visita? — ${ctx.clinicName ?? 'AM Clínica'}`;
+    } catch (renderErr) {
+      console.error('[AM-Scheduler] Error rendering SurveyFirstVisitEmail:', renderErr);
+      return { success: false, error: 'Failed to render email template' };
+    }
+  } else {
+    const template = renderTemplate(ctx.templateKey, ctx);
+    html = template.html;
+    subject = template.subject;
+  }
 
   try {
     const response = await EmailService.send({
@@ -418,10 +438,41 @@ export async function createAndSendSurvey(
 ) {
   const supabase = createAdminClient();
 
+  // Resolve actual patient_id if not provided
+  let actualPatientId = patientId;
+  if (!actualPatientId) {
+    const { data: appt } = await supabase
+      .from('agenda_appointments')
+      .select('patient_id')
+      .eq('id', appointmentId)
+      .single();
+    if (appt) {
+      actualPatientId = appt.patient_id;
+    }
+  }
+
+  // Detect if it is the first completed visit for this patient
+  let isFirstCompletedVisit = false;
+  if (actualPatientId) {
+    const { count, error: countErr } = await supabase
+      .from('agenda_appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('patient_id', actualPatientId)
+      .eq('status', 'completed');
+    
+    if (!countErr && count !== null) {
+      isFirstCompletedVisit = count <= 1;
+    }
+  }
+
   // Create survey record
   const { data: survey, error } = await supabase
     .from('satisfaction_surveys')
-    .insert({ appointment_id: appointmentId, patient_id: patientId, sent_at: new Date().toISOString() })
+    .insert({ 
+      appointment_id: appointmentId, 
+      patient_id: actualPatientId, 
+      sent_at: new Date().toISOString() 
+    })
     .select('token')
     .single();
 
@@ -430,10 +481,28 @@ export async function createAndSendSurvey(
     return;
   }
 
+  // Determine channel and template based on patient contact info and first-visit status
+  let channel: 'email' | 'whatsapp' | 'both' = 'whatsapp';
+  let templateKey = 'survey_post_appointment';
+
+  if (isFirstCompletedVisit && patientEmail) {
+    channel = 'email';
+    templateKey = 'survey_first_visit';
+  } else if (!patientPhone && patientEmail) {
+    channel = 'email';
+    templateKey = 'survey_post_appointment';
+  } else if (patientPhone) {
+    channel = 'whatsapp';
+    templateKey = 'survey_post_appointment';
+  } else {
+    console.warn('[AM-Scheduler] Patient has no phone nor email — cannot dispatch survey:', appointmentId);
+    return;
+  }
+
   await sendNotification({
     appointmentId,
-    templateKey: 'survey_post_appointment',
-    channel: 'whatsapp',
+    templateKey,
+    channel,
     patientName,
     patientEmail,
     patientPhone,

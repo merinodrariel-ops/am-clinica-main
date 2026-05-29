@@ -2,20 +2,24 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
-import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle } from 'lucide-react';
+import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle, UserPlus } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { upsertPatientAction } from '@/app/actions/patients';
 
 import { createClient } from '@/utils/supabase/client';
 import { type TarifarioItem } from '@/lib/supabase';
 import { parseOrthoReplacementDays, serializeAppointmentNotes, stripAppointmentMeta } from '@/lib/agenda-appointment-meta';
+import { buildPreloadedPatientPayload } from '@/lib/preloaded-patient';
 
 interface Patient {
     id: string;
     full_name: string;
     phone: string;
+    status?: string | null;
+    origin?: string | null;
 }
 
 interface Doctor {
@@ -101,6 +105,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [searching, setSearching] = useState(false);
     const [selectedPatientName, setSelectedPatientName] = useState('');
     const [selectedPatientPhone, setSelectedPatientPhone] = useState('');
+    const [selectedPatientStatus, setSelectedPatientStatus] = useState('');
+    const [showPreloadPatient, setShowPreloadPatient] = useState(false);
+    const [preloadPhone, setPreloadPhone] = useState('');
+    const [preloadEmail, setPreloadEmail] = useState('');
+    const [creatingPreloadPatient, setCreatingPreloadPatient] = useState(false);
 
 
     // Tarifario Search State
@@ -175,6 +184,10 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setNotes(stripAppointmentMeta(initialData.notes || ''));
             setOrthoReplacementDays(parsedDays ?? 15);
             setSelectedPatientName(initialData.patient?.full_name || '');
+            setSelectedPatientStatus('');
+            setShowPreloadPatient(false);
+            setPreloadPhone('');
+            setPreloadEmail('');
         } else if (initialDate) {
             // Create Mode con fecha específica
             setTitle('');
@@ -182,6 +195,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setDoctorId('');
             setDoctorSearch('');
             setSelectedPatientName('');
+            setSelectedPatientStatus('');
             setSearchTerm('');
             setTarifarioSearch('');
             const start = new Date(initialDate);
@@ -193,6 +207,9 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setType('consulta');
             setNotes('');
             setOrthoReplacementDays(15);
+            setShowPreloadPatient(false);
+            setPreloadPhone('');
+            setPreloadEmail('');
         }
     }, [isOpen, initialData, initialDate]);
 
@@ -273,6 +290,10 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const handleSubmit = useCallback(async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (loading || isSubmitting.current) return;
+        if (type !== 'recordatorio_interno' && !patientId) {
+            alert('Seleccioná un paciente existente o precargá uno pendiente de formulario antes de agendar.');
+            return;
+        }
         
         isSubmitting.current = true;
         setLoading(true);
@@ -355,6 +376,47 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         }
     };
 
+    const handleCreatePreloadedPatient = async () => {
+        const displayName = searchTerm.trim();
+        if (!displayName) {
+            alert('Escribí el nombre del paciente para precargarlo.');
+            return;
+        }
+
+        setCreatingPreloadPatient(true);
+        try {
+            const doctorName = doctors.find((doctor) => doctor.id === doctorId)?.full_name || doctorSearch;
+            const payload = buildPreloadedPatientPayload({
+                displayName,
+                whatsapp: preloadPhone,
+                email: preloadEmail,
+                doctorName,
+            });
+
+            const result = await upsertPatientAction(payload);
+            if (!result.success || !result.data?.id_paciente) {
+                throw new Error(result.error || 'No se pudo precargar el paciente');
+            }
+
+            const fullName = `${result.data.nombre || ''} ${result.data.apellido || ''}`.trim();
+            setPatientId(result.data.id_paciente);
+            setSelectedPatientName(fullName || displayName);
+            setSelectedPatientPhone(result.data.whatsapp || payload.whatsapp || '');
+            setSelectedPatientStatus(result.data.estado_paciente || '');
+            setSearchTerm('');
+            setPatients([]);
+            setShowPreloadPatient(false);
+            setPreloadPhone('');
+            setPreloadEmail('');
+            if (!title) setTitle(`Consulta - ${fullName || displayName}`);
+        } catch (error) {
+            console.error('Error creating preloaded patient:', error);
+            alert(error instanceof Error ? error.message : 'Error al precargar paciente');
+        } finally {
+            setCreatingPreloadPatient(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -372,6 +434,12 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
                 <form
                     onSubmit={handleSubmit}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter' && shouldHandleEnterAsSubmit(event)) {
+                            event.preventDefault();
+                            handleSubmit();
+                        }
+                    }}
                     className="p-6 space-y-5"
                 >
 
@@ -386,27 +454,34 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     </div>
                                     <div>
                                         <span className="block font-medium text-gray-900 dark:text-white leading-tight">{selectedPatientName}</span>
-                                        {selectedPatientPhone ? (
-                                            <a
-                                                href={`https://wa.me/${selectedPatientPhone.replace(/\D/g, '').replace(/^0/, '549')}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                onClick={e => e.stopPropagation()}
-                                                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium mt-0.5"
-                                            >
-                                                <MessageCircle size={11} />
-                                                {selectedPatientPhone}
-                                            </a>
-                                        ) : (
-                                            <span className="text-xs text-blue-500 font-medium">Paciente Registrado</span>
-                                        )}
+                                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                                            {selectedPatientPhone ? (
+                                                <a
+                                                    href={`https://wa.me/${selectedPatientPhone.replace(/\D/g, '').replace(/^0/, '549')}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    onClick={e => e.stopPropagation()}
+                                                    className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium"
+                                                >
+                                                    <MessageCircle size={11} />
+                                                    {selectedPatientPhone}
+                                                </a>
+                                            ) : (
+                                                <span className="text-xs text-blue-500 font-medium">Paciente registrado</span>
+                                            )}
+                                            {selectedPatientStatus === 'Pendiente formulario' && (
+                                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                                                    Pendiente formulario
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => { setPatientId(''); setSelectedPatientName(''); setSelectedPatientPhone(''); setSearchTerm(''); }}
+                                    onClick={() => { setPatientId(''); setSelectedPatientName(''); setSelectedPatientPhone(''); setSelectedPatientStatus(''); setSearchTerm(''); setShowPreloadPatient(false); }}
                                     className="text-gray-400 hover:text-red-500 rounded-lg hover:bg-white dark:hover:bg-gray-800 transition-all h-auto p-2"
                                 >
                                     <X size={18} />
@@ -432,6 +507,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                             setPatientId(p.id);
                                             setSelectedPatientName(p.full_name);
                                             setSelectedPatientPhone(p.phone || '');
+                                            setSelectedPatientStatus(p.status || '');
                                             setSearchTerm('');
                                             setPatients([]);
                                             if (!title) setTitle(`Consulta - ${p.full_name}`);
@@ -457,6 +533,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                                     setPatientId(p.id);
                                                     setSelectedPatientName(p.full_name);
                                                     setSelectedPatientPhone(p.phone || '');
+                                                    setSelectedPatientStatus(p.status || '');
                                                     setSearchTerm('');
                                                     setPatients([]);
                                                     if (!title) setTitle(`Consulta - ${p.full_name}`);
@@ -467,15 +544,80 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                                 </div>
                                                 <div>
                                                     <div className="font-medium text-gray-900 dark:text-white">{p.full_name}</div>
-                                                    <div className="text-xs text-gray-500">{p.phone}</div>
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                                        <span>{p.phone || 'Sin WhatsApp'}</span>
+                                                        {p.status === 'Pendiente formulario' && (
+                                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                                                                Pendiente formulario
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </Button>
                                         ))}
                                     </div>
                                 ) : (
                                     searchTerm.length > 2 && !searching && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                                            No se encontraron pacientes.
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 p-4 text-sm text-gray-500 dark:text-gray-400">
+                                            {!showPreloadPatient ? (
+                                                <div className="space-y-3 text-center">
+                                                    <p>No se encontraron pacientes.</p>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onMouseDown={(e) => e.preventDefault()}
+                                                        onClick={() => setShowPreloadPatient(true)}
+                                                        className="w-full h-auto justify-center gap-2 rounded-lg border-amber-200 bg-amber-50 px-3 py-2 text-amber-700 hover:bg-amber-100 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-300"
+                                                    >
+                                                        <UserPlus size={16} />
+                                                        Precargar paciente pendiente de formulario
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-200">
+                                                        Se creará como paciente propio del profesional y quedará pendiente de completar el formulario.
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <Input
+                                                            type="tel"
+                                                            placeholder="WhatsApp opcional"
+                                                            value={preloadPhone}
+                                                            onChange={(e) => setPreloadPhone(e.target.value)}
+                                                            className="h-auto rounded-lg px-3 py-2 text-sm"
+                                                        />
+                                                        <Input
+                                                            type="email"
+                                                            placeholder="Email opcional"
+                                                            value={preloadEmail}
+                                                            onChange={(e) => setPreloadEmail(e.target.value)}
+                                                            className="h-auto rounded-lg px-3 py-2 text-sm"
+                                                        />
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => setShowPreloadPatient(false)}
+                                                            className="h-auto flex-1 rounded-lg px-3 py-2"
+                                                            disabled={creatingPreloadPatient}
+                                                        >
+                                                            Cancelar
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={handleCreatePreloadedPatient}
+                                                            className="h-auto flex-1 rounded-lg bg-amber-600 px-3 py-2 text-white hover:bg-amber-700"
+                                                            disabled={creatingPreloadPatient}
+                                                        >
+                                                            {creatingPreloadPatient ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                                                            Crear y seleccionar
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )
                                 )}

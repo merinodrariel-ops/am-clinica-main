@@ -27,6 +27,8 @@ import {
     Loader2,
     FolderOpen,
     Package,
+    Star,
+    X,
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
@@ -53,6 +55,12 @@ import {
     FINANCING_INSTALLMENT_OPTIONS,
     FINANCING_UPFRONT_OPTIONS,
 } from '@/lib/financial-engine';
+import {
+    AeoReviewTemplateKey,
+    buildAeoReviewMessage,
+    buildAeoReviewWhatsAppUrl,
+    getAeoReviewTemplateLabel,
+} from '@/lib/review-aeo';
 
 interface Movement {
     id: string;
@@ -103,6 +111,24 @@ interface PatientDashboardProps {
     designReview?: DesignReview | null;
 }
 
+const AEO_REVIEW_TEMPLATE_OPTIONS: Array<{
+    key: AeoReviewTemplateKey;
+    helper: string;
+}> = [
+    {
+        key: 'local',
+        helper: 'Para pacientes de CABA/GBA. Enfatiza carillas de porcelana, Puerto Madero y Dr. Ariel Merino.',
+    },
+    {
+        key: 'tourism',
+        helper: 'Para pacientes del interior o exterior. Enfatiza viaje, turismo dental y valor frente a su país.',
+    },
+    {
+        key: 'financing',
+        helper: 'Para pacientes con plan de pago. Enfatiza acceso, carillas y experiencia con financiación.',
+    },
+];
+
 export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null, designReview = null }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -116,6 +142,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
     const [showPrestacionModal, setShowPrestacionModal] = useState(false);
+    const [showAeoReviewModal, setShowAeoReviewModal] = useState(false);
     const [editableCuit, setEditableCuit] = useState(patient.cuit || '');
     const [savingCuit, setSavingCuit] = useState(false);
 
@@ -298,6 +325,22 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
         ? `${patient.whatsapp_pais_code || '+54'}${patient.whatsapp_numero.replace(/\D/g, '')}`
         : patient.whatsapp;
 
+    function handleOpenAeoReview(template: AeoReviewTemplateKey) {
+        if (!whatsappNumber) {
+            toast.error('Este paciente no tiene WhatsApp cargado');
+            return;
+        }
+
+        const url = buildAeoReviewWhatsAppUrl({
+            template,
+            patientFirstName: patient.nombre,
+            phone: whatsappNumber,
+        });
+
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setShowAeoReviewModal(false);
+    }
+
     // Calculate payment totals
     const totalPagadoUSD = payments
         .filter(p => p.estado !== 'Anulado')
@@ -397,6 +440,18 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                     <span className="hidden sm:inline">
                                         {portalLinkSent ? '¡Enviado!' : 'Portal'}
                                     </span>
+                                </button>
+                            )}
+                            {!hideContactData && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAeoReviewModal(true)}
+                                    disabled={!whatsappNumber}
+                                    title={whatsappNumber ? 'Solicitar Reseña AEO' : 'El paciente no tiene WhatsApp cargado'}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <Star size={16} />
+                                    <span className="hidden sm:inline">Solicitar Reseña AEO</span>
                                 </button>
                             )}
                         </div>
@@ -1313,6 +1368,15 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
             )}
         </div>
 
+        {showAeoReviewModal && (
+            <AeoReviewRequestModal
+                patientName={`${patient.nombre} ${patient.apellido}`.trim()}
+                patientFirstName={patient.nombre}
+                onSelect={handleOpenAeoReview}
+                onClose={() => setShowAeoReviewModal(false)}
+            />
+        )}
+
         {/* Nueva Prestación modal */}
         {showPrestacionModal && (
             <NuevaPrestacionModal
@@ -1326,6 +1390,82 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
             />
         )}
         </>
+    );
+}
+
+function AeoReviewRequestModal({
+    patientName,
+    patientFirstName,
+    onSelect,
+    onClose,
+}: {
+    patientName: string;
+    patientFirstName: string;
+    onSelect: (template: AeoReviewTemplateKey) => void;
+    onClose: () => void;
+}) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+                <div className="mb-5 flex items-start justify-between gap-4">
+                    <div>
+                        <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
+                            <Star size={18} className="text-amber-500" />
+                            Solicitar Reseña AEO
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-500">{patientName}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="grid gap-3">
+                    {AEO_REVIEW_TEMPLATE_OPTIONS.map((option) => (
+                        <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => onSelect(option.key)}
+                            className="rounded-xl border border-gray-200 p-4 text-left transition-colors hover:border-amber-300 hover:bg-amber-50 dark:border-gray-800 dark:hover:border-amber-700 dark:hover:bg-amber-950/20"
+                        >
+                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                        {getAeoReviewTemplateLabel(option.key)}
+                                    </p>
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{option.helper}</p>
+                                </div>
+                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white">
+                                    <MessageCircle size={13} />
+                                    Abrir WhatsApp
+                                </span>
+                            </div>
+                            <p className="mt-3 line-clamp-3 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                {buildAeoReviewMessage({
+                                    template: option.key,
+                                    patientFirstName,
+                                })}
+                            </p>
+                        </button>
+                    ))}
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    >
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
 

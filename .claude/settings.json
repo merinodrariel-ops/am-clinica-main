@@ -1,4 +1,36 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_FLOW_V3_ENABLED": "true",
+    "CLAUDE_FLOW_HOOKS_ENABLED": "true"
+  },
+  "attribution": {
+    "commit": "Co-Authored-By: claude-flow <ruv@ruv.net>",
+    "pr": "🤖 Generated with [claude-flow](https://github.com/ruvnet/claude-flow)"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx @claude-flow*)",
+      "Bash(npx claude-flow*)",
+      "Bash(node .claude/*)",
+      "mcp__claude-flow__:*",
+      "Read(//Users/arimacm5/.supabase/**)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" log --oneline -5)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" show --stat 0125429)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" log --oneline origin/main..HEAD)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" status --short)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" remote -v)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" log --oneline origin/main -3)",
+      "Bash(gh workflow *)",
+      "Bash(gh run *)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" show 3b163f4 -- lib/doctor-daily-agenda-notifications.ts)",
+      "Bash(git -C \"/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main\" show 0125429 -- lib/doctor-daily-agenda-notifications.ts)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -162,27 +194,6 @@
     "command": "sh -c 'exec node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/statusline.cjs\"'"
   },
   "dangerouslySkipPermissions": true,
-  "permissions": {
-    "allow": [
-      "Bash(npx @claude-flow*)",
-      "Bash(npx claude-flow*)",
-      "Bash(node .claude/*)",
-      "mcp__claude-flow__:*"
-    ],
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)"
-    ]
-  },
-  "attribution": {
-    "commit": "Co-Authored-By: claude-flow <ruv@ruv.net>",
-    "pr": "🤖 Generated with [claude-flow](https://github.com/ruvnet/claude-flow)"
-  },
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_FLOW_V3_ENABLED": "true",
-    "CLAUDE_FLOW_HOOKS_ENABLED": "true"
-  },
   "claudeFlow": {
     "version": "3.0.0",
     "enabled": true,

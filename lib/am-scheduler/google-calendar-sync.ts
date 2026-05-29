@@ -19,7 +19,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 
 // ─── Google Auth ──────────────────────────────────────────────────────────────
 
-function buildGoogleAuth() {
+export function buildGoogleAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
@@ -32,7 +32,7 @@ function buildGoogleAuth() {
   return new google.auth.JWT({
     email,
     key,
-    scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+    scopes: ['https://www.googleapis.com/auth/calendar'],
   });
 }
 
