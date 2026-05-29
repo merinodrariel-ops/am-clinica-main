@@ -2,22 +2,24 @@
 
 import { createAdminClient } from '@/utils/supabase/admin';
 
-export type MonthlyAgendaMetricKey = 'primeras_consultas' | 'limpiezas' | 'control_carillas';
+export type AgendaMetricsPeriod = 'day' | 'week' | 'month' | 'year';
+export type AgendaMetricKey = 'primeras_consultas' | 'limpiezas' | 'controles_anuales';
 
-export type MonthlyAgendaMetric = {
-    key: MonthlyAgendaMetricKey;
+export type AgendaMetric = {
+    key: AgendaMetricKey;
     label: string;
     done: number;
     upcoming: number;
     total: number;
 };
 
-export type MonthlyAgendaMetrics = {
-    monthLabel: string;
-    monthStart: string;
-    monthEnd: string;
+export type AgendaMetrics = {
+    period: AgendaMetricsPeriod;
+    periodLabel: string;
+    rangeStart: string;
+    rangeEnd: string;
     generatedAt: string;
-    metrics: MonthlyAgendaMetric[];
+    metrics: AgendaMetric[];
 };
 
 type AgendaMetricRow = {
@@ -29,13 +31,12 @@ type AgendaMetricRow = {
 };
 
 const CLEANING_TYPES = new Set(['limpieza', 'limpieza_convencional', 'limpieza_laser']);
-const VENEER_CONTROL_TYPES = new Set(['control_carilla_inmediato', 'control_carilla_anual']);
 const IGNORED_STATUSES = new Set(['cancelled', 'no_show']);
 
-const METRIC_LABELS: Record<MonthlyAgendaMetricKey, string> = {
+const METRIC_LABELS: Record<AgendaMetricKey, string> = {
     primeras_consultas: 'Primeras consultas',
     limpiezas: 'Limpiezas',
-    control_carillas: 'Controles de carillas',
+    controles_anuales: 'Controles anuales',
 };
 
 function normalizeText(value: string | null | undefined) {
@@ -45,7 +46,7 @@ function normalizeText(value: string | null | undefined) {
         .toLowerCase();
 }
 
-function classifyAppointment(row: AgendaMetricRow): MonthlyAgendaMetricKey | null {
+function classifyAppointment(row: AgendaMetricRow): AgendaMetricKey | null {
     const type = row.type ?? '';
     const title = normalizeText(row.title);
 
@@ -58,30 +59,114 @@ function classifyAppointment(row: AgendaMetricRow): MonthlyAgendaMetricKey | nul
     }
 
     if (
-        VENEER_CONTROL_TYPES.has(type) ||
-        (title.includes('control') && (title.includes('carilla') || title.includes('veneer') || title.includes('faceta')))
+        type === 'control_carilla_anual' ||
+        (title.includes('control') && title.includes('anual') && (title.includes('carilla') || title.includes('veneer') || title.includes('faceta')))
     ) {
-        return 'control_carillas';
+        return 'controles_anuales';
     }
 
     return null;
 }
 
-function buildEmptyMetrics(): Record<MonthlyAgendaMetricKey, { done: number; upcoming: number }> {
+function buildEmptyMetrics(): Record<AgendaMetricKey, { done: number; upcoming: number }> {
     return {
         primeras_consultas: { done: 0, upcoming: 0 },
         limpiezas: { done: 0, upcoming: 0 },
-        control_carillas: { done: 0, upcoming: 0 },
+        controles_anuales: { done: 0, upcoming: 0 },
     };
 }
 
-function toMonthlyAgendaMetrics(
-    counters: Record<MonthlyAgendaMetricKey, { done: number; upcoming: number }>,
+function getArgentinaDateParts(date: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        weekday: 'short',
+    }).formatToParts(date);
+
+    const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
+    const weekdayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(value('weekday'));
+
+    return {
+        year: Number(value('year')),
+        month: Number(value('month')),
+        day: Number(value('day')),
+        weekdayIndex: weekdayIndex >= 0 ? weekdayIndex : 0,
+    };
+}
+
+function argentinaDate(year: number, month: number, day: number, time = '00:00:00.000') {
+    return new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${time}-03:00`);
+}
+
+function endOfRangeFromNextStart(nextStart: Date) {
+    return new Date(nextStart.getTime() - 1);
+}
+
+function addDays(date: Date, days: number) {
+    const next = new Date(date);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next;
+}
+
+function buildPeriodRange(period: AgendaMetricsPeriod, now: Date) {
+    const local = getArgentinaDateParts(now);
+    const todayStart = argentinaDate(local.year, local.month, local.day);
+    const todayEnd = argentinaDate(local.year, local.month, local.day, '23:59:59.999');
+
+    if (period === 'day') {
+        return {
+            rangeStart: todayStart,
+            rangeEnd: todayEnd,
+            periodLabel: 'Hoy',
+        };
+    }
+
+    if (period === 'week') {
+        const mondayOffset = local.weekdayIndex === 0 ? -6 : 1 - local.weekdayIndex;
+        const weekStart = addDays(todayStart, mondayOffset);
+        const weekEnd = endOfRangeFromNextStart(addDays(weekStart, 7));
+
+        return {
+            rangeStart: weekStart,
+            rangeEnd: weekEnd,
+            periodLabel: 'Esta semana',
+        };
+    }
+
+    if (period === 'year') {
+        return {
+            rangeStart: argentinaDate(local.year, 1, 1),
+            rangeEnd: argentinaDate(local.year, 12, 31, '23:59:59.999'),
+            periodLabel: String(local.year),
+        };
+    }
+
+    return {
+        rangeStart: argentinaDate(local.year, local.month, 1),
+        rangeEnd: endOfRangeFromNextStart(
+            local.month === 12
+                ? argentinaDate(local.year + 1, 1, 1)
+                : argentinaDate(local.year, local.month + 1, 1)
+        ),
+        periodLabel: now.toLocaleDateString('es-AR', {
+            timeZone: 'America/Argentina/Buenos_Aires',
+            month: 'long',
+            year: 'numeric',
+        }),
+    };
+}
+
+function toAgendaMetrics(
+    counters: Record<AgendaMetricKey, { done: number; upcoming: number }>,
+    period: AgendaMetricsPeriod,
     now: Date,
-    monthStart: Date,
-    monthEnd: Date
-): MonthlyAgendaMetrics {
-    const metrics = (Object.keys(METRIC_LABELS) as MonthlyAgendaMetricKey[]).map((key) => ({
+    rangeStart: Date,
+    rangeEnd: Date,
+    periodLabel: string
+): AgendaMetrics {
+    const metrics = (Object.keys(METRIC_LABELS) as AgendaMetricKey[]).map((key) => ({
         key,
         label: METRIC_LABELS[key],
         done: counters[key].done,
@@ -90,30 +175,31 @@ function toMonthlyAgendaMetrics(
     }));
 
     return {
-        monthLabel: now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }),
-        monthStart: monthStart.toISOString(),
-        monthEnd: monthEnd.toISOString(),
+        period,
+        periodLabel,
+        rangeStart: rangeStart.toISOString(),
+        rangeEnd: rangeEnd.toISOString(),
         generatedAt: now.toISOString(),
         metrics,
     };
 }
 
-export async function getMonthlyAgendaMetrics(): Promise<MonthlyAgendaMetrics> {
+export async function getAgendaMetrics(period: AgendaMetricsPeriod = 'month'): Promise<AgendaMetrics> {
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const normalizedPeriod: AgendaMetricsPeriod = ['day', 'week', 'month', 'year'].includes(period) ? period : 'month';
+    const { rangeStart, rangeEnd, periodLabel } = buildPeriodRange(normalizedPeriod, now);
     const counters = buildEmptyMetrics();
     const admin = createAdminClient();
 
     const { data, error } = await admin
         .from('agenda_appointments')
         .select('title, type, status, start_time, end_time')
-        .gte('start_time', monthStart.toISOString())
-        .lte('start_time', monthEnd.toISOString());
+        .gte('start_time', rangeStart.toISOString())
+        .lte('start_time', rangeEnd.toISOString());
 
     if (error) {
-        console.error('[AgendaMetrics] Error fetching monthly agenda metrics:', error);
-        return toMonthlyAgendaMetrics(counters, now, monthStart, monthEnd);
+        console.error('[AgendaMetrics] Error fetching agenda metrics:', error);
+        return toAgendaMetrics(counters, normalizedPeriod, now, rangeStart, rangeEnd, periodLabel);
     }
 
     for (const row of (data ?? []) as AgendaMetricRow[]) {
@@ -132,5 +218,9 @@ export async function getMonthlyAgendaMetrics(): Promise<MonthlyAgendaMetrics> {
         }
     }
 
-    return toMonthlyAgendaMetrics(counters, now, monthStart, monthEnd);
+    return toAgendaMetrics(counters, normalizedPeriod, now, rangeStart, rangeEnd, periodLabel);
+}
+
+export async function getMonthlyAgendaMetrics(): Promise<AgendaMetrics> {
+    return getAgendaMetrics('month');
 }
