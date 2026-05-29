@@ -9,6 +9,7 @@ import CsvImportWizard from '@/components/agenda/CsvImportWizard';
 import DoctorReassignmentPanel from '@/components/agenda/DoctorReassignmentPanel';
 import AgendaBlocksManager from '@/components/agenda/AgendaBlocksManager';
 import { Calendar, Settings, Upload, X } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Tab = 'calendar' | 'config' | 'import';
 
@@ -19,6 +20,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function AgendaPage() {
+    const { categoria, loading: authLoading } = useAuth();
     const [activeTab, setActiveTab] = useState<Tab>('calendar');
     const [showPanel, setShowPanel] = useState(false);
     const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
@@ -63,7 +65,9 @@ export default function AgendaPage() {
             {/* Tab Content */}
             {activeTab === 'calendar' && (
                 <div className="flex-1 min-h-0 flex flex-col gap-3">
-                    <MonthlyAgendaDashboard />
+                    {!authLoading && categoria && ['owner', 'admin', 'reception', 'recaptacion'].includes(categoria) && (
+                        <MonthlyAgendaDashboard />
+                    )}
 
                     <div className="flex-1 min-h-0 relative">
                         {/* Calendar — always full width */}
