@@ -39,8 +39,6 @@ import {
     RotateCcw,
     ChevronDown,
     ChevronUp,
-    ChevronLeft,
-    ChevronRight,
     Trash2,
     Plus,
     Lock,
@@ -269,6 +267,8 @@ interface KpiCardProps {
     icon: React.ElementType;
     label: string;
     value: string | number;
+    secondaryValue?: string;
+    secondaryLabel?: string;
     subtitle?: string;
     gradient: string;
     iconBg: string;
@@ -292,6 +292,8 @@ function KpiCard({
     icon: Icon,
     label,
     value,
+    secondaryValue,
+    secondaryLabel,
     subtitle,
     gradient,
     iconBg,
@@ -368,18 +370,37 @@ function KpiCard({
                             </span>
                         )}
                     </div>
-                    <p
-                        className={`font-bold tracking-tight leading-none ${isGiant ? 'text-5xl md:text-6xl lg:text-7xl' : isLarge ? 'text-3xl md:text-4xl' : 'text-2xl md:text-3xl'
-                            }`}
-                        style={{
-                            background: gradient,
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                        }}
-                    >
-                        {value}
-                    </p>
+                    <div className={secondaryValue ? 'flex flex-wrap items-end gap-x-4 gap-y-1' : ''}>
+                        <p
+                            className={`font-bold tracking-tight leading-none ${isGiant ? 'text-5xl md:text-6xl lg:text-7xl' : isLarge ? 'text-3xl md:text-4xl' : 'text-2xl md:text-3xl'
+                                }`}
+                            style={{
+                                background: gradient,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                            }}
+                        >
+                            {value}
+                        </p>
+                        {secondaryValue && (
+                            <div className="pb-0.5">
+                                <p
+                                    className="text-2xl md:text-3xl font-bold tracking-tight leading-none"
+                                    style={{
+                                        color: iconColor,
+                                    }}
+                                >
+                                    {secondaryValue}
+                                </p>
+                                {secondaryLabel && (
+                                    <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                                        {secondaryLabel}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     {subtitle && (
                         <p className="text-xs mt-1.5 text-slate-500">
                             {subtitle}
@@ -817,7 +838,9 @@ export default function OwnerDashboard() {
             icon: CreditCard,
             label: 'En Financiación',
             value: `${stats.personasEnFinanciacion} personas`,
-            subtitle: isCurrentMonth ? 'Con plan de cuotas activo' : 'Estado actual (no varía por mes)',
+            secondaryValue: `$${stats.cobroMensualFinanciacionUsd.toLocaleString()} USD/mes`,
+            secondaryLabel: 'Cobro esperado',
+            subtitle: isCurrentMonth ? 'Cuotas activas a cobrar el próximo mes' : 'Estado actual (no varía por mes)',
             gradient: 'linear-gradient(135deg, hsl(270 67% 55%), hsl(285 65% 50%))',
             iconBg: 'hsla(270, 67%, 55%, 0.15)',
             iconColor: 'hsl(270 67% 65%)',

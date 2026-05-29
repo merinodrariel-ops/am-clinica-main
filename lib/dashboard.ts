@@ -161,17 +161,26 @@ export interface OwnerDashboardStats {
     ingresosMesUsd: number;
     egresosMesUsd: number;
     personasEnFinanciacion: number;
+    cobroMensualFinanciacionUsd: number;
     deudaTotalUsd: number;
-    planesFinanciacion: Array<{
-        id: string;
-        paciente_nombre: string;
-        tratamiento: string;
-        cuotas_total: number;
-        cuotas_pagadas: number;
-        monto_cuota_usd: number;
-        saldo_restante_usd: number;
-        estado: string;
-    }>;
+    planesFinanciacion: PlanFinanciacionDashboard[];
+}
+
+export interface PlanFinanciacionDashboard {
+    id: string;
+    paciente_nombre: string;
+    tratamiento: string;
+    cuotas_total: number;
+    cuotas_pagadas: number;
+    monto_cuota_usd: number;
+    saldo_restante_usd: number;
+    estado: string;
+}
+
+export function getCobroMensualFinanciacionUsd(planes: PlanFinanciacionDashboard[] = []): number {
+    return planes
+        .filter((plan) => Number(plan.cuotas_pagadas || 0) < Number(plan.cuotas_total || 0))
+        .reduce((sum, plan) => sum + (Number(plan.monto_cuota_usd) || 0), 0);
 }
 
 export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
@@ -279,7 +288,9 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             .select('id, paciente_nombre, tratamiento, cuotas_total, cuotas_pagadas, monto_cuota_usd, saldo_restante_usd, estado')
             .eq('estado', 'En curso');
 
-        const personasEnFinanciacion = financData?.length || 0;
+        const planesFinanciacion = (financData || []) as PlanFinanciacionDashboard[];
+        const personasEnFinanciacion = planesFinanciacion.length;
+        const cobroMensualFinanciacionUsd = getCobroMensualFinanciacionUsd(planesFinanciacion);
         const deudaTotalUsd = financData?.reduce(
             (sum: number, p: { saldo_restante_usd: unknown }) => sum + (Number(p.saldo_restante_usd) || 0), 0
         ) || 0;
@@ -294,8 +305,9 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
             personasEnFinanciacion,
+            cobroMensualFinanciacionUsd: Math.round(cobroMensualFinanciacionUsd),
             deudaTotalUsd: Math.round(deudaTotalUsd),
-            planesFinanciacion: financData || [],
+            planesFinanciacion,
         };
     } catch (error) {
         console.error('Error in getOwnerDashboardStats:', error);
@@ -309,6 +321,7 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             ingresosMesUsd: 0,
             egresosMesUsd: 0,
             personasEnFinanciacion: 0,
+            cobroMensualFinanciacionUsd: 0,
             deudaTotalUsd: 0,
             planesFinanciacion: [],
         };

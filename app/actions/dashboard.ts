@@ -1,7 +1,19 @@
 'use server';
 
 import { createAdminClient } from '@/utils/supabase/admin';
-import type { DashboardStats, OwnerDashboardStats, ReferralStat } from '@/lib/dashboard';
+import { getCobroMensualFinanciacionUsd } from '@/lib/dashboard';
+import type { DashboardStats, OwnerDashboardStats, PlanFinanciacionDashboard, ReferralStat } from '@/lib/dashboard';
+
+type PrimeraConsultaRow = {
+    id_paciente: string;
+    nombre: string;
+    apellido: string;
+    primera_consulta_fecha: string;
+};
+
+type PrimeraConsultaReciente = PrimeraConsultaRow & {
+    monthKey: string;
+};
 
 export async function getDashboardStatsAction(): Promise<DashboardStats> {
     const supabase = createAdminClient();
@@ -155,16 +167,16 @@ export async function getOwnerDashboardStatsAction(
         const currentMonthKey = monthStart.slice(0, 7);
         const monthlyCounts = monthWindows.reduce<Record<string, number>>((acc, m) => { acc[m.key] = 0; return acc; }, {});
 
-        const primerasConsultasRecientes = (primerasConsultasData || []).map((p: any) => {
-            const monthKey = (p.primera_consulta_fecha as string).slice(0, 7);
+        const primerasConsultasRecientes = ((primerasConsultasData || []) as PrimeraConsultaRow[]).map((p): PrimeraConsultaReciente => {
+            const monthKey = p.primera_consulta_fecha.slice(0, 7);
             if (monthKey in monthlyCounts) monthlyCounts[monthKey] += 1;
-            return { id_paciente: p.id_paciente, nombre: p.nombre, apellido: p.apellido, primera_consulta_fecha: p.primera_consulta_fecha as string, monthKey };
+            return { id_paciente: p.id_paciente, nombre: p.nombre, apellido: p.apellido, primera_consulta_fecha: p.primera_consulta_fecha, monthKey };
         });
 
         const primeraVezMensual = monthWindows.map((m) => ({ ...m, count: monthlyCounts[m.key] || 0 }));
         const listaPrimeraVez = primerasConsultasRecientes
-            .filter((p: any) => p.monthKey === currentMonthKey)
-            .map(({ monthKey: _mk, ...rest }: any) => rest);
+            .filter((p) => p.monthKey === currentMonthKey)
+            .map(({ monthKey: _mk, ...rest }) => rest);
         const primeraVezMes = monthlyCounts[currentMonthKey] || 0;
 
         // Limpiezas por mes (últimos 6 meses) — desde agenda_appointments por type
@@ -210,6 +222,9 @@ export async function getOwnerDashboardStatsAction(
             .select('id, paciente_nombre, tratamiento, cuotas_total, cuotas_pagadas, monto_cuota_usd, saldo_restante_usd, estado')
             .eq('estado', 'En curso');
 
+        const planesFinanciacion = (financData || []) as PlanFinanciacionDashboard[];
+        const cobroMensualFinanciacionUsd = getCobroMensualFinanciacionUsd(planesFinanciacion);
+
         return {
             totalPacientes: totalPacientes || 0,
             primeraVezMes,
@@ -219,12 +234,13 @@ export async function getOwnerDashboardStatsAction(
             limpiezasMensual,
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
-            personasEnFinanciacion: financData?.length || 0,
-            deudaTotalUsd: Math.round(financData?.reduce((sum: number, p: { saldo_restante_usd: unknown }) => sum + (Number(p.saldo_restante_usd) || 0), 0) || 0),
-            planesFinanciacion: financData || [],
+            personasEnFinanciacion: planesFinanciacion.length,
+            cobroMensualFinanciacionUsd: Math.round(cobroMensualFinanciacionUsd),
+            deudaTotalUsd: Math.round(planesFinanciacion.reduce((sum, p) => sum + (Number(p.saldo_restante_usd) || 0), 0)),
+            planesFinanciacion,
         };
     } catch (error) {
         console.error('getOwnerDashboardStatsAction:', error);
-        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], limpiezasMensual: [], ingresosMesUsd: 0, egresosMesUsd: 0, personasEnFinanciacion: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
+        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], limpiezasMensual: [], ingresosMesUsd: 0, egresosMesUsd: 0, personasEnFinanciacion: 0, cobroMensualFinanciacionUsd: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
     }
 }
