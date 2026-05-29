@@ -30,9 +30,27 @@ function getMockCtx(templateKey: string): AppointmentNotificationContext {
         doctorName: 'Dra. Ana Morales',
         startTime: tomorrow.toISOString(),
         endTime: tomorrowEnd.toISOString(),
-        surveyToken: 'token-de-ejemplo-preview',
+        surveyToken: 'dummy-token', // Use dummy-token so clicking stars works instantly on test portal
         clinicName: 'AM Clínica',
     };
+}
+
+// Helper to render templates including dynamically rendered React-Email templates
+async function renderAdminTemplate(templateKey: string, ctx: AppointmentNotificationContext) {
+    if (templateKey === 'survey_first_visit') {
+        const { render } = await import('@react-email/render');
+        const { SurveyFirstVisitEmail } = await import('@/emails/SurveyFirstVisit');
+        const html = await render(SurveyFirstVisitEmail({
+            patientName: ctx.patientName,
+            surveyToken: ctx.surveyToken ?? '',
+        }));
+        const subject = `¿Cómo fue tu primera visita? — ${ctx.clinicName ?? 'AM Clínica'}`;
+        const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://am-clinica.ar').replace(/\/$/, "");
+        const whatsapp = `😊 Hola ${ctx.patientName}!\n\n¿Cómo fue tu primera consulta con ${ctx.doctorName}?\n\nNos tomaría solo 30 segundos si dejás tu opinión aquí:\n👉 ${appUrl}/survey/${ctx.surveyToken}\n\n¡Gracias! ⭐ AM Clínica`;
+        return { subject, html, whatsapp };
+    } else {
+        return renderTemplate(templateKey, ctx);
+    }
 }
 
 const ALLOWED_ROLES = ['owner', 'admin', 'developer'];
@@ -70,6 +88,7 @@ export async function GET(request: Request) {
                 'appointment_confirmed',
                 'appointment_cancelled',
                 'survey_post_appointment',
+                'survey_first_visit',
                 'birthday_greeting',
                 'post_treatment_followup',
                 'recall_6_months',
@@ -77,10 +96,14 @@ export async function GET(request: Request) {
         });
     }
 
-    const ctx = getMockCtx(templateKey);
-    const { subject, html, whatsapp } = renderTemplate(templateKey, ctx);
-
-    return NextResponse.json({ subject, html, whatsapp });
+    try {
+        const ctx = getMockCtx(templateKey);
+        const { subject, html, whatsapp } = await renderAdminTemplate(templateKey, ctx);
+        return NextResponse.json({ subject, html, whatsapp });
+    } catch (err) {
+        console.error('[EmailTemplatesRoute] Error rendering preview:', err);
+        return NextResponse.json({ error: 'Error al renderizar la plantilla' }, { status: 500 });
+    }
 }
 
 export async function POST(request: Request) {
@@ -96,18 +119,23 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Faltan parámetros: template, to' }, { status: 400 });
     }
 
-    const ctx = getMockCtx(template);
-    const { subject, html } = renderTemplate(template, ctx);
+    try {
+        const ctx = getMockCtx(template);
+        const { subject, html } = await renderAdminTemplate(template, ctx);
 
-    const result = await EmailService.send({
-        to,
-        subject: `[PREVIEW] ${subject}`,
-        html,
-    });
+        const result = await EmailService.send({
+            to,
+            subject: `[PREVIEW] ${subject}`,
+            html,
+        });
 
-    if (!result.success) {
-        return NextResponse.json({ success: false, error: (result as any).error?.message || 'Error al enviar' }, { status: 500 });
+        if (!result.success) {
+            return NextResponse.json({ success: false, error: (result as any).error?.message || 'Error al enviar' }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (err) {
+        console.error('[EmailTemplatesRoute] Error sending test:', err);
+        return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
     }
-
-    return NextResponse.json({ success: true });
 }

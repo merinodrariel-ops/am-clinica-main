@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CalendarClock, CheckCircle2, Clock3, RefreshCw } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock3, RefreshCw, Users, ExternalLink } from 'lucide-react';
 import {
     getAgendaMetrics,
     type AgendaMetric,
@@ -36,8 +36,33 @@ function MetricSkeleton() {
 }
 
 function MetricCard({ metric, scopeLabel }: { metric: AgendaMetric; scopeLabel: string }) {
+    const [expanded, setExpanded] = useState(false);
+
+    // Color styles for different status badges
+    const getStatusStyles = (status: string) => {
+        switch (status) {
+            case 'completed':
+                return 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300';
+            case 'confirmed':
+                return 'bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300';
+            case 'pending':
+                return 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300';
+            default:
+                return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300';
+        }
+    };
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'completed': return 'Hecho';
+            case 'confirmed': return 'Confirmado';
+            case 'pending': return 'Pendiente';
+            default: return status;
+        }
+    };
+
     return (
-        <div className={`rounded-xl border p-4 shadow-sm ${CARD_STYLES[metric.key]}`}>
+        <div className={`rounded-xl border p-4 shadow-sm flex flex-col transition-all duration-300 ${CARD_STYLES[metric.key]}`}>
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wide opacity-70">{metric.label}</p>
@@ -46,7 +71,17 @@ function MetricCard({ metric, scopeLabel }: { metric: AgendaMetric; scopeLabel: 
                         <span className="pb-1 text-xs font-semibold opacity-70">{scopeLabel}</span>
                     </div>
                 </div>
-                <CalendarClock size={20} className="opacity-55" />
+                <div className="flex items-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => setExpanded(!expanded)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/40 dark:hover:bg-black/20 text-current transition-all opacity-75 hover:opacity-100"
+                        title={expanded ? "Ocultar pacientes" : "Ver pacientes"}
+                    >
+                        <Users size={16} />
+                    </button>
+                    <CalendarClock size={20} className="opacity-55" />
+                </div>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
@@ -65,6 +100,65 @@ function MetricCard({ metric, scopeLabel }: { metric: AgendaMetric; scopeLabel: 
                     <div className="mt-1 text-2xl font-black tabular-nums">{metric.upcoming}</div>
                 </div>
             </div>
+
+            {expanded && (
+                <div className="mt-4 border-t border-current/15 pt-3 animate-fadeIn">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase opacity-75 tracking-wider">Lista de Pacientes</span>
+                        <span className="text-[9px] bg-white/40 dark:bg-black/20 px-2 py-0.5 rounded-full font-bold tabular-nums">
+                            {metric.appointments?.length ?? 0}
+                        </span>
+                    </div>
+
+                    {(!metric.appointments || metric.appointments.length === 0) ? (
+                        <p className="text-xs italic opacity-60 text-center py-4">No hay pacientes registrados</p>
+                    ) : (
+                        <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                            {metric.appointments.map((apt) => {
+                                const time = new Date(apt.start_time).toLocaleTimeString('es-AR', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    timeZone: 'America/Argentina/Buenos_Aires',
+                                });
+                                return (
+                                    <div 
+                                        key={apt.id} 
+                                        className="bg-white/40 dark:bg-black/15 border border-current/5 hover:border-current/15 rounded-lg p-2.5 transition-all text-xs flex flex-col gap-1 shadow-sm"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            {apt.patient_id ? (
+                                                <a 
+                                                    href={`/patients/${apt.patient_id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-bold underline hover:text-blue-600 dark:hover:text-blue-400 inline-flex items-center gap-1 leading-snug group"
+                                                >
+                                                    {apt.patient_name}
+                                                    <ExternalLink size={10} className="inline opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </a>
+                                            ) : (
+                                                <span className="font-bold leading-snug">{apt.patient_name}</span>
+                                            )}
+                                            <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0 leading-none ${getStatusStyles(apt.status)}`}>
+                                                {getStatusLabel(apt.status)}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between gap-2 opacity-80 text-[11px] font-medium mt-0.5">
+                                            <span className="font-bold tracking-tight bg-white/50 dark:bg-black/10 px-1.5 py-0.5 rounded text-[10px]">
+                                                {time} hs
+                                            </span>
+                                            <span className="truncate max-w-[120px]" title={apt.doctor_name}>
+                                                👨‍⚕️ {apt.doctor_name}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

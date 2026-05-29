@@ -19,6 +19,7 @@ const TEMPLATES: TemplateEntry[] = [
     { key: 'appointment_confirmed',  label: 'Turno confirmado',          description: 'Al agendar un turno nuevo',                icon: '✅', category: 'notification' },
     { key: 'appointment_cancelled',  label: 'Turno cancelado',           description: 'Cuando se cancela un turno',               icon: '❌', category: 'notification' },
     { key: 'survey_post_appointment',label: 'Encuesta post-turno',       description: 'Pedido de opinión tras la visita',         icon: '⭐', category: 'notification' },
+    { key: 'survey_first_visit',     label: 'Encuesta primera visita',   description: 'Pedido de opinión para nuevos pacientes',  icon: '✨', category: 'notification' },
     { key: 'birthday_greeting',      label: 'Saludo de cumpleaños',      description: 'Enviado el día del cumple del paciente',   icon: '🎉', category: 'notification' },
     { key: 'post_treatment_followup',label: 'Seguimiento post-tratamiento', description: 'Al día siguiente de cirugía/extracción', icon: '🩺', category: 'notification' },
     { key: 'recall_6_months',        label: 'Recall 6 meses',            description: 'Control preventivo a los 6 meses',         icon: '🦷', category: 'notification' },

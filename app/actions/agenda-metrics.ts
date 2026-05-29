@@ -5,12 +5,23 @@ import { createAdminClient } from '@/utils/supabase/admin';
 export type AgendaMetricsPeriod = 'day' | 'week' | 'month' | 'year';
 export type AgendaMetricKey = 'primeras_consultas' | 'limpiezas' | 'controles_anuales';
 
+export type AgendaMetricAppointment = {
+    id: string;
+    title: string;
+    start_time: string;
+    status: string;
+    patient_id: string | null;
+    patient_name: string;
+    doctor_name: string;
+};
+
 export type AgendaMetric = {
     key: AgendaMetricKey;
     label: string;
     done: number;
     upcoming: number;
     total: number;
+    appointments: AgendaMetricAppointment[];
 };
 
 export type AgendaMetrics = {
@@ -23,11 +34,15 @@ export type AgendaMetrics = {
 };
 
 type AgendaMetricRow = {
+    id: string;
     title: string | null;
     type: string | null;
     status: string | null;
     start_time: string | null;
     end_time: string | null;
+    patient_id: string | null;
+    patient: { nombre: string | null; apellido: string | null } | { nombre: string | null; apellido: string | null }[] | null;
+    doctor: { full_name: string | null } | { full_name: string | null }[] | null;
 };
 
 const CLEANING_TYPES = new Set(['limpieza', 'limpieza_convencional', 'limpieza_laser']);
@@ -46,7 +61,7 @@ function normalizeText(value: string | null | undefined) {
         .toLowerCase();
 }
 
-function classifyAppointment(row: AgendaMetricRow): AgendaMetricKey | null {
+function classifyAppointment(row: { type: string | null; title: string | null }): AgendaMetricKey | null {
     const type = row.type ?? '';
     const title = normalizeText(row.title);
 
@@ -68,11 +83,11 @@ function classifyAppointment(row: AgendaMetricRow): AgendaMetricKey | null {
     return null;
 }
 
-function buildEmptyMetrics(): Record<AgendaMetricKey, { done: number; upcoming: number }> {
+function buildEmptyMetrics(): Record<AgendaMetricKey, { done: number; upcoming: number; appointments: AgendaMetricAppointment[] }> {
     return {
-        primeras_consultas: { done: 0, upcoming: 0 },
-        limpiezas: { done: 0, upcoming: 0 },
-        controles_anuales: { done: 0, upcoming: 0 },
+        primeras_consultas: { done: 0, upcoming: 0, appointments: [] },
+        limpiezas: { done: 0, upcoming: 0, appointments: [] },
+        controles_anuales: { done: 0, upcoming: 0, appointments: [] },
     };
 }
 
@@ -159,7 +174,7 @@ function buildPeriodRange(period: AgendaMetricsPeriod, now: Date) {
 }
 
 function toAgendaMetrics(
-    counters: Record<AgendaMetricKey, { done: number; upcoming: number }>,
+    counters: Record<AgendaMetricKey, { done: number; upcoming: number; appointments: AgendaMetricAppointment[] }>,
     period: AgendaMetricsPeriod,
     now: Date,
     rangeStart: Date,
@@ -172,6 +187,7 @@ function toAgendaMetrics(
         done: counters[key].done,
         upcoming: counters[key].upcoming,
         total: counters[key].done + counters[key].upcoming,
+        appointments: counters[key].appointments,
     }));
 
     return {
@@ -193,7 +209,17 @@ export async function getAgendaMetrics(period: AgendaMetricsPeriod = 'month'): P
 
     const { data, error } = await admin
         .from('agenda_appointments')
-        .select('title, type, status, start_time, end_time')
+        .select(`
+            id,
+            title,
+            type,
+            status,
+            start_time,
+            end_time,
+            patient_id,
+            patient:patient_id (nombre, apellido),
+            doctor:doctor_id (full_name)
+        `)
         .gte('start_time', rangeStart.toISOString())
         .lte('start_time', rangeEnd.toISOString());
 
@@ -202,7 +228,7 @@ export async function getAgendaMetrics(period: AgendaMetricsPeriod = 'month'): P
         return toAgendaMetrics(counters, normalizedPeriod, now, rangeStart, rangeEnd, periodLabel);
     }
 
-    for (const row of (data ?? []) as AgendaMetricRow[]) {
+    for (const row of (data ?? []) as unknown as AgendaMetricRow[]) {
         if (!row.start_time || IGNORED_STATUSES.has(row.status ?? '')) continue;
 
         const metricKey = classifyAppointment(row);
@@ -211,11 +237,40 @@ export async function getAgendaMetrics(period: AgendaMetricsPeriod = 'month'): P
         const appointmentEnd = new Date(row.end_time ?? row.start_time);
         if (Number.isNaN(appointmentEnd.getTime())) continue;
 
-        if (appointmentEnd < now) {
+        const isPast = appointmentEnd < now;
+        if (isPast) {
             counters[metricKey].done += 1;
         } else {
             counters[metricKey].upcoming += 1;
         }
+
+        // Get patient name
+        const p = row.patient ? (Array.isArray(row.patient) ? row.patient[0] : row.patient) : null;
+        const patientName = p ? `${p.nombre ?? ''} ${p.apellido ?? ''}`.trim() : (row.title ?? 'Paciente');
+
+        // Get doctor name
+        const d = row.doctor ? (Array.isArray(row.doctor) ? row.doctor[0] : row.doctor) : null;
+        const doctorName = d?.full_name ?? 'Sin asignar';
+
+        // Regla de Oro AM Clínica: turnos pasados no cancelados son virtuales 'completed'
+        const virtualStatus = (isPast && !['cancelled', 'no_show'].includes(row.status ?? ''))
+            ? 'completed'
+            : (row.status ?? 'confirmed');
+
+        counters[metricKey].appointments.push({
+            id: row.id,
+            title: row.title ?? '',
+            start_time: row.start_time,
+            status: virtualStatus,
+            patient_id: row.patient_id,
+            patient_name: patientName,
+            doctor_name: doctorName,
+        });
+    }
+
+    // Sort appointments chronologically
+    for (const key of Object.keys(counters) as AgendaMetricKey[]) {
+        counters[key].appointments.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
     }
 
     return toAgendaMetrics(counters, normalizedPeriod, now, rangeStart, rangeEnd, periodLabel);
