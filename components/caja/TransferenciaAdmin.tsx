@@ -20,6 +20,7 @@ interface TransferenciaAdminProps {
     onSuccess: () => void;
     bnaRate: number;
     defaultTipo?: TransferenciaTipo;
+    fechaMovimiento?: string;
 }
 
 const MOTIVOS: Record<TransferenciaTipo, string[]> = {
@@ -47,6 +48,7 @@ export default function TransferenciaAdmin({
     onSuccess,
     bnaRate,
     defaultTipo = 'TRASPASO_INTERNO',
+    fechaMovimiento,
 }: TransferenciaAdminProps) {
     const [monto, setMonto] = useState(0);
     const [moneda, setMoneda] = useState<'USD' | 'ARS'>('ARS');
@@ -100,6 +102,8 @@ export default function TransferenciaAdmin({
 
             const opsTag = `[OPS:${tipoTransferencia}|${cajaOrigen}|${tipoTransferencia === 'RETIRO_EFECTIVO' ? 'EXT' : cajaDestino}]`;
 
+            const finalFechaMovimiento = fechaMovimiento || new Date().toISOString().split('T')[0];
+
             const insertPayload: Record<string, unknown> = {
                 movimiento_grupo_id: crypto.randomUUID(),
                 moneda,
@@ -113,6 +117,7 @@ export default function TransferenciaAdmin({
                 observaciones: observaciones || null,
                 usuario: 'Recepcion',
                 estado: 'confirmada',
+                fecha_movimiento: finalFechaMovimiento,
             };
 
             let { error } = await supabase
@@ -131,6 +136,7 @@ export default function TransferenciaAdmin({
                     observaciones: observaciones || null,
                     usuario: 'Recepcion',
                     estado: 'confirmada',
+                    fecha_movimiento: finalFechaMovimiento,
                 };
 
                 const fallbackResult = await supabase

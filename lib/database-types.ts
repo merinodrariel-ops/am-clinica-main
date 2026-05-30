@@ -78,6 +78,7 @@ export interface CajaMovimiento {
 export interface TransferenciaCaja {
     id: string;
     fecha_hora: string;
+    fecha_movimiento: string; // 'YYYY-MM-DD'
     usuario: string | null;
     moneda: 'ARS' | 'USD';
     monto: number;
@@ -87,6 +88,8 @@ export interface TransferenciaCaja {
     caja_origen: 'RECEPCION' | 'ADMIN';
     caja_destino: 'RECEPCION' | 'ADMIN' | null;
     movimiento_grupo_id: string;
+    cierre_id_recepcion: string | null;
+    cierre_id_admin: string | null;
     motivo: string | null;
     observaciones: string | null;
     estado: 'confirmada' | 'anulada';

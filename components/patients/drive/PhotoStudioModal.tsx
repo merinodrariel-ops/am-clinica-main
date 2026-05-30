@@ -4861,6 +4861,12 @@ export default function PhotoStudioModal({
                                                 }}
                                             >
                                                 <textarea
+                                                    ref={el => {
+                                                        if (el) {
+                                                            el.style.height = 'auto';
+                                                            el.style.height = `${el.scrollHeight}px`;
+                                                        }
+                                                    }}
                                                     autoFocus
                                                     value={ta.text}
                                                     placeholder="Texto..."

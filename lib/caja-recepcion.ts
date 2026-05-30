@@ -383,25 +383,17 @@ export async function cerrarCajaDelDia(
       0,
     ) || 0;
 
-  // 2. Get transfers since last closure
+  // 2. Get transfers since last closure (pending ones for this date or before)
   const ultimo = await getUltimoCierre(fecha);
   const saldoInicialUsd = ultimo?.saldo_final_usd_billete || 0;
   const saldoInicialArs = ultimo?.saldo_final_ars_billete || 0;
 
-  // For transfers, we look for anything confirmed AFTER the previous close
-  let transQuery = getSupabase()
+  const transQuery = getSupabase()
     .from("transferencias_caja")
     .select("*")
-    .eq("estado", "confirmada");
-
-  if (ultimo?.hora_cierre) {
-    transQuery = transQuery.gt("fecha_hora", ultimo.hora_cierre);
-  } else if (ultimo) {
-    // Fallback if hora_cierre missing (legacy), assume end of that day
-    transQuery = transQuery.gt("fecha_hora", `${ultimo.fecha}T23:59:59`);
-  }
-  // Limit to current close time (approx)
-  transQuery = transQuery.lt("fecha_hora", `${fecha}T23:59:59`);
+    .eq("estado", "confirmada")
+    .is("cierre_id_recepcion", null)
+    .lte("fecha_movimiento", fecha);
 
   const { data: transferencias } = await transQuery;
 
@@ -485,6 +477,7 @@ export async function crearTransferencia(
     cajaOrigen?: "RECEPCION" | "ADMIN";
     cajaDestino?: "RECEPCION" | "ADMIN" | null;
     movimientoGrupoId?: string;
+    fechaMovimiento?: string;
   },
 ): Promise<TransferenciaCaja> {
   const tipoTransferencia = options?.tipoTransferencia || "TRASPASO_INTERNO";
@@ -501,6 +494,8 @@ export async function crearTransferencia(
         ? Math.round((monto / tcBnaVenta) * 100) / 100
         : monto;
 
+  const fechaMov = options?.fechaMovimiento || getLocalISODate();
+
   const insertPayload: Record<string, unknown> = {
     moneda,
     monto,
@@ -513,6 +508,7 @@ export async function crearTransferencia(
     observaciones,
     usuario,
     estado: "confirmada",
+    fecha_movimiento: fechaMov,
   };
 
   const opsTag = `[OPS:${tipoTransferencia}|${cajaOrigen}|${tipoTransferencia === "RETIRO_EFECTIVO" ? "EXT" : (cajaDestino || "ADMIN")}]`;
@@ -542,6 +538,7 @@ export async function crearTransferencia(
       observaciones,
       usuario,
       estado: "confirmada",
+      fecha_movimiento: fechaMov,
     };
 
     const fallback = await getSupabase()
@@ -845,17 +842,16 @@ export async function getCurrentBalanceRecepcion(): Promise<{
   });
 
   // 3. Apply non-operational cash movements (retiros / traspasos)
-  const baseTransQuery = getSupabase()
+  // We use IS NULL on cierre_id_recepcion to get only pending transfers
+  let transQuery = getSupabase()
     .from("transferencias_caja")
     .select("*")
-    .eq("estado", "confirmada");
+    .eq("estado", "confirmada")
+    .is("cierre_id_recepcion", null);
 
-  let transQuery = baseTransQuery;
-
-  if (ultimo?.hora_cierre) {
-    transQuery = baseTransQuery.gt("fecha_hora", ultimo.hora_cierre);
-  } else if (ultimo) {
-    transQuery = baseTransQuery.gt("fecha_hora", `${ultimo.fecha}T23:59:59`);
+  // CRITICAL: Only include transfers that are ON or AFTER the last closure date.
+  if (ultimo?.fecha) {
+    transQuery = transQuery.gte("fecha_movimiento", ultimo.fecha);
   }
 
   const { data: transferencias } = await transQuery;

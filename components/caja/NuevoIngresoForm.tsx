@@ -41,7 +41,7 @@ interface NuevoIngresoFormProps {
 
 type SenaTipo = '' | 'diseno_sonrisa' | 'ortodoncia_invisible' | 'cirugia_implantes';
 type MonedaIngreso = 'USD' | 'ARS' | 'USDT';
-type MetodoPagoIngreso = 'Efectivo' | 'Transferencia' | 'MercadoPago' | 'Cripto' | 'Mixto';
+type MetodoPagoIngreso = 'Efectivo' | 'Transferencia' | 'Tarjeta_Credito' | 'Tarjeta_Debito' | 'MercadoPago' | 'Cripto' | 'Mixto';
 type CanalDestinoIngreso = 'Empresa' | 'Personal' | 'MP' | 'USDT' | 'Mixto';
 type TipoComprobanteIngreso = 'Factura A' | 'Tipo C' | 'Sin factura' | 'Otro';
 
@@ -150,9 +150,20 @@ interface PaymentSplit {
 const METODOS_PAGO = [
     { value: 'Efectivo', label: 'Efectivo', icon: '💵' },
     { value: 'Transferencia', label: 'Transferencia', icon: '🏦' },
+    { value: 'Tarjeta_Credito', label: 'Tarjeta de Crédito', icon: '💳' },
+    { value: 'Tarjeta_Debito', label: 'Tarjeta de Débito', icon: '💳' },
     { value: 'MercadoPago', label: 'Mercado Pago', icon: '📱' },
     { value: 'Cripto', label: 'Cripto (USDT)', icon: '₿' },
 ];
+
+const SURCHARGES: Record<string, number> = {
+    Efectivo: 0.00,
+    Transferencia: 0.10,      // 10% surcharge
+    Tarjeta_Debito: 0.15,     // 15% surcharge
+    Tarjeta_Credito: 0.15,    // 15% surcharge
+    MercadoPago: 0.10,        // 10% surcharge (same as bank transfer)
+    Cripto: 0.00,             // 0% surcharge
+};
 
 export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, initialPatientId }: NuevoIngresoFormProps) {
     const [step, setStep] = useState(1);
@@ -176,6 +187,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     const { user } = useAuth();
     const [cargaHistorica, setCargaHistorica] = useState(false);
     const [fechaMovimiento, setFechaMovimiento] = useState(getLocalISODate());
+    const [baseInstallmentAmount, setBaseInstallmentAmount] = useState<number>(0);
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
@@ -239,6 +251,20 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             }]);
         }
     }, [formData.moneda, formData.metodo_pago, formData.canal_destino, useMultiplePayments]);
+
+    // Sync cuota single-payment amount with surcharges automatically
+    useEffect(() => {
+        if (formData.es_cuota && baseInstallmentAmount > 0 && !useMultiplePayments) {
+            const surcharge = SURCHARGES[formData.metodo_pago] || 0;
+            const targetMonto = baseInstallmentAmount * (1 + surcharge);
+            setFormData(prev => {
+                if (prev.monto !== targetMonto) {
+                    return { ...prev, monto: targetMonto, moneda: 'USD' };
+                }
+                return prev;
+            });
+        }
+    }, [formData.es_cuota, formData.metodo_pago, baseInstallmentAmount, useMultiplePayments]);
 
     function setSplitValue(index: number, updates: Partial<PaymentSplit>) {
         setPaymentSplits((prev) => {
@@ -364,12 +390,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             paciente_nombre: `${patient.apellido}, ${patient.nombre}`,
         }));
         setPatientWhatsapp(patient.whatsapp || '');
-        // setStep(2); // Removed auto-advance to allow configuring amount/mixto in Step 1
+        setBaseInstallmentAmount(0); // Reset
 
         try {
             const { data: activePlan } = await supabase
                 .from('planes_financiacion')
-                .select('id, cuotas_pagadas, cuotas_total, estado')
+                .select('id, cuotas_pagadas, cuotas_total, estado, monto_cuota_usd')
                 .eq('paciente_id', patient.id_paciente)
                 .eq('estado', 'En curso')
                 .order('created_at', { ascending: false })
@@ -380,14 +406,18 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 const cuotasPagadas = Number(activePlan.cuotas_pagadas || 0);
                 const cuotasTotal = Number(activePlan.cuotas_total || 0);
                 const nextQuota = cuotasPagadas + 1;
+                const cuotaUsd = Number(activePlan.monto_cuota_usd || 0);
 
                 if (cuotasTotal > 0 && nextQuota <= cuotasTotal) {
+                    setBaseInstallmentAmount(cuotaUsd);
                     setFormData(prev => ({
                         ...prev,
                         es_cuota: true,
                         es_inicio_financiacion: false,
                         cuota_nro: nextQuota,
                         cuotas_total: cuotasTotal,
+                        monto: cuotaUsd,
+                        moneda: 'USD',
                     }));
                 }
             }
@@ -441,6 +471,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         return splits.reduce((acc, split) => acc + calculateUsdEquivalentForAmount(split.monto, split.moneda), 0);
     }
 
+    function getMixedCashEquivalentUsdTotal(splits: PaymentSplit[]) {
+        return splits.reduce((acc, split) => {
+            const usd = calculateUsdEquivalentForAmount(split.monto, split.moneda);
+            const surcharge = SURCHARGES[split.metodo_pago] || 0;
+            return acc + (usd / (1 + surcharge));
+        }, 0);
+    }
+
     async function handleSubmit() {
         if (!formData.paciente_id || !formData.concepto_nombre || (formData.monto <= 0 && !useMultiplePayments)) {
             alert('Complete todos los campos requeridos');
@@ -456,6 +494,25 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             if (formData.financ_saldo_usd <= 0 || formData.financ_cuotas_total <= 0 || formData.financ_monto_cuota_usd <= 0 || !formData.financ_fecha_inicio) {
                 alert('Completá saldo a financiar, cantidad de cuotas, valor de cuota y fecha de primera cuota.');
                 return;
+            }
+        }
+
+        if (formData.es_cuota && baseInstallmentAmount > 0) {
+            if (useMultiplePayments) {
+                const activeSplits = paymentSplits.filter(s => s.monto > 0);
+                const cashEquiv = getMixedCashEquivalentUsdTotal(activeSplits);
+                if (cashEquiv < baseInstallmentAmount - 0.05) {
+                    alert(`El desglose mixto ingresado es insuficiente.\nTotal equivalente en efectivo: USD ${cashEquiv.toFixed(2)}\nRequerido: USD ${baseInstallmentAmount.toFixed(2)} (efectivo equivalente).`);
+                    return;
+                }
+            } else {
+                const surcharge = SURCHARGES[formData.metodo_pago] || 0;
+                const expectedMontoUsd = baseInstallmentAmount * (1 + surcharge);
+                const currentMontoUsd = calculateUsdEquivalent();
+                if (currentMontoUsd < expectedMontoUsd - 0.05) {
+                    alert(`El monto ingresado para el medio de pago seleccionado es insuficiente.\nMonto con recargo requerido: USD ${expectedMontoUsd.toFixed(2)}\nMonto actual ingresado: USD ${currentMontoUsd.toFixed(2)}`);
+                    return;
+                }
             }
         }
 
@@ -896,12 +953,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                 </div>
                                             </div>
 
-                                            {/* Simplified Payment Method Selection directly in Step 1 */}
+                                                        {/* Simplified Payment Method Selection directly in Step 1 */}
                                             <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-400">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Medio de Pago</label>
                                                 </div>
-                                                <div className="grid grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                                                     {METODOS_PAGO.map((m) => (
                                                         <button
                                                             key={m.value}
@@ -914,24 +971,24 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                 });
                                                             }}
                                                             className={clsx(
-                                                                "py-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all",
+                                                                "py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all h-16",
                                                                 formData.metodo_pago === m.value
                                                                     ? "bg-blue-600 border-blue-600 shadow-md transform scale-[1.03]"
                                                                     : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-blue-100"
                                                             )}
                                                         >
-                                                            <span className="text-xl">{m.icon}</span>
+                                                            <span className="text-xl leading-none">{m.icon}</span>
                                                             <span className={clsx(
-                                                                "text-[8px] font-black uppercase tracking-tighter",
+                                                                "text-[8px] font-black uppercase tracking-tighter text-center px-0.5 leading-tight",
                                                                 formData.metodo_pago === m.value ? "text-white" : "text-gray-500"
-                                                            )}>{m.label.split(' ')[0]}</span>
+                                                            )}>{m.label.replace('de ', '')}</span>
                                                         </button>
                                                     ))}
                                                 </div>
                                             </div>
 
-                                            {/* Attach file if Transfer or MP */}
-                                            {(formData.metodo_pago === 'Transferencia' || formData.metodo_pago === 'MercadoPago') && (
+                                            {/* Attach file if Transfer, MP or Cards */}
+                                            {(formData.metodo_pago === 'Transferencia' || formData.metodo_pago === 'MercadoPago' || formData.metodo_pago === 'Tarjeta_Credito' || formData.metodo_pago === 'Tarjeta_Debito') && (
                                                 <div className="pt-2 animate-in zoom-in-95 duration-300">
                                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 px-1">Adjuntar Comprobante</p>
                                                     <ComprobanteUpload
@@ -939,6 +996,32 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                         onUploadComplete={({ url }) => setFormData(prev => ({ ...prev, comprobante_url: url }))}
                                                         className="w-full scale-95 origin-left"
                                                     />
+                                                </div>
+                                            )}
+
+                                            {/* Surcharge breakdown for Cuotas */}
+                                            {formData.es_cuota && baseInstallmentAmount > 0 && (
+                                                <div className="mt-4 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border-2 border-blue-100 dark:border-blue-800/40 animate-in fade-in zoom-in duration-300">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-[10px] font-black text-blue-800 dark:text-blue-300 uppercase tracking-widest">Desglose de Cuota</span>
+                                                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[8px] font-black rounded uppercase">Contrato</span>
+                                                    </div>
+                                                    <div className="space-y-1.5 text-xs">
+                                                        <div className="flex justify-between text-gray-500">
+                                                            <span>Cuota base (Efectivo)</span>
+                                                            <span className="font-bold font-mono">USD {baseInstallmentAmount.toFixed(2)}</span>
+                                                        </div>
+                                                        {SURCHARGES[formData.metodo_pago] > 0 && (
+                                                            <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                                                                <span>Recargo contractual ({SURCHARGES[formData.metodo_pago] * 100}%)</span>
+                                                                <span className="font-bold font-mono">+USD {(baseInstallmentAmount * SURCHARGES[formData.metodo_pago]).toFixed(2)}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="pt-2 border-t border-blue-100 dark:border-blue-800/40 flex justify-between text-gray-900 dark:text-white font-black text-sm">
+                                                            <span>Total requerido</span>
+                                                            <span className="font-mono text-blue-600 dark:text-blue-400">USD {formData.monto.toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -1036,7 +1119,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     <Plus size={16} className="mr-2" /> Agregar medio de pago
                                                 </Button>
 
-                                                {(paymentSplits.some(s => s.metodo_pago === 'Transferencia' || s.metodo_pago === 'MercadoPago')) && (
+                                                {(paymentSplits.some(s => s.metodo_pago === 'Transferencia' || s.metodo_pago === 'MercadoPago' || s.metodo_pago === 'Tarjeta_Credito' || s.metodo_pago === 'Tarjeta_Debito')) && (
                                                     <div className="flex-1">
                                                         <ComprobanteUpload
                                                             area="caja-recepcion"
@@ -1047,12 +1130,93 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                 )}
 
                                                 <div className="flex-1 bg-gray-950 dark:bg-black text-white p-4 rounded-2xl flex flex-col justify-center items-end shadow-xl border border-gray-800">
-                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Acumulado</span>
-                                                    <span className="text-xl font-black text-blue-400 tabular-nums">
-                                                        USD {getMixedUsdTotal(paymentSplits).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                                                    </span>
+                                                    {formData.es_cuota && baseInstallmentAmount > 0 ? (
+                                                        <>
+                                                            <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                                                Efectivo Equivalente
+                                                                <span className="px-1 py-0.5 bg-amber-500/20 text-amber-300 text-[7px] font-black rounded uppercase">Cuota</span>
+                                                            </span>
+                                                            <span className="text-xl font-black text-amber-400 tabular-nums">
+                                                                USD {getMixedCashEquivalentUsdTotal(paymentSplits).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                            <span className="text-[8px] font-bold text-gray-500 mt-1">
+                                                                Total real: USD {getMixedUsdTotal(paymentSplits).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Acumulado</span>
+                                                            <span className="text-xl font-black text-blue-400 tabular-nums">
+                                                                USD {getMixedUsdTotal(paymentSplits).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
+
+                                            {/* Mixed payment surcharge breakdown for Cuotas */}
+                                            {formData.es_cuota && baseInstallmentAmount > 0 && (
+                                                <div className="mt-4 p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-900/10 border-2 border-amber-100 dark:border-amber-800/40 animate-in fade-in zoom-in duration-300">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Equivalencia de Pago Mixto</span>
+                                                        <span className={clsx(
+                                                            "px-2 py-0.5 text-[8px] font-black rounded uppercase shadow-sm",
+                                                            getMixedCashEquivalentUsdTotal(paymentSplits) >= baseInstallmentAmount - 0.05
+                                                                ? "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300"
+                                                                : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 animate-pulse"
+                                                        )}>
+                                                            {getMixedCashEquivalentUsdTotal(paymentSplits) >= baseInstallmentAmount - 0.05 ? 'Completo' : 'Insuficiente'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-2 text-xs">
+                                                        {paymentSplits.filter(s => s.monto > 0).map((split, i) => {
+                                                            const usdAmount = calculateUsdEquivalentForAmount(split.monto, split.moneda);
+                                                            const surcharge = SURCHARGES[split.metodo_pago] || 0;
+                                                            const equiv = usdAmount / (1 + surcharge);
+                                                            return (
+                                                                <div key={split.id} className="flex justify-between items-center text-gray-600 dark:text-gray-400 font-mono text-[11px] border-b border-gray-100 dark:border-gray-800 pb-1.5 last:border-0 last:pb-0">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-gray-400">#{i + 1}</span>
+                                                                        <span className="font-bold text-gray-800 dark:text-gray-200">
+                                                                            {split.moneda} {split.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                                                        </span>
+                                                                        <span className="text-[9px] px-1 bg-gray-100 dark:bg-gray-800 rounded font-sans uppercase">
+                                                                            {split.metodo_pago.replace('Tarjeta_', 'Tarj. ')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <span className="font-bold text-gray-700 dark:text-gray-300">
+                                                                            USD {equiv.toFixed(2)}
+                                                                        </span>
+                                                                        {surcharge > 0 && (
+                                                                            <span className="text-[9px] text-amber-600 dark:text-amber-400 ml-1">
+                                                                                (-{surcharge * 100}%)
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        <div className="pt-3 border-t border-amber-200 dark:border-amber-800/60 flex flex-col gap-1">
+                                                            <div className="flex justify-between text-gray-500 text-[10px] uppercase font-black tracking-wider">
+                                                                <span>Cuota Base Requerida</span>
+                                                                <span className="font-bold font-mono">USD {baseInstallmentAmount.toFixed(2)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-gray-900 dark:text-white font-black text-sm">
+                                                                <span>Total Equivalente Neto</span>
+                                                                <span className={clsx(
+                                                                    "font-mono",
+                                                                    getMixedCashEquivalentUsdTotal(paymentSplits) >= baseInstallmentAmount - 0.05
+                                                                        ? "text-green-600 dark:text-green-400"
+                                                                        : "text-red-500 dark:text-red-400"
+                                                                )}>
+                                                                    USD {getMixedCashEquivalentUsdTotal(paymentSplits).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1174,11 +1338,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                         </Button>
                                         <Button
                                             type="button"
-                                            onClick={() => setFormData(prev => ({
-                                                ...prev,
-                                                es_cuota: !prev.es_cuota,
-                                                es_inicio_financiacion: !prev.es_cuota ? false : prev.es_inicio_financiacion,
-                                            }))}
+                                            onClick={() => {
+                                                const nextVal = !formData.es_cuota;
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    es_cuota: nextVal,
+                                                    es_inicio_financiacion: nextVal ? false : prev.es_inicio_financiacion,
+                                                    monto: nextVal && baseInstallmentAmount > 0 ? baseInstallmentAmount : prev.monto,
+                                                    moneda: nextVal ? 'USD' : prev.moneda,
+                                                }));
+                                            }}
                                             className={clsx(
                                                 'px-3 py-3 rounded-xl text-[9px] font-black uppercase tracking-tighter border-2 transition-all h-auto text-left justify-start shadow-sm',
                                                 formData.es_cuota

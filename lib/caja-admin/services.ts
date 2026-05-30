@@ -2128,23 +2128,20 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
     // Regla de Oro: use monto + moneda directly — no currency conversion.
     // TRASPASO and RETIRO_EFECTIVO are excluded from gastos (they're not losses).
     {
+        // Only count transfers since last closure (pending ones)
         let transQuery = getSupabase()
             .from('transferencias_caja')
             .select('monto, moneda, tipo_transferencia, caja_origen, caja_destino')
             .or('caja_origen.eq.ADMIN,caja_destino.eq.ADMIN')
-            .eq('estado', 'confirmada');
+            .eq('estado', 'confirmada')
+            .is('cierre_id_admin', null);
 
-        // Only count transfers since last closure
-        if (ultimo?.hora_cierre) {
-            transQuery = transQuery.gt('fecha_hora', ultimo.hora_cierre);
-        } else if (ultimo?.fecha) {
-            // Fallback: search since day of last closure (inclusive start to avoid missing gaps)
-            transQuery = transQuery.gte('fecha_hora', `${ultimo.fecha}T00:00:00`);
+        if (ultimo?.fecha) {
+            transQuery = transQuery.gte('fecha_movimiento', ultimo.fecha);
         }
 
         if (upToDate) {
-            const endTs = upToDate.length <= 10 ? `${upToDate}T23:59:59` : upToDate;
-            transQuery = transQuery.lte('fecha_hora', endTs);
+            transQuery = transQuery.lte('fecha_movimiento', upToDate);
         }
 
         const { data: adminTrans } = await transQuery;

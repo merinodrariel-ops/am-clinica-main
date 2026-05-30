@@ -2107,6 +2107,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             onSuccess={loadData}
                             bnaRate={bnaRate?.venta || 0}
                             defaultTipo={transferDefaultType}
+                            fechaMovimiento={aperturaAudit?.fecha}
                         />
 
                         {/* Historial Ediciones Modal — por movimiento individual */}
