@@ -12,9 +12,6 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Bypass SSL certificate validation globally for this request to fix self-signed cert chain errors
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
         // Locate migration file
         const migrationPath = path.join(process.cwd(), 'supabase', 'migrations', '20260530_fix_transfer_dates_and_surcharges.sql');
         const sql = fs.readFileSync(migrationPath, 'utf8');
@@ -47,18 +44,40 @@ export async function GET(request: Request) {
             debugInfo += 'Using SUPABASE_DATABASE_URL. ';
         }
 
-        if (!connString) {
-            // Fallback to pooler connection with the env DB password if available, otherwise fallback password
-            const dbPassword = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD || 'TBWogNx77j3kkuSG';
-            connString = `postgresql://postgres.ybozzesadqcorvfqpsyo:${dbPassword}@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require`;
-            debugInfo += `No connection string env found. Using fallback pooler connection on port 6543 (password length: ${dbPassword.length}). `;
+        let user = 'postgres.ybozzesadqcorvfqpsyo';
+        let password = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD || 'TBWogNx77j3kkuSG';
+        let host = 'aws-1-sa-east-1.pooler.supabase.com';
+        let port = 6543;
+        let database = 'postgres';
+
+        if (connString) {
+            try {
+                // Parse the connection string using URL parser
+                const parsed = new URL(connString);
+                user = decodeURIComponent(parsed.username || user);
+                password = decodeURIComponent(parsed.password || password);
+                host = parsed.hostname || host;
+                port = parsed.port ? parseInt(parsed.port, 10) : 5432;
+                database = parsed.pathname ? parsed.pathname.slice(1) : database;
+                debugInfo += `Parsed connection string successfully. Host: ${host}, Port: ${port}, User: ${user}. `;
+            } catch (e: any) {
+                debugInfo += `Failed to parse connection string: ${e.message}. Using fallback. `;
+            }
+        } else {
+            debugInfo += `No connection string env found. Using fallback pooler connection on port 6543. `;
         }
 
-        console.log('Connecting with debugInfo:', debugInfo);
+        console.log('Connecting with explicit properties. Host:', host, 'Port:', port, 'User:', user);
 
         const client = new Client({
-            connectionString: connString,
-            ssl: { rejectUnauthorized: false }
+            user,
+            password,
+            host,
+            port,
+            database,
+            ssl: { 
+                rejectUnauthorized: false 
+            }
         });
 
         await client.connect();
