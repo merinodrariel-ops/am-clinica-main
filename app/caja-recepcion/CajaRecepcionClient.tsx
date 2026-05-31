@@ -669,22 +669,6 @@ function CajaRecepcionContent() {
                 console.error('Error sending security alert:', alertErr);
             }
 
-            const updates: {
-                estado: string;
-                comprobante_url: string | null;
-                monto?: number;
-                moneda?: string;
-                metodo_pago?: string;
-                concepto_nombre?: string;
-                categoria?: string;
-                fecha_movimiento?: string;
-                registro_editado?: boolean;
-                usd_equivalente?: number;
-            } = {
-                estado: editEstado,
-                comprobante_url: editComprobanteUrl,
-            };
-
             // Recalculate USD equivalent
             let usd_equivalente = 0;
             if (editMoneda === 'USD') {
@@ -693,11 +677,17 @@ function CajaRecepcionContent() {
                 usd_equivalente = Math.abs(editMonto) / bnaRate.venta;
             }
 
+            const updates: any = {};
+
             if (editingMov.origen === 'transferencias_caja') {
+                updates.estado = editEstado;
                 updates.monto = Math.abs(editMonto);
                 updates.moneda = editMoneda;
                 updates.usd_equivalente = usd_equivalente;
+                updates.fecha_movimiento = newFecha;
             } else {
+                updates.estado = editEstado;
+                updates.comprobante_url = editComprobanteUrl;
                 updates.fecha_movimiento = newFecha;
                 updates.monto = editMonto;
                 updates.moneda = editMoneda;
