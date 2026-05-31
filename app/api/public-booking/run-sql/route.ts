@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
         // Connect via PG Client
         const client = new Client({
-            connectionString: process.env.DATABASE_URL,
+            connectionString: 'postgresql://postgres:TBWogNx77j3kkuSG@db.ybozzesadqcorvfqpsyo.supabase.co:5432/postgres',
             ssl: { rejectUnauthorized: false }
         });
 
