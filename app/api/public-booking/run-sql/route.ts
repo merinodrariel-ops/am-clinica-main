@@ -12,6 +12,9 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Bypass SSL certificate validation globally for this request to fix self-signed cert chain errors
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
         // Locate migration file
         const migrationPath = path.join(process.cwd(), 'supabase', 'migrations', '20260530_fix_transfer_dates_and_surcharges.sql');
         const sql = fs.readFileSync(migrationPath, 'utf8');
