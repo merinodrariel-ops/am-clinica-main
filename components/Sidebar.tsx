@@ -62,6 +62,13 @@ const MENU_ITEMS = [
         roles: ['owner', 'admin', 'developer', 'recaptacion']
     },
     {
+        icon: Briefcase,
+        label: 'Postulaciones',
+        href: '/admin/postulaciones',
+        key: 'postulaciones',
+        roles: ['owner', 'admin', 'developer']
+    },
+    {
         icon: Banknote,
         label: 'Caja Recepción',
         href: '/caja-recepcion',

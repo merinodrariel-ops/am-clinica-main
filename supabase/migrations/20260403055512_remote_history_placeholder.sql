@@ -1,0 +1,3 @@
+-- Placeholder for a remote migration that exists in Supabase migration history
+-- but was not present in this local checkout. Keep empty to avoid replaying
+-- unknown production schema changes.

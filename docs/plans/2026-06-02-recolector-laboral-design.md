@@ -31,6 +31,12 @@ clinica, pero el usuario la descubre desde la pagina publica del equipo.
 - Resultado: las postulaciones quedan ordenadas en Supabase y preparadas para una
   futura conversion a registro de personal si la persona queda seleccionada.
 
+Separacion clave: este recolector es la primera linea masiva de contacto, no el
+alta formal de prestador. `registro-prestador` se usa despues, cuando AM ya
+selecciono a la persona o decidio avanzar con su incorporacion. La postulacion
+laboral no debe crear registros en `personal`, usuarios de portal, liquidaciones
+ni permisos internos.
+
 ## Superficies
 
 - `am-paginas-web/amesteticadental/src/app/equipo-am/page.tsx`: CTA publico
@@ -187,6 +193,8 @@ Vista tipo tabla/detalle:
 ## No objetivos
 
 - No reemplaza el alta formal de personal.
+- No usa `registro-prestador` como formulario publico masivo.
+- No crea registros en `personal` al recibir una postulacion.
 - No crea usuarios de portal automaticamente.
 - No envia contratos ni invitaciones de Supabase Auth.
 - No importa automaticamente historicos del Google Form en esta primera etapa.
