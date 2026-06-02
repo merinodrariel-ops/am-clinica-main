@@ -57,6 +57,10 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/actualizar-datos/') ||
         path === '/registro-prestador' ||
         path.startsWith('/registro-prestador/') ||
+        path === '/trabaja-en-am' ||
+        path.startsWith('/trabaja-en-am/') ||
+        path === '/trabaja-con-nosotros' ||
+        path.startsWith('/trabaja-con-nosotros/') ||
         path === '/agenda-compartida' ||
         path === '/mi-portal' ||
         path.startsWith('/mi-portal/') ||
