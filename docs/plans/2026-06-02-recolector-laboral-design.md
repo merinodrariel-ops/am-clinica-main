@@ -17,6 +17,12 @@ Team AM pueda cargar su postulacion y adjuntar CV. Administracion debe poder
 revisar, filtrar, descargar y clasificar postulantes desde la app sin exponer CVs
 publicamente.
 
+El acceso principal no debe ser una ruta suelta sin contexto: debe nacer en la
+pagina publica de Equipo AM. En `am-paginas-web`, la pagina comercial
+`/equipo-am` debe incorporar un CTA visible "Trabaja con nosotros" que lleve al
+formulario de postulacion. La ruta de formulario puede vivir en la app de
+clinica, pero el usuario la descubre desde la pagina publica del equipo.
+
 ## Capacidad
 
 - Postulante: abre un link publico, completa el formulario y adjunta su CV.
@@ -27,11 +33,36 @@ publicamente.
 
 ## Superficies
 
-- Ruta publica: `/trabaja-con-nosotros`
-- Panel interno: `/admin/postulaciones` o una seccion dentro de Staff/Personal
-- Server action o API route publica para recibir postulaciones
-- Supabase tabla `job_applications`
-- Supabase Storage bucket privado `job-applications`
+- `am-paginas-web/amesteticadental/src/app/equipo-am/page.tsx`: CTA publico
+  "Trabaja con nosotros".
+- `am-paginas-web/amesteticadental/next.config.ts` y
+  `am-paginas-web/amesteticadental/src/middleware.ts`: las rutas historicas
+  `/trabaja-en-am` y `/unete-al-team-am` no deben redirigir al home; deben
+  apuntar al nuevo destino laboral.
+- Ruta publica de formulario: preferida `/trabaja-en-am`, tambien accesible
+  como `/trabaja-con-nosotros` si se quiere un alias mas literal.
+- Panel interno en `am-clinica-main`: `/admin/postulaciones` o una seccion
+  dentro de Staff/Personal.
+- Server action o API route publica para recibir postulaciones.
+- Supabase tabla `job_applications`.
+- Supabase Storage bucket privado `job-applications`.
+
+## Integracion web publica
+
+La pagina `/equipo-am` ya comunica quienes integran el equipo. El nuevo CTA debe
+estar en una posicion natural y no competir con los CTAs de pacientes:
+
+- Hero: boton secundario "Trabaja con nosotros" junto a "Agendar evaluacion" y
+  "Ver perfil del Dr. Merino", o
+- Cierre de pagina: bloque compacto antes de `Contacto` con titulo orientado a
+  postulantes y boton "Trabaja con nosotros".
+
+Recomendacion: usar ambos con distinta intensidad. En hero, link secundario
+discreto. En el cierre, CTA mas claro para postulantes: "Si queres sumarte a
+Team AM, dejanos tus datos y CV".
+
+El destino debe ser estable y compartible. Para SEO y memoria de URLs viejas,
+conviene conservar `/trabaja-en-am` como slug publico canonico.
 
 ## Campos del formulario
 
@@ -160,6 +191,8 @@ Vista tipo tabla/detalle:
 - No envia contratos ni invitaciones de Supabase Auth.
 - No importa automaticamente historicos del Google Form en esta primera etapa.
 - No comprime PDFs en el flujo inicial, salvo que los tamanos reales lo exijan.
+- No convierte la pagina `/equipo-am` en una landing laboral completa; solo suma
+  entrada clara hacia el formulario.
 
 ## Verificacion
 
@@ -168,6 +201,8 @@ Vista tipo tabla/detalle:
 - Test de rechazo con archivo invalido o demasiado grande.
 - Verificacion de que el CV no tenga URL publica.
 - Verificacion de que el panel interno pueda generar URL firmada.
+- Verificacion en `am-paginas-web` de que `/equipo-am` muestra el CTA y que
+  `/trabaja-en-am` ya no redirige al home.
 - Deploy y prueba en produccion si el usuario confirma implementacion.
 
 ## Riesgos
