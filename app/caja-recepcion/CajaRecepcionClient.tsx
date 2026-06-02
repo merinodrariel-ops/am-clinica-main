@@ -371,7 +371,8 @@ function CajaRecepcionContent() {
                         email,
                         financ_estado,
                         financ_monto_total,
-                        financ_cuotas_total
+                        financ_cuotas_total,
+                        saldo_a_favor_usd
                     )
                 `)
                 .gte('fecha_movimiento', `${mesActual}-01`)
@@ -425,7 +426,7 @@ function CajaRecepcionContent() {
                 if (hasNotionImports) {
                     const { data: allPacientes } = await supabase
                         .from('pacientes')
-                        .select('id_paciente, nombre, apellido, whatsapp, email, financ_estado, financ_monto_total, financ_cuotas_total');
+                        .select('id_paciente, nombre, apellido, whatsapp, email, financ_estado, financ_monto_total, financ_cuotas_total, saldo_a_favor_usd');
 
                     if (allPacientes) {
                         const enrichedMovs = allMovs.map((m: Movimiento) => {

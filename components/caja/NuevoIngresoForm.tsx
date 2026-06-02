@@ -29,6 +29,7 @@ interface Paciente {
     apellido: string;
     whatsapp: string | null;
     documento: string | null;
+    saldo_a_favor_usd?: number;
 }
 
 interface NuevoIngresoFormProps {
@@ -188,6 +189,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     const [cargaHistorica, setCargaHistorica] = useState(false);
     const [fechaMovimiento, setFechaMovimiento] = useState(getLocalISODate());
     const [baseInstallmentAmount, setBaseInstallmentAmount] = useState<number>(0);
+    const [saldoFavorDisponible, setSaldoFavorDisponible] = useState<number>(0);
+    const [aplicarSaldoFavor, setAplicarSaldoFavor] = useState<boolean>(false);
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
@@ -256,7 +259,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     useEffect(() => {
         if (formData.es_cuota && baseInstallmentAmount > 0 && !useMultiplePayments) {
             const surcharge = SURCHARGES[formData.metodo_pago] || 0;
-            const targetMonto = baseInstallmentAmount * (1 + surcharge);
+            let targetMonto = baseInstallmentAmount * (1 + surcharge);
+            if (aplicarSaldoFavor) {
+                targetMonto = Math.max(0, targetMonto - saldoFavorDisponible);
+            }
             setFormData(prev => {
                 if (prev.monto !== targetMonto) {
                     return { ...prev, monto: targetMonto, moneda: 'USD' };
@@ -264,7 +270,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 return prev;
             });
         }
-    }, [formData.es_cuota, formData.metodo_pago, baseInstallmentAmount, useMultiplePayments]);
+    }, [formData.es_cuota, formData.metodo_pago, baseInstallmentAmount, useMultiplePayments, aplicarSaldoFavor, saldoFavorDisponible]);
 
     function setSplitValue(index: number, updates: Partial<PaymentSplit>) {
         setPaymentSplits((prev) => {
@@ -343,7 +349,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
             const { data, error } = await supabase
                 .from('pacientes')
-                .select('id_paciente, nombre, apellido, whatsapp, documento')
+                .select('id_paciente, nombre, apellido, whatsapp, documento, saldo_a_favor_usd')
                 .eq('id_paciente', initialPatientId)
                 .eq('is_deleted', false)
                 .single();
@@ -356,6 +362,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 paciente_nombre: `${data.apellido}, ${data.nombre}`,
             }));
             setPatientWhatsapp(data.whatsapp || '');
+            setSaldoFavorDisponible(Number(data.saldo_a_favor_usd || 0));
+            setAplicarSaldoFavor(false);
             // Stay in Step 1 if values are 0, but if we have pre-filled we can go forward
             // setStep(prev => (prev < 2 ? 2 : prev)); 
         }
@@ -369,7 +377,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         try {
             const { data, error } = await supabase
                 .from('pacientes')
-                .select('id_paciente, nombre, apellido, whatsapp, documento')
+                .select('id_paciente, nombre, apellido, whatsapp, documento, saldo_a_favor_usd')
                 .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%,documento.ilike.%${query}%`)
                 .eq('is_deleted', false)
                 .limit(10);
@@ -390,6 +398,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             paciente_nombre: `${patient.apellido}, ${patient.nombre}`,
         }));
         setPatientWhatsapp(patient.whatsapp || '');
+        setSaldoFavorDisponible(Number(patient.saldo_a_favor_usd || 0));
+        setAplicarSaldoFavor(false);
         setBaseInstallmentAmount(0); // Reset
 
         try {
@@ -501,13 +511,17 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             if (useMultiplePayments) {
                 const activeSplits = paymentSplits.filter(s => s.monto > 0);
                 const cashEquiv = getMixedCashEquivalentUsdTotal(activeSplits);
-                if (cashEquiv < baseInstallmentAmount - 0.05) {
-                    alert(`El desglose mixto ingresado es insuficiente.\nTotal equivalente en efectivo: USD ${cashEquiv.toFixed(2)}\nRequerido: USD ${baseInstallmentAmount.toFixed(2)} (efectivo equivalente).`);
+                const requiredCash = aplicarSaldoFavor ? Math.max(0, baseInstallmentAmount - saldoFavorDisponible) : baseInstallmentAmount;
+                if (cashEquiv < requiredCash - 0.05) {
+                    alert(`El desglose mixto ingresado es insuficiente.\nTotal equivalente en efectivo: USD ${cashEquiv.toFixed(2)}\nRequerido: USD ${requiredCash.toFixed(2)} (efectivo equivalente).`);
                     return;
                 }
             } else {
                 const surcharge = SURCHARGES[formData.metodo_pago] || 0;
-                const expectedMontoUsd = baseInstallmentAmount * (1 + surcharge);
+                let expectedMontoUsd = baseInstallmentAmount * (1 + surcharge);
+                if (aplicarSaldoFavor) {
+                    expectedMontoUsd = Math.max(0, expectedMontoUsd - saldoFavorDisponible);
+                }
                 const currentMontoUsd = calculateUsdEquivalent();
                 if (currentMontoUsd < expectedMontoUsd - 0.05) {
                     alert(`El monto ingresado para el medio de pago seleccionado es insuficiente.\nMonto con recargo requerido: USD ${expectedMontoUsd.toFixed(2)}\nMonto actual ingresado: USD ${currentMontoUsd.toFixed(2)}`);
@@ -742,6 +756,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         setStep(1);
         setGeneratedReceiptUrl(null);
         setUseMultiplePayments(false);
+        setSaldoFavorDisponible(0);
+        setAplicarSaldoFavor(false);
         setPaymentSplits([{
             id: makeUuid(),
             monto: 0,
@@ -1006,6 +1022,28 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                         <span className="text-[10px] font-black text-blue-800 dark:text-blue-300 uppercase tracking-widest">Desglose de Cuota</span>
                                                         <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[8px] font-black rounded uppercase">Contrato</span>
                                                     </div>
+
+                                                    {/* Saldo a favor check */}
+                                                    {saldoFavorDisponible > 0 && (
+                                                        <div className="mb-3 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id="chkApplyCredit"
+                                                                    checked={aplicarSaldoFavor}
+                                                                    onChange={(e) => setAplicarSaldoFavor(e.target.checked)}
+                                                                    className="w-4 h-4 rounded text-green-600 focus:ring-green-500 border-gray-300"
+                                                                />
+                                                                <label htmlFor="chkApplyCredit" className="text-xs font-bold text-green-800 dark:text-green-300 cursor-pointer">
+                                                                    Aplicar saldo a favor disponible
+                                                                </label>
+                                                            </div>
+                                                            <span className="text-xs font-black text-green-700 dark:text-green-400 font-mono">
+                                                                USD {saldoFavorDisponible.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
                                                     <div className="space-y-1.5 text-xs">
                                                         <div className="flex justify-between text-gray-500">
                                                             <span>Cuota base (Efectivo)</span>
@@ -1015,6 +1053,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                             <div className="flex justify-between text-amber-600 dark:text-amber-400">
                                                                 <span>Recargo contractual ({SURCHARGES[formData.metodo_pago] * 100}%)</span>
                                                                 <span className="font-bold font-mono">+USD {(baseInstallmentAmount * SURCHARGES[formData.metodo_pago]).toFixed(2)}</span>
+                                                            </div>
+                                                        )}
+                                                        {aplicarSaldoFavor && (
+                                                            <div className="flex justify-between text-green-600 dark:text-green-400">
+                                                                <span>Crédito aplicado</span>
+                                                                <span className="font-bold font-mono">-USD {Math.min(saldoFavorDisponible, baseInstallmentAmount * (1 + (SURCHARGES[formData.metodo_pago] || 0))).toFixed(2)}</span>
                                                             </div>
                                                         )}
                                                         <div className="pt-2 border-t border-blue-100 dark:border-blue-800/40 flex justify-between text-gray-900 dark:text-white font-black text-sm">

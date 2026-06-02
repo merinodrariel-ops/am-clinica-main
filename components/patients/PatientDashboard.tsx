@@ -1056,7 +1056,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                         </div>
                                     ) : (
                                         <>
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                                                     <p className="text-sm text-gray-500 mb-1">Total Financiado</p>
                                                     <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalPlanDisplay.toLocaleString('es-AR')}</p>
@@ -1072,6 +1072,12 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                                     <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Saldo Restante</p>
                                                     <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                                                         ${saldoFinanc.toLocaleString('es-AR')}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-emerald-50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
+                                                    <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-1">Saldo a Favor</p>
+                                                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                                                        ${Number(patient.saldo_a_favor_usd || 0).toLocaleString('es-AR')}
                                                     </p>
                                                 </div>
                                             </div>

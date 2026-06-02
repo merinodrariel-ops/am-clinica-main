@@ -214,7 +214,7 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
 
         const { data: patientRow } = await admin
             .from('pacientes')
-            .select('id_paciente, documento, nombre, apellido, is_deleted')
+            .select('id_paciente, documento, nombre, apellido, is_deleted, saldo_a_favor_usd')
             .eq('id_paciente', params.pacienteId)
             .maybeSingle();
 
@@ -223,6 +223,7 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
         let effectivePatientId = params.pacienteId;
         let effectivePatientDni = normalizeDigits(patientRecord?.documento as string | undefined);
         let effectivePatientName = params.pacienteNombre || `${patientRecord?.apellido || ''} ${patientRecord?.nombre || ''}`.trim();
+        let effectivePatientSaldoFavor = Number(patientRecord?.saldo_a_favor_usd || 0);
 
         if (patientRecord?.is_deleted === true) {
             const { data: activePatients, error: activePatientsError } = await admin
@@ -250,6 +251,16 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
                         effectivePatientId = canonicalId;
                         effectivePatientName = `${String(canonicalPatient.apellido || '')}, ${String(canonicalPatient.nombre || '')}`.trim();
                         effectivePatientDni = normalizeDigits(String(canonicalPatient.documento || ''));
+
+                        // Fetch the canonical patient's credit balance
+                        const { data: canonicalPatientRow } = await admin
+                            .from('pacientes')
+                            .select('saldo_a_favor_usd')
+                            .eq('id_paciente', canonicalId)
+                            .maybeSingle();
+                        if (canonicalPatientRow) {
+                            effectivePatientSaldoFavor = Number((canonicalPatientRow as Record<string, unknown>).saldo_a_favor_usd || 0);
+                        }
 
                         await admin
                             .from('caja_recepcion_movimientos')
@@ -350,10 +361,53 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
             };
         }
 
+        const currentSaldoFavor = effectivePatientSaldoFavor;
+
         const prevPaid = getPlanNumber(matched, 'cuotas_pagadas');
         const totalCuotas = getPlanNumber(matched, 'cuotas_total');
         const cuotaValue = getPlanNumber(matched, 'monto_cuota_usd') || params.montoUsd;
         const currentSaldo = getPlanNumber(matched, 'saldo_restante_usd');
+
+        const difference = params.montoUsd - cuotaValue;
+        let nextSaldoFavor = currentSaldoFavor;
+        let saldoFavorGenerado = 0;
+        let saldoFavorAplicado = 0;
+
+        if (difference > 0) {
+            saldoFavorGenerado = difference;
+            nextSaldoFavor += difference;
+        } else if (difference < 0) {
+            const absDiff = Math.abs(difference);
+            saldoFavorAplicado = Math.min(absDiff, currentSaldoFavor);
+            nextSaldoFavor -= saldoFavorAplicado;
+        }
+
+        // Apply patient credit balance update if changed
+        if (nextSaldoFavor !== currentSaldoFavor) {
+            const { error: updatePatientErr } = await admin
+                .from('pacientes')
+                .update({ saldo_a_favor_usd: nextSaldoFavor })
+                .eq('id_paciente', effectivePatientId);
+            
+            if (updatePatientErr) {
+                console.error('Error updating patient credit balance:', updatePatientErr);
+            }
+        }
+
+        // Apply movement credit update
+        if (saldoFavorGenerado > 0 || saldoFavorAplicado > 0) {
+            const { error: updateMovErr } = await admin
+                .from('caja_recepcion_movimientos')
+                .update({
+                    saldo_a_favor_generado_usd: saldoFavorGenerado,
+                    saldo_a_favor_aplicado_usd: saldoFavorAplicado
+                })
+                .eq('id', params.movementId);
+            
+            if (updateMovErr) {
+                console.error('Error updating movement with credit info:', updateMovErr);
+            }
+        }
 
         const nextPaid = totalCuotas > 0 ? Math.min(totalCuotas, prevPaid + 1) : prevPaid + 1;
         const nextSaldo = Math.max(0, currentSaldo - cuotaValue);

@@ -48,6 +48,7 @@ export interface Paciente {
     primera_consulta_fecha?: string | null;
     foto_perfil_url?: string | null;
     profile_photo_url?: string | null;
+    saldo_a_favor_usd?: number;
 }
 
 export interface HistoriaClinica {

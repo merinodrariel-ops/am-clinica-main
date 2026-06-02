@@ -67,6 +67,9 @@ export interface CajaMovimiento {
     created_by: string | null;
     updated_by: string | null;
     updated_at: string | null;
+    // Credit Balance fields
+    saldo_a_favor_aplicado_usd?: number;
+    saldo_a_favor_generado_usd?: number;
     // Joined data
     paciente?: {
         id_paciente: string;
@@ -126,6 +129,7 @@ export interface Paciente {
     email: string | null;
     documento: string | null;
     referencia_origen?: string | null;
+    saldo_a_favor_usd?: number;
 }
 
 export interface HistorialEdicion {
