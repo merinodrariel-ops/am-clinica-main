@@ -217,25 +217,60 @@ export async function uploadWorkerDocument(workerId: string, file: File, type: s
     return { success: true, url: publicUrl };
 }
 
-export async function uploadWorkerPhoto(workerId: string, file: File) {
+export async function uploadWorkerPhoto(workerId: string, base64Data: string, mimeType: string) {
     const adminClient = getAdminClient();
     const supabase = await createClient();
 
-    // Derive extension from MIME type (file.name may still say .jpg even after WebP conversion)
+    // 1. Verify caller permissions
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: callerProfile } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .single();
+
+    const rawCategoria = (callerProfile?.categoria || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normalizedCategoria = ['administradora', 'administrador', 'administracion', 'admin'].includes(rawCategoria)
+        ? 'admin'
+        : rawCategoria;
+
+    const isAdminOrOwner = callerProfile && ['admin', 'owner'].includes(normalizedCategoria);
+
+    const { data: targetWorker } = await supabase
+        .from(TableNames.Profiles)
+        .select('user_id')
+        .eq('id', workerId)
+        .single();
+
+    const isOwnProfile = targetWorker && targetWorker.user_id === user.id;
+
+    if (!isAdminOrOwner && !isOwnProfile) {
+        throw new Error('Acceso denegado: No tiene permisos para actualizar este perfil');
+    }
+
+    // Derive extension from MIME type
     const mimeToExt: Record<string, string> = {
         'image/webp': 'webp',
         'image/jpeg': 'jpg',
         'image/png': 'png',
         'image/gif': 'gif',
     };
-    const fileExt = mimeToExt[file.type] ?? file.name.split('.').pop() ?? 'jpg';
+    const fileExt = mimeToExt[mimeType] ?? 'jpg';
     const fileName = `${workerId}/profile_${Date.now()}.${fileExt}`;
 
+    const buffer = Buffer.from(base64Data, 'base64');
+
     // Use admin client for storage upload to bypass RLS
-    // (admin uploads on behalf of any worker, not just themselves)
+    // (admin/service-role uploads on behalf of any worker)
     const { error: uploadError } = await adminClient.storage
         .from('personal-documents')
-        .upload(fileName, file, { upsert: false });
+        .upload(fileName, buffer, {
+            contentType: mimeType,
+            upsert: false,
+        });
 
     if (uploadError) throw uploadError;
 
@@ -243,8 +278,7 @@ export async function uploadWorkerPhoto(workerId: string, file: File) {
         .from('personal-documents')
         .getPublicUrl(fileName);
 
-    // Use admin client for DB update too — SSR client blocked by RLS when
-    // admin uploads for a worker that isn't their own auth user
+    // Use admin client for DB update
     const { error: updateError } = await adminClient
         .from(TableNames.Profiles)
         .update({ foto_url: publicUrl })

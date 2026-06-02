@@ -13,6 +13,18 @@ interface StaffPhotoUploaderProps {
     initials: string;
 }
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = (err) => reject(err);
+    });
+};
+
 export default function StaffPhotoUploader({ workerId, initialPhotoUrl, workerName, initials }: StaffPhotoUploaderProps) {
     const [uploading, setUploading] = useState(false);
     const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
@@ -30,7 +42,8 @@ export default function StaffPhotoUploader({ workerId, initialPhotoUrl, workerNa
                 quality: 0.82,
                 type: 'image/webp',
             });
-            const result = await uploadWorkerPhoto(workerId, compressed);
+            const base64 = await fileToBase64(compressed);
+            const result = await uploadWorkerPhoto(workerId, base64, compressed.type);
             if (result.success) {
                 setPhotoUrl(result.url);
                 toast.success('Foto de perfil actualizada correctamente');

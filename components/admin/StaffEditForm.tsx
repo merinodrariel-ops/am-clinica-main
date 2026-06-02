@@ -22,6 +22,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
     const [newCompanyName, setNewCompanyName] = useState('');
     const [creatingCompany, setCreatingCompany] = useState(false);
     const [cobraPorHoras, setCobraPorHoras] = useState(worker.cobra_por_horas ?? false);
+    const [currentFotoUrl, setCurrentFotoUrl] = useState(worker.foto_url || '');
     const formRef = useRef<HTMLFormElement>(null);
 
     useModalKeyboard(true, onCancel, () => formRef.current?.requestSubmit(), { disabled: isSaving });
@@ -72,6 +73,7 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
             user_id: linkedUserId || undefined,
             empresa_prestadora_id: providerCompanyId || undefined,
             cobra_por_horas: cobraPorHoras,
+            foto_url: (fd.get('foto_url') as string) || undefined,
         };
 
         try {
@@ -193,6 +195,28 @@ export default function StaffEditForm({ worker, onCancel, onSuccess }: StaffEdit
                                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                                 <input name="email" type="email" defaultValue={worker.email} className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl pl-11 pr-4 py-2.5 text-white outline-none transition-all" />
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase ml-1">URL de la Foto de Perfil (o sincronizar link)</label>
+                        <div className="flex gap-3 items-center">
+                            <div className="w-11 h-11 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                {currentFotoUrl ? (
+                                    <img src={currentFotoUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => {
+                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${worker.nombre || 'P'}&background=6366f1&color=fff`;
+                                    }} />
+                                ) : (
+                                    <User className="text-slate-600" size={20} />
+                                )}
+                            </div>
+                            <input 
+                                name="foto_url" 
+                                value={currentFotoUrl} 
+                                onChange={(e) => setCurrentFotoUrl(e.target.value)}
+                                placeholder="https://ejemplo.com/foto-del-prestador.jpg" 
+                                className="flex-1 bg-slate-950/50 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none transition-all placeholder:text-slate-600" 
+                            />
                         </div>
                     </div>
                 </div>

@@ -17,6 +17,18 @@ interface ProfileFormProps {
 
 type Section = 'identity' | 'contact' | 'professional' | 'documents';
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = (err) => reject(err);
+    });
+};
+
 export default function ProfileForm({ worker }: ProfileFormProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [uploading, setUploading] = useState<string | null>(null);
@@ -38,7 +50,8 @@ export default function ProfileForm({ worker }: ProfileFormProps) {
         try {
             if (type === 'profile_photo') {
                 const compressedFile = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.7 });
-                await uploadWorkerPhoto(worker.id, compressedFile);
+                const base64 = await fileToBase64(compressedFile);
+                await uploadWorkerPhoto(worker.id, base64, compressedFile.type);
                 toast.success('Foto de perfil actualizada (comprimida)');
             } else {
                 await uploadWorkerDocument(worker.id, file, type);
