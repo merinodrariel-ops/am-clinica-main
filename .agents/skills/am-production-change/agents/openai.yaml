@@ -1,0 +1,4 @@
+interface:
+  display_name: "AM Production Change"
+  short_description: "Ship AM clinic changes with production verification."
+  default_prompt: "Use am-production-change to plan, implement, verify, and deploy production-visible AM clinic changes."

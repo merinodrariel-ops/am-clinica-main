@@ -1,0 +1,25 @@
+# Project-local Codex baseline for am-clinica-main.
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "live"
+persistent_instructions = "Follow CLAUDE.md plus .codex/AGENTS.md. Use .agents/skills for AM-specific production, agenda, verification, and Supabase workflows."
+
+[features]
+multi_agent = true
+
+[agents]
+max_threads = 3
+max_depth = 1
+
+[agents.explorer]
+description = "Read-only AM clinic codebase explorer for execution-path evidence before changes."
+config_file = "agents/explorer.toml"
+
+[agents.reviewer]
+description = "Read-only AM clinic reviewer focused on correctness, regressions, security, and missing tests."
+config_file = "agents/reviewer.toml"
+
+[agents.docs_researcher]
+description = "Read-only documentation researcher for Next.js, Supabase, Vercel, Resend, and current APIs."
+config_file = "agents/docs-researcher.toml"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "AM Verification Loop"
+  short_description: "Verify AM clinic code, deploys, and online behavior."
+  default_prompt: "Use am-verification-loop before claiming an AM clinic change is ready or deployed."

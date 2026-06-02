@@ -1,0 +1,4 @@
+interface:
+  display_name: "AM Product Capability"
+  short_description: "Turn clinic product intent into implementation constraints."
+  default_prompt: "Use am-product-capability to convert AM clinic product ideas into explicit constraints before implementation."

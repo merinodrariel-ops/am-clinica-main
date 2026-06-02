@@ -1,0 +1,4 @@
+interface:
+  display_name: "AM Agenda Rules"
+  short_description: "Apply AM agenda invariants and Argentina date rules."
+  default_prompt: "Use am-agenda-rules for agenda, appointment, portal, reminder, and shared agenda changes."

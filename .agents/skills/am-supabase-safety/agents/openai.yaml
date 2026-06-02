@@ -1,0 +1,4 @@
+interface:
+  display_name: "AM Supabase Safety"
+  short_description: "Handle Supabase and sensitive clinic data safely."
+  default_prompt: "Use am-supabase-safety when touching Supabase tables, auth, RLS, patient data, or scripts."
