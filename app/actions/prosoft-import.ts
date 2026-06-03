@@ -72,9 +72,11 @@ function norm(s: string) {
 }
 
 function padTime(t: string): string {
-    // "8:00" → "08:00", "17:00" → "17:00"
-    const [h, m] = t.split(':');
-    return `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
+    // "8:00" → "08:00", "17:00" → "17:00", "25:30" → "01:30" (Prosoft overnight convention)
+    let h = parseInt(t.split(':')[0], 10);
+    const m = t.split(':')[1] || '00';
+    if (h >= 24 && h <= 47) h -= 24;
+    return `${String(h).padStart(2, '0')}:${m.padStart(2, '0')}`;
 }
 
 interface ParsedTime {
@@ -92,7 +94,8 @@ interface ParsedTime {
 function isValidTimeToken(token: string): boolean {
     if (!/^\d{1,2}:\d{2}$/.test(token)) return false;
     const [h, m] = token.split(':').map(Number);
-    return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+    // Accept 24–47 range (post-midnight Prosoft convention); normalized by padTime
+    return h >= 0 && h <= 47 && m >= 0 && m <= 59;
 }
 
 function computeHours(entrada: string, salida: string): { horas: number; overnight: boolean } {

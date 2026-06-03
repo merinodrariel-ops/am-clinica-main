@@ -67,4 +67,41 @@ assert.equal(nestedParsed.filas[0]?.registros[0]?.salidaDiaSiguiente, true);
 assert.equal(nestedParsed.filas[0]?.registros[1]?.requiereRevision, true);
 assert.equal(nestedParsed.filas[0]?.registros[1]?.motivoObservado, 'FaltaEgreso');
 
+// Prosoft 24+ hour convention (post-midnight times exported as 25:xx, 26:xx, etc.)
+const overnightXml = `<?xml version="1.0" encoding="UTF-8"?>
+<Fichadas>
+  <Empleado>
+    <NombreCompleto>Carlos Ruiz</NombreCompleto>
+    <Movimientos>
+      <Movimiento>
+        <DiaFecha>10/04/2026</DiaFecha>
+        <HoraIngreso>14:00</HoraIngreso>
+        <HoraEgreso>25:30</HoraEgreso>
+      </Movimiento>
+      <Movimiento>
+        <DiaFecha>11/04/2026</DiaFecha>
+        <HoraIngreso>22:00</HoraIngreso>
+        <HoraEgreso>26:00</HoraEgreso>
+      </Movimiento>
+    </Movimientos>
+  </Empleado>
+</Fichadas>`;
+
+const overnightParsed = parseProsoftXml(overnightXml);
+assert.equal(overnightParsed.filas.length, 1);
+assert.equal(overnightParsed.filas[0]?.rawName, 'Carlos Ruiz');
+assert.equal(overnightParsed.filas[0]?.registros.length, 2);
+
+const reg1 = overnightParsed.filas[0]?.registros[0];
+assert.equal(reg1?.entrada, '14:00');
+assert.equal(reg1?.salida, '01:30', 'Prosoft 25:30 should normalize to 01:30');
+assert.equal(reg1?.salidaDiaSiguiente, true);
+assert.equal(reg1?.horas, 11.5, 'Turno 14:00–25:30 = 11.5h');
+
+const reg2 = overnightParsed.filas[0]?.registros[1];
+assert.equal(reg2?.entrada, '22:00');
+assert.equal(reg2?.salida, '02:00', 'Prosoft 26:00 should normalize to 02:00');
+assert.equal(reg2?.salidaDiaSiguiente, true);
+assert.equal(reg2?.horas, 4, 'Turno 22:00–26:00 = 4h');
+
 console.log('prosoft-xml.spec.ts: ok');
