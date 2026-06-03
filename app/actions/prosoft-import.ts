@@ -3,6 +3,7 @@
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { parseImplicitHours } from '@/lib/gemini';
 import { addDays, parse, differenceInMinutes } from 'date-fns';
+import { repairOvernightExitMarks } from '@/lib/prosoft-overnight-repair';
 
 function getAdminClient() {
     return createAdminClient(
@@ -287,60 +288,6 @@ function parseExplicitTimeTokens(timeTokens: string[], raw = ''): ParsedTime | n
     };
 }
 
-function timeToMinutes(time: string): number {
-    const [hours, minutes] = time.split(':').map(Number);
-    return (hours * 60) + minutes;
-}
-
-function isNextCalendarDay(previousDate: string, nextDate: string): boolean {
-    const previous = new Date(`${previousDate}T12:00:00`);
-    const next = new Date(`${nextDate}T12:00:00`);
-    const diffMs = next.getTime() - previous.getTime();
-    return diffMs > 0 && diffMs <= 36 * 60 * 60 * 1000;
-}
-
-function repairOvernightExitMarks(registros: ProsoftRow['registros']): ProsoftRow['registros'] {
-    const sorted = [...registros].sort((a, b) => a.fecha.localeCompare(b.fecha));
-
-    for (let index = 1; index < sorted.length; index++) {
-        const previous = sorted[index - 1];
-        const current = sorted[index];
-        const firstCurrentMark = current.marcaciones?.[0];
-
-        const previousNeedsExit =
-            previous.motivoObservado === 'FaltaEgreso' &&
-            previous.entrada !== '00:00' &&
-            previous.salida === '00:00';
-
-        const currentCanDonateEarlyExit =
-            Boolean(firstCurrentMark) &&
-            isNextCalendarDay(previous.fecha, current.fecha) &&
-            timeToMinutes(firstCurrentMark!) <= 5 * 60 &&
-            (current.marcaciones?.length || 0) >= 3;
-
-        if (!previousNeedsExit || !currentCanDonateEarlyExit) continue;
-
-        const { horas, overnight } = computeHours(previous.entrada, firstCurrentMark!);
-        if (!overnight || horas <= 0 || horas > 18) continue;
-
-        previous.salida = firstCurrentMark!;
-        previous.salidaDiaSiguiente = true;
-        previous.horas = horas;
-        previous.incompleto = false;
-        previous.requiereRevision = false;
-        previous.motivoObservado = undefined;
-        previous.observaciones = `Salida de madrugada tomada del día siguiente (${current.fecha} ${firstCurrentMark})`;
-
-        const remainingMarks = current.marcaciones!.slice(1);
-        const repairedCurrent = parseExplicitTimeTokens(remainingMarks, remainingMarks.join(' '));
-        if (repairedCurrent) {
-            Object.assign(current, repairedCurrent);
-        }
-    }
-
-    return sorted;
-}
-
 function normalizeRepeatedMarksAsValid(reg: ProsoftRow['registros'][number]): ProsoftRow['registros'][number] {
     const repeatedMarksReason =
         reg.motivoObservado === 'MarcacionesImpares' ||
@@ -417,7 +364,7 @@ function normalizePreviewRows(preview: ProsoftPreview): ProsoftPreview {
         ...preview,
         filas: preview.filas.map((fila) => ({
             ...fila,
-            registros: repairOvernightExitMarks(fila.registros).map(normalizeRepeatedMarksAsValid),
+            registros: repairOvernightExitMarks(fila.registros, parseExplicitTimeTokens).map(normalizeRepeatedMarksAsValid),
         })),
     };
 }
@@ -1055,7 +1002,6 @@ export async function processProsoftRows(
     const matchMap = await matchEmployees(rawNames);
 
     const sinMatch: string[] = [];
-    let totalRegistros = 0;
 
     const filas: ProsoftRow[] = await Promise.all(employeeRows.map(async (emp) => {
         const match = matchMap.get(emp.rawName);
@@ -1074,10 +1020,9 @@ export async function processProsoftRows(
             });
 
         const registros = repairOvernightExitMarks(
-            (await Promise.all(registrosPromises)).filter(Boolean) as ProsoftRow['registros']
+            (await Promise.all(registrosPromises)).filter(Boolean) as ProsoftRow['registros'],
+            parseExplicitTimeTokens
         );
-
-        totalRegistros += registros.length;
 
         return {
             rawName: emp.rawName,
