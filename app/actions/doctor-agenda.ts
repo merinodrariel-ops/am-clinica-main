@@ -66,7 +66,7 @@ type SharePayload = {
     days?: number;
 };
 
-const ALLOWED_SHARE_CATEGORIES = new Set(['owner', 'admin', 'reception', 'asistente', 'developer']);
+const ALLOWED_SHARE_CATEGORIES = new Set(['owner', 'admin', 'reception', 'developer', 'partner_viewer']);
 
 function getAdminClient() {
     return createAdminClient(

@@ -14,6 +14,24 @@ function getAdminClient() {
     );
 }
 
+async function verifyAgendaWriteAccess() {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .single();
+
+    const isPortalUser = ['odontologo', 'asistente', 'laboratorio', 'dentist'].includes(profile?.categoria || '');
+    if (isPortalUser) {
+        throw new Error('No tenés permisos para modificar la agenda');
+    }
+    return user;
+}
+
 type AppointmentUpdatePayload = Partial<{
     id: string;
     title: string;
@@ -79,12 +97,13 @@ export async function getAppointments(start: string, end: string) {
 }
 
 export async function createAppointment(formData: FormData) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        throw new Error('Not authenticated');
+    let user;
+    try {
+        user = await verifyAgendaWriteAccess();
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'No autorizado' };
     }
+    const supabase = await createClient();
 
     const title = formData.get('title') as string;
     const patientId = formData.get('patientId') as string || null;
@@ -135,10 +154,12 @@ export async function createAppointment(formData: FormData) {
 }
 
 export async function updateAppointment(id: string, updates: AppointmentUpdatePayload) {
-    // Verify auth via SSR client, then use admin client to bypass RLS
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    let user;
+    try {
+        user = await verifyAgendaWriteAccess();
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'No autorizado' };
+    }
 
     // Sanitize input to avoid updating protected fields
     const safeUpdates = { ...updates };
@@ -282,10 +303,11 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
 }
 
 export async function deleteAppointment(id: string) {
-    // Verify auth via SSR client, then use admin client to bypass RLS
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    try {
+        await verifyAgendaWriteAccess();
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'No autorizado' };
+    }
 
     const adminClient = getAdminClient();
 
@@ -471,9 +493,11 @@ export async function reassignDoctorBulk(
     filters: { title: string; source: string; currentDoctorId: string },
     newDoctorId: string
 ) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado', updatedCount: 0 };
+    try {
+        await verifyAgendaWriteAccess();
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'No autorizado', updatedCount: 0 };
+    }
 
     const admin = getAdminClient();
     let query = admin
@@ -560,6 +584,7 @@ export async function getTomorrowAppointments(): Promise<TomorrowAppointment[]> 
 export async function sendBulkWhatsAppConfirmations(
     appointments: Pick<TomorrowAppointment, 'id' | 'start_time' | 'patientName' | 'patientPhone' | 'doctorName'>[]
 ): Promise<{ sent: number; failed: number; noPhone: number }> {
+    await verifyAgendaWriteAccess();
     const { sendNotification } = await import('@/lib/am-scheduler/notification-service');
     let sent = 0; let failed = 0; let noPhone = 0;
 
@@ -625,9 +650,12 @@ export async function getAgendaBlocks(start: string, end: string): Promise<Agend
 }
 
 export async function createAgendaBlock(payload: CreateAgendaBlockPayload) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'No autenticado' };
+    let user;
+    try {
+        user = await verifyAgendaWriteAccess();
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'No autorizado' };
+    }
 
     const admin = getAdminClient();
     const { error } = await admin
@@ -640,9 +668,11 @@ export async function createAgendaBlock(payload: CreateAgendaBlockPayload) {
 }
 
 export async function deleteAgendaBlock(blockId: string) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'No autenticado' };
+    try {
+        await verifyAgendaWriteAccess();
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'No autorizado' };
+    }
 
     const admin = getAdminClient();
     const { error } = await admin

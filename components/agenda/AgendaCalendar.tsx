@@ -185,7 +185,7 @@ export default function AgendaCalendar() {
     const [blockModalInitialStart, setBlockModalInitialStart] = useState<Date | undefined>();
     const [blockModalInitialEnd, setBlockModalInitialEnd] = useState<Date | undefined>();
     const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; start: Date; end: Date } | null>(null);
-    const { canEdit: canEditModule } = useAuth();
+    const { canEdit: canEditModule, categoria } = useAuth();
     const router = useRouter();
 
     const handleShareAgenda = async (target: { scope: 'all' } | { scope: 'doctor'; doctorId: string; doctorName: string }, mode: 'day' | 'range' = 'day') => {
@@ -610,7 +610,8 @@ export default function AgendaCalendar() {
         setDropConfirm(null);
     }, () => void handleDropConfirmSave(true), { disabled: isNotifying });
 
-    const canEdit = canEditModule('turnos');
+    const isPortalUser = ['odontologo', 'asistente', 'laboratorio', 'dentist'].includes(categoria || '');
+    const canEdit = canEditModule('turnos') && !isPortalUser;
 
     function isAppointmentBlocked(aptStart: Date, aptEnd: Date, doctorId: string | undefined): boolean {
         return agendaBlocks.some(block => {
@@ -1081,13 +1082,15 @@ export default function AgendaCalendar() {
                                 {contextMenu.data.patient?.full_name || contextMenu.data.title || 'Turno'}
                             </p>
                         </div>
-                        <button
-                            onClick={() => { openFullModal(contextMenu.data); setContextMenu(null); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                        >
-                            <Edit2 size={14} />
-                            Editar turno
-                        </button>
+                        {canEdit && (
+                            <button
+                                onClick={() => { openFullModal(contextMenu.data); setContextMenu(null); }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                            >
+                                <Edit2 size={14} />
+                                Editar turno
+                            </button>
+                        )}
                         <button
                             onClick={() => { window.open(`/patients/${contextMenu.data.patientId}`, '_blank'); setContextMenu(null); }}
                             disabled={!contextMenu.data.patientId}
@@ -1096,15 +1099,17 @@ export default function AgendaCalendar() {
                             <Users size={14} />
                             Ver ficha ↗
                         </button>
-                        <div className="border-t border-gray-100 dark:border-gray-800 mt-1 pt-1">
-                            <button
-                                onClick={async () => { await handleQuickStatusChange(contextMenu.data.id!, 'cancelled'); setContextMenu(null); }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            >
-                                <X size={14} />
-                                Cancelar turno
-                            </button>
-                        </div>
+                        {canEdit && (
+                            <div className="border-t border-gray-100 dark:border-gray-800 mt-1 pt-1">
+                                <button
+                                    onClick={async () => { await handleQuickStatusChange(contextMenu.data.id!, 'cancelled'); setContextMenu(null); }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                >
+                                    <X size={14} />
+                                    Cancelar turno
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -1351,7 +1356,7 @@ export default function AgendaCalendar() {
                             </button>
 
                             <button
-                                disabled={!quickPopup.fullData.patientId}
+                                disabled={!canEdit || !quickPopup.fullData.patientId}
                                 onClick={() => router.push(`/caja-recepcion?tab=caja&action=nuevo-ingreso&patientId=${quickPopup.fullData.patientId}`)}
                                 className="flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-xl transition-colors disabled:opacity-50"
                             >
@@ -1455,7 +1460,7 @@ export default function AgendaCalendar() {
                         {/* Cancelar / No vino — los únicos estados que importan */}
                         <div className="px-3 pb-2 grid grid-cols-2 gap-2">
                             <button
-                                disabled={updatingStatus || quickPopup.currentStatus === 'cancelled'}
+                                disabled={!canEdit || updatingStatus || quickPopup.currentStatus === 'cancelled'}
                                 onClick={() => handleQuickStatusChange(quickPopup.appointmentId, 'cancelled')}
                                 className="flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 rounded-xl transition-colors disabled:opacity-40"
                             >
@@ -1463,7 +1468,7 @@ export default function AgendaCalendar() {
                                 Cancelar turno
                             </button>
                             <button
-                                disabled={updatingStatus || quickPopup.currentStatus === 'no_show'}
+                                disabled={!canEdit || updatingStatus || quickPopup.currentStatus === 'no_show'}
                                 onClick={() => handleQuickStatusChange(quickPopup.appointmentId, 'no_show')}
                                 className="flex items-center justify-center gap-2 py-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 rounded-xl transition-colors disabled:opacity-40"
                             >
