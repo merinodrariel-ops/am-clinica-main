@@ -13,32 +13,40 @@ import Link from 'next/link';
 // Checking `lib/caja-admin.ts` -> `getSucursales`.
 import { getSucursales } from '@/lib/caja-admin';
 
+import { useAuth } from '@/contexts/AuthContext';
+
 export default function CajaAlerts() {
+    const { categoria: role } = useAuth();
     const [alertsRecepcion, setAlertsRecepcion] = useState<DiaSinCierre[]>([]);
     const [alertsAdmin, setAlertsAdmin] = useState<{ sucursal: string, dias: DiaSinCierreAdmin[] }[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!role) return;
         async function checkAlerts() {
             try {
-                // 1. Recepcion (Global usually, or per branch? Schema has no sucursal_id in caja_recepcion_arqueos yet? 
-                // Wait, caja_recepcion_arqueos DOES NOT have sucursal_id based on previous migrations shown. 
-                // It seems Reception is mono-sucursal for now or implied?)
-                // `caja_recepcion_operaciones` table...
-                // Let's assume global for Reception based on current code.
+                const isSuperAdmin = ['owner', 'admin', 'developer'].includes(role || '');
+                const isReception = role === 'reception';
 
-                const recepcion = await getDiasSinCierreRecepcion();
-                setAlertsRecepcion(recepcion);
+                if (isSuperAdmin || isReception) {
+                    const recepcion = await getDiasSinCierreRecepcion();
+                    setAlertsRecepcion(recepcion);
+                } else {
+                    setAlertsRecepcion([]);
+                }
 
-                // 2. Admin (Per Sucursal)
-                const sucursales = await getSucursales();
-                const adminAlertsPromises = sucursales.map(async (s) => {
-                    const dias = await getDiasSinCierreAdmin(s.id);
-                    return { sucursal: s.nombre, dias };
-                });
+                if (isSuperAdmin) {
+                    const sucursales = await getSucursales();
+                    const adminAlertsPromises = sucursales.map(async (s) => {
+                        const dias = await getDiasSinCierreAdmin(s.id);
+                        return { sucursal: s.nombre, dias };
+                    });
 
-                const adminResults = await Promise.all(adminAlertsPromises);
-                setAlertsAdmin(adminResults.filter(r => r.dias.length > 0));
+                    const adminResults = await Promise.all(adminAlertsPromises);
+                    setAlertsAdmin(adminResults.filter(r => r.dias.length > 0));
+                } else {
+                    setAlertsAdmin([]);
+                }
 
             } catch (error) {
                 console.error(error);
@@ -48,7 +56,7 @@ export default function CajaAlerts() {
         }
 
         checkAlerts();
-    }, []);
+    }, [role]);
 
     if (loading) return null; // Or skeleton
     if (alertsRecepcion.length === 0 && alertsAdmin.length === 0) return null;

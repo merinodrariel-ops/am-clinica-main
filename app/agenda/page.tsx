@@ -25,6 +25,20 @@ export default function AgendaPage() {
     const [showPanel, setShowPanel] = useState(false);
     const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
 
+    const isAdminOrOwner = ['owner', 'admin', 'developer'].includes(categoria || '');
+    const visibleTabs = TABS.filter(tab => {
+        if (tab.id === 'config' || tab.id === 'import') {
+            return isAdminOrOwner;
+        }
+        return true;
+    });
+
+    useEffect(() => {
+        if (!authLoading && !isAdminOrOwner && activeTab !== 'calendar') {
+            setActiveTab('calendar');
+        }
+    }, [activeTab, authLoading, isAdminOrOwner]);
+
     useEffect(() => {
         import('@/app/actions/agenda').then(({ getDoctors }) => {
             getDoctors().then(setDoctors);
@@ -46,7 +60,7 @@ export default function AgendaPage() {
 
                 {/* Tab Bar */}
                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-                    {TABS.map(tab => (
+                    {visibleTabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}

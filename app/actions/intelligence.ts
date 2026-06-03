@@ -173,6 +173,20 @@ function inferNoShowRiskScore(history: AppointmentRow[]) {
 
 export async function getExecutiveIntelligence(): Promise<ExecutiveIntelligenceSnapshot> {
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Unauthenticated');
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .single();
+
+    const allowed = ['owner', 'admin', 'developer', 'partner_viewer'];
+    if (!profile || !allowed.includes(profile.categoria || '')) {
+        throw new Error('Unauthorized');
+    }
+
     const now = new Date();
     const nowIso = now.toISOString();
 

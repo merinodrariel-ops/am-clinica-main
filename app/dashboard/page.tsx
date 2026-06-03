@@ -46,18 +46,22 @@ export default function DashboardPage() {
         if (!loading && role === 'laboratorio') {
             router.replace('/inventario');
         }
-        if (!loading && role === 'asistente') {
-            router.replace('/patients');
+        if (!loading && (role === 'asistente' || role === 'odontologo' || role === 'dentist')) {
+            router.replace('/portal/dashboard');
         }
     }, [role, loading, router]);
 
-    if (loading || role === 'laboratorio' || role === 'asistente') {
+    if (loading || role === 'laboratorio' || role === 'asistente' || role === 'odontologo' || role === 'dentist') {
         return (
             <div className="flex h-[80vh] items-center justify-center">
                 <Loader2 className="animate-spin" size={40} style={{ color: 'hsl(165 100% 42%)' }} />
             </div>
         );
     }
+
+    const isManagement = ['owner', 'admin', 'developer', 'partner_viewer'].includes(role || '');
+    const isSuperAdmin = ['owner', 'admin', 'developer'].includes(role || '');
+    const isReceptionOrAdmin = ['owner', 'admin', 'developer', 'reception'].includes(role || '');
 
     return (
         <div className="p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">
@@ -74,26 +78,28 @@ export default function DashboardPage() {
             {/* Pacientes con tratamiento activo sin turno hace +45 días */}
             {(role === 'owner' || role === 'admin') && <SilentPatientsPanel />}
 
-            <UserAlerts />
-            <CajaAlerts />
+            {isSuperAdmin && <UserAlerts />}
+            {isReceptionOrAdmin && <CajaAlerts />}
 
-            <ExecutiveCommandCenter />
+            {isManagement && <ExecutiveCommandCenter />}
 
             {/* Financial Overview */}
-            <FinancialOverview />
+            {isManagement && <FinancialOverview />}
 
             {/* Real-time Stats */}
-            <StatsGrid />
+            {isManagement && <StatsGrid />}
 
             {/* Analytics Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                <div className="lg:col-span-2">
-                    <NewPatientsCard />
+            {isManagement && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                    <div className="lg:col-span-2">
+                        <NewPatientsCard />
+                    </div>
+                    <div className="lg:col-span-1">
+                        <ReferralChart />
+                    </div>
                 </div>
-                <div className="lg:col-span-1">
-                    <ReferralChart />
-                </div>
-            </div>
+            )}
 
             {/* Quick Links */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
@@ -112,20 +118,22 @@ export default function DashboardPage() {
                     </div>
                 </Link>
 
-                <Link href="/caja-recepcion" className="group">
-                    <div className="glass-card hover:bg-white/5 transition-colors duration-300 rounded-xl p-4 border border-white/10 group-hover:border-emerald-500/50">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg flex items-center justify-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors">
-                                <Banknote size={20} />
+                {isReceptionOrAdmin && (
+                    <Link href="/caja-recepcion" className="group">
+                        <div className="glass-card hover:bg-white/5 transition-colors duration-300 rounded-xl p-4 border border-white/10 group-hover:border-emerald-500/50">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-lg flex items-center justify-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors">
+                                    <Banknote size={20} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">Caja Recepción</h3>
+                                    <p className="text-xs text-slate-500">Ingresos y cobros</p>
+                                </div>
+                                <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1 text-slate-500 group-hover:text-emerald-400" />
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-sm text-slate-200 group-hover:text-white transition-colors">Caja Recepción</h3>
-                                <p className="text-xs text-slate-500">Ingresos y cobros</p>
-                            </div>
-                            <ArrowRight size={16} className="transition-all duration-300 group-hover:translate-x-1 text-slate-500 group-hover:text-emerald-400" />
                         </div>
-                    </div>
-                </Link>
+                    </Link>
+                )}
 
                 <Link href="/agenda" className="group">
                     <div className="glass-card hover:bg-white/5 transition-colors duration-300 rounded-xl p-4 border border-white/10 group-hover:border-purple-500/50">

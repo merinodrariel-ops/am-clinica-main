@@ -101,19 +101,13 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    // OPTIONAL: If user is logged in and visits /login, redirect to /dashboard
-    if (user && path === '/login') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
-        return NextResponse.redirect(url)
-    }
+    // Bloquear rutas exclusivamente admin para categorías de portal y manejar redirección de /login
+    const PORTAL_CATEGORIES = ['odontologo', 'asistente', 'laboratorio', 'dentist']
+    let userCategory = ''
 
-    // Bloquear rutas exclusivamente admin para categorías de portal
-    const PORTAL_CATEGORIES = ['odontologo', 'asistente', 'laboratorio', 'recaptacion', 'dentist']
-    let userCategory = (user?.user_metadata?.categoria ?? user?.user_metadata?.role ?? '') as string
-
-    // Source-of-truth category comes from profiles.categoria (metadata can be stale).
     if (user) {
+        userCategory = (user.user_metadata?.categoria ?? user.user_metadata?.role ?? '') as string
+        // Source-of-truth category comes from profiles.categoria (metadata can be stale).
         const { data: currentProfile } = await supabase
             .from('profiles')
             .select('categoria')
@@ -123,18 +117,30 @@ export async function updateSession(request: NextRequest) {
             userCategory = currentProfile.categoria
         }
     }
+
+    // OPTIONAL: If user is logged in and visits /login, redirect to /dashboard
+    if (user && path === '/login') {
+        const url = request.nextUrl.clone()
+        const isPortalRole = PORTAL_CATEGORIES.includes(userCategory);
+        if (isPortalRole) {
+            url.pathname = userCategory === 'laboratorio' ? '/inventario' : '/portal/dashboard'
+        } else {
+            url.pathname = '/dashboard'
+        }
+        return NextResponse.redirect(url)
+    }
+
     if (user && PORTAL_CATEGORIES.includes(userCategory)) {
         const ADMIN_ONLY_PATHS = [
             '/caja-admin',
             '/caja-recepcion',
-            '/admin/staff',
-            '/admin/liquidaciones',
-            '/admin/prestaciones',
+            '/admin',
             '/admin-users',
+            '/dashboard',
         ]
         if (ADMIN_ONLY_PATHS.some(p => path === p || path.startsWith(p + '/'))) {
             const url = request.nextUrl.clone()
-            url.pathname = '/dashboard'
+            url.pathname = userCategory === 'laboratorio' ? '/inventario' : '/portal/dashboard'
             return NextResponse.redirect(url)
         }
     }

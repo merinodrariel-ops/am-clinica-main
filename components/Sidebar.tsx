@@ -38,7 +38,7 @@ const MENU_ITEMS = [
         label: 'Dashboard',
         href: '/dashboard',
         key: null,
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'odontologo', 'recaptacion']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'pricing_manager', 'developer', 'recaptacion']
     },
     {
         icon: CalendarDays,

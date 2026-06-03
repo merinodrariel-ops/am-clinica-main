@@ -1,6 +1,7 @@
 'use server';
 
 import { createAdminClient } from '@/utils/supabase/admin';
+import { createClient } from '@/utils/supabase/server';
 import { getFinanciacionMensualResumen } from '@/lib/dashboard';
 import type { DashboardStats, OwnerDashboardStats, PlanFinanciacionDashboard, ReferralStat } from '@/lib/dashboard';
 
@@ -15,7 +16,24 @@ type PrimeraConsultaReciente = PrimeraConsultaRow & {
     monthKey: string;
 };
 
+async function verifyAccess(allowedRoles: string[]) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Unauthenticated');
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile || !allowedRoles.includes(profile.categoria || '')) {
+        throw new Error('Unauthorized');
+    }
+}
+
 export async function getDashboardStatsAction(): Promise<DashboardStats> {
+    await verifyAccess(['owner', 'admin', 'developer', 'partner_viewer', 'reception']);
     const supabase = createAdminClient();
     try {
         const { count: patientsCount } = await supabase
@@ -100,6 +118,7 @@ export async function getDashboardStatsAction(): Promise<DashboardStats> {
 }
 
 export async function getReferralStatsAction(): Promise<ReferralStat[]> {
+    await verifyAccess(['owner', 'admin', 'developer', 'partner_viewer', 'reception']);
     const supabase = createAdminClient();
     try {
         const { data } = await supabase
@@ -126,6 +145,7 @@ export async function getOwnerDashboardStatsAction(
     targetYear?: number,
     targetMonth?: number  // 0-based (0=enero, 11=diciembre)
 ): Promise<OwnerDashboardStats> {
+    await verifyAccess(['owner', 'admin', 'developer']);
     const supabase = createAdminClient();
     try {
         const now = new Date();
