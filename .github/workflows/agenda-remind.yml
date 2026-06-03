@@ -1,0 +1,37 @@
+name: Agenda reminders and surveys
+
+on:
+  schedule:
+    # Every 15 minutes. Vercel Hobby cannot run sub-daily cron jobs.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger-agenda-remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run agenda reminder cycle
+        env:
+          NEXT_PUBLIC_APP_URL: https://am-clinica-main.vercel.app
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+        run: |
+          set -euo pipefail
+          npx tsx scripts/run-agenda-remind.ts

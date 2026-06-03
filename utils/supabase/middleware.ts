@@ -78,6 +78,7 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/api/smile-design/') ||
         path.startsWith('/api/public-booking') ||
         path === '/api/agenda/daily-summary' ||
+        path === '/api/agenda/remind' ||
         path.startsWith('/api/workflows/') ||
         path === '/api/admission';
 
@@ -102,7 +103,6 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Bloquear rutas exclusivamente admin para categorías de portal y manejar redirección de /login
-    const PORTAL_CATEGORIES = ['odontologo', 'asistente', 'laboratorio', 'dentist']
     let userCategory = ''
 
     if (user) {
@@ -122,7 +122,6 @@ export async function updateSession(request: NextRequest) {
     const isOwnerOrAdmin = ['owner', 'admin', 'developer'].includes(userCategory);
     const isPartnerViewer = userCategory === 'partner_viewer';
     const isReception = userCategory === 'reception';
-    const isRecaptacion = userCategory === 'recaptacion';
     const isDoctor = ['odontologo', 'dentist'].includes(userCategory);
     const isAssistant = userCategory === 'asistente';
     const isLab = userCategory === 'laboratorio';

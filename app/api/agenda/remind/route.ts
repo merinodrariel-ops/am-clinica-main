@@ -7,8 +7,7 @@
  *
  * Also handles post-appointment satisfaction surveys (30 min after completion).
  *
- * Recommended schedule: every 5 minutes
- * vercel.json: { "crons": [{ "path": "/api/agenda/remind", "schedule": "every-5-minutes" }] }
+ * Recommended schedule: every 15 minutes via GitHub Actions or another cron provider.
  *
  * Secured by CRON_SECRET header.
  */
@@ -20,12 +19,17 @@ import {
   createAndSendSurvey,
   type AppointmentNotificationContext,
 } from '@/lib/am-scheduler/notification-service';
+import {
+  getAutoCompleteSurveyWindow,
+  shouldAutoCompleteForSurvey,
+} from '@/lib/am-scheduler/auto-complete-surveys';
+import { createRecallsFromAppointment } from '@/app/actions/recalls';
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // dev mode: open
+  if (!secret) return process.env.NODE_ENV !== 'production';
   const header = req.headers.get('Authorization') ?? req.headers.get('x-cron-secret');
   return header === `Bearer ${secret}` || header === secret;
 }
@@ -55,6 +59,32 @@ interface CompletedForSurvey {
   doctor_name:    string | null;
 }
 
+interface AutoCompleteForSurvey {
+  id: string;
+  patient_id: string | null;
+  doctor_id: string | null;
+  type: string | null;
+  status: string | null;
+  start_time: string;
+  end_time: string;
+  patient: {
+    nombre: string | null;
+    apellido: string | null;
+    whatsapp: string | null;
+    email: string | null;
+  } | Array<{
+    nombre: string | null;
+    apellido: string | null;
+    whatsapp: string | null;
+    email: string | null;
+  }> | null;
+  doctor: {
+    full_name: string | null;
+  } | Array<{
+    full_name: string | null;
+  }> | null;
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -63,10 +93,12 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createAdminClient();
-  const now      = new Date().toISOString();
+  const nowDate  = new Date();
+  const now      = nowDate.toISOString();
 
   const dispatched: string[] = [];
   const failed:     string[] = [];
+  const autoCompleted: string[] = [];
 
   // ── 1. Pending appointment reminders ──────────────────────────────────────
 
@@ -103,7 +135,79 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── 2. Post-appointment satisfaction surveys ────────────────────────────────
+  // ── 2. Auto-complete recent clinical appointments for survey dispatch ───────
+
+  const autoWindow = getAutoCompleteSurveyWindow(nowDate);
+  const { data: autoCandidates, error: autoErr } = await supabase
+    .from('agenda_appointments')
+    .select(`
+      id,
+      patient_id,
+      doctor_id,
+      type,
+      status,
+      start_time,
+      end_time,
+      patient:pacientes(nombre, apellido, whatsapp, email),
+      doctor:profiles!agenda_appointments_doctor_id_fkey(full_name)
+    `)
+    .gte('end_time', autoWindow.earliestEndTime)
+    .lte('end_time', autoWindow.latestEndTime)
+    .is('survey_sent_at', null)
+    .not('patient_id', 'is', null)
+    .not('status', 'in', '("cancelled","no_show","completed")');
+
+  if (autoErr) {
+    console.error('[Remind] Auto-complete query error:', autoErr);
+    failed.push('auto-complete-query');
+  }
+
+  for (const apt of (autoCandidates as AutoCompleteForSurvey[] ?? [])) {
+    if (!shouldAutoCompleteForSurvey(apt, nowDate)) continue;
+
+    const patient = Array.isArray(apt.patient) ? apt.patient[0] : apt.patient;
+    const doctor = Array.isArray(apt.doctor) ? apt.doctor[0] : apt.doctor;
+    const patientName = `${patient?.nombre ?? ''} ${patient?.apellido ?? ''}`.trim() || 'Paciente';
+
+    const { error: updateErr } = await supabase
+      .from('agenda_appointments')
+      .update({ status: 'completed', updated_at: now })
+      .eq('id', apt.id)
+      .is('survey_sent_at', null)
+      .not('status', 'in', '("cancelled","no_show","completed")');
+
+    if (updateErr) {
+      failed.push(`auto-complete:${apt.id}`);
+      console.error('[Remind] Auto-complete update failed:', apt.id, updateErr);
+      continue;
+    }
+
+    autoCompleted.push(apt.id);
+
+    if (apt.patient_id && apt.type) {
+      await createRecallsFromAppointment(
+        apt.id,
+        apt.type,
+        apt.patient_id,
+        apt.start_time,
+        apt.doctor_id ?? null,
+      ).catch((err) => {
+        console.error('[Remind] Recall creation failed after auto-complete:', apt.id, err);
+      });
+    }
+
+    await createAndSendSurvey(
+      apt.id,
+      apt.patient_id,
+      patientName,
+      patient?.whatsapp ?? null,
+      patient?.email ?? null,
+      doctor?.full_name ?? null,
+    );
+    dispatched.push(`survey:auto:${apt.id}`);
+  }
+
+  // ── 3. Post-appointment satisfaction surveys ────────────────────────────────
 
   const { data: forSurvey, error: sErr } = await supabase
     .rpc('get_completed_for_survey', { p_now: now });
@@ -129,15 +233,13 @@ export async function POST(req: NextRequest) {
     at:         now,
     dispatched: dispatched.length,
     failed:     failed.length,
+    autoCompleted: autoCompleted.length,
     surveys:    forSurvey?.length ?? 0,
-    ids:        { dispatched, failed },
+    ids:        { dispatched, failed, autoCompleted },
   });
 }
 
-// Allow GET for manual testing in dev
+// Vercel Cron invokes configured paths with GET.
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json({ error: 'GET not allowed in production' }, { status: 405 });
-  }
   return POST(req);
 }
