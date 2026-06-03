@@ -118,29 +118,65 @@ export async function updateSession(request: NextRequest) {
         }
     }
 
-    // OPTIONAL: If user is logged in and visits /login, redirect to /dashboard
+    // Role-based path access control rules (caja, pagos and admin areas)
+    const isOwnerOrAdmin = ['owner', 'admin', 'developer'].includes(userCategory);
+    const isPartnerViewer = userCategory === 'partner_viewer';
+    const isReception = userCategory === 'reception';
+    const isRecaptacion = userCategory === 'recaptacion';
+    const isDoctor = ['odontologo', 'dentist'].includes(userCategory);
+    const isAssistant = userCategory === 'asistente';
+    const isLab = userCategory === 'laboratorio';
+
+    // OPTIONAL: If user is logged in and visits /login, redirect to correct home page
     if (user && path === '/login') {
         const url = request.nextUrl.clone()
-        const isPortalRole = PORTAL_CATEGORIES.includes(userCategory);
-        if (isPortalRole) {
-            url.pathname = userCategory === 'laboratorio' ? '/inventario' : '/portal/dashboard'
+        if (isDoctor || isAssistant) {
+            url.pathname = '/portal/dashboard'
+        } else if (isLab) {
+            url.pathname = '/inventario'
         } else {
             url.pathname = '/dashboard'
         }
         return NextResponse.redirect(url)
     }
 
-    if (user && PORTAL_CATEGORIES.includes(userCategory)) {
-        const ADMIN_ONLY_PATHS = [
-            '/caja-admin',
-            '/caja-recepcion',
-            '/admin',
-            '/admin-users',
-            '/dashboard',
-        ]
-        if (ADMIN_ONLY_PATHS.some(p => path === p || path.startsWith(p + '/'))) {
+    // 1. Guard for /caja-admin
+    if (path === '/caja-admin' || path.startsWith('/caja-admin/')) {
+        if (!isOwnerOrAdmin && !isPartnerViewer) {
             const url = request.nextUrl.clone()
-            url.pathname = userCategory === 'laboratorio' ? '/inventario' : '/portal/dashboard'
+            url.pathname = (isDoctor || isAssistant) ? '/portal/dashboard' : (isLab ? '/inventario' : '/dashboard')
+            return NextResponse.redirect(url)
+        }
+    }
+
+    // 2. Guard for /caja-recepcion
+    if (path === '/caja-recepcion' || path.startsWith('/caja-recepcion/')) {
+        if (!isOwnerOrAdmin && !isPartnerViewer && !isReception) {
+            const url = request.nextUrl.clone()
+            url.pathname = (isDoctor || isAssistant) ? '/portal/dashboard' : (isLab ? '/inventario' : '/dashboard')
+            return NextResponse.redirect(url)
+        }
+    }
+
+    // 3. Guard for /admin and /admin-users
+    if (path === '/admin' || path.startsWith('/admin/') || path === '/admin-users' || path.startsWith('/admin-users/')) {
+        if (!isOwnerOrAdmin) {
+            const url = request.nextUrl.clone()
+            url.pathname = (isDoctor || isAssistant) ? '/portal/dashboard' : (isLab ? '/inventario' : '/dashboard')
+            return NextResponse.redirect(url)
+        }
+    }
+
+    // 4. Guard for /dashboard
+    if (path === '/dashboard' || path.startsWith('/dashboard/')) {
+        if (isDoctor || isAssistant) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/portal/dashboard'
+            return NextResponse.redirect(url)
+        }
+        if (isLab) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/inventario'
             return NextResponse.redirect(url)
         }
     }

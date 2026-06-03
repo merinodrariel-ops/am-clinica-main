@@ -30,8 +30,11 @@ export type ModuleKey = typeof MODULE_DEFINITIONS[number]['key'];
 export function getCategoryDefault(categoria: string, moduleKey: string): 'full' | 'read' | 'none' {
     if (categoria === 'owner') return 'full';
 
-    // Financial modules: only admin has full access by default
-    if (['caja_recepcion', 'caja_admin', 'liquidaciones'].includes(moduleKey)) {
+    // Financial modules: only admin has full access by default, reception gets full access to caja_recepcion
+    if (moduleKey === 'caja_recepcion') {
+        return ['admin', 'reception'].includes(categoria) ? 'full' : 'none';
+    }
+    if (['caja_admin', 'liquidaciones'].includes(moduleKey)) {
         return categoria === 'admin' ? 'full' : 'none';
     }
 
