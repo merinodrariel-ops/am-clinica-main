@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/utils/supabase/admin';
 import { EmailService } from '@/lib/email-service';
 import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
+import { buildAuthCallbackLink } from '@/lib/supabase-auth-links';
 import { revalidatePath } from 'next/cache';
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica-main.vercel.app').replace(/\/$/, '');
@@ -297,7 +298,7 @@ export async function registerPrestadorPublico(
             const emailResult = await EmailService.sendInvitation(
                 fullName,
                 email,
-                linkData.properties.action_link,
+                buildAuthCallbackLink(APP_URL, linkData, linkType),
                 getRoleLabelFromCategoria(categoria),
             );
 

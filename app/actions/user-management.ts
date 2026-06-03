@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { EmailService } from '@/lib/email-service';
 import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
+import { buildAuthCallbackLink } from '@/lib/supabase-auth-links';
 
 // Initialize Admin Client securely
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -159,7 +160,7 @@ export async function inviteUser(formData: FormData) {
             email: email,
             options: {
                 data: { full_name: fullName, categoria: categoria },
-                redirectTo: `${publicUrl}/auth/update-password`
+                redirectTo: `${publicUrl}/auth/callback?next=/auth/update-password`
             }
         });
 
@@ -170,7 +171,7 @@ export async function inviteUser(formData: FormData) {
         const emailResult = await EmailService.sendInvitation(
             fullName,
             email,
-            linkData.properties.action_link
+            buildAuthCallbackLink(publicUrl, linkData, 'invite')
         );
 
         if (!emailResult.success) {
@@ -216,8 +217,9 @@ export async function resendInvitation(email: string) {
     // This function seems unused in favor of resendUserAccessEmail, but limiting scope for now.
     // If used, it needs similar fix. 
     try {
+        const publicUrl = getAppPublicUrl();
         const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-            redirectTo: `${getAppPublicUrl()}/auth/update-password`
+            redirectTo: `${publicUrl}/auth/callback?next=/auth/update-password`
         });
         if (error) throw error;
 
@@ -516,7 +518,7 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
         const emailRes = await EmailService.sendInvitation(
             targetUser.user_metadata?.full_name || 'Usuario',
             targetUser.email!,
-            linkData.properties.action_link
+            buildAuthCallbackLink(publicUrl, linkData, linkType)
         );
 
         if (!emailRes.success) throw new Error(`Email failed: ${emailRes.error}`);
@@ -557,7 +559,7 @@ export async function resetUserPassword(email: string) {
             .eq('email', searchEmail)
             .maybeSingle();
 
-        // 2. Generar el link de recuperación seguro con redirectTo por el flujo PKCE
+        // 2. Generar el link de recuperación y enviarlo por nuestro callback SSR
         const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
             type: 'recovery',
             email: searchEmail,
@@ -575,17 +577,12 @@ export async function resetUserPassword(email: string) {
             throw linkError;
         }
 
-        const actionLink = linkData?.properties?.action_link;
-        if (!actionLink) {
-            throw new Error('No se pudo generar el enlace de restablecimiento');
-        }
-
         // 3. Enviar el email con nuestro servicio de alta entregabilidad (Resend)
         const userName = profile?.full_name || 'Miembro del Equipo';
         const emailRes = await EmailService.sendPasswordReset(
             userName,
             searchEmail,
-            actionLink
+            buildAuthCallbackLink(getAppPublicUrl(), linkData, 'recovery')
         );
 
         if (!emailRes.success) {

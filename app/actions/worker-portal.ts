@@ -6,6 +6,7 @@ import { WorkerProfile, WorkLog, Achievement, WorkerAchievement, ProviderGoal, G
 import { revalidatePath } from 'next/cache';
 import { EmailService } from '@/lib/email-service';
 import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
+import { buildAuthCallbackLink } from '@/lib/supabase-auth-links';
 
 // Service-role client for admin operations that bypass RLS
 function getAdminClient() {
@@ -13,6 +14,10 @@ function getAdminClient() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+}
+
+function getAppPublicUrl() {
+    return (process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica-main.vercel.app').replace(/\/$/, '');
 }
 
 const LOCKED_FIELDS = ['documento', 'matricula_provincial', 'poliza_url'] as const;
@@ -564,7 +569,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
         type: 'invite',
         email: data.email,
         options: {
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/callback?next=/auth/update-password`,
+            redirectTo: `${getAppPublicUrl()}/auth/callback?next=/auth/update-password`,
             data: {
                 full_name: `${data.nombre} ${data.apellido || ''}`.trim(),
                 categoria: authRole,
@@ -575,7 +580,7 @@ export async function createWorkerWithInvite(data: CreateWorkerInput): Promise<W
     if (linkError) throw new Error(linkError.message);
 
     const userId = linkData.user?.id;
-    const actionLink = linkData.properties?.action_link;
+    const actionLink = buildAuthCallbackLink(getAppPublicUrl(), linkData, 'invite');
 
     // 2. Send invitation email (non-blocking — worker is created even if email fails)
     if (actionLink) {
@@ -703,7 +708,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
         type: 'invite',
         email: worker.email,
         options: {
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/callback?next=/auth/update-password`,
+            redirectTo: `${getAppPublicUrl()}/auth/callback?next=/auth/update-password`,
             data: {
                 full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
                 categoria: authRole,
@@ -730,7 +735,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
             .eq('id', workerId);
     }
 
-    const actionLink = linkData.properties?.action_link;
+    const actionLink = buildAuthCallbackLink(getAppPublicUrl(), linkData, 'invite');
     if (actionLink) {
         const emailResult = await EmailService.sendInvitation(
             `${worker.nombre} ${worker.apellido || ''}`.trim(),
