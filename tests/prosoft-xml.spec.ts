@@ -104,4 +104,45 @@ assert.equal(reg2?.salida, '02:00', 'Prosoft 26:00 should normalize to 02:00');
 assert.equal(reg2?.salidaDiaSiguiente, true);
 assert.equal(reg2?.horas, 4, 'Turno 22:00–26:00 = 4h');
 
+// Prosoft split-record overnight (entry on day N, exit on day N+1 as separate records)
+const splitOvernightXml = `<?xml version="1.0" encoding="UTF-8"?>
+<Fichadas>
+  <Empleado>
+    <NombreCompleto>Georgina Lopez</NombreCompleto>
+    <Movimientos>
+      <Movimiento>
+        <DiaFecha>12/04/2026</DiaFecha>
+        <HoraIngreso>22:00</HoraIngreso>
+      </Movimiento>
+      <Movimiento>
+        <DiaFecha>13/04/2026</DiaFecha>
+        <HoraEgreso>01:30</HoraEgreso>
+      </Movimiento>
+      <Movimiento>
+        <DiaFecha>14/04/2026</DiaFecha>
+        <HoraIngreso>09:00</HoraIngreso>
+        <HoraEgreso>17:00</HoraEgreso>
+      </Movimiento>
+    </Movimientos>
+  </Empleado>
+</Fichadas>`;
+
+const splitParsed = parseProsoftXml(splitOvernightXml);
+assert.equal(splitParsed.filas.length, 1);
+const georginaRegs = splitParsed.filas[0]?.registros ?? [];
+// Day 12 (overnight) + day 14 (normal) = 2 records; day 13 exit is merged into day 12
+assert.equal(georginaRegs.length, 2, 'split overnight should merge into one record');
+
+const overnight = georginaRegs.find(r => r.fecha === '2026-04-12');
+assert.ok(overnight, 'overnight record should be on the entry date');
+assert.equal(overnight?.entrada, '22:00');
+assert.equal(overnight?.salida, '01:30');
+assert.equal(overnight?.salidaDiaSiguiente, true);
+assert.equal(overnight?.horas, 3.5);
+assert.equal(overnight?.incompleto, undefined);
+
+const normal = georginaRegs.find(r => r.fecha === '2026-04-14');
+assert.ok(normal, 'normal day should still exist');
+assert.equal(normal?.horas, 8);
+
 console.log('prosoft-xml.spec.ts: ok');

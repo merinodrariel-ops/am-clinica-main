@@ -78,11 +78,12 @@ export function parseProsoftXml(xml: string): ProsoftXmlPreview {
     }
 
     const deduped = dedupeRecords(candidates);
+    const repaired = repairOvernightSplits(deduped);
     const byName = new Map<string, ProsoftXmlRegistro[]>();
-    let minDate = deduped[0].fecha;
-    let maxDate = deduped[0].fecha;
+    let minDate = repaired[0].fecha;
+    let maxDate = repaired[0].fecha;
 
-    for (const record of deduped) {
+    for (const record of repaired) {
         if (record.fecha < minDate) minDate = record.fecha;
         if (record.fecha > maxDate) maxDate = record.fecha;
         const current = byName.get(record.rawName) ?? [];
@@ -117,8 +118,85 @@ export function parseProsoftXml(xml: string): ProsoftXmlPreview {
         periodoDetectado: true,
         filas,
         sinMatch: filas.map((fila) => fila.rawName),
-        totalRegistros: deduped.length,
+        totalRegistros: repaired.length,
     };
+}
+
+function addOneDay(fecha: string): string {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const date = new Date(y, m - 1, d + 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+// Prosoft sometimes exports overnight shifts as two separate records:
+//   Day N  → entry=22:00, exit missing  (FaltaEgreso)
+//   Day N+1 → entry missing, exit=01:00 (FaltaIngreso)
+// This function pairs those split records and also removes FaltaIngreso
+// orphans that were already merged by a higher-level node in the XML tree.
+function repairOvernightSplits(records: CandidateRecord[]): CandidateRecord[] {
+    // Step 1: pair FaltaEgreso(dayN) + FaltaIngreso(dayN+1) → overnight record
+    const skip = new Set<number>();
+    const step1: CandidateRecord[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+        if (skip.has(i)) continue;
+        const rec = records[i];
+
+        const isFaltaEgreso =
+            rec.incompleto &&
+            rec.motivoObservado === 'FaltaEgreso' &&
+            rec.entrada !== '00:00';
+
+        if (isFaltaEgreso) {
+            const expectedNext = addOneDay(rec.fecha);
+            let paired = false;
+
+            for (let j = i + 1; j < records.length; j++) {
+                const next = records[j];
+                if (next.rawName !== rec.rawName) break;
+                if (next.fecha !== expectedNext) break;
+
+                if (next.incompleto && next.motivoObservado === 'FaltaIngreso' && next.salida !== '00:00') {
+                    const computed = computeHours(rec.entrada, next.salida);
+                    step1.push({
+                        ...rec,
+                        salida: next.salida,
+                        salidaDiaSiguiente: true,
+                        horas: computed.horas,
+                        incompleto: undefined,
+                        requiereRevision: computed.horas > 14,
+                        motivoObservado: computed.horas > 14 ? 'HorasExcesivas' : undefined,
+                        observaciones: `Turno nocturno reconstruido (${rec.fecha} → ${next.fecha})`,
+                    });
+                    skip.add(j);
+                    paired = true;
+                }
+                break;
+            }
+
+            if (!paired) step1.push(rec);
+            continue;
+        }
+
+        step1.push(rec);
+    }
+
+    // Step 2: drop FaltaIngreso orphans on day N+1 when there is already a
+    // correct overnight record on day N for the same person (produced by a
+    // parent XML node that combined entry/exit from different child nodes).
+    const overnightEndDates = new Set<string>();
+    for (const rec of step1) {
+        if (rec.salidaDiaSiguiente && !rec.incompleto) {
+            overnightEndDates.add(`${rec.rawName}::${addOneDay(rec.fecha)}`);
+        }
+    }
+
+    return step1.filter(rec => {
+        if (rec.incompleto && rec.motivoObservado === 'FaltaIngreso') {
+            return !overnightEndDates.has(`${rec.rawName}::${rec.fecha}`);
+        }
+        return true;
+    });
 }
 
 function collectCandidateRecords(node: XmlNode, inheritedName?: string): CandidateRecord[] {
