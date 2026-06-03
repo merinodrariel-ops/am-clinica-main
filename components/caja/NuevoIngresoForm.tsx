@@ -191,6 +191,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     const [baseInstallmentAmount, setBaseInstallmentAmount] = useState<number>(0);
     const [saldoFavorDisponible, setSaldoFavorDisponible] = useState<number>(0);
     const [aplicarSaldoFavor, setAplicarSaldoFavor] = useState<boolean>(false);
+    const [pagaCon, setPagaCon] = useState<number>(0);
+    const [diferenciaDestino, setDiferenciaDestino] = useState<'saldo_a_favor' | 'vuelto'>('saldo_a_favor');
+    const [lastTargetMonto, setLastTargetMonto] = useState<number>(0);
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
@@ -263,14 +266,21 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             if (aplicarSaldoFavor) {
                 targetMonto = Math.max(0, targetMonto - saldoFavorDisponible);
             }
-            setFormData(prev => {
-                if (prev.monto !== targetMonto) {
-                    return { ...prev, monto: targetMonto, moneda: 'USD' };
-                }
-                return prev;
-            });
+            // Round to avoid float precision issues
+            targetMonto = Math.round(targetMonto * 100) / 100;
+            if (targetMonto !== lastTargetMonto) {
+                setLastTargetMonto(targetMonto);
+                setPagaCon(targetMonto);
+                setDiferenciaDestino('saldo_a_favor');
+                setFormData(prev => {
+                    if (prev.monto !== targetMonto) {
+                        return { ...prev, monto: targetMonto, moneda: 'USD' };
+                    }
+                    return prev;
+                });
+            }
         }
-    }, [formData.es_cuota, formData.metodo_pago, baseInstallmentAmount, useMultiplePayments, aplicarSaldoFavor, saldoFavorDisponible]);
+    }, [formData.es_cuota, formData.metodo_pago, baseInstallmentAmount, useMultiplePayments, aplicarSaldoFavor, saldoFavorDisponible, lastTargetMonto]);
 
     function setSplitValue(index: number, updates: Partial<PaymentSplit>) {
         setPaymentSplits((prev) => {
@@ -401,6 +411,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         setSaldoFavorDisponible(Number(patient.saldo_a_favor_usd || 0));
         setAplicarSaldoFavor(false);
         setBaseInstallmentAmount(0); // Reset
+        setPagaCon(0);
+        setDiferenciaDestino('saldo_a_favor');
+        setLastTargetMonto(0);
 
         try {
             const { data: activePlan } = await supabase
@@ -758,6 +771,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         setUseMultiplePayments(false);
         setSaldoFavorDisponible(0);
         setAplicarSaldoFavor(false);
+        setPagaCon(0);
+        setDiferenciaDestino('saldo_a_favor');
+        setLastTargetMonto(0);
         setPaymentSplits([{
             id: makeUuid(),
             monto: 0,
@@ -946,7 +962,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     <MoneyInput
                                                         value={formData.monto || 0}
                                                         onChange={(val) => setFormData({ ...formData, monto: val })}
-                                                        className="w-full h-auto text-3xl font-black py-4 focus-visible:ring-blue-500 bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 shadow-inner"
+                                                        disabled={formData.es_cuota && baseInstallmentAmount > 0}
+                                                        className={clsx(
+                                                            "w-full h-auto text-3xl font-black py-4 focus-visible:ring-blue-500 bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 shadow-inner",
+                                                            formData.es_cuota && baseInstallmentAmount > 0 && "opacity-80 cursor-not-allowed bg-gray-100 dark:bg-gray-950"
+                                                        )}
                                                         placeholder="0"
                                                     />
                                                 </div>
@@ -1016,58 +1036,145 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             )}
 
                                             {/* Surcharge breakdown for Cuotas */}
-                                            {formData.es_cuota && baseInstallmentAmount > 0 && (
-                                                <div className="mt-4 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border-2 border-blue-100 dark:border-blue-800/40 animate-in fade-in zoom-in duration-300">
-                                                    <div className="flex justify-between items-center mb-2">
-                                                        <span className="text-[10px] font-black text-blue-800 dark:text-blue-300 uppercase tracking-widest">Desglose de Cuota</span>
-                                                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[8px] font-black rounded uppercase">Contrato</span>
-                                                    </div>
+                                            {(() => {
+                                                const surcharge = SURCHARGES[formData.metodo_pago] || 0;
+                                                let montoRequerido = baseInstallmentAmount * (1 + surcharge);
+                                                if (aplicarSaldoFavor) {
+                                                    montoRequerido = Math.max(0, montoRequerido - saldoFavorDisponible);
+                                                }
+                                                montoRequerido = Math.round(montoRequerido * 100) / 100;
 
-                                                    {/* Saldo a favor check */}
-                                                    {saldoFavorDisponible > 0 && (
-                                                        <div className="mb-3 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl flex items-center justify-between">
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    id="chkApplyCredit"
-                                                                    checked={aplicarSaldoFavor}
-                                                                    onChange={(e) => setAplicarSaldoFavor(e.target.checked)}
-                                                                    className="w-4 h-4 rounded text-green-600 focus:ring-green-500 border-gray-300"
-                                                                />
-                                                                <label htmlFor="chkApplyCredit" className="text-xs font-bold text-green-800 dark:text-green-300 cursor-pointer">
-                                                                    Aplicar saldo a favor disponible
+                                                return formData.es_cuota && baseInstallmentAmount > 0 && (
+                                                    <div className="mt-4 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border-2 border-blue-100 dark:border-blue-800/40 animate-in fade-in zoom-in duration-300">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <span className="text-[10px] font-black text-blue-800 dark:text-blue-300 uppercase tracking-widest">Desglose de Cuota</span>
+                                                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[8px] font-black rounded uppercase">Contrato</span>
+                                                        </div>
+
+                                                        {/* Saldo a favor check */}
+                                                        {saldoFavorDisponible > 0 && (
+                                                            <div className="mb-3 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        id="chkApplyCredit"
+                                                                        checked={aplicarSaldoFavor}
+                                                                        onChange={(e) => setAplicarSaldoFavor(e.target.checked)}
+                                                                        className="w-4 h-4 rounded text-green-600 focus:ring-green-500 border-gray-300"
+                                                                    />
+                                                                    <label htmlFor="chkApplyCredit" className="text-xs font-bold text-green-800 dark:text-green-300 cursor-pointer">
+                                                                        Aplicar saldo a favor disponible
+                                                                    </label>
+                                                                </div>
+                                                                <span className="text-xs font-black text-green-700 dark:text-green-400 font-mono">
+                                                                    USD {saldoFavorDisponible.toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="space-y-1.5 text-xs">
+                                                            <div className="flex justify-between text-gray-500">
+                                                                <span>Cuota base (Efectivo)</span>
+                                                                <span className="font-bold font-mono">USD {baseInstallmentAmount.toFixed(2)}</span>
+                                                            </div>
+                                                            {surcharge > 0 && (
+                                                                <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                                                                    <span>Recargo contractual ({surcharge * 100}%)</span>
+                                                                    <span className="font-bold font-mono">+USD {(baseInstallmentAmount * surcharge).toFixed(2)}</span>
+                                                                </div>
+                                                            )}
+                                                            {aplicarSaldoFavor && (
+                                                                <div className="flex justify-between text-green-600 dark:text-green-400">
+                                                                    <span>Crédito aplicado</span>
+                                                                    <span className="font-bold font-mono">-USD {Math.min(saldoFavorDisponible, baseInstallmentAmount * (1 + surcharge)).toFixed(2)}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="pt-2 border-t border-blue-100 dark:border-blue-800/40 flex justify-between text-gray-900 dark:text-white font-black text-sm">
+                                                                <span>Total requerido</span>
+                                                                <span className="font-mono text-blue-600 dark:text-blue-400">USD {montoRequerido.toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Calculator Section */}
+                                                        <div className="mt-4 pt-3 border-t border-dashed border-blue-100 dark:border-blue-800/40 space-y-3">
+                                                            <div>
+                                                                <label className="block text-[10px] font-black text-blue-800 dark:text-blue-300 uppercase tracking-widest mb-1.5">
+                                                                    ¿Con cuánto paga? (Monto Recibido)
                                                                 </label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">USD</span>
+                                                                    <MoneyInput
+                                                                        value={pagaCon || 0}
+                                                                        onChange={(val) => {
+                                                                            setPagaCon(val);
+                                                                            const diff = val - montoRequerido;
+                                                                            setFormData(prev => ({
+                                                                                ...prev,
+                                                                                monto: diff > 0 && diferenciaDestino === 'vuelto' ? montoRequerido : val
+                                                                            }));
+                                                                        }}
+                                                                        className="w-full h-10 pl-11 bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-500 font-bold text-lg"
+                                                                        placeholder="0.00"
+                                                                    />
+                                                                </div>
                                                             </div>
-                                                            <span className="text-xs font-black text-green-700 dark:text-green-400 font-mono">
-                                                                USD {saldoFavorDisponible.toFixed(2)}
-                                                            </span>
-                                                        </div>
-                                                    )}
 
-                                                    <div className="space-y-1.5 text-xs">
-                                                        <div className="flex justify-between text-gray-500">
-                                                            <span>Cuota base (Efectivo)</span>
-                                                            <span className="font-bold font-mono">USD {baseInstallmentAmount.toFixed(2)}</span>
-                                                        </div>
-                                                        {SURCHARGES[formData.metodo_pago] > 0 && (
-                                                            <div className="flex justify-between text-amber-600 dark:text-amber-400">
-                                                                <span>Recargo contractual ({SURCHARGES[formData.metodo_pago] * 100}%)</span>
-                                                                <span className="font-bold font-mono">+USD {(baseInstallmentAmount * SURCHARGES[formData.metodo_pago]).toFixed(2)}</span>
-                                                            </div>
-                                                        )}
-                                                        {aplicarSaldoFavor && (
-                                                            <div className="flex justify-between text-green-600 dark:text-green-400">
-                                                                <span>Crédito aplicado</span>
-                                                                <span className="font-bold font-mono">-USD {Math.min(saldoFavorDisponible, baseInstallmentAmount * (1 + (SURCHARGES[formData.metodo_pago] || 0))).toFixed(2)}</span>
-                                                            </div>
-                                                        )}
-                                                        <div className="pt-2 border-t border-blue-100 dark:border-blue-800/40 flex justify-between text-gray-900 dark:text-white font-black text-sm">
-                                                            <span>Total requerido</span>
-                                                            <span className="font-mono text-blue-600 dark:text-blue-400">USD {formData.monto.toFixed(2)}</span>
+                                                            {pagaCon > montoRequerido && (
+                                                                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                                    <div className="flex justify-between items-center text-xs">
+                                                                        <span className="font-bold text-amber-800 dark:text-amber-300">Excedente recibido:</span>
+                                                                        <span className="font-black text-amber-700 dark:text-amber-400 font-mono text-sm">USD {(pagaCon - montoRequerido).toFixed(2)}</span>
+                                                                    </div>
+
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="text-[10px] font-black text-amber-800/70 dark:text-amber-400/70 uppercase tracking-wider mb-1">Destino de la diferencia:</p>
+                                                                        <div className="flex gap-2">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setDiferenciaDestino('saldo_a_favor');
+                                                                                    setFormData(prev => ({ ...prev, monto: pagaCon }));
+                                                                                }}
+                                                                                className={clsx(
+                                                                                    "flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase transition-all border",
+                                                                                    diferenciaDestino === 'saldo_a_favor'
+                                                                                        ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                                                                                        : "bg-white dark:bg-gray-800 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-850 hover:bg-amber-50"
+                                                                                )}
+                                                                            >
+                                                                                Guardar como Saldo a Favor
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setDiferenciaDestino('vuelto');
+                                                                                    setFormData(prev => ({ ...prev, monto: montoRequerido }));
+                                                                                }}
+                                                                                className={clsx(
+                                                                                    "flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase transition-all border",
+                                                                                    diferenciaDestino === 'vuelto'
+                                                                                        ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                                                                                        : "bg-white dark:bg-gray-800 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-850 hover:bg-amber-50"
+                                                                                )}
+                                                                            >
+                                                                                Entregar vuelto en mano
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="pt-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-400 border-t border-amber-100 dark:border-amber-900/50">
+                                                                        {diferenciaDestino === 'saldo_a_favor' ? (
+                                                                            <span>✓ Se registrarán <strong>USD {pagaCon.toFixed(2)}</strong> en caja y <strong>USD {(pagaCon - montoRequerido).toFixed(2)}</strong> como crédito para el paciente.</span>
+                                                                        ) : (
+                                                                            <span>✓ Se registrarán <strong>USD {montoRequerido.toFixed(2)}</strong> en caja. Debés entregar <strong>USD {(pagaCon - montoRequerido).toFixed(2)}</strong> de vuelto.</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                );
+                                            })()}
                                         </div>
                                     ) : (
                                         <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
