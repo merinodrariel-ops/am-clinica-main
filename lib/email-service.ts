@@ -138,5 +138,18 @@ export const EmailService = {
             subject,
             html
         });
+    },
+
+    /**
+     * Sends a Password Reset email
+     */
+    async sendPasswordReset(name: string, email: string, link: string) {
+        const html = templates.generatePasswordResetEmail(name, link);
+
+        return this.send({
+            to: email,
+            subject: 'Restablecer tu Contraseña — AM Clínica',
+            html
+        });
     }
 };

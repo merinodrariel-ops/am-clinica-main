@@ -548,17 +548,54 @@ export async function resendUserAccessEmail(userId: string, ownerId: string) {
 
 export async function resetUserPassword(email: string) {
     try {
-        // Send recovery email
-        // redirectTo must go through /auth/callback so the code is exchanged for a session
-        // before landing on the update-password page (PKCE flow requires this)
-        const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-            redirectTo: `${getAppPublicUrl()}/auth/callback?next=/auth/update-password`
+        const searchEmail = email.trim().toLowerCase();
+
+        // 1. Obtener el nombre del usuario de su perfil (si existe) para personalizar el email
+        const { data: profile } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name')
+            .eq('email', searchEmail)
+            .maybeSingle();
+
+        // 2. Generar el link de recuperación seguro con redirectTo por el flujo PKCE
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'recovery',
+            email: searchEmail,
+            options: {
+                redirectTo: `${getAppPublicUrl()}/auth/callback?next=/auth/update-password`
+            }
         });
 
-        if (error) throw error;
+        if (linkError) {
+            // Si el usuario no existe en Auth, simulamos éxito por seguridad (evita enumeración de cuentas)
+            const errMsg = linkError.message?.toLowerCase() || '';
+            if (errMsg.includes('user not found') || errMsg.includes('email not found') || errMsg.includes('not found')) {
+                return { success: true };
+            }
+            throw linkError;
+        }
+
+        const actionLink = linkData?.properties?.action_link;
+        if (!actionLink) {
+            throw new Error('No se pudo generar el enlace de restablecimiento');
+        }
+
+        // 3. Enviar el email con nuestro servicio de alta entregabilidad (Resend)
+        const userName = profile?.full_name || 'Miembro del Equipo';
+        const emailRes = await EmailService.sendPasswordReset(
+            userName,
+            searchEmail,
+            actionLink
+        );
+
+        if (!emailRes.success) {
+            throw new Error(emailRes.error || 'Error al enviar el email de restablecimiento');
+        }
+
         return { success: true };
     } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        console.error('Error in resetUserPassword:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Error al procesar la solicitud' };
     }
 }
 

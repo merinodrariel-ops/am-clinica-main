@@ -734,3 +734,95 @@ export function generatePaymentConfirmationEmail(nombre: string, amountUsd: numb
 </body>
 </html>`;
 }
+
+
+export function generatePasswordResetEmail(nombre: string, link: string): string {
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restablecer Contraseña — AM Clínica</title>
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000;padding:60px 20px;">
+        <tr>
+            <td align="center">
+                <table width="540" cellpadding="0" cellspacing="0" border="0" style="max-width:540px;width:100%;background-color:#050505;border:1px solid rgba(201,169,110,0.15);border-radius:2px;">
+                    
+                    <!-- Top Ribbon -->
+                    <tr>
+                        <td height="3" style="background:linear-gradient(90deg, transparent, #C9A96E, transparent);"></td>
+                    </tr>
+
+                    <!-- Logo Section -->
+                    <tr>
+                        <td align="center" style="padding:40px 0 20px;">
+                            <img src="https://i.ibb.co/bJC2S6s/am-logo-horizontal-final.png" alt="AM Clínica" height="35" style="display:block;height:35px;filter:brightness(0) invert(1);">
+                        </td>
+                    </tr>
+
+                    <!-- Key Visual -->
+                    <tr>
+                        <td align="center" style="padding:20px 0 40px;">
+                            <div style="width:80px;height:80px;background-color:rgba(201,169,110,0.05);border-radius:50%;border:1px solid rgba(201,169,110,0.2);display:inline-block;padding:20px;box-shadow: 0 0 20px rgba(201,169,110,0.1);">
+                                <img src="https://cdn-icons-png.flaticon.com/512/6195/6195699.png" width="40" style="filter:invert(84%) sepia(21%) saturate(798%) hue-rotate(345deg) brightness(88%) contrast(85%);" alt="Reset Password">
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Content Section -->
+                    <tr>
+                        <td align="center" style="padding:0 50px 50px;">
+                            <p style="margin:0 0 12px;color:#C9A96E;font-size:10px;letter-spacing:5px;text-transform:uppercase;font-weight:700;">Seguridad</p>
+                            <h1 style="margin:0 0 24px;font-size:28px;font-weight:300;letter-spacing:-0.5px;line-height:1.2;color:#ffffff;font-family:'Times New Roman',serif;">
+                                Restablecer tu <br><span style="color:#C9A96E;font-weight:700;">Contraseña.</span>
+                            </h1>
+                            <p style="margin:0 0 35px;color:rgba(255,255,255,0.6);font-size:15px;line-height:1.7;font-weight:400;">
+                                Hola <strong>${nombre}</strong>. <br>
+                                Recibimos una solicitud para restablecer la contraseña de tu cuenta en AM Clínica. Haz clic en el botón de abajo para definir una nueva contraseña segura.
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <table cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center" style="background-color:#C9A96E;border-radius:2px;box-shadow: 0 4px 15px rgba(201,169,110,0.2);">
+                                        <a href="${link}" style="display:inline-block;padding:18px 45px;color:#000000;text-decoration:none;font-size:13px;font-weight:900;letter-spacing:2px;text-transform:uppercase;">
+                                            RESTABLECER CONTRASEÑA
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin:35px 0 0;color:rgba(255,255,255,0.3);font-size:12px;line-height:1.6;">
+                                Si no solicitaste este cambio, puedes ignorar este correo de forma segura. El enlace expirará en 24 horas.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer Details -->
+                    <tr>
+                        <td style="padding:30px;background-color:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.05);">
+                            <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;text-align:center;">
+                                Este es un correo de seguridad automatizado de AM Clínica.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Institutional Footer -->
+                <table width="540" cellpadding="0" cellspacing="0" border="0" style="margin-top:40px;">
+                    <tr>
+                        <td align="center">
+                            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:10px;letter-spacing:1px;text-transform:uppercase;">
+                                AM Clínica Dental · Excellence in Puerto Madero
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
