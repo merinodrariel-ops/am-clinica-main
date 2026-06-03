@@ -327,6 +327,7 @@ export default function ContratosFinanciacionTab({ initialPatientId }: Contratos
     printWindow.document.write(`
       <html>
         <head>
+          <meta charset="UTF-8">
           <title>Contrato de Prestación de Servicios Odontológicos</title>
           <style>
             body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #000; padding: 40px; max-width: 800px; margin: 0 auto; }

@@ -549,6 +549,7 @@ export default function ProsoftImporter({ mes }: { mes?: string }) {
         printWindow.document.write(`
             <html>
                 <head>
+                    <meta charset="UTF-8">
                     <title>Informe ProSoft ${mesLabel(activeMes)}</title>
                     <style>
                         body { font-family: Arial, sans-serif; color: #111827; padding: 28px; }

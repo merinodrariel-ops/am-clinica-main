@@ -648,6 +648,7 @@ function HorasDetalleModal({
         popup.document.write(`
             <html>
                 <head>
+                    <meta charset="UTF-8">
                     <title>Detalle de horarios - ${worker.nombre} ${worker.apellido || ''}</title>
                     <style>
                         body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
@@ -1827,6 +1828,7 @@ export default function LiquidacionesPage() {
         popup.document.write(`
             <html>
                 <head>
+                    <meta charset="UTF-8">
                     <title>Liquidación empresa - ${escapeHtml(group.empresaNombre)}</title>
                     <style>
                         body { font-family: Arial, sans-serif; margin: 24px; color: #111; }

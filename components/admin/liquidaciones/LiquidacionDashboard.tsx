@@ -471,6 +471,7 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
         popup.document.write(`
             <html>
                 <head>
+                    <meta charset="UTF-8">
                     <title>Resumen mensual de prestaciones - ${escapeHtml(row.nombre)} ${escapeHtml(row.apellido || '')}</title>
                     <style>
                         body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
