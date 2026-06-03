@@ -133,6 +133,7 @@ export interface Personal {
     fecha_ingreso?: string;
     descripcion?: string;
     valor_hora_ars: number;
+    valor_hora_personalizado?: boolean;
     horas_base?: number | null;
     costo_hora_extra?: number | null;
     modelo_pago: 'horas' | 'prestaciones' | 'mensual';
@@ -286,6 +287,7 @@ export interface CreatePersonalInput {
     barrio_localidad?: string;
     condicion_afip?: 'monotributista' | 'responsable_inscripto' | 'relacion_dependencia' | 'otro';
     valor_hora_ars?: number;
+    valor_hora_personalizado?: boolean;
     horas_base?: number | null;
     costo_hora_extra?: number | null;
     modelo_pago?: 'horas' | 'prestaciones' | 'mensual';

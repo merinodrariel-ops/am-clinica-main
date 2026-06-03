@@ -873,6 +873,7 @@ export async function createPersonal(input: CreatePersonalInput): Promise<{ data
         categoria,
         whatsapp: normalizedWhatsapp,
         valor_hora_ars: input.valor_hora_ars || 0,
+        valor_hora_personalizado: input.valor_hora_personalizado ?? false,
         moneda_mensual: input.moneda_mensual || 'ARS',
         activo: input.activo ?? true,
         fecha_ingreso: input.fecha_ingreso || new Date().toISOString().split('T')[0],

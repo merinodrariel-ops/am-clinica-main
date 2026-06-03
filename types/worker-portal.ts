@@ -38,6 +38,7 @@ export interface WorkerProfile {
 
     // Financial Config
     valor_hora_ars?: number;
+    valor_hora_personalizado?: boolean;
     porcentaje_honorarios?: number;
     pagado_mes_actual?: boolean;
     ultimo_pago_fecha?: string;

@@ -223,6 +223,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         barrio_localidad: '',
         condicion_afip: undefined,
         valor_hora_ars: 0,
+        valor_hora_personalizado: false,
         horas_base: null as number | null,
         costo_hora_extra: null as number | null,
         descripcion: '',
@@ -1035,8 +1036,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             documento: p.documento || '',
             direccion: p.direccion || '',
             barrio_localidad: p.barrio_localidad || '',
-            condicion_afip: p.condicion_afip,
             valor_hora_ars: p.valor_hora_ars,
+            valor_hora_personalizado: p.valor_hora_personalizado ?? false,
             horas_base: p.horas_base ?? null,
             costo_hora_extra: p.costo_hora_extra ?? null,
             descripcion: p.descripcion || '',
@@ -1080,8 +1081,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             documento: '',
             direccion: '',
             barrio_localidad: '',
-            condicion_afip: undefined,
             valor_hora_ars: 0,
+            valor_hora_personalizado: false,
             descripcion: '',
             matricula_provincial: '',
             especialidad: '',
@@ -2473,9 +2474,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         const isOdontologoOwner = ['owner', 'odontologo', 'profesional'].includes(tipoLower) || rolLower.includes('owner');
                                                         const hasCustomHourlyRule = formData.horas_base !== null || formData.costo_hora_extra !== null;
                                                         const isLaboratorio = areaLower.includes('laboratorio') || areaLower === 'lab' || rolLower.includes('lab');
-                                                        const usesCentralizedHourlyValue = !isOdontologoOwner && !hasCustomHourlyRule && !isLaboratorio;
+                                                        
+                                                        const isEditableHourlyRate = isOdontologoOwner || hasCustomHourlyRule || isLaboratorio || formData.valor_hora_personalizado;
+                                                        const canCustomize = !isOdontologoOwner && !hasCustomHourlyRule && !isLaboratorio;
 
-                                                        if (usesCentralizedHourlyValue) {
+                                                        if (!isEditableHourlyRate) {
                                                             return (
                                                                 <div>
                                                                     <div className="relative">
@@ -2491,6 +2494,22 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                                                                         El valor por hora para este rol se administra centralizadamente desde la pestaña de Configuración &gt; Valores Hora Staff.
                                                                     </p>
+                                                                    {canCustomize && (
+                                                                        <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={formData.valor_hora_personalizado || false}
+                                                                                onChange={(e) => {
+                                                                                    setFormData({
+                                                                                        ...formData,
+                                                                                        valor_hora_personalizado: e.target.checked
+                                                                                    });
+                                                                                }}
+                                                                                className="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                                                            />
+                                                                            <span className="text-xs text-slate-600 dark:text-slate-400 font-semibold">Usar valor hora personalizado para este prestador</span>
+                                                                        </label>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         }
@@ -2508,6 +2527,22 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                                                                         Este prestador tiene reglas propias de horas base/extra, por eso el valor hora se edita de forma individual.
                                                                     </p>
+                                                                )}
+                                                                {canCustomize && (
+                                                                    <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={formData.valor_hora_personalizado || false}
+                                                                            onChange={(e) => {
+                                                                                setFormData({
+                                                                                    ...formData,
+                                                                                    valor_hora_personalizado: e.target.checked
+                                                                                });
+                                                                            }}
+                                                                            className="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                                                        />
+                                                                        <span className="text-xs text-slate-600 dark:text-slate-400 font-semibold">Usar valor hora personalizado para este prestador</span>
+                                                                    </label>
                                                                 )}
                                                             </div>
                                                         );

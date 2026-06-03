@@ -124,7 +124,7 @@ function SortableRow({
 // ── Main component ──────────────────────────────────────────────────────────
 export default function ConfiguracionTab({ sucursal }: Props) {
     const { categoria } = useAuth();
-    const canManageProviderStatus = categoria === "owner";
+    const canManageProviderStatus = categoria === "owner" || categoria === "admin";
     const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
     const [providerConfigTab, setProviderConfigTab] = useState<"categorias" | "prestadores" | "tipos" | "valores-hora">("categorias");
     const [personal, setPersonal] = useState<Personal[]>([]);
@@ -695,7 +695,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
 
                     {!canManageProviderStatus && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
-                            Solo un Owner puede agregar o eliminar períodos.
+                            Solo un Administrador o Dueño puede agregar o eliminar períodos.
                         </p>
                     )}
                 </div>
@@ -756,7 +756,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                         </p>
                         {!canManageProviderStatus && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                                Solo el usuario owner puede cambiar estados. En este perfil es solo lectura.
+                                Solo un Administrador o Dueño puede cambiar estados. En este perfil es solo lectura.
                             </p>
                         )}
                     </div>
