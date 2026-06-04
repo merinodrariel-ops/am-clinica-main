@@ -1,216 +1,243 @@
-import { getCurrentWorkerProfile, getWorkerLiquidations, getWorkerLogs } from '@/app/actions/worker-portal';
-import { DollarSign, TrendingUp, Calendar, CheckCircle2, Clock, ArrowDown, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { getCurrentWorkerProfile, getWorkerLiquidations } from '@/app/actions/worker-portal';
+import { getMisPrestaciones, type PrestacionRealizada } from '@/app/actions/prestaciones';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Calendar, CheckCircle2, Clock, DollarSign, FileText, Stethoscope } from 'lucide-react';
+import { getLocalYearMonth } from '@/lib/local-date';
 
 const STATUS_CONFIG = {
-    paid: { label: 'Pagado', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-    approved: { label: 'Aprobado', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
-    pending: { label: 'Pendiente', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-    rejected: { label: 'Rechazado', color: 'text-red-400 bg-red-500/10 border-red-500/20' },
+    paid: { label: 'Pagado', color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', icon: CheckCircle2 },
+    approved: { label: 'Aprobado', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20', icon: CheckCircle2 },
+    pending: { label: 'Pendiente', color: 'text-amber-300 bg-amber-500/10 border-amber-500/20', icon: Clock },
+    rejected: { label: 'Rechazado', color: 'text-red-300 bg-red-500/10 border-red-500/20', icon: Clock },
 };
+
+function formatMoney(value?: number | null, currency: 'ARS' | 'USD' = 'ARS') {
+    if (!value) return currency === 'USD' ? 'USD 0' : '$0';
+    if (currency === 'USD') return `USD ${value.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`;
+    return `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+}
+
+function monthLabel(mes: string) {
+    const normalized = mes.length === 7 ? `${mes}-02` : mes;
+    return new Date(normalized + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+}
+
+function shiftMonth(mes: string, delta: number) {
+    const [year, month] = mes.split('-').map(Number);
+    const date = new Date(year, month - 1 + delta, 1);
+    return getLocalYearMonth(date);
+}
+
+function countByPrestacion(items: PrestacionRealizada[]) {
+    const map = new Map<string, { name: string; count: number; ars: number; usd: number }>();
+
+    for (const item of items) {
+        const name = item.prestacion_nombre || 'Prestación sin nombre';
+        const current = map.get(name) || { name, count: 0, ars: 0, usd: 0 };
+        current.count += 1;
+        if (item.moneda_cobro === 'USD') current.usd += Number(item.monto_honorarios || 0);
+        else current.ars += Number(item.monto_honorarios || 0);
+        map.set(name, current);
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.count - a.count || b.ars + b.usd - (a.ars + a.usd));
+}
+
+function Variation({ current, previous }: { current: number; previous: number }) {
+    const delta = current - previous;
+    const Icon = delta > 0 ? ArrowUpRight : delta < 0 ? ArrowDownRight : ArrowRight;
+    const color = delta > 0 ? 'text-emerald-300' : delta < 0 ? 'text-amber-300' : 'text-slate-400';
+
+    return (
+        <span className={`inline-flex items-center gap-1 text-xs font-bold ${color}`}>
+            <Icon size={14} />
+            {delta === 0 ? 'Sin cambio' : `${delta > 0 ? '+' : ''}${delta} vs mes anterior`}
+        </span>
+    );
+}
 
 export default async function LiquidationPage() {
     const worker = await getCurrentWorkerProfile();
     if (!worker) return <div className="p-12 text-center text-slate-500">Perfil no encontrado.</div>;
 
-    const liquidations = await getWorkerLiquidations(worker.id);
-    const workerLogs = await getWorkerLogs(worker.id);
+    const currentMonth = getLocalYearMonth();
+    const previousMonth = shiftMonth(currentMonth, -1);
 
-    const totalEarned = liquidations.filter(l => l.estado === 'paid').reduce((s, l) => s + (l.total_ars || 0), 0);
-    const totalHours = liquidations.reduce((s, l) => s + (l.total_horas || 0), 0);
-    const lastLiq = liquidations[0];
+    const [liquidations, currentPrestaciones, previousPrestaciones] = await Promise.all([
+        getWorkerLiquidations(worker.id),
+        getMisPrestaciones(worker.id, currentMonth),
+        getMisPrestaciones(worker.id, previousMonth),
+    ]);
+
+    const paidTotal = liquidations.filter(l => l.estado === 'paid').reduce((s, l) => s + (l.total_ars || 0), 0);
+    const pendingTotal = liquidations.filter(l => l.estado !== 'paid' && l.estado !== 'rejected').reduce((s, l) => s + (l.total_ars || 0), 0);
+    const latestLiquidation = liquidations[0];
+    const prestacionesRanking = countByPrestacion(currentPrestaciones.prestaciones);
+    const topPrestacion = prestacionesRanking[0];
 
     return (
-        <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in duration-700 pb-16">
-            {/* Header */}
-            <div className="border-b border-slate-800/50 pb-6">
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">Mis Liquidaciones</h1>
-                <p className="text-slate-400 mt-1 font-medium">Historial de pagos y detalles mensuales.</p>
+        <div className="mx-auto max-w-5xl space-y-6 pb-16">
+            <div className="space-y-2 border-b border-slate-800/50 pb-5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-indigo-300">Liquidaciones</p>
+                <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Pagos y prestaciones</h1>
+                <p className="max-w-2xl text-sm font-medium text-slate-400">
+                    Resumen mensual para corroborar lo cargado, lo pendiente y lo pagado por administración.
+                </p>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-emerald-900/20 to-slate-900 border border-emerald-500/20 rounded-2xl p-5">
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">Total Cobrado</p>
-                    <p className="text-2xl font-black text-white">${totalEarned.toLocaleString()}</p>
-                    <p className="text-emerald-500/60 text-[11px] mt-1">{liquidations.filter(l => l.estado === 'paid').length} liquidaciones pagas</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Total cobrado</p>
+                    <p className="mt-2 text-2xl font-black text-white">{formatMoney(paidTotal)}</p>
+                    <p className="mt-1 text-xs text-emerald-200/70">{liquidations.filter(l => l.estado === 'paid').length} liquidaciones pagas</p>
                 </div>
-                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Horas Totales</p>
-                    <p className="text-2xl font-black text-white">{totalHours}h</p>
-                    <p className="text-slate-600 text-[11px] mt-1">Registradas en el sistema</p>
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300">A corroborar</p>
+                    <p className="mt-2 text-2xl font-black text-white">{formatMoney(pendingTotal)}</p>
+                    <p className="mt-1 text-xs text-amber-200/70">Aprobado o pendiente de pago</p>
                 </div>
-                <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Valor/Hora</p>
-                    <p className="text-2xl font-black text-white">${(worker.valor_hora_ars || 0).toLocaleString()}</p>
-                    <p className="text-slate-600 text-[11px] mt-1">Tarifa actual</p>
-                </div>
-            </div>
-
-            {/* Daily Breakdown */}
-            <div className="mt-8">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Clock className="text-teal-400" size={20} />
-                        Detalle Diario
-                    </h2>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Últimos Registros</span>
-                </div>
-
-                <div className="grid gap-3">
-                    {workerLogs.length === 0 ? (
-                        <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-8 text-center">
-                            <Clock size={32} className="mx-auto text-slate-700 mb-3 opacity-20" />
-                            <p className="text-slate-500 text-sm">No se encontraron registros diarios para este período.</p>
-                        </div>
-                    ) : (
-                        workerLogs.map((log: any, idx: number) => {
-                            const dailyEarning = worker?.valor_hora_ars ? log.horas * worker.valor_hora_ars : 0;
-                            return (
-                                <div key={idx} className="group relative overflow-hidden bg-slate-900/40 hover:bg-slate-800/40 border border-slate-800/60 rounded-xl p-4 transition-all duration-300">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex flex-col items-center justify-center text-white">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">{format(new Date(log.fecha), 'EEE', { locale: es })}</span>
-                                                <span className="text-lg font-bold leading-none">{format(new Date(log.fecha), 'dd')}</span>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-white font-bold">{format(new Date(log.fecha), 'MMMM yyyy', { locale: es })}</span>
-                                                    {log.estado === 'pending' && (
-                                                        <span className="px-1.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[9px] font-bold uppercase">Validado</span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-3 text-sm">
-                                                    <div className="flex items-center gap-1 text-slate-400">
-                                                        <ArrowRight size={12} className="text-teal-500" />
-                                                        <span>{log.entrada}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 text-slate-400">
-                                                        <ArrowLeft size={12} className="text-rose-500" />
-                                                        <span>{log.salida}</span>
-                                                    </div>
-                                                    <div className="w-px h-3 bg-slate-700 mx-1" />
-                                                    <span className="text-slate-300 font-medium">{log.horas} horas</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-6 text-right sm:pr-2">
-                                            <div>
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5 tracking-tighter">Ganancia Estimada</p>
-                                                <p className="text-lg font-black text-white">
-                                                    {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(dailyEarning)}
-                                                </p>
-                                            </div>
-                                            <div className="text-teal-400/20 group-hover:text-teal-400/40 transition-colors">
-                                                <Sparkles size={24} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {/* Subtly highlight incomplete logs */}
-                                    {log.horas === 0 && (
-                                        <div className="absolute top-0 right-0 p-1">
-                                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-
-                    <p className="text-center text-[10px] text-slate-600 mt-2 uppercase tracking-[0.2em]">
-                        * Las ganancias son estimadas en base al valor hora configurado.
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Último período</p>
+                    <p className="mt-2 text-xl font-black capitalize text-white">
+                        {latestLiquidation ? monthLabel(latestLiquidation.mes) : monthLabel(currentMonth)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                        {latestLiquidation ? formatMoney(latestLiquidation.total_ars) : 'Sin liquidación emitida'}
                     </p>
                 </div>
             </div>
 
-            {/* Timeline */}
-            <div className="space-y-4">
-                <h2 className="text-lg font-bold text-white">Historial detallado</h2>
+            <section className="rounded-2xl border border-slate-800/70 bg-slate-900/40 p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+                            <Stethoscope size={18} className="text-indigo-300" />
+                            Prestaciones de {monthLabel(currentMonth)}
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-400">
+                            Base operativa para revisar la liquidación del mes.
+                        </p>
+                    </div>
+                    <Variation current={currentPrestaciones.prestaciones.length} previous={previousPrestaciones.prestaciones.length} />
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Cantidad</p>
+                        <p className="mt-1 text-2xl font-black text-white">{currentPrestaciones.prestaciones.length}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Total ARS</p>
+                        <p className="mt-1 text-xl font-black text-white">{formatMoney(currentPrestaciones.total_ars)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Total USD</p>
+                        <p className="mt-1 text-xl font-black text-white">{formatMoney(currentPrestaciones.total_usd, 'USD')}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Principal</p>
+                        <p className="mt-1 truncate text-base font-black text-white">{topPrestacion?.name || '-'}</p>
+                    </div>
+                </div>
+
+                <div className="mt-5 space-y-2">
+                    {prestacionesRanking.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center">
+                            <FileText size={30} className="mx-auto mb-3 text-slate-700" />
+                            <p className="text-sm font-medium text-slate-500">No hay prestaciones cargadas este mes.</p>
+                        </div>
+                    ) : (
+                        prestacionesRanking.slice(0, 8).map((item) => (
+                            <div key={item.name} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800/70 bg-slate-950/30 px-3 py-3">
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold text-white">{item.name}</p>
+                                    <p className="text-xs text-slate-500">{item.count} prestación{item.count === 1 ? '' : 'es'}</p>
+                                </div>
+                                <div className="shrink-0 text-right text-sm font-black text-slate-200">
+                                    {item.ars > 0 && <p>{formatMoney(item.ars)}</p>}
+                                    {item.usd > 0 && <p className="text-emerald-300">{formatMoney(item.usd, 'USD')}</p>}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </section>
+
+            <section className="space-y-3">
+                <h2 className="text-lg font-bold text-white">Historial de liquidaciones</h2>
 
                 {liquidations.length === 0 ? (
-                    <div className="text-center py-20 border border-dashed border-slate-800 rounded-3xl">
-                        <DollarSign size={40} className="mx-auto text-slate-700 mb-4" />
-                        <p className="text-slate-500">No hay liquidaciones registradas aún.</p>
-                        <p className="text-slate-600 text-sm mt-1">Las liquidaciones son generadas por administración cada mes.</p>
+                    <div className="rounded-3xl border border-dashed border-slate-800 px-4 py-16 text-center">
+                        <DollarSign size={40} className="mx-auto mb-4 text-slate-700" />
+                        <p className="text-slate-500">No hay liquidaciones registradas todavía.</p>
+                        <p className="mt-1 text-sm text-slate-600">Administración las emite al cierre de cada mes.</p>
                     </div>
                 ) : (
                     liquidations.map((liq, idx) => {
                         const status = STATUS_CONFIG[liq.estado as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+                        const StatusIcon = status.icon;
                         const tc = liq.tc_liquidacion || 1;
-                        const mesLabel = new Date(liq.mes + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
                         return (
-                            <div
+                            <article
                                 key={liq.id}
-                                className={`bg-slate-900/40 border border-slate-800/60 rounded-3xl overflow-hidden ${idx === 0 ? 'border-indigo-500/20 bg-indigo-500/5' : ''}`}
+                                className={`overflow-hidden rounded-2xl border bg-slate-900/40 ${idx === 0 ? 'border-indigo-500/30' : 'border-slate-800/60'}`}
                             >
-                                {/* Header row */}
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${idx === 0 ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-slate-900 border-slate-800'}`}>
-                                            <Calendar className={idx === 0 ? 'text-indigo-400' : 'text-slate-500'} size={20} />
+                                <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${idx === 0 ? 'border-indigo-500/20 bg-indigo-500/10' : 'border-slate-800 bg-slate-950'}`}>
+                                            <Calendar className={idx === 0 ? 'text-indigo-300' : 'text-slate-500'} size={19} />
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-white capitalize">{mesLabel}</h3>
-                                            {idx === 0 && <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Más reciente</span>}
+                                        <div className="min-w-0">
+                                            <h3 className="truncate font-bold capitalize text-white">{monthLabel(liq.mes)}</h3>
+                                            {idx === 0 && <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Más reciente</p>}
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-4 flex-wrap">
-                                        <div className="text-right">
-                                            <p className="text-2xl font-black text-white">${(liq.total_ars || 0).toLocaleString()}</p>
-                                            {liq.total_usd && (
-                                                <p className="text-xs text-slate-400">≈ USD {liq.total_usd.toFixed(2)} @ {tc}</p>
-                                            )}
+                                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                                        <div className="text-left sm:text-right">
+                                            <p className="text-2xl font-black text-white">{formatMoney(liq.total_ars)}</p>
+                                            {liq.total_usd ? <p className="text-xs text-slate-400">USD {liq.total_usd.toFixed(2)} @ {tc}</p> : null}
                                         </div>
-                                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase border ${status.color}`}>
+                                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold uppercase ${status.color}`}>
+                                            <StatusIcon size={13} />
                                             {status.label}
                                         </span>
                                     </div>
                                 </div>
 
-                                {/* Details row */}
-                                <div className="border-t border-slate-800/50 px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-950/20">
+                                <div className="grid grid-cols-2 gap-3 border-t border-slate-800/50 bg-slate-950/20 px-4 py-4 sm:grid-cols-4 sm:px-5">
                                     <div>
-                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">Horas</p>
-                                        <div className="flex items-center gap-1.5">
-                                            <Clock size={13} className="text-slate-500" />
-                                            <span className="font-mono font-bold text-slate-300 text-sm">{liq.total_horas}h</span>
-                                        </div>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Horas</p>
+                                        <p className="mt-1 text-sm font-bold text-slate-300">{liq.total_horas || 0}h</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">Valor/hora</p>
-                                        <span className="font-mono font-bold text-slate-300 text-sm">
-                                            ${(liq.valor_hora_snapshot || 0).toLocaleString()}
-                                        </span>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Valor/hora</p>
+                                        <p className="mt-1 text-sm font-bold text-slate-300">{formatMoney(liq.valor_hora_snapshot)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">TC Liquidación</p>
-                                        <span className="font-mono font-bold text-slate-300 text-sm">{tc}</span>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">TC</p>
+                                        <p className="mt-1 text-sm font-bold text-slate-300">{tc}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">Fecha de Pago</p>
-                                        <span className="font-mono font-bold text-slate-300 text-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Pago</p>
+                                        <p className="mt-1 text-sm font-bold text-slate-300">
                                             {liq.fecha_pago
                                                 ? new Date(liq.fecha_pago + 'T12:00:00').toLocaleDateString('es-AR')
-                                                : '---'}
-                                        </span>
+                                                : '-'}
+                                        </p>
                                     </div>
                                 </div>
 
                                 {liq.observaciones && (
-                                    <div className="px-6 py-3 bg-amber-500/5 border-t border-amber-500/10">
-                                        <p className="text-xs text-amber-400/80 font-medium">💬 {liq.observaciones}</p>
+                                    <div className="border-t border-amber-500/10 bg-amber-500/5 px-4 py-3 sm:px-5">
+                                        <p className="text-xs font-medium text-amber-300/80">{liq.observaciones}</p>
                                     </div>
                                 )}
-                            </div>
+                            </article>
                         );
                     })
                 )}
-            </div>
+            </section>
         </div>
     );
 }

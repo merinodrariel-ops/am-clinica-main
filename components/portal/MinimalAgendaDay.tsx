@@ -17,33 +17,35 @@ function statusMeta(status: string) {
 function AppointmentCard({ appointment }: { appointment: MinimalDoctorAppointment }) {
     const meta = statusMeta(appointment.status);
     return (
-        <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-4">
-                    <div className="w-20 shrink-0 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-center">
-                        <p className="text-lg font-black text-white">{appointment.startTime}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">{appointment.endTime}</p>
-                    </div>
-                    <div>
-                        <h3 className="text-base font-bold text-white">{appointment.patientName}</h3>
-                        <p className="mt-1 text-sm text-slate-300">{appointment.title}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                            <span className="inline-flex items-center gap-1">
-                                <Stethoscope size={12} />
-                                {appointment.type}
-                            </span>
-                            {appointment.durationMinutes > 0 && (
-                                <span className="inline-flex items-center gap-1">
-                                    <Clock size={12} />
-                                    {appointment.durationMinutes} min
-                                </span>
-                            )}
+        <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 p-3 sm:p-4">
+            <div className="flex items-start gap-3 sm:gap-4">
+                <div className="w-[4.5rem] shrink-0 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-2 text-center sm:w-20">
+                    <p className="text-base font-black leading-none text-white sm:text-lg">{appointment.startTime}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-300">{appointment.endTime}</p>
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                            <h3 className="truncate text-base font-bold text-white">{appointment.patientName}</h3>
+                            <p className="mt-1 line-clamp-2 text-sm leading-snug text-slate-300">{appointment.title}</p>
                         </div>
+                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold uppercase sm:px-3 sm:text-xs ${meta.className}`}>
+                            {meta.label}
+                        </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                            <Stethoscope size={12} className="shrink-0" />
+                            <span className="truncate">{appointment.type}</span>
+                        </span>
+                        {appointment.durationMinutes > 0 && (
+                            <span className="inline-flex items-center gap-1">
+                                <Clock size={12} />
+                                {appointment.durationMinutes} min
+                            </span>
+                        )}
                     </div>
                 </div>
-                <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold uppercase ${meta.className}`}>
-                    {meta.label}
-                </span>
             </div>
         </div>
     );
@@ -51,14 +53,14 @@ function AppointmentCard({ appointment }: { appointment: MinimalDoctorAppointmen
 
 export default function MinimalAgendaDay({ agenda, shared = false }: { agenda: DoctorAgendaDay; shared?: boolean }) {
     return (
-        <div className="mx-auto max-w-4xl space-y-8">
-            <div className="rounded-3xl border border-slate-800/70 bg-gradient-to-br from-slate-900 to-slate-950 p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mx-auto max-w-4xl space-y-4 sm:space-y-8">
+            <div className="rounded-2xl border border-slate-800/70 bg-gradient-to-br from-slate-900 to-slate-950 p-4 sm:rounded-3xl sm:p-6">
+                <div className="flex items-end justify-between gap-3">
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-indigo-300">
                             {shared ? 'Agenda compartida' : 'Mi agenda'}
                         </p>
-                        <h1 className="mt-2 text-3xl font-black tracking-tight text-white">
+                        <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
                             {agenda.doctorName}
                         </h1>
                         <p className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-400">
@@ -71,8 +73,8 @@ export default function MinimalAgendaDay({ agenda, shared = false }: { agenda: D
                             })}
                         </p>
                     </div>
-                    <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-5 py-3 text-right">
-                        <p className="text-3xl font-black text-white">{agenda.appointments.length}</p>
+                    <div className="shrink-0 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-right sm:px-5">
+                        <p className="text-2xl font-black text-white sm:text-3xl">{agenda.appointments.length}</p>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Turnos</p>
                     </div>
                 </div>

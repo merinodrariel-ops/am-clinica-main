@@ -40,7 +40,7 @@ interface Profesional {
 
 interface Props {
     worker: Worker;
-    viewMode: 'readonly' | 'registro';
+    viewMode: 'readonly' | 'registro' | 'own';
     tarifario: TarifarioItem[];
     resumenInicial: PrestacionesResumen;
     profesionales?: Profesional[];
@@ -159,6 +159,7 @@ export default function PrestacionesClient({
     profesionales,
 }: Props) {
     const isReadonly = viewMode === 'readonly';
+    const isOwnMode = viewMode === 'own';
 
     const [resumen, setResumen] = useState<PrestacionesResumen>(resumenInicial);
     const [mes, setMes] = useState(mesActual());
@@ -170,7 +171,7 @@ export default function PrestacionesClient({
     const [selectedDocId, setSelectedDocId] = useState<string | null>(
         !isReadonly && profesionales && profesionales.length > 0 ? profesionales[0].id : null
     );
-    const activeDocId = isReadonly ? worker.id : selectedDocId;
+    const activeDocId = isReadonly || isOwnMode ? worker.id : selectedDocId;
 
     // Form state
     const [form, setForm] = useState<Partial<RegistrarPrestacionInput>>({
@@ -386,12 +387,14 @@ export default function PrestacionesClient({
             {/* ── Header ── */}
             <div className="flex items-start justify-between gap-4 border-b border-slate-800/50 pb-6">
                 <div>
-                    {isReadonly ? (
+                    {isReadonly || isOwnMode ? (
                         <>
                             <h1 className="text-3xl font-extrabold text-white tracking-tight">Mis Prestaciones</h1>
                             <p className="text-slate-400 mt-1 font-medium flex items-center gap-2">
-                                <Eye size={13} className="text-slate-500" />
-                                Solo lectura — las prestaciones son cargadas por la clínica
+                                {isOwnMode ? <Stethoscope size={13} className="text-indigo-400" /> : <Eye size={13} className="text-slate-500" />}
+                                {isOwnMode
+                                    ? 'Carga mensual para que administración pueda liquidar'
+                                    : 'Solo lectura — las prestaciones son cargadas por la clínica'}
                             </p>
                         </>
                     ) : (
@@ -604,7 +607,7 @@ export default function PrestacionesClient({
                                         {tarifarioSearchTrimmed.length > 0 ? (
                                             /* Búsqueda activa: resultados planos */
                                             filteredTarifario.length === 0 ? (
-                                                <p className="text-xs text-slate-600 text-center py-6">Sin coincidencias para "{tarifarioSearch}"</p>
+                                                <p className="text-xs text-slate-600 text-center py-6">Sin coincidencias para &quot;{tarifarioSearch}&quot;</p>
                                             ) : (
                                                 filteredTarifario.map(item => (
                                                     <button
@@ -788,7 +791,7 @@ export default function PrestacionesClient({
                                 <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
                                     {tarifarioSearchTrimmed.length > 0 ? (
                                         filteredTarifario.length === 0 ? (
-                                            <p className="text-xs text-slate-600 text-center py-6">Sin coincidencias para "{tarifarioSearch}"</p>
+                                            <p className="text-xs text-slate-600 text-center py-6">Sin coincidencias para &quot;{tarifarioSearch}&quot;</p>
                                         ) : (
                                             filteredTarifario.map(item => (
                                                 <button

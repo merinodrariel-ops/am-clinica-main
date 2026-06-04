@@ -36,27 +36,27 @@ export default async function PortalAgendaPage({
     const nextDate = shiftDate(date, 1);
 
     return (
-        <div className="space-y-6 pb-16">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+        <div className="space-y-4 pb-16">
+            <div className="sticky top-[65px] z-20 -mx-3 border-b border-slate-800/70 bg-[#0a0a0f]/95 px-3 py-3 backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex sm:flex-wrap">
                     <Link
                         href={`/portal/agenda?date=${prevDate}`}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm font-semibold text-slate-300 hover:border-slate-700 hover:text-white"
+                        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-slate-800 bg-slate-900/60 px-2 py-2 text-xs font-semibold text-slate-300 hover:border-slate-700 hover:text-white sm:px-3 sm:text-sm"
                     >
                         <ChevronLeft size={16} />
-                        Día anterior
+                        <span className="hidden min-[380px]:inline">Anterior</span>
                     </Link>
                     <Link
                         href={`/portal/agenda?date=${today}`}
-                        className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm font-semibold text-indigo-300 hover:bg-indigo-500/20"
+                        className="min-h-11 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-center text-sm font-bold text-indigo-300 hover:bg-indigo-500/20"
                     >
                         Hoy
                     </Link>
                     <Link
                         href={`/portal/agenda?date=${nextDate}`}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm font-semibold text-slate-300 hover:border-slate-700 hover:text-white"
+                        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-slate-800 bg-slate-900/60 px-2 py-2 text-xs font-semibold text-slate-300 hover:border-slate-700 hover:text-white sm:px-3 sm:text-sm"
                     >
-                        Día siguiente
+                        <span className="hidden min-[380px]:inline">Siguiente</span>
                         <ChevronRight size={16} />
                     </Link>
                 </div>

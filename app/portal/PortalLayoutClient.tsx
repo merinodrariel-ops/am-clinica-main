@@ -3,29 +3,23 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    LayoutDashboard,
     CalendarDays,
-    Target,
     DollarSign,
-    Users,
-    Award,
+    FileText,
     LogOut,
     Settings,
     ChevronRight,
     Stethoscope,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 const NAV_ITEMS = [
-    { href: '/portal/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/portal/agenda', icon: CalendarDays, label: 'Mi Agenda' },
     { href: '/portal/prestaciones', icon: Stethoscope, label: 'Mis Prestaciones' },
-    { href: '/portal/goals', icon: Target, label: 'Objetivos' },
     { href: '/portal/liquidation', icon: DollarSign, label: 'Liquidaciones' },
-    { href: '/portal/profile', icon: Users, label: 'Mi Ficha' },
-    { href: '/portal/medals', icon: Award, label: 'Medallas' },
 ];
 
-function NavLink({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
+function NavLink({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
     const pathname = usePathname();
     const isActive = pathname === href || pathname.startsWith(href + '/');
 
@@ -54,12 +48,13 @@ export default function PortalLayoutClient({ children, workerName, workerRole, w
     workerInitials: string;
 }) {
     const isAdmin = workerRole?.toLowerCase().includes('admin') || workerRole?.toLowerCase().includes('administra');
+    const pathname = usePathname();
 
     return (
-        <div className="flex h-screen bg-[#0a0a0f] text-slate-100 font-sans antialiased selection:bg-indigo-500/30">
+        <div className="min-h-screen bg-[#0a0a0f] text-slate-100 font-sans antialiased selection:bg-indigo-500/30 lg:flex lg:h-screen">
 
             {/* Sidebar */}
-            <aside className="w-64 border-r border-slate-800/60 bg-slate-950/60 backdrop-blur-xl flex flex-col justify-between flex-shrink-0">
+            <aside className="hidden w-64 flex-shrink-0 flex-col justify-between border-r border-slate-800/60 bg-slate-950/60 backdrop-blur-xl lg:flex">
                 <div>
                     {/* Logo */}
                     <div className="p-6 border-b border-slate-800/40">
@@ -99,6 +94,13 @@ export default function PortalLayoutClient({ children, workerName, workerRole, w
 
                 {/* Footer */}
                 <div className="p-3 border-t border-slate-800/40 space-y-1">
+                    <Link
+                        href="/portal/profile"
+                        className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all group"
+                    >
+                        <FileText size={17} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
+                        <span>Mi Ficha</span>
+                    </Link>
                     {isAdmin && (
                         <Link
                             href="/caja-admin/personal"
@@ -118,12 +120,58 @@ export default function PortalLayoutClient({ children, workerName, workerRole, w
                 </div>
             </aside>
 
+            {/* Mobile top identity bar */}
+            <header className="sticky top-0 z-30 border-b border-slate-800/70 bg-slate-950/95 px-4 py-3 backdrop-blur-xl lg:hidden">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-xs font-black text-white">
+                            {workerInitials}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-white">{workerName || 'Portal AM'}</p>
+                            <p className="truncate text-[10px] font-bold uppercase tracking-widest text-indigo-300">
+                                {workerRole || 'Prestador'}
+                            </p>
+                        </div>
+                    </div>
+                    <Link
+                        href="/portal/profile"
+                        aria-label="Mi ficha"
+                        className="rounded-xl border border-slate-800 bg-slate-900/70 p-2 text-slate-400 hover:text-white"
+                    >
+                        <FileText size={18} />
+                    </Link>
+                </div>
+            </header>
+
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto bg-[#0a0a0f]">
-                <div className="p-8 max-w-7xl mx-auto">
+                <div className="mx-auto max-w-7xl px-3 py-4 pb-28 sm:px-5 md:p-8 lg:pb-8">
                     {children}
                 </div>
             </main>
+
+            {/* Mobile primary navigation */}
+            <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t border-slate-800/80 bg-slate-950/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur-xl lg:hidden">
+                {NAV_ITEMS.map(item => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+
+                    return (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-bold transition-colors ${isActive
+                                ? 'bg-indigo-500/10 text-indigo-300'
+                                : 'text-slate-500 hover:text-slate-200'
+                                }`}
+                        >
+                            <Icon size={20} />
+                            <span>{item.label.replace('Mi ', '')}</span>
+                        </Link>
+                    );
+                })}
+            </nav>
         </div>
     );
 }

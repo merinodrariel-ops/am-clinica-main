@@ -1,6 +1,7 @@
 import { getCurrentWorkerProfile, getUserAppProfile } from '@/app/actions/worker-portal';
 import {
     getTarifarioCompleto,
+    getTarifarioParaDoctor,
     getMisPrestaciones,
     getProfesionales,
 } from '@/app/actions/prestaciones';
@@ -35,7 +36,8 @@ export default async function PrestacionesPage() {
     const appProfile = await getUserAppProfile();
     const categoria = appProfile?.categoria ?? '';
     const isRegistroMode = REGISTRO_CATEGORIAS.includes(categoria);
-    const viewMode = isRegistroMode ? 'registro' : 'readonly';
+    const canRegisterOwn = ['odontologo', 'profesional'].includes((worker.tipo || '').toLowerCase());
+    const viewMode = isRegistroMode ? 'registro' : canRegisterOwn ? 'own' : 'readonly';
 
     let tarifario: Awaited<ReturnType<typeof getTarifarioCompleto>> = [];
     let resumen: Awaited<ReturnType<typeof getMisPrestaciones>> = {
@@ -46,8 +48,11 @@ export default async function PrestacionesPage() {
 
     try {
         if (!isRegistroMode) {
-            // Odontólogo: solo ve sus propias prestaciones, sin tarifario
             resumen = await getMisPrestaciones(worker.id);
+            if (canRegisterOwn) {
+                const ownTarifario = await getTarifarioParaDoctor(worker.id);
+                tarifario = ownTarifario.items;
+            }
         } else {
             // Admin/asistente/owner: carga el tarifario completo y la lista de profesionales
             [tarifario, profesionales] = await Promise.all([
