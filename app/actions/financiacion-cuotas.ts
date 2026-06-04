@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { calculateInstallmentCreditBalance } from '@/lib/caja-recepcion/credit-balance';
 
 type MatchMethod = 'paciente_id' | 'presupuesto_id' | 'dni' | 'nombre_fuzzy';
 type SyncFailureCode =
@@ -24,6 +25,7 @@ interface SyncCuotaParams {
     cuotasTotal?: number | null;
     presupuestoRef?: string | null;
     observaciones?: string | null;
+    saldoFavorManualUsd?: number | null;
 }
 
 interface SyncCuotaResult {
@@ -368,19 +370,15 @@ export async function syncPagoCuotaAction(params: SyncCuotaParams): Promise<Sync
         const cuotaValue = getPlanNumber(matched, 'monto_cuota_usd') || params.montoUsd;
         const currentSaldo = getPlanNumber(matched, 'saldo_restante_usd');
 
-        const difference = params.montoUsd - cuotaValue;
-        let nextSaldoFavor = currentSaldoFavor;
-        let saldoFavorGenerado = 0;
-        let saldoFavorAplicado = 0;
-
-        if (difference > 0) {
-            saldoFavorGenerado = difference;
-            nextSaldoFavor += difference;
-        } else if (difference < 0) {
-            const absDiff = Math.abs(difference);
-            saldoFavorAplicado = Math.min(absDiff, currentSaldoFavor);
-            nextSaldoFavor -= saldoFavorAplicado;
-        }
+        const creditBalance = calculateInstallmentCreditBalance({
+            cashPaidUsd: params.montoUsd,
+            installmentUsd: cuotaValue,
+            currentPatientCreditUsd: currentSaldoFavor,
+            manualHistoricalCreditUsd: params.saldoFavorManualUsd || 0,
+        });
+        const nextSaldoFavor = creditBalance.nextPatientCreditUsd;
+        const saldoFavorGenerado = creditBalance.creditGeneratedUsd;
+        const saldoFavorAplicado = creditBalance.creditAppliedUsd;
 
         // Apply patient credit balance update if changed
         if (nextSaldoFavor !== currentSaldoFavor) {

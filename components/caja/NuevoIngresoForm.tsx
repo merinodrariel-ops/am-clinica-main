@@ -148,7 +148,7 @@ interface PaymentSplit {
     canal_destino: CanalDestinoIngreso;
 }
 
-const METODOS_PAGO = [
+const METODOS_PAGO: Array<{ value: Exclude<MetodoPagoIngreso, 'Mixto'>; label: string; icon: string }> = [
     { value: 'Efectivo', label: 'Efectivo', icon: '💵' },
     { value: 'Transferencia', label: 'Transferencia', icon: '🏦' },
     { value: 'Tarjeta_Credito', label: 'Tarjeta de Crédito', icon: '💳' },
@@ -191,6 +191,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     const [baseInstallmentAmount, setBaseInstallmentAmount] = useState<number>(0);
     const [saldoFavorDisponible, setSaldoFavorDisponible] = useState<number>(0);
     const [aplicarSaldoFavor, setAplicarSaldoFavor] = useState<boolean>(false);
+    const [creditoHistoricoMonto, setCreditoHistoricoMonto] = useState<number>(0);
+    const [creditoHistoricoMoneda, setCreditoHistoricoMoneda] = useState<MonedaIngreso>('ARS');
     const [pagaCon, setPagaCon] = useState<number>(0);
     const [diferenciaDestino, setDiferenciaDestino] = useState<'saldo_a_favor' | 'vuelto'>('saldo_a_favor');
     const [lastTargetMonto, setLastTargetMonto] = useState<number>(0);
@@ -274,7 +276,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 });
             }
         }
-    }, [formData.es_cuota, formData.metodo_pago, formData.moneda, baseInstallmentAmount, useMultiplePayments, aplicarSaldoFavor, saldoFavorDisponible, bnaRate, lastTargetMonto]);
+    }, [formData.es_cuota, formData.metodo_pago, formData.moneda, baseInstallmentAmount, useMultiplePayments, aplicarSaldoFavor, saldoFavorDisponible, creditoHistoricoMonto, creditoHistoricoMoneda, bnaRate, lastTargetMonto]);
 
     function setSplitValue(index: number, updates: Partial<PaymentSplit>) {
         setPaymentSplits((prev) => {
@@ -368,6 +370,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             setPatientWhatsapp(data.whatsapp || '');
             setSaldoFavorDisponible(Number(data.saldo_a_favor_usd || 0));
             setAplicarSaldoFavor(false);
+            setCreditoHistoricoMonto(0);
             // Stay in Step 1 if values are 0, but if we have pre-filled we can go forward
             // setStep(prev => (prev < 2 ? 2 : prev)); 
         }
@@ -404,6 +407,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         setPatientWhatsapp(patient.whatsapp || '');
         setSaldoFavorDisponible(Number(patient.saldo_a_favor_usd || 0));
         setAplicarSaldoFavor(false);
+        setCreditoHistoricoMonto(0);
         setBaseInstallmentAmount(0); // Reset
         setPagaCon(0);
         setDiferenciaDestino('saldo_a_favor');
@@ -487,10 +491,18 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     function getRequiredSingleInstallmentUsd(): number {
         const surcharge = SURCHARGES[formData.metodo_pago] || 0;
         let targetUsd = baseInstallmentAmount * (1 + surcharge);
-        if (aplicarSaldoFavor) {
-            targetUsd = Math.max(0, targetUsd - saldoFavorDisponible);
-        }
+        targetUsd = Math.max(0, targetUsd - getInstallmentCreditToApplyUsd());
         return roundMoney(targetUsd);
+    }
+
+    function getHistoricalCreditUsd(): number {
+        if (!formData.es_cuota || creditoHistoricoMonto <= 0) return 0;
+        return calculateUsdEquivalentForAmount(creditoHistoricoMonto, creditoHistoricoMoneda);
+    }
+
+    function getInstallmentCreditToApplyUsd(): number {
+        const storedCreditUsd = aplicarSaldoFavor ? saldoFavorDisponible : 0;
+        return roundMoney(storedCreditUsd + getHistoricalCreditUsd());
     }
 
     function convertUsdToCurrency(montoUsd: number, moneda: MonedaIngreso): number {
@@ -556,7 +568,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             if (useMultiplePayments) {
                 const activeSplits = paymentSplits.filter(s => s.monto > 0);
                 const cashEquiv = getMixedCashEquivalentUsdTotal(activeSplits);
-                const requiredCash = aplicarSaldoFavor ? Math.max(0, baseInstallmentAmount - saldoFavorDisponible) : baseInstallmentAmount;
+                const requiredCash = Math.max(0, baseInstallmentAmount - getInstallmentCreditToApplyUsd());
                 if (cashEquiv < requiredCash - 0.05) {
                     alert(`El desglose mixto ingresado es insuficiente.\nTotal equivalente en efectivo: USD ${cashEquiv.toFixed(2)}\nRequerido: USD ${requiredCash.toFixed(2)} (efectivo equivalente).`);
                     return;
@@ -564,9 +576,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             } else {
                 const surcharge = SURCHARGES[formData.metodo_pago] || 0;
                 let expectedMontoUsd = baseInstallmentAmount * (1 + surcharge);
-                if (aplicarSaldoFavor) {
-                    expectedMontoUsd = Math.max(0, expectedMontoUsd - saldoFavorDisponible);
-                }
+                expectedMontoUsd = Math.max(0, expectedMontoUsd - getInstallmentCreditToApplyUsd());
                 const currentMontoUsd = calculateUsdEquivalent();
                 if (currentMontoUsd < expectedMontoUsd - 0.05) {
                     alert(`El monto ingresado para el medio de pago seleccionado es insuficiente.\nMonto con recargo requerido: USD ${expectedMontoUsd.toFixed(2)}\nMonto actual ingresado: USD ${currentMontoUsd.toFixed(2)}`);
@@ -586,6 +596,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             const conceptoFinal = formData.concepto_nombre || 'Sin concepto';
             const categoriaFinal = formData.categoria || 'Sin categoría';
             const cleanedObservation = formData.observaciones?.trim() || '';
+            const creditoHistoricoUsd = getHistoricalCreditUsd();
+            const creditoHistoricoObservation = formData.es_cuota && creditoHistoricoUsd > 0
+                ? `Credito historico aplicado: ${formatPaymentAmount(creditoHistoricoMonto, creditoHistoricoMoneda)} (USD ${creditoHistoricoUsd.toFixed(2)})`
+                : '';
             const receiptNumber = generateReciboNumber();
             const splitGroupId = useMultiplePayments ? makeUuid() : null;
 
@@ -629,6 +643,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     cleanedObservation,
                 ].filter(Boolean).join(' · ')
                 : cleanedObservation;
+            const finalObservation = [
+                financingObservation,
+                creditoHistoricoObservation,
+            ].filter(Boolean).join(' · ');
 
             // 3. Prepare Payloads
             // We'll insert one row per active payment split to have clean accounting by method/channel
@@ -646,7 +664,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     metodo_pago: split.metodo_pago,
                     canal_destino: split.canal_destino,
                     estado: formData.estado,
-                    observaciones: isFirst ? financingObservation : `(Pago Mixto ${index + 1}/${activeSplits.length}) ${financingObservation}`,
+                    observaciones: isFirst ? finalObservation : `(Pago Mixto ${index + 1}/${activeSplits.length}) ${finalObservation}`,
                     usd_equivalente: usdEquiv,
                     tipo_comprobante: formData.tipo_comprobante,
                     fecha_movimiento: fechaMovimiento,
@@ -672,7 +690,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             if (movementError) throw movementError;
             if (!insertedData || insertedData.length === 0) throw new Error("No se pudo insertar el movimiento");
 
-            const mainMovement = insertedData[0];
+            const typedInsertedData = insertedData as Array<{ id: string }>;
+            const mainMovement = typedInsertedData[0];
 
             // 7. Sync with Cuotas Plan (Using total sum)
             if (formData.es_cuota) {
@@ -683,11 +702,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     pacienteNombre: formData.paciente_nombre,
                     montoUsd: totalUsdEquiv,
                     montoOriginal: useMultiplePayments ? totalUsdEquiv : formData.monto, // simplified for multi-currency
-                    moneda: useMultiplePayments ? 'USD' : formData.moneda as any,
+                    moneda: useMultiplePayments ? 'USD' : formData.moneda,
                     cuotaNro: formData.cuota_nro,
                     cuotasTotal: formData.cuotas_total,
                     presupuestoRef: formData.presupuesto_ref,
                     observaciones: cleanedObservation,
+                    saldoFavorManualUsd: creditoHistoricoUsd,
                 });
             }
 
@@ -761,7 +781,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     const base64Data = imageDataUrl.split(',')[1];
 
                     // Link receipt to all movements inserted
-                    await Promise.all(insertedData.map((m: any) =>
+                    await Promise.all(typedInsertedData.map((m) =>
                         saveReceiptAndLinkToMovement(m.id, receiptNumber, base64Data)
                     ));
                 }
@@ -788,9 +808,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
             onSuccess();
             setStep(5);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error saving income:', error);
-            const errorMessage = error.message || error.details || (typeof error === 'string' ? error : 'Error desconocido');
+            const errorMessage = error instanceof Error
+                ? error.message
+                : typeof error === 'object' && error !== null && 'details' in error
+                    ? String((error as { details?: unknown }).details || 'Error desconocido')
+                    : typeof error === 'string' ? error : 'Error desconocido';
             alert('Error al guardar el ingreso: ' + errorMessage);
         } finally {
             setSaving(false);
@@ -803,6 +827,8 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         setUseMultiplePayments(false);
         setSaldoFavorDisponible(0);
         setAplicarSaldoFavor(false);
+        setCreditoHistoricoMonto(0);
+        setCreditoHistoricoMoneda('ARS');
         setPagaCon(0);
         setDiferenciaDestino('saldo_a_favor');
         setLastTargetMonto(0);
@@ -1034,7 +1060,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                             onClick={() => {
                                                                 setFormData({
                                                                     ...formData,
-                                                                    metodo_pago: m.value as any,
+                                                                    metodo_pago: m.value,
                                                                     canal_destino: m.value === 'MercadoPago' ? 'MP' : m.value === 'Cripto' ? 'USDT' : 'Empresa'
                                                                 });
                                                             }}
@@ -1102,6 +1128,49 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                             </div>
                                                         )}
 
+                                                        <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl space-y-2">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div>
+                                                                    <p className="text-xs font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                                                                        Crédito histórico a aplicar
+                                                                    </p>
+                                                                    <p className="text-[10px] font-bold text-emerald-700/80 dark:text-emerald-400/80">
+                                                                        Usalo solo para saldos viejos que estaban anotados fuera del sistema.
+                                                                    </p>
+                                                                </div>
+                                                                {getHistoricalCreditUsd() > 0 && (
+                                                                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 font-mono shrink-0">
+                                                                        USD {getHistoricalCreditUsd().toFixed(2)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <MoneyInput
+                                                                    value={creditoHistoricoMonto}
+                                                                    onChange={setCreditoHistoricoMonto}
+                                                                    className="flex-1 h-10 bg-white dark:bg-gray-900 border-emerald-200 dark:border-emerald-800 focus-visible:ring-emerald-500 font-bold"
+                                                                    placeholder="0"
+                                                                />
+                                                                <div className="flex rounded-xl overflow-hidden border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-900 shrink-0">
+                                                                    {['ARS', 'USD'].map((moneda) => (
+                                                                        <button
+                                                                            key={moneda}
+                                                                            type="button"
+                                                                            onClick={() => setCreditoHistoricoMoneda(moneda as MonedaIngreso)}
+                                                                            className={clsx(
+                                                                                "px-3 text-[10px] font-black transition-all",
+                                                                                creditoHistoricoMoneda === moneda
+                                                                                    ? "bg-emerald-600 text-white"
+                                                                                    : "text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                                                                            )}
+                                                                        >
+                                                                            {moneda}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
                                                         <div className="space-y-1.5 text-xs">
                                                             <div className="flex justify-between text-gray-500">
                                                                 <span>Cuota base (Efectivo)</span>
@@ -1117,6 +1186,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                 <div className="flex justify-between text-green-600 dark:text-green-400">
                                                                     <span>Crédito aplicado</span>
                                                                     <span className="font-bold font-mono">-USD {Math.min(saldoFavorDisponible, baseInstallmentAmount * (1 + surcharge)).toFixed(2)}</span>
+                                                                </div>
+                                                            )}
+                                                            {getHistoricalCreditUsd() > 0 && (
+                                                                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                                                    <span>Crédito histórico manual</span>
+                                                                    <span className="font-bold font-mono">-USD {getHistoricalCreditUsd().toFixed(2)}</span>
                                                                 </div>
                                                             )}
                                                             <div className="pt-2 border-t border-blue-100 dark:border-blue-800/40 flex justify-between text-gray-900 dark:text-white font-black text-sm">
@@ -1253,13 +1328,13 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                         placeholder="0"
                                                                     />
                                                                     <div className="flex border rounded-lg overflow-hidden shrink-0">
-                                                                        {['ARS', 'USD'].map(curr => (
+                                                                        {(['ARS', 'USD'] as MonedaIngreso[]).map(curr => (
                                                                             <button
                                                                                 key={curr}
                                                                                 type="button"
                                                                                 onClick={() => {
                                                                                     const newSplits = [...paymentSplits];
-                                                                                    newSplits[index].moneda = curr as any;
+                                                                                    newSplits[index].moneda = curr;
                                                                                     setPaymentSplits(newSplits);
                                                                                 }}
                                                                                 className={clsx(
@@ -1279,7 +1354,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                     value={split.metodo_pago}
                                                                     onChange={(e) => {
                                                                         const newSplits = [...paymentSplits];
-                                                                        newSplits[index].metodo_pago = e.target.value as any;
+                                                                        newSplits[index].metodo_pago = e.target.value as MetodoPagoIngreso;
                                                                         // Auto-channel
                                                                         newSplits[index].canal_destino = e.target.value === 'MercadoPago' ? 'MP' : e.target.value === 'Cripto' ? 'USDT' : 'Empresa';
                                                                         setPaymentSplits(newSplits);
@@ -1354,11 +1429,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                         <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Equivalencia de Pago Mixto</span>
                                                         <span className={clsx(
                                                             "px-2 py-0.5 text-[8px] font-black rounded uppercase shadow-sm",
-                                                            getMixedCashEquivalentUsdTotal(paymentSplits) >= baseInstallmentAmount - 0.05
+                                                            getMixedCashEquivalentUsdTotal(paymentSplits) >= Math.max(0, baseInstallmentAmount - getInstallmentCreditToApplyUsd()) - 0.05
                                                                 ? "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300"
                                                                 : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 animate-pulse"
                                                         )}>
-                                                            {getMixedCashEquivalentUsdTotal(paymentSplits) >= baseInstallmentAmount - 0.05 ? 'Completo' : 'Insuficiente'}
+                                                            {getMixedCashEquivalentUsdTotal(paymentSplits) >= Math.max(0, baseInstallmentAmount - getInstallmentCreditToApplyUsd()) - 0.05 ? 'Completo' : 'Insuficiente'}
                                                         </span>
                                                     </div>
                                                     <div className="space-y-2 text-xs">
@@ -1395,11 +1470,21 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                 <span>Cuota Base Requerida</span>
                                                                 <span className="font-bold font-mono">USD {baseInstallmentAmount.toFixed(2)}</span>
                                                             </div>
+                                                            {getInstallmentCreditToApplyUsd() > 0 && (
+                                                                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 text-[10px] uppercase font-black tracking-wider">
+                                                                    <span>Crédito aplicado</span>
+                                                                    <span className="font-bold font-mono">-USD {getInstallmentCreditToApplyUsd().toFixed(2)}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex justify-between text-gray-500 text-[10px] uppercase font-black tracking-wider">
+                                                                <span>Efectivo requerido</span>
+                                                                <span className="font-bold font-mono">USD {Math.max(0, baseInstallmentAmount - getInstallmentCreditToApplyUsd()).toFixed(2)}</span>
+                                                            </div>
                                                             <div className="flex justify-between text-gray-900 dark:text-white font-black text-sm">
                                                                 <span>Total Equivalente Neto</span>
                                                                 <span className={clsx(
                                                                     "font-mono",
-                                                                    getMixedCashEquivalentUsdTotal(paymentSplits) >= baseInstallmentAmount - 0.05
+                                                                    getMixedCashEquivalentUsdTotal(paymentSplits) >= Math.max(0, baseInstallmentAmount - getInstallmentCreditToApplyUsd()) - 0.05
                                                                         ? "text-green-600 dark:text-green-400"
                                                                         : "text-red-500 dark:text-red-400"
                                                                 )}>
