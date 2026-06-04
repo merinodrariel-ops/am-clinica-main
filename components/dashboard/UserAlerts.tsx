@@ -33,29 +33,15 @@ export default function UserAlerts() {
                 const { data, error } = await supabase
                     .from('profiles')
                     .select('id, full_name, email, estado, created_at, invitation_sent_at')
-                    .in('estado', ['invitado', 'suspendido']);
+                    .eq('estado', 'suspendido');
 
                 if (error) throw error;
 
                 const profiles = data as unknown as Profile[];
 
-                const pending = profiles?.filter((p) => p.estado === 'invitado') || [];
-                const suspended = profiles?.filter((p) => p.estado === 'suspendido') || [];
+                const suspended = profiles || [];
 
                 const newAlerts: UserAlert[] = [];
-
-                if (pending.length > 0) {
-                    newAlerts.push({
-                        type: 'pending',
-                        count: pending.length,
-                        users: pending.map((u) => ({
-                            id: u.id,
-                            full_name: u.full_name || 'Sin nombre',
-                            email: u.email || '',
-                            date: u.invitation_sent_at || u.created_at
-                        }))
-                    });
-                }
 
                 if (suspended.length > 0) {
                     newAlerts.push({

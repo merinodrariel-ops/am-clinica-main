@@ -23,10 +23,7 @@ const FinancialOverview = dynamic(() => import('@/components/dashboard/Financial
     ssr: false,
     loading: () => <Skeleton className="h-[400px] w-full rounded-xl" />
 });
-const ExecutiveCommandCenter = dynamic(() => import('@/components/dashboard/ExecutiveCommandCenter'), {
-    ssr: false,
-    loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />
-});
+
 const OwnerDashboard = dynamic(() => import('@/components/dashboard/OwnerDashboard'), {
     ssr: false,
     loading: () => <Skeleton className="h-[400px] w-full rounded-xl" />
@@ -80,8 +77,6 @@ export default function DashboardPage() {
 
             {isSuperAdmin && <UserAlerts />}
             {isReceptionOrAdmin && <CajaAlerts />}
-
-            {isManagement && <ExecutiveCommandCenter />}
 
             {/* Financial Overview */}
             {isManagement && <FinancialOverview />}
