@@ -22,6 +22,11 @@ import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
 import { crearPlanFinanciacionAction, syncPagoCuotaAction } from '@/app/actions/financiacion-cuotas';
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
+import {
+    getInstallmentCashEquivalentUsd,
+    getPaymentSurcharge,
+    type MetodoPagoCuota,
+} from '@/lib/caja-recepcion/payment-policy';
 
 interface Paciente {
     id_paciente: string;
@@ -156,15 +161,6 @@ const METODOS_PAGO: Array<{ value: Exclude<MetodoPagoIngreso, 'Mixto'>; label: s
     { value: 'MercadoPago', label: 'Mercado Pago', icon: '📱' },
     { value: 'Cripto', label: 'Cripto (USDT)', icon: '₿' },
 ];
-
-const SURCHARGES: Record<string, number> = {
-    Efectivo: 0.00,
-    Transferencia: 0.10,      // 10% surcharge
-    Tarjeta_Debito: 0.15,     // 15% surcharge
-    Tarjeta_Credito: 0.15,    // 15% surcharge
-    MercadoPago: 0.10,        // 10% surcharge (same as bank transfer)
-    Cripto: 0.00,             // 0% surcharge
-};
 
 export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, initialPatientId }: NuevoIngresoFormProps) {
     const [step, setStep] = useState(1);
@@ -489,7 +485,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     }
 
     function getRequiredSingleInstallmentUsd(): number {
-        const surcharge = SURCHARGES[formData.metodo_pago] || 0;
+        const surcharge = getPaymentSurcharge(formData.metodo_pago as MetodoPagoCuota);
         let targetUsd = baseInstallmentAmount * (1 + surcharge);
         targetUsd = Math.max(0, targetUsd - getInstallmentCreditToApplyUsd());
         return roundMoney(targetUsd);
@@ -539,11 +535,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     }
 
     function getMixedCashEquivalentUsdTotal(splits: PaymentSplit[]) {
-        return splits.reduce((acc, split) => {
-            const usd = calculateUsdEquivalentForAmount(split.monto, split.moneda);
-            const surcharge = SURCHARGES[split.metodo_pago] || 0;
-            return acc + (usd / (1 + surcharge));
-        }, 0);
+        return getInstallmentCashEquivalentUsd(splits.map(split => ({
+            amountUsd: calculateUsdEquivalentForAmount(split.monto, split.moneda),
+            metodoPago: split.metodo_pago as MetodoPagoCuota,
+        })));
     }
 
     async function handleSubmit() {
@@ -574,7 +569,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     return;
                 }
             } else {
-                const surcharge = SURCHARGES[formData.metodo_pago] || 0;
+                const surcharge = getPaymentSurcharge(formData.metodo_pago as MetodoPagoCuota);
                 let expectedMontoUsd = baseInstallmentAmount * (1 + surcharge);
                 expectedMontoUsd = Math.max(0, expectedMontoUsd - getInstallmentCreditToApplyUsd());
                 const currentMontoUsd = calculateUsdEquivalent();
@@ -621,6 +616,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             }
 
             const totalUsdEquiv = useMultiplePayments ? getMixedUsdTotal(activeSplits) : calculateUsdEquivalent();
+            const totalInstallmentCashEquivalentUsd = formData.es_cuota
+                ? useMultiplePayments
+                    ? getMixedCashEquivalentUsdTotal(activeSplits)
+                    : getInstallmentCashEquivalentUsd([{
+                        amountUsd: totalUsdEquiv,
+                        metodoPago: formData.metodo_pago as MetodoPagoCuota,
+                    }])
+                : totalUsdEquiv;
             const adelantoPrevioUsd = Math.max(0, formData.financ_adelanto_previo_usd || 0);
             const adelantoTotalUsd = adelantoPrevioUsd + totalUsdEquiv;
             const financInstallmentUsd = Math.round(Math.max(0, formData.financ_monto_cuota_usd || 0) * 100) / 100;
@@ -700,7 +703,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     movementId: mainMovement.id,
                     pacienteId: formData.paciente_id,
                     pacienteNombre: formData.paciente_nombre,
-                    montoUsd: totalUsdEquiv,
+                    montoUsd: totalInstallmentCashEquivalentUsd,
                     montoOriginal: useMultiplePayments ? totalUsdEquiv : formData.monto, // simplified for multi-currency
                     moneda: useMultiplePayments ? 'USD' : formData.moneda,
                     cuotaNro: formData.cuota_nro,
@@ -1095,7 +1098,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
                                             {/* Surcharge breakdown for Cuotas */}
                                             {(() => {
-                                                const surcharge = SURCHARGES[formData.metodo_pago] || 0;
+                                                const surcharge = getPaymentSurcharge(formData.metodo_pago as MetodoPagoCuota);
                                                 const montoRequeridoUsd = getRequiredSingleInstallmentUsd();
                                                 const montoRequeridoCobro = convertUsdToCurrency(montoRequeridoUsd, formData.moneda);
                                                 const excedenteCobro = roundMoney(pagaCon - montoRequeridoCobro);
@@ -1211,6 +1214,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                 </div>
                                                             )}
                                                         </div>
+
+                                                        {!useMultiplePayments && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setUseMultiplePayments(true)}
+                                                                className="mt-4 w-full py-3 rounded-xl border-2 border-dashed border-blue-200 dark:border-blue-800 bg-white/70 dark:bg-gray-900/60 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                                            >
+                                                                Usar pago mixto para esta cuota
+                                                            </button>
+                                                        )}
 
                                                         {/* Calculator Section */}
                                                         <div className="mt-4 pt-3 border-t border-dashed border-blue-100 dark:border-blue-800/40 space-y-3">
@@ -1439,7 +1452,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     <div className="space-y-2 text-xs">
                                                         {paymentSplits.filter(s => s.monto > 0).map((split, i) => {
                                                             const usdAmount = calculateUsdEquivalentForAmount(split.monto, split.moneda);
-                                                            const surcharge = SURCHARGES[split.metodo_pago] || 0;
+                                                            const surcharge = getPaymentSurcharge(split.metodo_pago as MetodoPagoCuota);
                                                             const equiv = usdAmount / (1 + surcharge);
                                                             return (
                                                                 <div key={split.id} className="flex justify-between items-center text-gray-600 dark:text-gray-400 font-mono text-[11px] border-b border-gray-100 dark:border-gray-800 pb-1.5 last:border-0 last:pb-0">
