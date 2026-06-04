@@ -68,11 +68,9 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
     const [copied, setCopied] = useState(false);
 
     function copyFormLink() {
-        if (typeof window === 'undefined') return;
-        const origin = window.location.origin;
         const link = areaFilter && areaFilter !== 'todas'
-            ? `${origin}/trabaja-con-nosotros?area=${encodeURIComponent(areaFilter)}`
-            : `${origin}/trabaja-con-nosotros`;
+            ? `https://www.amesteticadental.com/trabaja-en-am?area=${encodeURIComponent(areaFilter)}`
+            : `https://www.amesteticadental.com/trabaja-en-am`;
 
         navigator.clipboard.writeText(link).then(() => {
             setCopied(true);
@@ -106,7 +104,10 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
             return;
         }
 
-        setCvUrls((prev) => ({ ...prev, [row.id]: result.url }));
+        // Append a dummy parameter ending in .pdf to help browser PDF plugins render it inline
+        const previewUrl = result.url.includes('?') ? `${result.url}&file=.pdf` : `${result.url}?file=.pdf`;
+
+        setCvUrls((prev) => ({ ...prev, [row.id]: previewUrl }));
         setActivePreviews((prev) => ({ ...prev, [row.id]: true }));
     }
 
@@ -289,11 +290,24 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                             {activePreviews[row.id] && (
                                 <div className="mt-5 border border-slate-200 rounded-xl overflow-hidden bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
                                     {(row.cv_mime_type === 'application/pdf' || row.cv_original_filename.toLowerCase().endsWith('.pdf')) ? (
-                                        <iframe
-                                            src={cvUrls[row.id]}
-                                            className="w-full h-[600px] border-0"
-                                            title={`Vista previa CV - ${row.full_name}`}
-                                        />
+                                        <div className="flex flex-col">
+                                            <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 text-xs flex justify-between items-center text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                                                <span className="font-semibold">Vista previa en pantalla</span>
+                                                <a
+                                                    href={cvUrls[row.id]}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition"
+                                                >
+                                                    Abrir en pestaña nueva ↗
+                                                </a>
+                                            </div>
+                                            <iframe
+                                                src={cvUrls[row.id]}
+                                                className="w-full h-[600px] border-0 bg-white"
+                                                title={`Vista previa CV - ${row.full_name}`}
+                                            />
+                                        </div>
                                     ) : (
                                         <div className="p-8 text-center text-slate-500">
                                             <p className="font-semibold text-slate-700 dark:text-slate-300">Previsualización no disponible</p>
