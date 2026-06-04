@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
 
 function getAdminClient() {
     return createAdminClient(
@@ -110,7 +111,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
 
     const { data } = await admin
         .from('registro_horas')
-        .select('personal_id, horas, hora_ingreso, hora_egreso, salida_dia_siguiente, personal!inner(nombre, apellido, valor_hora_ars, horas_base, costo_hora_extra)')
+        .select('personal_id, fecha, horas, hora_ingreso, hora_egreso, salida_dia_siguiente, personal!inner(nombre, apellido, valor_hora_ars, horas_base, costo_hora_extra, recargo_sabado, recargo_domingo_feriado, recargo_nocturno)')
         .gte('fecha', start)
         .lte('fecha', end);
 
@@ -122,7 +123,8 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
     const byPersonal = new Map<string, {
         nombre: string; apellido: string | null;
         valorHoraArs: number | null; horasBase: number | null; costoHoraExtra: number | null;
-        horas: number[]; ingresos: string[]; egresos: string[];
+        recargoSabado: boolean; recargoDomingoFeriado: boolean; recargoNocturno: boolean;
+        logs: any[];
     }>();
 
     for (const row of data as Record<string, unknown>[]) {
@@ -130,6 +132,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         const p = (Array.isArray(row.personal) ? row.personal[0] : row.personal) as {
             nombre: string; apellido: string | null;
             valor_hora_ars: number | null; horas_base: number | null; costo_hora_extra: number | null;
+            recargo_sabado?: boolean; recargo_domingo_feriado?: boolean; recargo_nocturno?: boolean;
         };
         if (!byPersonal.has(pid)) {
             byPersonal.set(pid, {
@@ -137,13 +140,19 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
                 valorHoraArs: p.valor_hora_ars ?? null,
                 horasBase: p.horas_base ?? null,
                 costoHoraExtra: p.costo_hora_extra ?? null,
-                horas: [], ingresos: [], egresos: [],
+                recargoSabado: p.recargo_sabado !== false,
+                recargoDomingoFeriado: p.recargo_domingo_feriado !== false,
+                recargoNocturno: !!p.recargo_nocturno,
+                logs: [],
             });
         }
         const entry = byPersonal.get(pid)!;
-        entry.horas.push(Number(row.horas) || 0);
-        if (row.hora_ingreso && row.hora_ingreso !== '00:00') entry.ingresos.push(row.hora_ingreso as string);
-        if (row.hora_egreso && row.hora_egreso !== '00:00') entry.egresos.push(row.hora_egreso as string);
+        entry.logs.push({
+            fecha: row.fecha,
+            horas: Number(row.horas) || 0,
+            hora_ingreso: row.hora_ingreso,
+            hora_egreso: row.hora_egreso,
+        });
     }
 
     const prestadores: ResumenPrestador[] = [];
@@ -151,8 +160,8 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
     let total_dias = 0;
 
     for (const [pid, e] of byPersonal.entries()) {
-        const th = Math.round(e.horas.reduce((a, b) => a + b, 0) * 100) / 100;
-        const dias = e.horas.length;
+        const th = Math.round(e.logs.reduce((a, b) => a + b.horas, 0) * 100) / 100;
+        const dias = e.logs.length;
         total_horas += th;
         total_dias += dias;
 
@@ -163,14 +172,22 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         let costoTotal: number | null = null;
         let horasExtra = 0;
         if (valorHora !== null) {
+            costoTotal = calculateAdjustedEarnings(e.logs, valorHora, {
+                recargo_sabado: e.recargoSabado,
+                recargo_domingo_feriado: e.recargoDomingoFeriado,
+                recargo_nocturno: e.recargoNocturno,
+                horas_base: horasBase,
+                costo_hora_extra: costoExtra,
+            });
+            costoTotal = Math.round(costoTotal);
+
             if (horasBase !== null && th > horasBase) {
                 horasExtra = Math.round((th - horasBase) * 100) / 100;
-                costoTotal = horasBase * valorHora + horasExtra * (costoExtra ?? valorHora);
-            } else {
-                costoTotal = th * valorHora;
             }
-            costoTotal = Math.round(costoTotal);
         }
+
+        const ingresos = e.logs.map(l => l.hora_ingreso).filter(h => h && h !== '00:00');
+        const egresos = e.logs.map(l => l.hora_egreso).filter(h => h && h !== '00:00');
 
         prestadores.push({
             personal_id: pid,
@@ -180,8 +197,8 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
             total_horas: th,
             horas_extra: horasExtra,
             prom_horas_dia: dias > 0 ? Math.round((th / dias) * 100) / 100 : 0,
-            hora_ingreso_min: e.ingresos.length > 0 ? e.ingresos.sort()[0] : null,
-            hora_egreso_max: e.egresos.length > 0 ? e.egresos.sort().at(-1)! : null,
+            hora_ingreso_min: ingresos.length > 0 ? ingresos.sort()[0] : null,
+            hora_egreso_max: egresos.length > 0 ? egresos.sort().at(-1)! : null,
             valor_hora_ars: valorHora,
             horas_base: horasBase,
             costo_hora_extra: costoExtra,

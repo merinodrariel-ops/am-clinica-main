@@ -136,6 +136,9 @@ export interface Personal {
     valor_hora_personalizado?: boolean;
     horas_base?: number | null;
     costo_hora_extra?: number | null;
+    recargo_sabado?: boolean;
+    recargo_domingo_feriado?: boolean;
+    recargo_nocturno?: boolean;
     modelo_pago: 'horas' | 'prestaciones' | 'mensual';
     activo: boolean;
     pagado_mes_actual?: boolean;
@@ -290,6 +293,9 @@ export interface CreatePersonalInput {
     valor_hora_personalizado?: boolean;
     horas_base?: number | null;
     costo_hora_extra?: number | null;
+    recargo_sabado?: boolean;
+    recargo_domingo_feriado?: boolean;
+    recargo_nocturno?: boolean;
     modelo_pago?: 'horas' | 'prestaciones' | 'mensual';
     empresa_prestadora_id?: string;
     descripcion?: string;
@@ -334,3 +340,21 @@ export const SUBTIPOS_ADJUNTO_OBLIGATORIO = [
     'Banco',
     'Liquidaciones',
 ];
+
+export interface PersonalValoresHoraHistoria {
+    id: string;
+    personal_id: string;
+    fecha_desde: string;
+    valor_hora_ars: number;
+    horas_base: number | null;
+    costo_hora_extra: number | null;
+    valor_hora_personalizado: boolean;
+    recargo_sabado: boolean;
+    recargo_domingo_feriado: boolean;
+    recargo_nocturno: boolean;
+    notas: string | null;
+    created_at: string;
+    created_by: string | null;
+    editor?: { full_name: string } | null;
+}
+

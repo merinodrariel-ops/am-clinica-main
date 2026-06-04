@@ -8,7 +8,7 @@ import {
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
-    AlignLeft, AlignCenter, AlignRight, Minus
+    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -878,6 +878,12 @@ export default function PhotoStudioModal({
     // Active file in the studio (may differ from initial file when user clicks thumbnails)
     const [activeFile, setActiveFile] = useState<DriveFile | null>(file);
     const [imageUrl, setImageUrl] = useState(() => file ? `/api/drive/file/${file.id}` : '');
+    const [imgLoaded, setImgLoaded] = useState(false);
+
+    // Reset loading flag whenever we switch to a Drive-proxied URL (not local blobs/base64)
+    useEffect(() => {
+        if (imageUrl.startsWith('/api/drive/file/')) setImgLoaded(false);
+    }, [imageUrl]);
 
     // Edit state
     const [rotation, setRotation] = useState(0);
@@ -1221,6 +1227,22 @@ export default function PhotoStudioModal({
 
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [saving, setSaving] = useState<'replace' | 'copy' | null>(null);
+
+    const [editedFileIds, setEditedFileIds] = useState<Set<string>>(() => {
+        if (typeof window === 'undefined') return new Set();
+        try {
+            const stored = localStorage.getItem(`edited_photos_${patientId}`);
+            return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+        } catch { return new Set(); }
+    });
+
+    const markAsEdited = useCallback((fileId: string) => {
+        setEditedFileIds(prev => {
+            const next = new Set([...prev, fileId]);
+            try { localStorage.setItem(`edited_photos_${patientId}`, JSON.stringify([...next])); } catch {}
+            return next;
+        });
+    }, [patientId]);
 
     const baseImageFiles = useMemo(() => allFolderFiles.filter(isImageFile), [allFolderFiles]);
     const [imageOrderIds, setImageOrderIds] = useState<string[]>(() => baseImageFiles.map(item => item.id));
@@ -4175,6 +4197,7 @@ export default function PhotoStudioModal({
                     return;
                 }
                 toast.success('Foto reemplazada en Drive');
+                markAsEdited(activeFile.id);
                 // Reset edit state and reload fresh from Drive (cache-busted)
                 setImageUrl(`/api/drive/file/${activeFile.id}?t=${Date.now()}`);
                 setRotation(0);
@@ -4197,6 +4220,7 @@ export default function PhotoStudioModal({
                 // Store the new file ID so the sync effect places it at the end of the filmstrip
                 if (result.fileId) {
                     pendingCopyIdRef.current = result.fileId;
+                    markAsEdited(result.fileId);
                 }
                 toast.success('Copia guardada en Drive');
             }
@@ -4250,6 +4274,11 @@ export default function PhotoStudioModal({
         objectFit: 'contain',
         display: 'block',
     };
+
+    // Fast thumbnail shown as blurred placeholder while the full-res loads
+    const thumbPlaceholderUrl = activeFile?.thumbnailLink
+        ? activeFile.thumbnailLink.replace(/=s\d+(-[a-z])?$/i, '=s400')
+        : null;
 
     return (
         <>
@@ -4556,6 +4585,11 @@ export default function PhotoStudioModal({
                                                 <Check size={16} className="text-white drop-shadow" />
                                             </div>
                                         )}
+                                        {(editedFileIds.has(f.id) || f.name.includes('_editada')) && (
+                                            <div className="absolute bottom-0.5 right-0.5 w-[15px] h-[15px] rounded-full bg-[#C9A96E] flex items-center justify-center shadow z-10" title="Foto editada">
+                                                <Sparkles size={8} className="text-black" />
+                                            </div>
+                                        )}
                                         {showDropTop && <div className="absolute -top-0.5 left-1 right-1 h-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
                                         {showDropBottom && <div className="absolute -bottom-0.5 left-1 right-1 h-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
                                     </button>
@@ -4693,6 +4727,7 @@ export default function PhotoStudioModal({
                                             src={imageUrl}
                                             alt={activeFile.name}
                                             crossOrigin="anonymous"
+                                            onLoad={() => setImgLoaded(true)}
                                             style={{
                                                 display: 'block',
                                                 maxWidth: '100%',
@@ -4817,13 +4852,36 @@ export default function PhotoStudioModal({
                                         })()}
                                         </>
                                     ) : (
-                                    <img
-                                        ref={imgRef}
-                                        src={imageUrl}
-                                        alt={activeFile.name}
-                                        crossOrigin="anonymous"
-                                        style={imageStyle}
-                                    />
+                                    <div className="relative" style={{ lineHeight: 0 }}>
+                                        {!imgLoaded && thumbPlaceholderUrl && (
+                                            <img
+                                                src={thumbPlaceholderUrl}
+                                                aria-hidden="true"
+                                                alt=""
+                                                style={{
+                                                    ...imageStyle,
+                                                    position: 'absolute',
+                                                    inset: 0,
+                                                    filter: 'blur(8px)',
+                                                    transform: imageStyle.transform,
+                                                    opacity: 0.7,
+                                                    pointerEvents: 'none',
+                                                }}
+                                            />
+                                        )}
+                                        <img
+                                            ref={imgRef}
+                                            src={imageUrl}
+                                            alt={activeFile.name}
+                                            crossOrigin="anonymous"
+                                            onLoad={() => setImgLoaded(true)}
+                                            style={{
+                                                ...imageStyle,
+                                                opacity: imgLoaded ? 1 : 0,
+                                                transition: imgLoaded ? 'opacity 0.2s ease' : 'none',
+                                            }}
+                                        />
+                                    </div>
                                     )}
                                     <canvas
                                         ref={drawCanvasRef}

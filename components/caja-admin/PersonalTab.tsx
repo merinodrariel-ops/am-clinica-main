@@ -58,7 +58,9 @@ import {
     createPersonal,
     updatePersonal,
     uploadPersonalDocument,
-    type CreatePersonalInput
+    type CreatePersonalInput,
+    getPersonalValoresHoraHistoria,
+    type PersonalValoresHoraHistoria
 } from '@/lib/caja-admin';
 import {
     type PrestacionLista,
@@ -277,6 +279,21 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         fechaPago: getLocalISODate(),
         observaciones: '',
     });
+
+    const [rateHistory, setRateHistory] = useState<PersonalValoresHoraHistoria[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+
+    const loadRateHistory = async (personalId: string) => {
+        setLoadingHistory(true);
+        try {
+            const history = await getPersonalValoresHoraHistoria(personalId);
+            setRateHistory(history);
+        } catch (err) {
+            console.error('Error loading custom rate history:', err);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
 
     useEffect(() => {
         setPortalReady(true);
@@ -1040,6 +1057,9 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             valor_hora_personalizado: p.valor_hora_personalizado ?? false,
             horas_base: p.horas_base ?? null,
             costo_hora_extra: p.costo_hora_extra ?? null,
+            recargo_sabado: p.recargo_sabado !== false,
+            recargo_domingo_feriado: p.recargo_domingo_feriado !== false,
+            recargo_nocturno: !!p.recargo_nocturno,
             descripcion: p.descripcion || '',
             matricula_provincial: p.matricula_provincial || '',
             especialidad: p.especialidad || '',
@@ -1050,6 +1070,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             activo: p.activo !== false,
             datos_bancarios: p.datos_bancarios || '',
         });
+        setRateHistory([]);
+        void loadRateHistory(p.id);
         setShowForm(true);
     }
 
@@ -1071,6 +1093,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const defaults = activeProviderCategory === 'todos' ? byCategory.odontologos : byCategory[activeProviderCategory];
 
         setEditingPersonal(null);
+        setRateHistory([]);
         setFormData({
             nombre: '',
             apellido: '',
@@ -1083,6 +1106,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             barrio_localidad: '',
             valor_hora_ars: 0,
             valor_hora_personalizado: false,
+            horas_base: null,
+            costo_hora_extra: null,
+            recargo_sabado: true,
+            recargo_domingo_feriado: true,
+            recargo_nocturno: false,
             descripcion: '',
             matricula_provincial: '',
             especialidad: '',
@@ -2589,6 +2617,50 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                 </div>
                                             )}
 
+                                            {formData.modelo_pago === 'horas' && (
+                                                <div className="md:col-span-2 space-y-3 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                                    <h5 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Configuración de Adicionales</h5>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={formData.recargo_sabado !== false}
+                                                                onChange={(e) => setFormData({ ...formData, recargo_sabado: e.target.checked })}
+                                                                className="rounded mt-1 text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 w-4 h-4"
+                                                            />
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Recargo Sábados (1.5x)</span>
+                                                                <p className="text-[10px] text-slate-400">Aplica recargo los sábados.</p>
+                                                            </div>
+                                                        </label>
+                                                        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={formData.recargo_domingo_feriado !== false}
+                                                                onChange={(e) => setFormData({ ...formData, recargo_domingo_feriado: e.target.checked })}
+                                                                className="rounded mt-1 text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 w-4 h-4"
+                                                            />
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Recargo Domingos/Feriados (2.0x)</span>
+                                                                <p className="text-[10px] text-slate-400">Aplica recargo domingos y feriados.</p>
+                                                            </div>
+                                                        </label>
+                                                        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!formData.recargo_nocturno}
+                                                                onChange={(e) => setFormData({ ...formData, recargo_nocturno: e.target.checked })}
+                                                                className="rounded mt-1 text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 w-4 h-4"
+                                                            />
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Recargo Nocturno (+20%)</span>
+                                                                <p className="text-[10px] text-slate-400">22h a 04h (asistente/admin).</p>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            )}
+
 
                                             <div className="md:col-span-2">
                                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -2606,6 +2678,85 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Historial de tarifas (solo en edición de prestadores por hora) */}
+                                {editingPersonal && formData.modelo_pago === 'horas' && (
+                                    <div className="border-t border-slate-200 dark:border-slate-800 pt-6 mt-6">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Clock className="w-4 h-4 text-indigo-500" />
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                                                Historial de Tarifas y Recargos
+                                            </h4>
+                                        </div>
+                                        
+                                        {loadingHistory ? (
+                                            <div className="py-6 text-center text-slate-400 text-xs">
+                                                <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto mb-2" />
+                                                Cargando historial de cambios...
+                                            </div>
+                                        ) : rateHistory.length === 0 ? (
+                                            <p className="text-xs text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 p-4 rounded-xl text-center">
+                                                No se registran cambios históricos de tarifa para este prestador.
+                                            </p>
+                                        ) : (
+                                            <div className="overflow-hidden border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40">
+                                                <div className="overflow-x-auto font-sans">
+                                                    <table className="w-full text-left text-[11px] border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-slate-100 dark:bg-slate-900 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
+                                                                <th className="p-2.5">Fecha</th>
+                                                                <th className="p-2.5">Valor Hora</th>
+                                                                <th className="p-2.5">Base/Extra</th>
+                                                                <th className="p-2.5">Recargos</th>
+                                                                <th className="p-2.5">Modificado Por</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                            {rateHistory.map((h) => {
+                                                                const hasCustomRule = h.horas_base !== null;
+                                                                return (
+                                                                    <tr key={h.id} className="hover:bg-slate-100/50 dark:hover:bg-slate-800/30 text-slate-600 dark:text-slate-300">
+                                                                        <td className="p-2.5 font-medium whitespace-nowrap">
+                                                                            {new Date(h.fecha_desde + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                                        </td>
+                                                                        <td className="p-2.5 font-bold text-slate-900 dark:text-white">
+                                                                            ${Number(h.valor_hora_ars || 0).toLocaleString('es-AR')}
+                                                                            {h.valor_hora_personalizado && (
+                                                                                <span className="ml-1 text-[9px] px-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Pers.</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="p-2.5">
+                                                                            {hasCustomRule ? (
+                                                                                <span>
+                                                                                    Base {h.horas_base}h · Extra: ${Number(h.costo_hora_extra || 0).toLocaleString('es-AR')}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-slate-400 dark:text-slate-500">—</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="p-2.5">
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {h.recargo_sabado && <span className="text-[9px] px-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Sáb</span>}
+                                                                                {h.recargo_domingo_feriado && <span className="text-[9px] px-1 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Dom/Fer</span>}
+                                                                                {h.recargo_nocturno && <span className="text-[9px] px-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Noc</span>}
+                                                                                {!h.recargo_sabado && !h.recargo_domingo_feriado && !h.recargo_nocturno && <span className="text-slate-400 dark:text-slate-500">Sin recargos</span>}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-2.5">
+                                                                            <div className="truncate max-w-[120px]" title={h.editor?.full_name || 'Sistema'}>
+                                                                                {h.editor?.full_name || 'Sistema'}
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Form Footer */}

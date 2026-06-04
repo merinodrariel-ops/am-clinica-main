@@ -50,3 +50,7 @@ google_client_secret.json
 
 # Visual brainstorming companion
 .superpowers/
+
+# Local scratch & temporary files
+/scratch/
+/horarios/

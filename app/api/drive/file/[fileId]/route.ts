@@ -14,21 +14,13 @@ export async function GET(
     try {
         const drive = getDriveClient();
 
-        // Get file metadata to check name/mimeType
-        const fileMetadata = await drive.files.get({
-            fileId,
-            fields: 'name, mimeType',
-        });
-
-        // Optional: Add security check here (e.g. check session or token).
-        // In production, you might want to verify the patient's identity.
-
         const response = await drive.files.get(
             { fileId, alt: 'media' },
             { responseType: 'stream' }
         );
 
-        // Create a ReadableStream from the Axios/Gaxios stream
+        const contentType = (response.headers as Record<string, string>)['content-type'] || 'image/jpeg';
+
         const stream = new ReadableStream({
             start(controller) {
                 response.data.on('data', (chunk: Buffer) => controller.enqueue(chunk));
@@ -38,9 +30,9 @@ export async function GET(
         });
 
         const headers = new Headers();
-        headers.set('Content-Type', fileMetadata.data.mimeType || 'application/octet-stream');
-        headers.set('Content-Disposition', `inline; filename="${fileMetadata.data.name}"`);
-        headers.set('Cache-Control', 'no-cache');
+        headers.set('Content-Type', contentType);
+        // Cache in the browser for 10 minutes — avoids re-fetching when navigating between photos
+        headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=60');
         // Allow canvas drawImage() without tainting (needed for PhotoStudio export)
         headers.set('Access-Control-Allow-Origin', '*');
 

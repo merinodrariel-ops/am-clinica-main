@@ -21,6 +21,7 @@ import {
     CreatePersonalInput,
     type CajaAdminCategoria,
     MotivoObservado,
+    PersonalValoresHoraHistoria,
 } from './types';
 import { calculateWorkedHours, inferSalidaDiaSiguiente } from './attendance-utils';
 import { summarizeCriticalObservedLeaders, type ObservadoLeaderRow } from './observados-summary';
@@ -243,6 +244,25 @@ export async function deleteValoresHoraHistoriaEntry(id: string): Promise<{ succ
     if (error) return { success: false, error: error.message };
     return { success: true };
 }
+
+export async function getPersonalValoresHoraHistoria(personalId: string): Promise<PersonalValoresHoraHistoria[]> {
+    const { data, error } = await getSupabase()
+        .from('personal_valores_hora_historia')
+        .select('*, profiles:created_by(full_name)')
+        .eq('personal_id', personalId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching personal valores hora historia:', error);
+        return [];
+    }
+    
+    return (data || []).map((row: any) => ({
+        ...row,
+        editor: Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+    }));
+}
+
 
 // =============================================
 // Cuentas Financieras

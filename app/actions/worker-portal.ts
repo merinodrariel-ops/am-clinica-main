@@ -502,7 +502,7 @@ export async function getWorkerMonthlyStats(personalId: string, month: number, y
     const [logsResult, achievements, workerResult] = await Promise.all([
         getWorkerLogs(personalId, startDate, endDate),
         getWorkerAchievements(personalId),
-        supabase.from(TableNames.Profiles).select('valor_hora_ars, area').eq('id', personalId).single()
+        supabase.from(TableNames.Profiles).select('valor_hora_ars, area, horas_base, costo_hora_extra, recargo_sabado, recargo_domingo_feriado, recargo_nocturno').eq('id', personalId).single()
     ]);
 
     const logs = logsResult || [];
@@ -510,7 +510,14 @@ export async function getWorkerMonthlyStats(personalId: string, month: number, y
     const area = workerResult.data?.area || '';
 
     const totalHours = logs.reduce((sum, log) => sum + Number(log.horas || 0), 0);
-    const totalEarnings = calculateAdjustedEarnings(logs, valor_hora_ars, area);
+    const totalEarnings = calculateAdjustedEarnings(logs, valor_hora_ars, {
+        area,
+        recargo_sabado: workerResult.data?.recargo_sabado,
+        recargo_domingo_feriado: workerResult.data?.recargo_domingo_feriado,
+        recargo_nocturno: workerResult.data?.recargo_nocturno,
+        horas_base: workerResult.data?.horas_base,
+        costo_hora_extra: workerResult.data?.costo_hora_extra,
+    });
     const totalXP = achievements.reduce((sum, wa: any) => sum + (wa.achievement?.xp_reward || 0), 0);
 
     return {
