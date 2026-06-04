@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Pencil, Trash2, Save, X, GripVertical, FileText, UserCheck, UserX } from "lucide-react";
+import { CalendarDays, Plus, Pencil, Trash2, Save, X, GripVertical, FileText, UserCheck, UserX } from "lucide-react";
 import {
     DndContext,
     closestCenter,
@@ -28,6 +28,7 @@ import { updateSucursalValoresHora, getValoresHoraHistoria, createValoresHoraHis
 import { CajaAdminCategoria, Sucursal, Personal, ValoresHoraHistoria } from "@/lib/caja-admin/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { PAYROLL_CALENDAR_2026 } from "@/lib/payroll-rules";
 
 interface Props {
     sucursal: Sucursal;
@@ -126,7 +127,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
     const { categoria } = useAuth();
     const canManageProviderStatus = categoria === "owner" || categoria === "admin";
     const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
-    const [providerConfigTab, setProviderConfigTab] = useState<"categorias" | "prestadores" | "tipos" | "valores-hora">("categorias");
+    const [providerConfigTab, setProviderConfigTab] = useState<"categorias" | "prestadores" | "tipos" | "valores-hora" | "calendario">("categorias");
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [personalLoading, setPersonalLoading] = useState(true);
     const [personalError, setPersonalError] = useState<string | null>(null);
@@ -141,11 +142,6 @@ export default function ConfiguracionTab({ sucursal }: Props) {
     const [isEditing, setIsEditing] = useState(false);
     const [editingItem, setEditingItem] = useState<Partial<CajaAdminCategoria>>({});
     const [error, setError] = useState<string | null>(null);
-
-    // Valores Hora global states
-    const [valorHoraStaff, setValorHoraStaff] = useState<number>(sucursal.valor_hora_staff_ars || 0);
-    const [valorHoraLimpieza, setValorHoraLimpieza] = useState<number>(sucursal.valor_hora_limpieza_ars || 0);
-    const [isSavingValoresHora, setIsSavingValoresHora] = useState(false);
 
     // Historical rates
     const [valoresHoraHistoria, setValoresHoraHistoria] = useState<ValoresHoraHistoria[]>([]);
@@ -343,26 +339,6 @@ export default function ConfiguracionTab({ sucursal }: Props) {
         }
     }
 
-    async function handleSaveValoresHora() {
-        if (!canManageProviderStatus) return;
-        setIsSavingValoresHora(true);
-        try {
-            const res = await updateSucursalValoresHora(sucursal.id, {
-                staff: valorHoraStaff,
-                limpieza: valorHoraLimpieza
-            });
-
-            if (!res.success) {
-                alert(res.error || 'No se pudieron actualizar los valores hora');
-                return;
-            }
-
-            alert('Valores actualizados exitosamente en toda la sucursal y la base de personal.');
-        } finally {
-            setIsSavingValoresHora(false);
-        }
-    }
-
     async function handleSavePeriodo() {
         if (!canManageProviderStatus || !newPeriodoFecha) return;
         setIsSavingPeriodo(true);
@@ -386,8 +362,6 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                     staff: vigente.valor_hora_staff_ars,
                     limpieza: vigente.valor_hora_limpieza_ars,
                 });
-                setValorHoraStaff(vigente.valor_hora_staff_ars);
-                setValorHoraLimpieza(vigente.valor_hora_limpieza_ars);
             }
             setShowAddPeriodo(false);
             setEditingPeriodoId(null);
@@ -535,7 +509,82 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                 >
                     Valores Hora
                 </button>
+                <button
+                    onClick={() => setProviderConfigTab("calendario")}
+                    className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${providerConfigTab === "calendario"
+                        ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border-b-2 border-indigo-500"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
+                >
+                    Calendario laboral
+                </button>
             </div>
+
+            {providerConfigTab === "calendario" && (
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <CalendarDays className="w-5 h-5 text-indigo-500" />
+                            Calendario laboral 2026
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Los días con pago doble aplican al recargo Domingos/Feriados. Los días optativos no pagan doble salvo decisión interna.
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-x-auto bg-white dark:bg-slate-900">
+                        <table className="w-full min-w-[760px] text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+                                    <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Fecha</th>
+                                    <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Día</th>
+                                    <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Liquidación</th>
+                                    <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Operación</th>
+                                    <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Nota</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {PAYROLL_CALENDAR_2026.map((day) => {
+                                    const date = new Date(`${day.date}T12:00:00`);
+                                    const dateLabel = date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+                                    const weekdayLabel = date.toLocaleDateString('es-AR', { weekday: 'short' });
+                                    const operationLabel = day.staffingRecommendation === 'prefer_close'
+                                        ? 'Preferir cerrar'
+                                        : day.staffingRecommendation === 'optional_minimal_staff'
+                                            ? 'Optativo / dotación mínima'
+                                            : 'Horario normal';
+
+                                    return (
+                                        <tr key={day.date} className="border-b last:border-0 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                                            <td className="px-4 py-3 text-slate-900 dark:text-white font-semibold whitespace-nowrap">
+                                                {dateLabel}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400 capitalize whitespace-nowrap">
+                                                {weekdayLabel}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${day.paysDouble
+                                                    ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                                                    }`}>
+                                                    {day.paysDouble ? 'Paga doble' : 'No paga doble'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                                                {operationLabel}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                                                <span className="font-medium text-slate-700 dark:text-slate-200">{day.label}</span>
+                                                {day.notes ? <span className="block text-xs mt-0.5">{day.notes}</span> : null}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {providerConfigTab === "valores-hora" && (
                 <div className="space-y-4">
