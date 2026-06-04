@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Check, Download, Instagram, Link, Loader2, Mail, MapPin, Search, UserCheck } from 'lucide-react';
+import { Check, Download, Eye, Instagram, Link, Loader2, Mail, MapPin, Search, UserCheck } from 'lucide-react';
 import {
     createJobApplicationCvSignedUrl,
     type JobApplicationRow,
@@ -80,6 +80,34 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
         }).catch((err) => {
             console.error('Failed to copy text: ', err);
         });
+    }
+
+    const [cvUrls, setCvUrls] = useState<Record<string, string>>({});
+    const [activePreviews, setActivePreviews] = useState<Record<string, boolean>>({});
+    const [loadingCvId, setLoadingCvId] = useState<string | null>(null);
+
+    async function togglePreview(row: JobApplicationRow) {
+        if (activePreviews[row.id]) {
+            setActivePreviews((prev) => ({ ...prev, [row.id]: false }));
+            return;
+        }
+
+        if (cvUrls[row.id]) {
+            setActivePreviews((prev) => ({ ...prev, [row.id]: true }));
+            return;
+        }
+
+        setLoadingCvId(row.id);
+        const result = await createJobApplicationCvSignedUrl(row.id);
+        setLoadingCvId(null);
+
+        if (!result.success || !result.url) {
+            window.alert(result.error || 'No se pudo abrir la vista previa.');
+            return;
+        }
+
+        setCvUrls((prev) => ({ ...prev, [row.id]: result.url }));
+        setActivePreviews((prev) => ({ ...prev, [row.id]: true }));
     }
 
     const filtered = useMemo(() => {
@@ -232,10 +260,20 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                                         )}
                                     </div>
                                 </div>
-                                <button onClick={() => openCv(row)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">
-                                    {pendingId === row.id && !isPending ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                                    CV ({fileSizeLabel(row.cv_size_bytes)})
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => togglePreview(row)}
+                                        disabled={loadingCvId === row.id}
+                                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900"
+                                    >
+                                        {loadingCvId === row.id ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
+                                        {activePreviews[row.id] ? 'Cerrar' : 'Previsualizar'}
+                                    </button>
+                                    <button onClick={() => openCv(row)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">
+                                        {pendingId === row.id && !isPending ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                        Descargar CV ({fileSizeLabel(row.cv_size_bytes)})
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="mt-5 grid gap-4 text-sm text-slate-700 dark:text-slate-300 md:grid-cols-2">
@@ -247,6 +285,28 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                                 <p><strong>Aporte:</strong> {row.team_contribution}</p>
                                 <p className="md:col-span-2"><strong>Por qué elegirle:</strong> {row.why_choose_you}</p>
                             </div>
+
+                            {activePreviews[row.id] && (
+                                <div className="mt-5 border border-slate-200 rounded-xl overflow-hidden bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
+                                    {(row.cv_mime_type === 'application/pdf' || row.cv_original_filename.toLowerCase().endsWith('.pdf')) ? (
+                                        <iframe
+                                            src={cvUrls[row.id]}
+                                            className="w-full h-[600px] border-0"
+                                            title={`Vista previa CV - ${row.full_name}`}
+                                        />
+                                    ) : (
+                                        <div className="p-8 text-center text-slate-500">
+                                            <p className="font-semibold text-slate-700 dark:text-slate-300">Previsualización no disponible</p>
+                                            <p className="mt-1 text-sm text-slate-400">
+                                                Navegadores web solo pueden previsualizar archivos PDF en pantalla.
+                                            </p>
+                                            <p className="mt-2 text-sm text-slate-400">
+                                                Para ver este archivo ({row.cv_original_filename}), podés descargarlo usando el botón superior.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="mt-5 grid gap-3 border-t border-slate-100 pt-5 dark:border-slate-800 md:grid-cols-[220px_1fr_auto]">
                                 <select value={draft.status} onChange={(event) => updateDraft(row.id, { status: event.target.value as JobApplicationStatus })} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900 dark:text-white">
