@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
-import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
+import { calculateAdjustedEarnings, type PayrollLog } from '@/lib/payroll-rules';
 
 function getAdminClient() {
     return createAdminClient(
@@ -111,7 +111,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
 
     const { data } = await admin
         .from('registro_horas')
-        .select('personal_id, fecha, horas, hora_ingreso, hora_egreso, salida_dia_siguiente, personal!inner(nombre, apellido, valor_hora_ars, horas_base, costo_hora_extra, recargo_sabado, recargo_domingo_feriado, recargo_nocturno)')
+        .select('personal_id, fecha, horas, hora_ingreso, hora_egreso, salida_dia_siguiente, personal!inner(nombre, apellido, area, valor_hora_ars, horas_base, costo_hora_extra, recargo_sabado, recargo_domingo_feriado, recargo_nocturno)')
         .gte('fecha', start)
         .lte('fecha', end);
 
@@ -122,21 +122,24 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
     // Group by personal_id
     const byPersonal = new Map<string, {
         nombre: string; apellido: string | null;
+        area: string | null;
         valorHoraArs: number | null; horasBase: number | null; costoHoraExtra: number | null;
         recargoSabado: boolean; recargoDomingoFeriado: boolean; recargoNocturno: boolean;
-        logs: any[];
+        logs: PayrollLog[];
     }>();
 
     for (const row of data as Record<string, unknown>[]) {
         const pid = row.personal_id as string;
         const p = (Array.isArray(row.personal) ? row.personal[0] : row.personal) as {
             nombre: string; apellido: string | null;
+            area: string | null;
             valor_hora_ars: number | null; horas_base: number | null; costo_hora_extra: number | null;
             recargo_sabado?: boolean; recargo_domingo_feriado?: boolean; recargo_nocturno?: boolean;
         };
         if (!byPersonal.has(pid)) {
             byPersonal.set(pid, {
                 nombre: p.nombre, apellido: p.apellido,
+                area: p.area,
                 valorHoraArs: p.valor_hora_ars ?? null,
                 horasBase: p.horas_base ?? null,
                 costoHoraExtra: p.costo_hora_extra ?? null,
@@ -148,10 +151,10 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         }
         const entry = byPersonal.get(pid)!;
         entry.logs.push({
-            fecha: row.fecha,
+            fecha: String(row.fecha),
             horas: Number(row.horas) || 0,
-            hora_ingreso: row.hora_ingreso,
-            hora_egreso: row.hora_egreso,
+            hora_ingreso: typeof row.hora_ingreso === 'string' ? row.hora_ingreso : null,
+            hora_egreso: typeof row.hora_egreso === 'string' ? row.hora_egreso : null,
         });
     }
 
@@ -160,7 +163,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
     let total_dias = 0;
 
     for (const [pid, e] of byPersonal.entries()) {
-        const th = Math.round(e.logs.reduce((a, b) => a + b.horas, 0) * 100) / 100;
+        const th = Math.round(e.logs.reduce((a, b) => a + Number(b.horas || 0), 0) * 100) / 100;
         const dias = e.logs.length;
         total_horas += th;
         total_dias += dias;
@@ -173,6 +176,7 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
         let horasExtra = 0;
         if (valorHora !== null) {
             costoTotal = calculateAdjustedEarnings(e.logs, valorHora, {
+                area: e.area || '',
                 recargo_sabado: e.recargoSabado,
                 recargo_domingo_feriado: e.recargoDomingoFeriado,
                 recargo_nocturno: e.recargoNocturno,
@@ -197,8 +201,8 @@ export async function getResumenHorasMes(mes: string): Promise<ResumenMes> {
             total_horas: th,
             horas_extra: horasExtra,
             prom_horas_dia: dias > 0 ? Math.round((th / dias) * 100) / 100 : 0,
-            hora_ingreso_min: ingresos.length > 0 ? ingresos.sort()[0] : null,
-            hora_egreso_max: egresos.length > 0 ? egresos.sort().at(-1)! : null,
+            hora_ingreso_min: ingresos.length > 0 ? (ingresos.sort()[0] ?? null) : null,
+            hora_egreso_max: egresos.length > 0 ? (egresos.sort().at(-1) ?? null) : null,
             valor_hora_ars: valorHora,
             horas_base: horasBase,
             costo_hora_extra: costoExtra,

@@ -3,7 +3,7 @@
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { awardAchievement, updateGoalProgressByCode } from './worker-portal';
-import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
+import { calculateAdjustedEarnings, type PayrollLog } from '@/lib/payroll-rules';
 
 function getAdminClient() {
     return createAdminClient(
@@ -784,7 +784,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
         .lte('fecha', endDate)
         .in('estado', ['Registrado', 'Observado', 'Resuelto', 'pending', 'observado', 'approved']);
 
-    const logsByWorker = new Map<string, any[]>();
+    const logsByWorker = new Map<string, PayrollLog[]>();
     (logsData || []).forEach(log => {
         const list = logsByWorker.get(log.personal_id) || [];
         list.push(log);

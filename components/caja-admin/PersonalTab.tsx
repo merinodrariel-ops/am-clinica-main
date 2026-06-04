@@ -388,6 +388,18 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         return personalValue > 0 ? personalValue : getConfiguredHourValue(p);
     }
 
+    function getPayrollOptionsForPersonal(p: Personal) {
+        return {
+            area: p.area || '',
+            rol: p.rol || '',
+            recargo_sabado: p.recargo_sabado !== false,
+            recargo_domingo_feriado: p.recargo_domingo_feriado !== false,
+            recargo_nocturno: !!p.recargo_nocturno,
+            horas_base: p.horas_base ?? null,
+            costo_hora_extra: p.costo_hora_extra ?? null,
+        };
+    }
+
     function mesLabel(ym: string) {
         const [year, month] = ym.split('-');
         const monthName = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][Number(month) - 1] || ym;
@@ -424,12 +436,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     function downloadHoursDashboardCsv(p: Personal, rows: RegistroHoras[]) {
         const headers = ['Prestador', 'Mes', 'Fecha', 'Ingreso', 'Egreso', 'Horas', 'Total Fila', 'Estado', 'Observaciones'];
         const valorHora = getEffectiveHourValue(p);
+        const payrollOptions = getPayrollOptionsForPersonal(p);
         const csvRows = rows
             .filter((row) => row.fecha.startsWith(hoursDashboardMes))
             .slice()
             .sort((a, b) => a.fecha.localeCompare(b.fecha))
             .map((row) => {
-                const rowEarnings = calculateAdjustedEarnings([row], valorHora, p.area || '', p.rol || '');
+                const rowEarnings = calculateAdjustedEarnings([row], valorHora, payrollOptions);
                 return [
                     `${p.nombre} ${p.apellido || ''}`.trim(),
                     row.fecha.slice(0, 7),
@@ -447,8 +460,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const totalEarnings = calculateAdjustedEarnings(
             rows.filter((row) => row.fecha.startsWith(hoursDashboardMes)),
             valorHora,
-            p.area || '',
-            p.rol || ''
+            payrollOptions
         );
         csvRows.push(['TOTAL', '', '', '', '', totalHoras, totalEarnings, '', '']);
 
@@ -474,7 +486,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             .sort((a, b) => a.fecha.localeCompare(b.fecha));
         const total = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
         const valorHora = getEffectiveHourValue(p);
-        const totalEarnings = calculateAdjustedEarnings(monthRows, valorHora, p.area || '', p.rol || '');
+        const payrollOptions = getPayrollOptionsForPersonal(p);
+        const totalEarnings = calculateAdjustedEarnings(monthRows, valorHora, payrollOptions);
         const pending = monthRows.filter(isObservedRegistro).length;
         const resolved = monthRows.filter(isResolvedRegistro).length;
 
@@ -590,7 +603,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         }
 
         monthRows.forEach((row) => {
-            const rowEarnings = calculateAdjustedEarnings([row], valorHora, p.area || '', p.rol || '');
+            const rowEarnings = calculateAdjustedEarnings([row], valorHora, payrollOptions);
             const status = isResolvedRegistro(row) ? 'Resuelto' : isObservedRegistro(row) ? 'Pendiente' : 'OK';
             const notes = doc.splitTextToSize(row.observaciones || row.motivo_observado || '-', 44).slice(0, 2);
             const rowHeight = Math.max(8, notes.length * 4 + 2);
@@ -2653,8 +2666,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                 className="rounded mt-1 text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 w-4 h-4"
                                                             />
                                                             <div>
-                                                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Recargo Nocturno (+20%)</span>
-                                                                <p className="text-[10px] text-slate-400">22h a 04h (asistente/admin).</p>
+                                                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Bono extra por horario nocturno (+20%)</span>
+                                                                <p className="text-[10px] text-slate-400">Gratificación AM de 22h a 04h para asistentes/admin/recepción. No aplica a laboratorio.</p>
                                                             </div>
                                                         </label>
                                                     </div>
@@ -2685,7 +2698,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         <div className="flex items-center gap-2 mb-3">
                                             <Clock className="w-4 h-4 text-indigo-500" />
                                             <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                                                Historial de Tarifas y Recargos
+                                                Historial de tarifas y adicionales
                                             </h4>
                                         </div>
                                         
@@ -2707,7 +2720,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                 <th className="p-2.5">Fecha</th>
                                                                 <th className="p-2.5">Valor Hora</th>
                                                                 <th className="p-2.5">Base/Extra</th>
-                                                                <th className="p-2.5">Recargos</th>
+                                                                <th className="p-2.5">Adicionales</th>
                                                                 <th className="p-2.5">Modificado Por</th>
                                                             </tr>
                                                         </thead>
@@ -2738,8 +2751,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                             <div className="flex flex-wrap gap-1">
                                                                                 {h.recargo_sabado && <span className="text-[9px] px-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Sáb</span>}
                                                                                 {h.recargo_domingo_feriado && <span className="text-[9px] px-1 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">Dom/Fer</span>}
-                                                                                {h.recargo_nocturno && <span className="text-[9px] px-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Noc</span>}
-                                                                                {!h.recargo_sabado && !h.recargo_domingo_feriado && !h.recargo_nocturno && <span className="text-slate-400 dark:text-slate-500">Sin recargos</span>}
+                                                                                {h.recargo_nocturno && <span className="text-[9px] px-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Bono noct.</span>}
+                                                                                {!h.recargo_sabado && !h.recargo_domingo_feriado && !h.recargo_nocturno && <span className="text-slate-400 dark:text-slate-500">Sin adicionales</span>}
                                                                             </div>
                                                                         </td>
                                                                         <td className="p-2.5">
@@ -3795,7 +3808,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 .sort((a, b) => a.fecha.localeCompare(b.fecha));
                             const totalMonthHours = monthRows.reduce((sum, row) => sum + Number(row.horas || 0), 0);
                             const effectiveHourValue = getEffectiveHourValue(p);
-                            const totalMonthEarnings = calculateAdjustedEarnings(monthRows, effectiveHourValue, p.area || '', p.rol || '');
+                            const totalMonthEarnings = calculateAdjustedEarnings(monthRows, effectiveHourValue, getPayrollOptionsForPersonal(p));
                             const pendingMonth = monthRows.filter(isObservedRegistro).length;
                             const resolvedMonth = monthRows.filter(isResolvedRegistro).length;
                             const monthlyMap = new Map<string, { mes: string; dias: number; horas: number; pendientes: number; resueltos: number }>();

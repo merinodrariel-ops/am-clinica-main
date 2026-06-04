@@ -71,6 +71,41 @@ export interface PayrollLog {
     hora_egreso?: string | null;
 }
 
+function getPayrollProfileText(areaOrOptions: string | PayrollOptions = '', rol: string = ''): string {
+    if (typeof areaOrOptions === 'object' && areaOrOptions !== null) {
+        return `${areaOrOptions.area || ''} ${areaOrOptions.rol || ''}`.toLowerCase();
+    }
+
+    return `${areaOrOptions} ${rol}`.toLowerCase();
+}
+
+export function isNightBonusEligible(areaOrOptions: string | PayrollOptions = '', rol: string = ''): boolean {
+    const profileText = getPayrollProfileText(areaOrOptions, rol);
+
+    if (profileText.includes('lab')) return false;
+
+    return (
+        profileText.includes('asist') ||
+        profileText.includes('admin') ||
+        profileText.includes('recep')
+    );
+}
+
+function isDateSurchargeEligible(areaOrOptions: string | PayrollOptions = '', rol: string = ''): boolean {
+    const profileText = getPayrollProfileText(areaOrOptions, rol);
+
+    if (profileText.includes('lab')) return false;
+
+    return (
+        profileText.includes('asist') ||
+        profileText.includes('admin') ||
+        profileText.includes('recep') ||
+        profileText.includes('staff') ||
+        profileText.includes('general') ||
+        profileText.includes('limpieza')
+    );
+}
+
 /**
  * Calculates the number of hours in a shift that fall between 22:00 and 04:00 (night shift).
  */
@@ -128,23 +163,10 @@ export function getPayrollMultiplier(
         recargoSabado = areaOrOptions.recargo_sabado !== false;
         recargoDomingoFeriado = areaOrOptions.recargo_domingo_feriado !== false;
     } else {
-        const areaLower = `${areaOrOptions} ${rol}`.toLowerCase();
-        // Laboratory is excluded from these rules by default
-        if (areaLower.includes('lab')) {
-            return 1.0;
-        }
-
-        // Only apply to Assistant, Admin, Reception, Staff, Cleaners by default
-        const isApplicable =
-            areaLower.includes('asist') ||
-            areaLower.includes('admin') ||
-            areaLower.includes('recep') ||
-            areaLower.includes('staff') ||
-            areaLower.includes('general') ||
-            areaLower.includes('limpieza');
-
-        if (!isApplicable) return 1.0;
+        if (!isDateSurchargeEligible(areaOrOptions, rol)) return 1.0;
     }
+
+    if (!isDateSurchargeEligible(areaOrOptions, rol)) return 1.0;
 
     const date = new Date(dateStr + 'T12:00:00'); // Use midday to avoid TZ issues
     const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
@@ -169,7 +191,7 @@ export function getPayrollMultiplier(
 
 /**
  * Calculates adjusted earnings over a list of daily logs.
- * Supports weekly/holiday multipliers, night shift surcharge (+20%), and tiered base/extra rates.
+ * Supports weekly/holiday multipliers, night shift bonus (+20%), and tiered base/extra rates.
  */
 export function calculateAdjustedEarnings(
     logs: PayrollLog[],
@@ -182,7 +204,7 @@ export function calculateAdjustedEarnings(
     let costoHoraExtra: number | null = null;
 
     if (typeof optionsOrArea === 'object' && optionsOrArea !== null) {
-        recargoNocturno = !!optionsOrArea.recargo_nocturno;
+        recargoNocturno = !!optionsOrArea.recargo_nocturno && isNightBonusEligible(optionsOrArea, rol);
         horasBase = optionsOrArea.horas_base ?? null;
         costoHoraExtra = optionsOrArea.costo_hora_extra ?? null;
     }
@@ -197,13 +219,13 @@ export function calculateAdjustedEarnings(
         // Date multiplier (e.g. 1.0, 1.5, 2.0)
         const m = getPayrollMultiplier(log.fecha, optionsOrArea, rol);
 
-        // Night surcharge
+        // Night bonus
         let hNight = 0;
         if (recargoNocturno) {
             hNight = calculateNightHours(log.hora_ingreso, log.hora_egreso);
         }
 
-        // Night surcharge is +20% (+0.2x) on top of the date's standard rate
+        // Night bonus is +20% (+0.2x) on top of the date's standard rate
         const logEfectivas = m * (horas + hNight * 0.2);
         totalHorasEfectivas += logEfectivas;
     }

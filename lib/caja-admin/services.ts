@@ -1190,7 +1190,7 @@ export async function generarLiquidacion(
     // Get total hours for the month
     const { data: horas } = await getSupabase()
         .from('registro_horas')
-        .select('fecha, horas')
+        .select('fecha, horas, hora_ingreso, hora_egreso')
         .eq('personal_id', personalId)
         .gte('fecha', startDate)
         .lte('fecha', endDateStr);
@@ -1198,7 +1198,15 @@ export async function generarLiquidacion(
     const totalHoras = horas?.reduce((sum: number, h: { horas: number }) => sum + h.horas, 0) || 0;
     const hourlyDefaults = await getHourlyDefaults();
     const effectiveValorHora = getEffectiveHourlyRate(personal, hourlyDefaults);
-    const totalArs = calculateAdjustedEarnings(horas || [], effectiveValorHora, personal.area || '');
+    const totalArs = calculateAdjustedEarnings(horas || [], effectiveValorHora, {
+        area: personal.area || '',
+        rol: personal.rol || '',
+        recargo_sabado: personal.recargo_sabado,
+        recargo_domingo_feriado: personal.recargo_domingo_feriado,
+        recargo_nocturno: personal.recargo_nocturno,
+        horas_base: personal.horas_base,
+        costo_hora_extra: personal.costo_hora_extra,
+    });
     const totalUsd = tcBna ? totalArs / tcBna : undefined;
 
     const { data, error } = await getSupabase()
