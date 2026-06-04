@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Briefcase, CheckCircle2, FileText, Loader2, Send, ShieldCheck } from 'lucide-react';
 import { submitJobApplication } from '@/app/actions/job-applications';
 
@@ -36,6 +36,14 @@ export default function JobApplicationForm() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const startedAt = useMemo(() => Date.now(), []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const areaParam = params.get('area');
+        if (areaParam && AREAS.includes(areaParam)) {
+            setArea(areaParam);
+        }
+    }, []);
 
     async function handleSubmit(formData: FormData) {
         setIsSubmitting(true);

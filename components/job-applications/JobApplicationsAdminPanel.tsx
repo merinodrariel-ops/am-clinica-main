@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Download, Loader2, Search, UserCheck } from 'lucide-react';
+import { Check, Download, Instagram, Link, Loader2, Mail, MapPin, Search, UserCheck } from 'lucide-react';
 import {
     createJobApplicationCvSignedUrl,
     type JobApplicationRow,
@@ -31,6 +31,30 @@ function fileSizeLabel(bytes: number) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getInstagramHref(handleOrUrl: string) {
+    if (!handleOrUrl) return '';
+    const trimmed = handleOrUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return trimmed;
+    }
+    const username = trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
+    return `https://instagram.com/${encodeURIComponent(username)}`;
+}
+
+function getInstagramLabel(handleOrUrl: string) {
+    if (!handleOrUrl) return '';
+    const trimmed = handleOrUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        try {
+            const url = new URL(trimmed);
+            return url.pathname.replace(/\//g, '') || trimmed;
+        } catch {
+            return trimmed;
+        }
+    }
+    return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+}
+
 export default function JobApplicationsAdminPanel({ initialRows }: { initialRows: JobApplicationRow[] }) {
     const [rows, setRows] = useState(initialRows);
     const [statusFilter, setStatusFilter] = useState('todos');
@@ -41,6 +65,22 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
     ));
     const [pendingId, setPendingId] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
+    const [copied, setCopied] = useState(false);
+
+    function copyFormLink() {
+        if (typeof window === 'undefined') return;
+        const origin = window.location.origin;
+        const link = areaFilter && areaFilter !== 'todas'
+            ? `${origin}/trabaja-con-nosotros?area=${encodeURIComponent(areaFilter)}`
+            : `${origin}/trabaja-con-nosotros`;
+
+        navigator.clipboard.writeText(link).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }).catch((err) => {
+            console.error('Failed to copy text: ', err);
+        });
+    }
 
     const filtered = useMemo(() => {
         const rawSearch = search.trim().toLowerCase();
@@ -118,7 +158,7 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                 ))}
             </div>
 
-            <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[1fr_220px_220px]">
+            <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[1fr_200px_200px_auto]">
                 <label className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
@@ -140,6 +180,14 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                         <option key={area} value={area}>{area}</option>
                     ))}
                 </select>
+                <button
+                    onClick={copyFormLink}
+                    title="Copiar el link del formulario público de postulación"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900"
+                >
+                    {copied ? <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : <Link className="h-4 w-4" />}
+                    <span>{copied ? '¡Copiado!' : 'Copiar link'}</span>
+                </button>
             </div>
 
             <div className="space-y-4">
@@ -162,7 +210,27 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                                         </span>
                                     </div>
                                     <p className="mt-1 text-sm text-slate-500">{formatDate(row.created_at)} · {row.area}{row.other_area ? ` · ${row.other_area}` : ''}</p>
-                                    <p className="mt-1 text-sm text-slate-500">{row.email} · {row.location} · {row.instagram_url}</p>
+                                    <div className="mt-3 flex flex-wrap gap-y-2 gap-x-4 text-sm">
+                                        <a href={`mailto:${row.email}`} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition">
+                                            <Mail className="h-4 w-4 text-slate-400" />
+                                            <span>{row.email}</span>
+                                        </a>
+                                        <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                            <MapPin className="h-4 w-4 text-slate-400" />
+                                            <span>{row.location}</span>
+                                        </span>
+                                        {row.instagram_url && (
+                                            <a
+                                                href={getInstagramHref(row.instagram_url)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 text-pink-600 hover:text-pink-700 dark:text-pink-400 dark:hover:text-pink-300 transition"
+                                            >
+                                                <Instagram className="h-4 w-4" />
+                                                <span>{getInstagramLabel(row.instagram_url)}</span>
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
                                 <button onClick={() => openCv(row)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">
                                     {pendingId === row.id && !isPending ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
