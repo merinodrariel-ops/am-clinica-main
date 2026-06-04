@@ -4,12 +4,86 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { parseImplicitHours } from '@/lib/gemini';
 import { addDays, parse, differenceInMinutes } from 'date-fns';
 import { repairOvernightExitMarks } from '@/lib/prosoft-overnight-repair';
+import {
+    shouldDeleteOrphanObservedImportRegistro,
+    shouldOverwriteExistingRegistro,
+    type ExistingRegistroHorasForImport,
+    type ProsoftImportSource,
+} from '@/lib/prosoft-reimport-policy';
 
 function getAdminClient() {
     return createAdminClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+}
+
+const REIMPORT_EXISTING_SELECT = [
+    'id',
+    'fecha',
+    'horas',
+    'estado',
+    'motivo_observado',
+    'observaciones',
+    'resuelto_por',
+    'resuelto_fecha_hora',
+    'metodo_verificacion',
+    'evidencia_url',
+    'nota_resolucion',
+].join(', ');
+
+function nextMonthStart(mes: string): string {
+    const [year, month] = mes.split('-').map(Number);
+    if (month === 12) return `${year + 1}-01-01`;
+    return `${year}-${String(month + 1).padStart(2, '0')}-01`;
+}
+
+async function cleanupOrphanedObservedImportRows(input: {
+    admin: ReturnType<typeof getAdminClient>;
+    personalId: string;
+    mes: string;
+    source: ProsoftImportSource;
+    previewDates: Set<string>;
+    rawName: string;
+    errors: string[];
+}): Promise<number> {
+    const { data, error } = await input.admin
+        .from('registro_horas')
+        .select(REIMPORT_EXISTING_SELECT)
+        .eq('personal_id', input.personalId)
+        .gte('fecha', `${input.mes}-01`)
+        .lt('fecha', nextMonthStart(input.mes))
+        .in('estado', ['Observado', 'observado'])
+        .eq('horas', 0);
+
+    if (error) {
+        input.errors.push(`${input.rawName}: no se pudieron revisar observados huerfanos (${error.message})`);
+        return 0;
+    }
+
+    const rows = (data || []) as unknown as ExistingRegistroHorasForImport[];
+    const orphanIds = rows
+        .filter((row) => shouldDeleteOrphanObservedImportRegistro({
+            row,
+            previewDates: input.previewDates,
+            source: input.source,
+            mes: input.mes,
+        }))
+        .map((row) => row.id);
+
+    if (orphanIds.length === 0) return 0;
+
+    const { error: deleteError } = await input.admin
+        .from('registro_horas')
+        .delete()
+        .in('id', orphanIds);
+
+    if (deleteError) {
+        input.errors.push(`${input.rawName}: no se pudieron limpiar ${orphanIds.length} observados huerfanos (${deleteError.message})`);
+        return 0;
+    }
+
+    return orphanIds.length;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -46,6 +120,7 @@ export interface ProsoftPreview {
 export interface ImportResult {
     inserted: number;
     skipped: number;
+    cleaned?: number;
     errors: string[];
 }
 
@@ -876,6 +951,7 @@ export async function importProsoftData(
 
     let inserted = 0;
     let skipped = 0;
+    let cleaned = 0;
     const errors: string[] = [];
 
     const filasToImport = onlyMatched
@@ -887,6 +963,8 @@ export async function importProsoftData(
             skipped += fila.registros.length;
             continue;
         }
+
+        const previewDates = new Set(fila.registros.map((reg) => reg.fecha));
 
         for (const reg of fila.registros) {
             const requiereRevision = Boolean(reg.incompleto || reg.requiereRevision);
@@ -904,20 +982,17 @@ export async function importProsoftData(
             // Check if record already exists (dedup by personal_id + fecha)
             const { data: existingRows } = await admin
                 .from('registro_horas')
-                .select('id, horas, estado')
+                .select(REIMPORT_EXISTING_SELECT)
                 .eq('personal_id', fila.personalId)
                 .eq('fecha', reg.fecha)
                 .limit(1);
-            const existing = existingRows?.[0] ?? null;
+            const existing = (existingRows?.[0] ?? null) as ExistingRegistroHorasForImport | null;
 
             if (existing) {
-                // Skip if the existing record has real hours (could be manually corrected)
-                const existingIsObserved = String(existing.estado || '').toLowerCase() === 'observado';
-                if (Number(existing.horas) > 0 && !requiereRevision && !existingIsObserved) {
+                if (!shouldOverwriteExistingRegistro(existing, requiereRevision)) {
                     skipped++;
                     continue;
                 }
-                // Update if existing record had 0h (bad previous import) or if new data is complete
                 const { error } = await admin
                     .from('registro_horas')
                     .update({
@@ -957,9 +1032,19 @@ export async function importProsoftData(
                 inserted++;
             }
         }
+
+        cleaned += await cleanupOrphanedObservedImportRows({
+            admin,
+            personalId: fila.personalId,
+            mes: preview.mes,
+            source: 'Prosoft',
+            previewDates,
+            rawName: fila.rawName,
+            errors,
+        });
     }
 
-    return { inserted, skipped, errors };
+    return { inserted, skipped, cleaned, errors };
 }
 
 export async function importProsoftDataSafe(
@@ -1087,6 +1172,7 @@ export async function importProsoftPreviewSafe(
         const admin = getAdminClient();
         let inserted = 0;
         let skipped = 0;
+        let cleaned = 0;
         const errors: string[] = [];
 
         let filasToImport = onlyMatched
@@ -1103,6 +1189,8 @@ export async function importProsoftPreviewSafe(
                 continue;
             }
 
+            const previewDates = new Set(fila.registros.map((reg) => reg.fecha));
+
             for (const reg of fila.registros) {
                 const requiereRevision = Boolean(reg.incompleto || reg.requiereRevision);
                 const estado = requiereRevision ? 'Observado' : 'Registrado';
@@ -1118,15 +1206,14 @@ export async function importProsoftPreviewSafe(
 
                 const { data: existingRows2 } = await admin
                     .from('registro_horas')
-                    .select('id, horas, estado')
+                    .select(REIMPORT_EXISTING_SELECT)
                     .eq('personal_id', fila.personalId)
                     .eq('fecha', reg.fecha)
                     .limit(1);
-                const existing = existingRows2?.[0] ?? null;
+                const existing = (existingRows2?.[0] ?? null) as ExistingRegistroHorasForImport | null;
 
                 if (existing) {
-                    const existingIsObserved = String(existing.estado || '').toLowerCase() === 'observado';
-                    if (Number(existing.horas) > 0 && !requiereRevision && !existingIsObserved) {
+                    if (!shouldOverwriteExistingRegistro(existing, requiereRevision)) {
                         skipped++;
                         continue;
                     }
@@ -1169,9 +1256,19 @@ export async function importProsoftPreviewSafe(
                     inserted++;
                 }
             }
+
+            cleaned += await cleanupOrphanedObservedImportRows({
+                admin,
+                personalId: fila.personalId,
+                mes: normalizedPreview.mes,
+                source: 'Local',
+                previewDates,
+                rawName: fila.rawName,
+                errors,
+            });
         }
 
-        return { success: true, data: { inserted, skipped, errors } };
+        return { success: true, data: { inserted, skipped, cleaned, errors } };
     } catch (e: unknown) {
         return { success: false, error: toActionErrorMessage(e, 'Error al importar') };
     }

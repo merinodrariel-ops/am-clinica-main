@@ -188,7 +188,7 @@ export default function ProsoftImporter({ mes }: { mes?: string }) {
     const [preview, setPreview] = useState<ProsoftPreview | null>(null);
     const [loading, setLoading] = useState(false);
     const [importing, setImporting] = useState(false);
-    const [result, setResult] = useState<{ inserted: number; skipped: number; errors: string[] } | null>(null);
+    const [result, setResult] = useState<{ inserted: number; skipped: number; cleaned?: number; errors: string[] } | null>(null);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [activeMes, setActiveMes] = useState(initialMes);
     const [monthRows, setMonthRows] = useState<RegistroHoras[]>([]);
@@ -1298,6 +1298,7 @@ export default function ProsoftImporter({ mes }: { mes?: string }) {
                                         <p className="text-xs text-slate-400 mt-0.5">
                                             <span className="text-emerald-400 font-medium">{result.inserted} registros insertados</span>
                                             {result.skipped > 0 && <> · <span className="text-slate-300">{result.skipped} omitidos (ya existían)</span></>}
+                                            {(result.cleaned || 0) > 0 && <> · <span className="text-amber-300">{result.cleaned} observados viejos limpiados</span></>}
                                             {totalIncomplete > 0 && <> · <span className="text-amber-400">{totalIncomplete} fichajes observados (requieren resolución manual)</span></>}
                                             {result.errors.length > 0 && <> · <span className="text-red-400">{result.errors.length} errores</span></>}
                                         </p>
