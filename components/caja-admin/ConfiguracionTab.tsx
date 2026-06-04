@@ -156,6 +156,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
     const [newPeriodoLimpieza, setNewPeriodoLimpieza] = useState<number>(sucursal.valor_hora_limpieza_ars || 0);
     const [newPeriodoNotas, setNewPeriodoNotas] = useState('');
     const [isSavingPeriodo, setIsSavingPeriodo] = useState(false);
+    const [editingPeriodoId, setEditingPeriodoId] = useState<string | null>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -389,11 +390,21 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                 setValorHoraLimpieza(vigente.valor_hora_limpieza_ars);
             }
             setShowAddPeriodo(false);
+            setEditingPeriodoId(null);
             setNewPeriodoFecha('');
             setNewPeriodoNotas('');
         } finally {
             setIsSavingPeriodo(false);
         }
+    }
+
+    function handleEditPeriodo(v: ValoresHoraHistoria) {
+        setEditingPeriodoId(v.id);
+        setNewPeriodoFecha(v.fecha_desde);
+        setNewPeriodoStaff(v.valor_hora_staff_ars);
+        setNewPeriodoLimpieza(v.valor_hora_limpieza_ars);
+        setNewPeriodoNotas(v.notas || '');
+        setShowAddPeriodo(true);
     }
 
     async function handleDeletePeriodo(id: string) {
@@ -540,8 +551,10 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                             <button
                                 onClick={() => {
                                     setShowAddPeriodo(true);
-                                    setNewPeriodoStaff(sucursal.valor_hora_staff_ars || 0);
-                                    setNewPeriodoLimpieza(sucursal.valor_hora_limpieza_ars || 0);
+                                    setEditingPeriodoId(null);
+                                    const latest = valoresHoraHistoria[0];
+                                    setNewPeriodoStaff(latest ? latest.valor_hora_staff_ars : (sucursal.valor_hora_staff_ars || 0));
+                                    setNewPeriodoLimpieza(latest ? latest.valor_hora_limpieza_ars : (sucursal.valor_hora_limpieza_ars || 0));
                                     setNewPeriodoNotas('');
                                     setNewPeriodoFecha('');
                                 }}
@@ -557,8 +570,16 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                     {showAddPeriodo && (
                         <div className="rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-5 space-y-4">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Agregar nuevo período</h3>
-                                <button onClick={() => setShowAddPeriodo(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                                    {editingPeriodoId !== null ? 'Editar período' : 'Agregar nuevo período'}
+                                </h3>
+                                <button
+                                    onClick={() => {
+                                        setShowAddPeriodo(false);
+                                        setEditingPeriodoId(null);
+                                    }}
+                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                >
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
@@ -567,9 +588,14 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Vigente desde</label>
                                     <input
                                         type="date"
+                                        disabled={editingPeriodoId !== null}
                                         value={newPeriodoFecha}
                                         onChange={(e) => setNewPeriodoFecha(e.target.value)}
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        className={`w-full px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                            editingPeriodoId !== null 
+                                                ? "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 cursor-not-allowed" 
+                                                : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+                                        }`}
                                     />
                                 </div>
                                 <div>
@@ -611,9 +637,12 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                     placeholder="Ej: Actualización marzo 2026"
                                 />
                             </div>
-                            <div className="flex justify-end gap-2">
+                             <div className="flex justify-end gap-2">
                                 <button
-                                    onClick={() => setShowAddPeriodo(false)}
+                                    onClick={() => {
+                                        setShowAddPeriodo(false);
+                                        setEditingPeriodoId(null);
+                                    }}
                                     className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                 >
                                     Cancelar
@@ -624,7 +653,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
                                 >
                                     <Save className="w-4 h-4" />
-                                    {isSavingPeriodo ? 'Guardando...' : 'Guardar período'}
+                                    {isSavingPeriodo ? 'Guardando...' : editingPeriodoId !== null ? 'Guardar cambios' : 'Guardar período'}
                                 </button>
                             </div>
                         </div>
@@ -646,7 +675,7 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                         <th className="text-right px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Staff / Admin / Recepción</th>
                                         <th className="text-right px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Limpieza</th>
                                         <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Notas</th>
-                                        {canManageProviderStatus && <th className="w-10"></th>}
+                                        {canManageProviderStatus && <th className="w-20"></th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -675,10 +704,17 @@ export default function ConfiguracionTab({ sucursal }: Props) {
                                                     {v.notas || '—'}
                                                 </td>
                                                 {canManageProviderStatus && (
-                                                    <td className="px-2 py-3">
+                                                    <td className="px-2 py-3 flex items-center justify-end gap-1">
+                                                        <button
+                                                            onClick={() => handleEditPeriodo(v)}
+                                                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 rounded-lg transition-colors"
+                                                            title="Editar período"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
                                                         <button
                                                             onClick={() => handleDeletePeriodo(v.id)}
-                                                            className="text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors"
+                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-lg transition-colors"
                                                             title="Eliminar período"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
