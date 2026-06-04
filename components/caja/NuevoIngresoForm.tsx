@@ -261,26 +261,20 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     // Sync cuota single-payment amount with surcharges automatically
     useEffect(() => {
         if (formData.es_cuota && baseInstallmentAmount > 0 && !useMultiplePayments) {
-            const surcharge = SURCHARGES[formData.metodo_pago] || 0;
-            let targetMonto = baseInstallmentAmount * (1 + surcharge);
-            if (aplicarSaldoFavor) {
-                targetMonto = Math.max(0, targetMonto - saldoFavorDisponible);
-            }
-            // Round to avoid float precision issues
-            targetMonto = Math.round(targetMonto * 100) / 100;
+            const targetUsd = getRequiredSingleInstallmentUsd();
+            const targetMonto = convertUsdToCurrency(targetUsd, formData.moneda);
+
             if (targetMonto !== lastTargetMonto) {
                 setLastTargetMonto(targetMonto);
                 setPagaCon(targetMonto);
                 setDiferenciaDestino('saldo_a_favor');
                 setFormData(prev => {
-                    if (prev.monto !== targetMonto) {
-                        return { ...prev, monto: targetMonto, moneda: 'USD' };
-                    }
-                    return prev;
+                    if (prev.monto === targetMonto) return prev;
+                    return { ...prev, monto: targetMonto };
                 });
             }
         }
-    }, [formData.es_cuota, formData.metodo_pago, baseInstallmentAmount, useMultiplePayments, aplicarSaldoFavor, saldoFavorDisponible, lastTargetMonto]);
+    }, [formData.es_cuota, formData.metodo_pago, formData.moneda, baseInstallmentAmount, useMultiplePayments, aplicarSaldoFavor, saldoFavorDisponible, bnaRate, lastTargetMonto]);
 
     function setSplitValue(index: number, updates: Partial<PaymentSplit>) {
         setPaymentSplits((prev) => {
@@ -484,6 +478,44 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
         if (moneda === 'USD' || moneda === 'USDT') return monto;
         if (moneda === 'ARS' && bnaRate > 0) return Math.round((monto / bnaRate) * 100) / 100;
         return 0;
+    }
+
+    function roundMoney(value: number): number {
+        return Math.round(value * 100) / 100;
+    }
+
+    function getRequiredSingleInstallmentUsd(): number {
+        const surcharge = SURCHARGES[formData.metodo_pago] || 0;
+        let targetUsd = baseInstallmentAmount * (1 + surcharge);
+        if (aplicarSaldoFavor) {
+            targetUsd = Math.max(0, targetUsd - saldoFavorDisponible);
+        }
+        return roundMoney(targetUsd);
+    }
+
+    function convertUsdToCurrency(montoUsd: number, moneda: MonedaIngreso): number {
+        if (moneda === 'ARS') return roundMoney(montoUsd * bnaRate);
+        return roundMoney(montoUsd);
+    }
+
+    function getCurrencyPrefix(moneda: MonedaIngreso) {
+        return moneda === 'ARS' ? '$' : moneda;
+    }
+
+    function formatPaymentAmount(monto: number, moneda: MonedaIngreso) {
+        return `${moneda} ${monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function setSinglePaymentCurrency(moneda: MonedaIngreso) {
+        if (formData.es_cuota && baseInstallmentAmount > 0 && !useMultiplePayments) {
+            const targetMonto = convertUsdToCurrency(getRequiredSingleInstallmentUsd(), moneda);
+            setLastTargetMonto(targetMonto);
+            setPagaCon(targetMonto);
+            setDiferenciaDestino('saldo_a_favor');
+            setFormData(prev => ({ ...prev, moneda, monto: targetMonto }));
+            return;
+        }
+        setFormData(prev => ({ ...prev, moneda }));
     }
 
     function calculateUsdEquivalent(): number {
@@ -975,7 +1007,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                         <Button
                                                             key={m}
                                                             type="button"
-                                                            onClick={() => setFormData({ ...formData, moneda: m as any })}
+                                                            onClick={() => setSinglePaymentCurrency(m as MonedaIngreso)}
                                                             className={clsx(
                                                                 "px-5 py-2 text-[11px] font-black transition-all rounded-none h-auto",
                                                                 formData.moneda === m
@@ -1038,11 +1070,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             {/* Surcharge breakdown for Cuotas */}
                                             {(() => {
                                                 const surcharge = SURCHARGES[formData.metodo_pago] || 0;
-                                                let montoRequerido = baseInstallmentAmount * (1 + surcharge);
-                                                if (aplicarSaldoFavor) {
-                                                    montoRequerido = Math.max(0, montoRequerido - saldoFavorDisponible);
-                                                }
-                                                montoRequerido = Math.round(montoRequerido * 100) / 100;
+                                                const montoRequeridoUsd = getRequiredSingleInstallmentUsd();
+                                                const montoRequeridoCobro = convertUsdToCurrency(montoRequeridoUsd, formData.moneda);
+                                                const excedenteCobro = roundMoney(pagaCon - montoRequeridoCobro);
 
                                                 return formData.es_cuota && baseInstallmentAmount > 0 && (
                                                     <div className="mt-4 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border-2 border-blue-100 dark:border-blue-800/40 animate-in fade-in zoom-in duration-300">
@@ -1091,8 +1121,20 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                             )}
                                                             <div className="pt-2 border-t border-blue-100 dark:border-blue-800/40 flex justify-between text-gray-900 dark:text-white font-black text-sm">
                                                                 <span>Total requerido</span>
-                                                                <span className="font-mono text-blue-600 dark:text-blue-400">USD {montoRequerido.toFixed(2)}</span>
+                                                                <span className="font-mono text-blue-600 dark:text-blue-400">USD {montoRequeridoUsd.toFixed(2)}</span>
                                                             </div>
+                                                            {formData.moneda === 'ARS' && (
+                                                                <div className="flex justify-between text-blue-700 dark:text-blue-300 font-black text-sm">
+                                                                    <span>A cobrar en ARS</span>
+                                                                    <span className="font-mono">{formatPaymentAmount(montoRequeridoCobro, 'ARS')}</span>
+                                                                </div>
+                                                            )}
+                                                            {formData.moneda === 'ARS' && bnaRate > 0 && (
+                                                                <div className="flex justify-between text-[10px] text-gray-500 font-bold uppercase tracking-wide">
+                                                                    <span>Tipo de cambio BNA venta</span>
+                                                                    <span className="font-mono">$ {bnaRate.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
 
                                                         {/* Calculator Section */}
@@ -1102,15 +1144,15 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                     ¿Con cuánto paga? (Monto Recibido)
                                                                 </label>
                                                                 <div className="relative">
-                                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">USD</span>
+                                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">{getCurrencyPrefix(formData.moneda)}</span>
                                                                     <MoneyInput
                                                                         value={pagaCon || 0}
                                                                         onChange={(val) => {
                                                                             setPagaCon(val);
-                                                                            const diff = val - montoRequerido;
+                                                                            const diff = val - montoRequeridoCobro;
                                                                             setFormData(prev => ({
                                                                                 ...prev,
-                                                                                monto: diff > 0 && diferenciaDestino === 'vuelto' ? montoRequerido : val
+                                                                                monto: diff > 0 && diferenciaDestino === 'vuelto' ? montoRequeridoCobro : val
                                                                             }));
                                                                         }}
                                                                         className="w-full h-10 pl-11 bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-500 font-bold text-lg"
@@ -1119,11 +1161,11 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                 </div>
                                                             </div>
 
-                                                            {pagaCon > montoRequerido && (
+                                                            {excedenteCobro > 0 && (
                                                                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
                                                                     <div className="flex justify-between items-center text-xs">
                                                                         <span className="font-bold text-amber-800 dark:text-amber-300">Excedente recibido:</span>
-                                                                        <span className="font-black text-amber-700 dark:text-amber-400 font-mono text-sm">USD {(pagaCon - montoRequerido).toFixed(2)}</span>
+                                                                        <span className="font-black text-amber-700 dark:text-amber-400 font-mono text-sm">{formatPaymentAmount(excedenteCobro, formData.moneda)}</span>
                                                                     </div>
 
                                                                     <div className="space-y-1.5">
@@ -1148,7 +1190,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                                                 type="button"
                                                                                 onClick={() => {
                                                                                     setDiferenciaDestino('vuelto');
-                                                                                    setFormData(prev => ({ ...prev, monto: montoRequerido }));
+                                                                                    setFormData(prev => ({ ...prev, monto: montoRequeridoCobro }));
                                                                                 }}
                                                                                 className={clsx(
                                                                                     "flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase transition-all border",
@@ -1164,9 +1206,9 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
                                                                     <div className="pt-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-400 border-t border-amber-100 dark:border-amber-900/50">
                                                                         {diferenciaDestino === 'saldo_a_favor' ? (
-                                                                            <span>✓ Se registrarán <strong>USD {pagaCon.toFixed(2)}</strong> en caja y <strong>USD {(pagaCon - montoRequerido).toFixed(2)}</strong> como crédito para el paciente.</span>
+                                                                            <span>✓ Se registrarán <strong>{formatPaymentAmount(pagaCon, formData.moneda)}</strong> en caja y <strong>{formatPaymentAmount(excedenteCobro, formData.moneda)}</strong> como crédito para el paciente.</span>
                                                                         ) : (
-                                                                            <span>✓ Se registrarán <strong>USD {montoRequerido.toFixed(2)}</strong> en caja. Debés entregar <strong>USD {(pagaCon - montoRequerido).toFixed(2)}</strong> de vuelto.</span>
+                                                                            <span>✓ Se registrarán <strong>{formatPaymentAmount(montoRequeridoCobro, formData.moneda)}</strong> en caja. Debés entregar <strong>{formatPaymentAmount(excedenteCobro, formData.moneda)}</strong> de vuelto.</span>
                                                                         )}
                                                                     </div>
                                                                 </div>
