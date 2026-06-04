@@ -141,6 +141,18 @@ export interface LiquidacionAdminRow {
     total_proyectado?: number;
 }
 
+export interface LiquidacionPagoCajaSuggestion {
+    id: string;
+    personal_id: string;
+    personal_nombre: string;
+    mes: string;
+    estado: LiquidacionResult['estado'];
+    modelo_pago: LiquidacionResult['modelo_pago'];
+    total_ars: number;
+    total_usd?: number | null;
+    tc_liquidacion?: number | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GENERATE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -477,14 +489,15 @@ export async function registrarMensualidadFija(formData: FormData): Promise<{ su
 
 export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
     movimientoId: string;
-    personalId: string;
+    personalId?: string;
+    liquidacionId?: string;
 }): Promise<{ success: boolean; error?: string }> {
     try {
         const admin = getAdminClient();
-        const { movimientoId, personalId } = input;
+        const { movimientoId, personalId, liquidacionId } = input;
 
         if (!movimientoId) throw new Error('Movimiento inválido');
-        if (!personalId) throw new Error('Prestador inválido');
+        if (!personalId && !liquidacionId) throw new Error('Seleccioná una liquidación o un prestador');
 
         const { data: movimiento, error: movError } = await admin
             .from('caja_admin_movimientos')
@@ -497,17 +510,7 @@ export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
             throw new Error('Solo se sincronizan egresos de caja');
         }
 
-        const { data: personal, error: personalError } = await admin
-            .from('personal')
-            .select('id, nombre, apellido, modelo_pago, monto_mensual, moneda_mensual')
-            .eq('id', personalId)
-            .single();
-
-        if (personalError || !personal) throw new Error('Prestador no encontrado');
-
         const fechaMovimiento = String(movimiento.fecha_movimiento || new Date().toISOString().slice(0, 10));
-        const mes = fechaMovimiento.slice(0, 7);
-        const mesDate = `${mes}-01`;
         const tcLiquidacion = Number(movimiento.tc_bna_venta || 0) > 0
             ? Number(movimiento.tc_bna_venta)
             : await fetchBnaVenta();
@@ -515,7 +518,7 @@ export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
         const lines = Array.isArray(movimiento.caja_admin_movimiento_lineas)
             ? movimiento.caja_admin_movimiento_lineas as Array<{ importe?: number | null; moneda?: string | null; usd_equivalente?: number | null; cuenta_id?: string | null }>
             : [];
-        const totalUsd = round(
+        const totalUsdMovimiento = round(
             Number(movimiento.usd_equivalente_total || 0) || lines.reduce((sum, line) => {
                 const moneda = String(line.moneda || '').toUpperCase();
                 const importe = Number(line.importe || 0);
@@ -527,8 +530,96 @@ export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
             }, 0),
             2
         );
-        const totalArs = round(totalUsd * tcLiquidacion, 2);
+        const totalArsMovimiento = round(totalUsdMovimiento * tcLiquidacion, 2);
         const adjuntos = Array.isArray(movimiento.adjuntos) ? movimiento.adjuntos : [];
+
+        if (liquidacionId) {
+            const { data: liquidacion, error: liqError } = await admin
+                .from('liquidaciones_mensuales')
+                .select('id, personal_id, mes, estado, total_ars, total_usd, tc_liquidacion, breakdown, observaciones')
+                .eq('id', liquidacionId)
+                .single();
+
+            if (liqError || !liquidacion) throw new Error('Liquidación no encontrada');
+
+            const estado = normalizeEstado(liquidacion.estado);
+            if (estado === 'paid') return { success: true };
+            if (estado === 'rejected') throw new Error('No se puede pagar una liquidación rechazada');
+
+            const breakdownActual =
+                liquidacion.breakdown && typeof liquidacion.breakdown === 'object' && !Array.isArray(liquidacion.breakdown)
+                    ? liquidacion.breakdown as Record<string, unknown>
+                    : {};
+
+            let lastError: { message?: string } | null = null;
+            for (const estadoDb of ESTADO_DB_CANDIDATES.paid) {
+                const { error } = await admin
+                    .from('liquidaciones_mensuales')
+                    .update({
+                        estado: estadoDb,
+                        fecha_pago: fechaMovimiento,
+                        observaciones: liquidacion.observaciones || movimiento.nota || movimiento.descripcion || null,
+                        breakdown: {
+                            ...breakdownActual,
+                            pago_caja_admin: {
+                                origen: 'caja_admin_movimientos',
+                                caja_movimiento_id: movimiento.id,
+                                descripcion: movimiento.descripcion,
+                                subtipo: movimiento.subtipo,
+                                nota: movimiento.nota,
+                                fecha_pago: fechaMovimiento,
+                                total_movimiento_usd: totalUsdMovimiento,
+                                total_movimiento_ars: totalArsMovimiento,
+                                total_liquidacion_usd: liquidacion.total_usd ?? null,
+                                total_liquidacion_ars: liquidacion.total_ars,
+                                tc_liquidacion: tcLiquidacion,
+                                adjuntos,
+                                comprobante_url: adjuntos[0] || null,
+                                lineas: lines.map((line) => ({
+                                    cuenta_id: line.cuenta_id || null,
+                                    importe: Number(line.importe || 0),
+                                    moneda: line.moneda || null,
+                                    usd_equivalente: Number(line.usd_equivalente || 0),
+                                })),
+                                sincronizado_at: new Date().toISOString(),
+                            },
+                        },
+                    })
+                    .eq('id', liquidacion.id);
+
+                if (!error) {
+                    lastError = null;
+                    break;
+                }
+
+                lastError = error;
+                if (!isEstadoConstraintError(error.message)) break;
+            }
+
+            if (lastError) throw new Error(lastError.message || 'Error al marcar liquidación como pagada');
+
+            revalidatePath('/admin/liquidaciones');
+            revalidatePath('/caja-admin');
+            revalidatePath('/caja-admin/liquidaciones');
+
+            return { success: true };
+        }
+
+        const { data: personal, error: personalError } = await admin
+            .from('personal')
+            .select('id, nombre, apellido, modelo_pago, monto_mensual, moneda_mensual')
+            .eq('id', personalId!)
+            .single();
+
+        if (personalError || !personal) throw new Error('Prestador no encontrado');
+
+        const mes = fechaMovimiento.slice(0, 7);
+        const mesDate = `${mes}-01`;
+        const totalUsd = round(
+            totalUsdMovimiento,
+            2
+        );
+        const totalArs = round(totalUsd * tcLiquidacion, 2);
 
         const payloadBase = {
             personal_id: personalId,
@@ -602,6 +693,37 @@ export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
             error: error instanceof Error ? error.message : 'Error al sincronizar liquidación',
         };
     }
+}
+
+export async function getLiquidacionesPendientesParaCaja(): Promise<LiquidacionPagoCajaSuggestion[]> {
+    const admin = getAdminClient();
+
+    const { data, error } = await admin
+        .from('liquidaciones_mensuales')
+        .select('id, personal_id, mes, estado, modelo_pago, total_ars, total_usd, tc_liquidacion, personal!inner(nombre, apellido, activo)')
+        .order('mes', { ascending: false })
+        .limit(150);
+
+    if (error) throw new Error(error.message);
+
+    return (data || [])
+        .map((row) => {
+            const personal = Array.isArray(row.personal) ? row.personal[0] : row.personal;
+            return {
+                id: row.id,
+                personal_id: row.personal_id,
+                personal_nombre: `${personal?.nombre || ''} ${personal?.apellido || ''}`.trim(),
+                mes: String(row.mes || '').slice(0, 7),
+                estado: normalizeEstado(row.estado),
+                modelo_pago: row.modelo_pago,
+                total_ars: Number(row.total_ars || 0),
+                total_usd: row.total_usd == null ? null : Number(row.total_usd),
+                tc_liquidacion: row.tc_liquidacion == null ? null : Number(row.tc_liquidacion),
+                activo: personal?.activo !== false,
+            };
+        })
+        .filter((row) => row.activo && row.estado !== 'paid' && row.estado !== 'rejected' && row.total_ars > 0)
+        .map(({ activo: _activo, ...row }) => row);
 }
 
 export async function rejectLiquidacion(id: string, motivo?: string): Promise<void> {

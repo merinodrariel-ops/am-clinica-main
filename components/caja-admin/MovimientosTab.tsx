@@ -55,7 +55,11 @@ import {
   type CajaAdminCategoria,
 } from "@/lib/caja-admin";
 import { updateCajaAdminMovimientoSecure } from "@/app/actions/caja-admin";
-import { sincronizarLiquidacionDesdeMovimientoCaja } from "@/app/actions/liquidaciones";
+import {
+  getLiquidacionesPendientesParaCaja,
+  sincronizarLiquidacionDesdeMovimientoCaja,
+  type LiquidacionPagoCajaSuggestion,
+} from "@/app/actions/liquidaciones";
 import { createClient } from "@/utils/supabase/client";
 import { ComprobanteLink } from "@/components/caja/ComprobanteLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -105,6 +109,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   const [transfers, setTransfers] = useState<TransferenciaAdmin[]>([]);
   const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
   const [personalLiquidacion, setPersonalLiquidacion] = useState<Personal[]>([]);
+  const [liquidacionesPendientes, setLiquidacionesPendientes] = useState<LiquidacionPagoCajaSuggestion[]>([]);
   const [categorias, setCategorias] = useState<CajaAdminCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -179,6 +184,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     nota: "",
     fecha_movimiento: getLocalISODate(),
     personal_id: "",
+    liquidacion_id: "",
   });
   const [formLineas, setFormLineas] = useState<MovimientoLinea[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -270,6 +276,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       const arqueosData = await getArqueosForMonth(sucursal.id, mesActual);
       const balanceData = await getCurrentBalanceAdmin(sucursal.id);
       const personalData = await getPersonal();
+      const liquidacionesPendientesData = await getLiquidacionesPendientesParaCaja();
 
       setMovimientos(movData || []);
 
@@ -285,6 +292,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       setCuentas(cuentasData || []);
       setCategorias((categoriasData || []).filter(c => c.activo));
       setPersonalLiquidacion((personalData || []).filter(p => p.activo !== false && ['horas', 'prestaciones', 'mensual'].includes(p.modelo_pago)));
+      setLiquidacionesPendientes(liquidacionesPendientesData || []);
       setAperturaHoy(aperturaHoy);
       setArqueos(arqueosData || []);
       setBalanceVivo(balanceData);
@@ -577,6 +585,87 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     if (moneda === "USD") return importe;
     if (moneda === "ARS" && tcBna) return importe / tcBna;
     return previousUsd || 0;
+  }
+
+  function normalizeCajaText(value?: string | null) {
+    return (value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
+
+  function formatLiquidacionMes(mes: string) {
+    const [year, month] = mes.split("-");
+    const date = new Date(Number(year), Number(month) - 1, 1);
+    return date.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  }
+
+  function formatARS(value: number) {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      maximumFractionDigits: 0,
+    }).format(value || 0);
+  }
+
+  function getLiquidacionPagoLine(liquidacion: LiquidacionPagoCajaSuggestion): MovimientoLinea | null {
+    const arsAccount =
+      cuentas.find((cuenta) => cuenta.moneda === "ARS" && cuenta.tipo_cuenta === "BANCO") ||
+      cuentas.find((cuenta) => cuenta.moneda === "ARS") ||
+      null;
+    const usdAccount =
+      cuentas.find((cuenta) => cuenta.moneda === "USD" && cuenta.tipo_cuenta === "BANCO") ||
+      cuentas.find((cuenta) => cuenta.moneda === "USD") ||
+      null;
+
+    if (arsAccount) {
+      return {
+        cuenta_id: arsAccount.id,
+        importe: Math.round(Number(liquidacion.total_ars || 0)),
+        moneda: "ARS",
+        usd_equivalente: (Number(liquidacion.total_ars || 0) / (Number(liquidacion.tc_liquidacion || 0) || tcBna || 1)),
+      };
+    }
+
+    if (usdAccount) {
+      const usdAmount = Number(liquidacion.total_usd || 0) || (Number(liquidacion.total_ars || 0) / (Number(liquidacion.tc_liquidacion || 0) || tcBna || 1));
+      return {
+        cuenta_id: usdAccount.id,
+        importe: Math.round(usdAmount * 100) / 100,
+        moneda: "USD",
+        usd_equivalente: Math.round(usdAmount * 100) / 100,
+      };
+    }
+
+    return null;
+  }
+
+  function applyLiquidacionSuggestion(liquidacionId: string) {
+    const liquidacion = liquidacionesPendientes.find((item) => item.id === liquidacionId);
+    if (!liquidacion) {
+      setFormData((prev) => ({ ...prev, liquidacion_id: "", personal_id: "" }));
+      return;
+    }
+
+    const category = categorias.find((item) =>
+      item.tipo_movimiento === "EGRESO" && normalizeCajaText(item.nombre).includes("liquid")
+    );
+    const paymentLine = getLiquidacionPagoLine(liquidacion);
+
+    setFormData((prev) => ({
+      ...prev,
+      tipo_movimiento: "EGRESO",
+      liquidacion_id: liquidacion.id,
+      personal_id: liquidacion.personal_id,
+      subtipo: prev.subtipo || category?.nombre || "",
+      descripcion: `Pago liquidación ${liquidacion.personal_nombre} · ${formatLiquidacionMes(liquidacion.mes)}`,
+      nota: prev.nota || `Pago sugerido desde liquidación ${liquidacion.mes}. Importe liquidado: ${formatARS(liquidacion.total_ars)}.`,
+    }));
+
+    if (paymentLine) {
+      setFormLineas([paymentLine]);
+    }
   }
 
   function addEditLinea() {
@@ -877,7 +966,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       setSubmitting(false);
       if (error) { setFormError(error.message); return; }
       setShowForm(false);
-      setFormData({ tipo_movimiento: "EGRESO", subtipo: "", descripcion: "", nota: "", fecha_movimiento: getLocalISODate(), personal_id: "" });
+      setFormData({ tipo_movimiento: "EGRESO", subtipo: "", descripcion: "", nota: "", fecha_movimiento: getLocalISODate(), personal_id: "", liquidacion_id: "" });
       setGiroMonto("");
       setGiroMoneda("ARS");
       setGiroRate("");
@@ -960,10 +1049,11 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       return;
     }
 
-    if (createdMovimiento?.id && formData.personal_id) {
+    if (createdMovimiento?.id && (formData.liquidacion_id || formData.personal_id)) {
       const syncResult = await sincronizarLiquidacionDesdeMovimientoCaja({
         movimientoId: createdMovimiento.id,
-        personalId: formData.personal_id,
+        liquidacionId: formData.liquidacion_id || undefined,
+        personalId: formData.personal_id || undefined,
       });
 
       if (!syncResult.success) {
@@ -981,6 +1071,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       nota: "",
       fecha_movimiento: getLocalISODate(),
       personal_id: "",
+      liquidacion_id: "",
     });
     setFormLineas([]);
     setAdjuntos([]);
@@ -1370,35 +1461,88 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
             )}
 
             {formData.tipo_movimiento === "EGRESO" && (
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">
-                  Vincular a prestador / liquidación
-                </label>
-                <select
-                  value={formData.personal_id}
-                  onChange={(e) => {
-                    const personalId = e.target.value;
-                    const selected = personalLiquidacion.find((p) => p.id === personalId);
-                    setFormData({
-                      ...formData,
-                      personal_id: personalId,
-                      descripcion: selected && !formData.descripcion
-                        ? `Pago liquidación ${selected.nombre} ${selected.apellido || ''}`.trim()
-                        : formData.descripcion,
-                    });
-                  }}
-                  className="w-full px-4 py-2.5 text-sm font-bold rounded-2xl border-none ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-950 h-11 focus:ring-2 ring-indigo-500 transition-all shadow-sm"
-                >
-                  <option value="">No vincular</option>
-                  {personalLiquidacion.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {`${p.nombre} ${p.apellido || ''}`.trim()} · {p.modelo_pago === 'mensual' ? 'Mensual' : p.modelo_pago === 'prestaciones' ? 'Prestaciones' : 'Horas'}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Si elegís una persona, este egreso y sus comprobantes se sincronizan con su liquidación del mes.
-                </p>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">
+                    Liquidación sugerida
+                  </label>
+                  <select
+                    value={formData.liquidacion_id}
+                    onChange={(e) => applyLiquidacionSuggestion(e.target.value)}
+                    className="w-full px-4 py-2.5 text-sm font-bold rounded-2xl border-none ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-950 h-11 focus:ring-2 ring-indigo-500 transition-all shadow-sm"
+                  >
+                    <option value="">Elegir liquidación impaga...</option>
+                    {liquidacionesPendientes.map((liq) => (
+                      <option key={liq.id} value={liq.id}>
+                        {liq.personal_nombre} · {formatLiquidacionMes(liq.mes)} · {formatARS(liq.total_ars)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Al elegir una liquidación, se precarga el monto y al guardar queda marcada como pagada.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">
+                    Vincular solo a prestador
+                  </label>
+                  <select
+                    value={formData.personal_id}
+                    onChange={(e) => {
+                      const personalId = e.target.value;
+                      const selected = personalLiquidacion.find((p) => p.id === personalId);
+                      setFormData({
+                        ...formData,
+                        personal_id: personalId,
+                        liquidacion_id: "",
+                        descripcion: selected && !formData.descripcion
+                          ? `Pago liquidación ${selected.nombre} ${selected.apellido || ''}`.trim()
+                          : formData.descripcion,
+                      });
+                    }}
+                    className="w-full px-4 py-2.5 text-sm font-bold rounded-2xl border-none ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-950 h-11 focus:ring-2 ring-indigo-500 transition-all shadow-sm"
+                  >
+                    <option value="">No vincular</option>
+                    {personalLiquidacion.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {`${p.nombre} ${p.apellido || ''}`.trim()} · {p.modelo_pago === 'mensual' ? 'Mensual' : p.modelo_pago === 'prestaciones' ? 'Prestaciones' : 'Horas'}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Usalo solo si todavía no hay liquidación generada; toma el mes de la fecha del egreso.
+                  </p>
+                </div>
+
+                {formData.liquidacion_id && (
+                  <div className="md:col-span-2 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3">
+                    {(() => {
+                      const selected = liquidacionesPendientes.find((liq) => liq.id === formData.liquidacion_id);
+                      if (!selected) return null;
+                      return (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                              {selected.personal_nombre} · {formatLiquidacionMes(selected.mes)}
+                            </p>
+                            <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                              Importe estipulado en liquidación. El egreso queda como comprobante de pago.
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-black text-emerald-700 dark:text-emerald-300">{formatARS(selected.total_ars)}</p>
+                            {selected.total_usd ? (
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                USD {Number(selected.total_usd).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             )}
 
