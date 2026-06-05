@@ -75,7 +75,7 @@ export default function NewPatientsCard() {
         async function loadStats() {
             try {
                 const now = new Date();
-                const months = buildMonthSeries(now, MONTHS_TO_SHOW);
+                const months = buildMonthSeries(now, MONTHS_TO_SHOW).filter(m => !m.key.startsWith('2025'));
                 const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
                 const { data: pacientesMeses } = await supabase

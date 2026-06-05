@@ -155,13 +155,14 @@ export async function getOwnerDashboardStatsAction(
         const monthStart = new Date(year, month, 1).toISOString().split('T')[0];
         const nextMonthStart = new Date(year, month + 1, 1).toISOString().split('T')[0];
         const comparisonMonthStart = new Date(year, month - (monthsToCompare - 1), 1).toISOString().split('T')[0];
-        const monthWindows = Array.from({ length: monthsToCompare }, (_, index) => {
+        const rawMonthWindows = Array.from({ length: monthsToCompare }, (_, index) => {
             const date = new Date(year, month - (monthsToCompare - 1) + index, 1);
             const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             const shortLabel = date.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').slice(0, 3);
             const label = date.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-            return { key, shortLabel, label };
+            return { key, shortLabel, label, year: date.getFullYear() };
         });
+        const monthWindows = rawMonthWindows.filter(w => w.year >= 2026).map(({ year: _y, ...rest }) => rest);
 
         const { count: totalPacientes } = await supabase
             .from('pacientes')

@@ -503,7 +503,7 @@ function MonthlyTrendsPanel({
         <div className="glass-card rounded-2xl p-5 border border-white/10 bg-black/20">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold text-white">Tendencia Mensual</h3>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider">últimos 6 meses</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">este año</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -559,11 +559,11 @@ export default function OwnerDashboard() {
     const isCurrentMonth = selectedYear === todayRef.getFullYear() && selectedMonth === todayRef.getMonth();
     const selectedMonthLabel = MONTH_NAMES[selectedMonth];
 
-    // Build last 12 months for the selector
+    // Build months of this year for the selector
     const monthOptions = Array.from({ length: 12 }, (_, i) => {
         const d = new Date(todayRef.getFullYear(), todayRef.getMonth() - (11 - i), 1);
         return { year: d.getFullYear(), month: d.getMonth(), label: MONTH_NAMES[d.getMonth()], shortLabel: d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '') };
-    });
+    }).filter(opt => opt.year === todayRef.getFullYear());
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
