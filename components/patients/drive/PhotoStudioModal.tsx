@@ -19,6 +19,7 @@ import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
+import { cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -865,6 +866,7 @@ export default function PhotoStudioModal({
     const textResizeDragRef = useRef<{ id: string; startNx: number; startWidth: number } | null>(null);
     const textMetricsRef = useRef<Map<string, { hNorm: number }>>(new Map());
     const justFinishedEditRef = useRef<string | null>(null); // guards against blur-then-click creating new text
+    const textClipboardRef = useRef<TextAnnotation | null>(null);
     const selectedText = useMemo(() => textAnnotations.find(t => t.id === selectedTextId) ?? null, [textAnnotations, selectedTextId]);
 
     const [zoom, setZoom] = useState(1);
@@ -1598,15 +1600,43 @@ export default function PhotoStudioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [history]);
 
-    // Keyboard shortcut: Cmd+C / Cmd+V for draw shape copy/paste
+    // Keyboard shortcut: Cmd+C / Cmd+V for selected text annotations or draw shapes
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (!e.metaKey && !e.ctrlKey) return;
-            if (e.key === 'c' && selectedShapeId) {
-                const shape = drawShapes.find(s => s.id === selectedShapeId);
-                if (shape) setDrawClipboard(shape);
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+            const key = e.key.toLowerCase();
+            if (key === 'c' && selectedTextId) {
+                const textAnnotation = textAnnotations.find(t => t.id === selectedTextId);
+                if (textAnnotation) {
+                    textClipboardRef.current = textAnnotation;
+                    setDrawClipboard(null);
+                    e.preventDefault();
+                    return;
+                }
             }
-            if (e.key === 'v' && drawClipboard) {
+            if (key === 'v' && textClipboardRef.current) {
+                const newText = cloneTextAnnotationForPaste(textClipboardRef.current, `text-${Date.now()}`);
+                textClipboardRef.current = newText;
+                setTextAnnotations(prev => [...prev, newText]);
+                setSelectedTextId(newText.id);
+                setEditingTextId(null);
+                setTextToolActive(true);
+                e.preventDefault();
+                return;
+            }
+
+            if (key === 'c' && selectedShapeId) {
+                const shape = drawShapes.find(s => s.id === selectedShapeId);
+                if (shape) {
+                    textClipboardRef.current = null;
+                    setDrawClipboard(shape);
+                    e.preventDefault();
+                }
+            }
+            if (key === 'v' && drawClipboard) {
                 const OFFSET = 0.02;
                 const newShape: DrawShape = {
                     ...drawClipboard,
@@ -1620,12 +1650,13 @@ export default function PhotoStudioModal({
                 setDrawShapes(prev => [...prev, newShape]);
                 setSelectedShapeId(newShape.id);
                 setDrawMode('editing');
+                e.preventDefault();
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedShapeId, drawShapes, drawClipboard]);
+    }, [selectedTextId, textAnnotations, selectedShapeId, drawShapes, drawClipboard]);
 
     // Keyboard shortcut: Delete / Backspace → delete selected shape, text annotation, or canvas layer
     // Escape while drawing → cancel current in-progress path
