@@ -56,18 +56,21 @@ export async function sendResendEmail(input: SendResendEmailInput) {
             return {
                 success: false,
                 error: error.message || 'Error en Resend SDK',
+                provider: 'resend' as const,
             };
         }
 
         return {
             success: true,
             id: data?.id,
+            provider: 'resend' as const,
         };
     } catch (error: unknown) {
         console.error('Exception in sendResendEmail:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Error enviando email con Resend SDK',
+            provider: 'resend' as const,
         };
     }
 }

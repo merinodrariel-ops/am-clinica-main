@@ -18,7 +18,7 @@ export const MODULE_DEFINITIONS = [
     { key: 'portal',           label: 'Mi Portal (Prestador)', financial: false },
     { key: 'staff',            label: 'Gestión de Staff',      financial: false },
     { key: 'liquidaciones',    label: 'Liquidaciones',         financial: true  },
-    { key: 'email_templates',  label: 'Plantillas Email',      financial: false },
+    { key: 'email_templates',  label: 'Emails',                financial: false },
 ] as const;
 
 export type ModuleKey = typeof MODULE_DEFINITIONS[number]['key'];

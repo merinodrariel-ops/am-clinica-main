@@ -127,10 +127,14 @@ export async function POST(request: Request) {
             to,
             subject: `[PREVIEW] ${subject}`,
             html,
+            messageType: 'test',
+            sourceModule: 'email_templates',
+            templateKey: template,
+            templateLabel: template,
         });
 
         if (!result.success) {
-            return NextResponse.json({ success: false, error: (result as any).error?.message || 'Error al enviar' }, { status: 500 });
+            return NextResponse.json({ success: false, error: String(result.error || 'Error al enviar') }, { status: 500 });
         }
 
         return NextResponse.json({ success: true });

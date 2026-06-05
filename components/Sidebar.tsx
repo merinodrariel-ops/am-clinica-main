@@ -119,8 +119,8 @@ const MENU_ITEMS = [
     },
     {
         icon: Mail,
-        label: 'Templates Email',
-        href: '/admin/email-templates',
+        label: 'Emails',
+        href: '/admin/emails',
         key: 'email_templates',
         roles: ['owner', 'admin', 'developer']
     },

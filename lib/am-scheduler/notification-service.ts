@@ -6,6 +6,7 @@
 
 import { createAdminClient } from '@/utils/supabase/admin';
 import { EmailService } from '@/lib/email-service';
+import type { EmailMessageType } from '@/lib/email-message-tracking';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://am-clinica.ar';
 
@@ -269,15 +270,36 @@ async function sendEmail(ctx: AppointmentNotificationContext): Promise<{ success
   }
 
   try {
+    const messageTypeByTemplate: Record<string, EmailMessageType> = {
+      reminder_24h: 'appointment_reminder',
+      reminder_1h: 'appointment_reminder',
+      appointment_confirmed: 'appointment_confirmation',
+      appointment_cancelled: 'appointment_cancellation',
+      survey_first_visit: 'survey_first_visit',
+      survey_post_appointment: 'survey_post_appointment',
+      post_treatment_followup: 'treatment_followup',
+    };
+
     const response = await EmailService.send({
       to: ctx.patientEmail,
       subject,
       html,
       idempotencyKey: ctx.idempotencyKey,
+      messageType: messageTypeByTemplate[ctx.templateKey] ?? 'other',
+      sourceModule: 'agenda',
+      templateKey: ctx.templateKey,
+      appointmentId: ctx.appointmentId,
+      toName: ctx.patientName,
+      payload: {
+        patientName: ctx.patientName,
+        doctorName: ctx.doctorName,
+        startTime: ctx.startTime,
+        appointmentType: ctx.appointmentType,
+      },
     });
 
-    if (!response.success) return { success: false, error: (response as any).error?.message || 'Error sending email' };
-    return { success: true, id: (response as any).id };
+    if (!response.success) return { success: false, error: String(response.error || 'Error sending email') };
+    return { success: true, id: response.id };
   } catch (err) {
     return { success: false, error: String(err) };
   }

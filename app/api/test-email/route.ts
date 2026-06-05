@@ -30,14 +30,18 @@ export async function GET(request: Request) {
                         </p>
                     </div>
                 </div>
-            `
+            `,
+            messageType: 'test',
+            sourceModule: 'test_email',
+            templateKey: 'test_email',
+            templateLabel: 'Prueba de email',
         });
 
         if (result.success) {
             return NextResponse.json({
                 success: true,
                 message: `Email enviado exitosamente a ${to}`,
-                messageId: (result as any).id
+                messageId: result.id
             });
         } else {
             return NextResponse.json({
