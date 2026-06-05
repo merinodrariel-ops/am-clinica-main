@@ -110,6 +110,94 @@ function getEffectiveHourlyRate(
     return isCleaning ? defaults.cleaningHourValue : defaults.staffGeneralHourValue;
 }
 
+async function getWorkerHistoricalSettings(
+    admin: ReturnType<typeof getAdminClient>,
+    personalId: string,
+    mes: string,
+    worker: {
+        valor_hora_ars?: number | null;
+        area?: string | null;
+        rol?: string | null;
+        recargo_sabado?: boolean;
+        recargo_domingo_feriado?: boolean;
+        recargo_nocturno?: boolean;
+        horas_base?: number | null;
+        costo_hora_extra?: number | null;
+    },
+    defaults: { cleaningHourValue: number; staffGeneralHourValue: number }
+) {
+    const normalizedMes = mes.slice(0, 7);
+    const [year, month] = normalizedMes.split('-').map(Number);
+    const lastDayDate = new Date(year, month + 1, 0);
+    const lastDayStr = lastDayDate.toISOString().slice(0, 10);
+
+    const { data: workerHist, error: workerHistError } = await admin
+        .from('personal_valores_hora_historia')
+        .select('valor_hora_ars, valor_hora_personalizado, recargo_sabado, recargo_domingo_feriado, recargo_nocturno, horas_base, costo_hora_extra')
+        .eq('personal_id', personalId)
+        .lte('fecha_desde', lastDayStr)
+        .order('fecha_desde', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (workerHistError) {
+        console.error('Error fetching worker history settings:', workerHistError);
+    }
+
+    const hasHist = workerHist && workerHist.length > 0;
+    const isCustom = hasHist && workerHist[0].valor_hora_personalizado;
+
+    if (isCustom) {
+        const h = workerHist[0];
+        return {
+            valor_hora_ars: Number(h.valor_hora_ars || 0),
+            recargo_sabado: h.recargo_sabado ?? true,
+            recargo_domingo_feriado: h.recargo_domingo_feriado ?? true,
+            recargo_nocturno: h.recargo_nocturno ?? false,
+            horas_base: h.horas_base !== undefined ? h.horas_base : null,
+            costo_hora_extra: h.costo_hora_extra !== undefined ? h.costo_hora_extra : null,
+        };
+    }
+
+    const { data: sucursalHist, error: sucursalHistError } = await admin
+        .from('sucursal_valores_hora_historia')
+        .select('valor_hora_staff_ars, valor_hora_limpieza_ars')
+        .lte('fecha_desde', lastDayStr)
+        .order('fecha_desde', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (sucursalHistError) {
+        console.error('Error fetching sucursal history settings:', sucursalHistError);
+    }
+
+    const area = normalizeText(worker.area);
+    const rol = normalizeText(worker.rol);
+    const isCleaning = area.includes('limpieza') || rol.includes('limpieza');
+
+    let resolvedRate = 0;
+    if (sucursalHist && sucursalHist.length > 0) {
+        resolvedRate = Number(
+            isCleaning ? sucursalHist[0].valor_hora_limpieza_ars : sucursalHist[0].valor_hora_staff_ars
+        );
+    }
+
+    const finalRate = resolvedRate > 0 
+        ? resolvedRate 
+        : getEffectiveHourlyRate(worker, defaults);
+
+    const h = hasHist ? workerHist[0] : null;
+
+    return {
+        valor_hora_ars: finalRate,
+        recargo_sabado: h?.recargo_sabado ?? worker.recargo_sabado ?? true,
+        recargo_domingo_feriado: h?.recargo_domingo_feriado ?? worker.recargo_domingo_feriado ?? true,
+        recargo_nocturno: h?.recargo_nocturno ?? worker.recargo_nocturno ?? false,
+        horas_base: h ? h.horas_base : (worker.horas_base ?? null),
+        costo_hora_extra: h ? h.costo_hora_extra : (worker.costo_hora_extra ?? null),
+    };
+}
+
 const ESTADO_DB_CANDIDATES: Record<LiquidacionResult['estado'], string[]> = {
     // Legacy DB in this project currently accepts Spanish states
     pending: ['Pendiente', 'pending', 'pendiente'],
@@ -237,17 +325,18 @@ export async function generateLiquidacion(
 
         totalHoras = (logs || []).reduce((s, l) => s + Number(l.horas || 0), 0);
         const hourlyDefaults = await getHourlyDefaults(admin);
-        const valorHora = getEffectiveHourlyRate(worker, hourlyDefaults);
+        const hist = await getWorkerHistoricalSettings(admin, personalId, mes, worker, hourlyDefaults);
+        const valorHora = hist.valor_hora_ars;
         valorHoraSnapshot = valorHora;
 
         // Apply multipliers (holidays/weekends)
         totalArs = Math.round(calculateAdjustedEarnings(logs || [], valorHora, {
             area: worker.area || '',
-            recargo_sabado: worker.recargo_sabado,
-            recargo_domingo_feriado: worker.recargo_domingo_feriado,
-            recargo_nocturno: worker.recargo_nocturno,
-            horas_base: worker.horas_base,
-            costo_hora_extra: worker.costo_hora_extra,
+            recargo_sabado: hist.recargo_sabado,
+            recargo_domingo_feriado: hist.recargo_domingo_feriado,
+            recargo_nocturno: hist.recargo_nocturno,
+            horas_base: hist.horas_base,
+            costo_hora_extra: hist.costo_hora_extra,
         }) * 100) / 100;
 
         breakdown = {
@@ -929,7 +1018,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
 
     const hourlyDefaults = await getHourlyDefaults(admin);
 
-    return workersData.map(w => {
+    const rows = await Promise.all(workersData.map(async (w) => {
         const liq = liqMap.get(w.id);
         const liquidacionNormalizada = liq
             ? ({
@@ -941,14 +1030,16 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
         const isDoctor = w.tipo === 'odontologo' || w.tipo === 'profesional';
         const workerLogs = logsByWorker.get(w.id) || [];
         const totalHoras = workerLogs.reduce((s, l) => s + Number(l.horas || 0), 0);
-        const effectiveValorHora = getEffectiveHourlyRate(w, hourlyDefaults);
-        const totalProyectado = calculateAdjustedEarnings(workerLogs, effectiveValorHora, {
+        
+        const hist = await getWorkerHistoricalSettings(admin, w.id, mesDate, w, hourlyDefaults);
+
+        const totalProyectado = calculateAdjustedEarnings(workerLogs, hist.valor_hora_ars, {
             area: w.area || '',
-            recargo_sabado: w.recargo_sabado,
-            recargo_domingo_feriado: w.recargo_domingo_feriado,
-            recargo_nocturno: w.recargo_nocturno,
-            horas_base: w.horas_base,
-            costo_hora_extra: w.costo_hora_extra,
+            recargo_sabado: hist.recargo_sabado,
+            recargo_domingo_feriado: hist.recargo_domingo_feriado,
+            recargo_nocturno: hist.recargo_nocturno,
+            horas_base: hist.horas_base,
+            costo_hora_extra: hist.costo_hora_extra,
         });
 
         return {
@@ -963,8 +1054,8 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
                 ? (w.empresas_prestadoras[0]?.nombre || null)
                 : (w.empresas_prestadoras?.nombre || null),
             tipo: w.tipo || 'prestador',
-            modelo_pago: isDoctor ? 'prestacion_usd' : 'hora_ars',
-            valor_hora_ars: effectiveValorHora,
+            modelo_pago: (isDoctor ? 'prestacion_usd' : 'hora_ars') as 'hora_ars' | 'prestacion_usd',
+            valor_hora_ars: hist.valor_hora_ars,
             liquidacion: liquidacionNormalizada,
             tiene_pendientes: Boolean(
                 liquidacionNormalizada && Number(liquidacionNormalizada.prestaciones_pendientes) > 0
@@ -972,7 +1063,9 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
             total_horas: totalHoras,
             total_proyectado: totalProyectado
         };
-    });
+    }));
+
+    return rows;
 }
 
 export async function generateLiquidacionesEmpresa(empresaId: string, mes: string): Promise<{ generated: number; skipped: number }> {

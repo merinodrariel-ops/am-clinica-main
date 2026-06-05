@@ -95,6 +95,94 @@ function getEffectiveHourlyRate(personal: { valor_hora_ars?: number | null; area
         : defaults.staffGeneralHourValue;
 }
 
+async function getWorkerHistoricalSettings(
+    personalId: string,
+    mes: string,
+    worker: {
+        valor_hora_ars?: number | null;
+        area?: string | null;
+        rol?: string | null;
+        recargo_sabado?: boolean;
+        recargo_domingo_feriado?: boolean;
+        recargo_nocturno?: boolean;
+        horas_base?: number | null;
+        costo_hora_extra?: number | null;
+    },
+    defaults: { cleaningHourValue: number; staffGeneralHourValue: number }
+) {
+    const supabase = getSupabase();
+    const normalizedMes = mes.slice(0, 7);
+    const [year, month] = normalizedMes.split('-').map(Number);
+    const lastDayDate = new Date(year, month + 1, 0);
+    const lastDayStr = lastDayDate.toISOString().slice(0, 10);
+
+    const { data: workerHist, error: workerHistError } = await supabase
+        .from('personal_valores_hora_historia')
+        .select('valor_hora_ars, valor_hora_personalizado, recargo_sabado, recargo_domingo_feriado, recargo_nocturno, horas_base, costo_hora_extra')
+        .eq('personal_id', personalId)
+        .lte('fecha_desde', lastDayStr)
+        .order('fecha_desde', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (workerHistError) {
+        console.error('Error fetching worker history settings in services:', workerHistError);
+    }
+
+    const hasHist = workerHist && workerHist.length > 0;
+    const isCustom = hasHist && workerHist[0].valor_hora_personalizado;
+
+    if (isCustom) {
+        const h = workerHist[0];
+        return {
+            valor_hora_ars: Number(h.valor_hora_ars || 0),
+            recargo_sabado: h.recargo_sabado ?? true,
+            recargo_domingo_feriado: h.recargo_domingo_feriado ?? true,
+            recargo_nocturno: h.recargo_nocturno ?? false,
+            horas_base: h.horas_base !== undefined ? h.horas_base : null,
+            costo_hora_extra: h.costo_hora_extra !== undefined ? h.costo_hora_extra : null,
+        };
+    }
+
+    const { data: sucursalHist, error: sucursalHistError } = await supabase
+        .from('sucursal_valores_hora_historia')
+        .select('valor_hora_staff_ars, valor_hora_limpieza_ars')
+        .lte('fecha_desde', lastDayStr)
+        .order('fecha_desde', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (sucursalHistError) {
+        console.error('Error fetching sucursal history settings in services:', sucursalHistError);
+    }
+
+    const area = (worker.area || '').toLowerCase();
+    const rol = (worker.rol || '').toLowerCase();
+    const isCleaning = area.includes('limpieza') || rol.includes('limpieza');
+
+    let resolvedRate = 0;
+    if (sucursalHist && sucursalHist.length > 0) {
+        resolvedRate = Number(
+            isCleaning ? sucursalHist[0].valor_hora_limpieza_ars : sucursalHist[0].valor_hora_staff_ars
+        );
+    }
+
+    const finalRate = resolvedRate > 0 
+        ? resolvedRate 
+        : getEffectiveHourlyRate(worker, defaults);
+
+    const h = hasHist ? workerHist[0] : null;
+
+    return {
+        valor_hora_ars: finalRate,
+        recargo_sabado: h?.recargo_sabado ?? worker.recargo_sabado ?? true,
+        recargo_domingo_feriado: h?.recargo_domingo_feriado ?? worker.recargo_domingo_feriado ?? true,
+        recargo_nocturno: h?.recargo_nocturno ?? worker.recargo_nocturno ?? false,
+        horas_base: h ? h.horas_base : (worker.horas_base ?? null),
+        costo_hora_extra: h ? h.costo_hora_extra : (worker.costo_hora_extra ?? null),
+    };
+}
+
 function normalizeWhatsAppE164(value?: string | null): string | null {
     if (!value) return null;
 
@@ -1197,15 +1285,16 @@ export async function generarLiquidacion(
 
     const totalHoras = horas?.reduce((sum: number, h: { horas: number }) => sum + h.horas, 0) || 0;
     const hourlyDefaults = await getHourlyDefaults();
-    const effectiveValorHora = getEffectiveHourlyRate(personal, hourlyDefaults);
+    const hist = await getWorkerHistoricalSettings(personalId, mes, personal, hourlyDefaults);
+    const effectiveValorHora = hist.valor_hora_ars;
     const totalArs = calculateAdjustedEarnings(horas || [], effectiveValorHora, {
         area: personal.area || '',
         rol: personal.rol || '',
-        recargo_sabado: personal.recargo_sabado,
-        recargo_domingo_feriado: personal.recargo_domingo_feriado,
-        recargo_nocturno: personal.recargo_nocturno,
-        horas_base: personal.horas_base,
-        costo_hora_extra: personal.costo_hora_extra,
+        recargo_sabado: hist.recargo_sabado,
+        recargo_domingo_feriado: hist.recargo_domingo_feriado,
+        recargo_nocturno: hist.recargo_nocturno,
+        horas_base: hist.horas_base,
+        costo_hora_extra: hist.costo_hora_extra,
     });
     const totalUsd = tcBna ? totalArs / tcBna : undefined;
 
