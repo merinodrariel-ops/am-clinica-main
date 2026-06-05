@@ -18,6 +18,7 @@ import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAc
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
+import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -2172,8 +2173,10 @@ export default function PhotoStudioModal({
             W = img.naturalWidth || img.width;
             H = img.naturalHeight || img.height;
             if (W === 0 || H === 0) return;
-            const rect = canvas.getBoundingClientRect();
-            displayScale = rect.width > 0 ? W / rect.width : 1;
+            displayScale = getPhotoAnnotationDisplayScale({
+                canvasWidthPx: W,
+                layoutWidthPx: canvas.clientWidth,
+            });
         }
         canvas.width = W;
         canvas.height = H;
@@ -3773,7 +3776,7 @@ export default function PhotoStudioModal({
         }
         // Bake text annotations with word-wrap (including any currently being edited)
         if (drawVisible && textAnnotations.length > 0) {
-            const displayW = drawCanvasRef.current?.getBoundingClientRect().width || canvasW;
+            const displayW = drawCanvasRef.current?.clientWidth || canvasW;
             ctx.textBaseline = 'top';
             for (const ta of textAnnotations) {
                 if (!ta.text.trim()) continue;
