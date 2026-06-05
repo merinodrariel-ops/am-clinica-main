@@ -19,7 +19,7 @@ import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
-import { cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
+import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -313,8 +313,6 @@ function AirDropIcon({ size = 16, className = '' }: { size?: number; className?:
 
 const TEXT_LINE_HEIGHT = 1.35; // em — must match CSS in the textarea overlay
 const DEFAULT_TEXT_ANNOTATION_WIDTH = 0.5;
-const DEFAULT_TEXT_FONT_SIZE = 24;
-
 function normalizeTextAnnotation(annotation: Partial<TextAnnotation>): TextAnnotation {
     return {
         id: annotation.id ?? `text-${Date.now()}`,

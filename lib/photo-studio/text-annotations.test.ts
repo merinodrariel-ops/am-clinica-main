@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { cloneTextAnnotationForPaste } from './text-annotations';
+import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from './text-annotations';
+
+test('uses 30px as the default text annotation font size', () => {
+    assert.equal(DEFAULT_TEXT_FONT_SIZE, 30);
+});
 
 test('clones a selected text annotation with a new id and visible offset', () => {
     const copy = cloneTextAnnotationForPaste(
@@ -42,4 +46,3 @@ test('keeps pasted text annotation inside the canvas bounds', () => {
     assert.equal(copy.x, 0.98);
     assert.equal(copy.y, 0.98);
 });
-
