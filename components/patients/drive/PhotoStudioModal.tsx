@@ -17,6 +17,7 @@ import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
+import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -894,6 +895,10 @@ export default function PhotoStudioModal({
     const [cropActive, setCropActive] = useState(false);
     const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
+    const [cropAspectPreset, setCropAspectPreset] = useState<CropAspectPresetId>('free');
+    const activeCropAspect = getCropAspectPreset(cropAspectPreset).aspect;
+    const cropActiveRef = useRef(false);
+    useEffect(() => { cropActiveRef.current = cropActive; }, [cropActive]);
 
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
@@ -1153,7 +1158,7 @@ export default function PhotoStudioModal({
                 ctx.rotate(radians);
                 ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                const isPng = bgDone || activeFile?.name.toLowerCase().endsWith('.png');
+                const isPng = shouldExportPhotoAsPng({ fileName: activeFile?.name ?? '', bgDone, bgColor });
                 const blob = await new Promise<Blob>((res, rej) =>
                     canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
                 );
@@ -1177,6 +1182,30 @@ export default function PhotoStudioModal({
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rotation, cropActive]);
+
+    const applyCropAspectPreset = useCallback((presetId: CropAspectPresetId, img = imgRef.current) => {
+        setCropAspectPreset(presetId);
+        const preset = getCropAspectPreset(presetId);
+
+        if (!img || img.width === 0 || img.height === 0) {
+            setCompletedCrop(null);
+            return;
+        }
+
+        if (!preset.aspect) {
+            return;
+        }
+
+        const nextCrop = buildCenteredAspectCrop(img.width, img.height, preset.aspect);
+        setCrop(nextCrop);
+        setCompletedCrop({
+            unit: 'px',
+            x: Math.round((nextCrop.x / 100) * img.width),
+            y: Math.round((nextCrop.y / 100) * img.height),
+            width: Math.round((nextCrop.width / 100) * img.width),
+            height: Math.round((nextCrop.height / 100) * img.height),
+        });
+    }, []);
 
     // UI state
     // Rebake canvas layer crop source when rotation changes inside the layer crop overlay.
@@ -1416,6 +1445,7 @@ export default function PhotoStudioModal({
         setCropActive(false);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
         setCompletedCrop(null);
+        setCropAspectPreset('free');
         setZoom(1);
         setPanX(0);
         setPanY(0);
@@ -1526,6 +1556,7 @@ export default function PhotoStudioModal({
 
         const wheelHandler = (e: WheelEvent) => {
             e.preventDefault();
+            if (cropActiveRef.current) return;
             const delta = e.deltaY > 0 ? -0.15 : 0.15;
             setZoom(prev => {
                 const next = Math.min(5, Math.max(1, prev + delta));
@@ -3710,7 +3741,7 @@ export default function PhotoStudioModal({
         const outH = img.naturalHeight;
         if (outW === 0 || outH === 0) throw new Error('Imagen vacía o sin dimensiones');
 
-        const isPng = bgDone || activeFile!.name.toLowerCase().endsWith('.png');
+        const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
         const mime = isPng ? 'image/png' : 'image/jpeg';
 
         const radians = (rotation * Math.PI) / 180;
@@ -3771,6 +3802,9 @@ export default function PhotoStudioModal({
     async function handleEnterCropMode() {
         setDrawMode('idle');
         setMousePos(null);
+        setZoom(1);
+        setPanX(0);
+        setPanY(0);
 
         // Save rotation and imageUrl so we can restore them if the user cancels.
         cropEntryRotationRef.current = rotation;
@@ -3789,6 +3823,7 @@ export default function PhotoStudioModal({
             objectUrlRef.current = preCropImageRef.current.startsWith('blob:') ? preCropImageRef.current : null;
             setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
             setCompletedCrop(null);
+            setCropAspectPreset('free');
             cropJustEnteredRef.current = true;
             setCropActive(true);
             return;
@@ -3798,6 +3833,7 @@ export default function PhotoStudioModal({
             // No rotation to bake — remember the current image as pre-crop reference
             cropPreBakeRef.current = imageUrl;
             preCropImageRef.current = imageUrl;
+            setCropAspectPreset('free');
             cropJustEnteredRef.current = true;
             setCropActive(true);
             return;
@@ -3829,7 +3865,7 @@ export default function PhotoStudioModal({
             ctx.rotate(radians);
             ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
-            const isPng = bgDone || activeFile!.name.toLowerCase().endsWith('.png');
+            const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
             const blob = await new Promise<Blob>((res, rej) =>
                 canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
             );
@@ -3843,6 +3879,7 @@ export default function PhotoStudioModal({
         } catch {
             preCropImageRef.current = imageUrl; // fallback: bake failed
         }
+        setCropAspectPreset('free');
         cropJustEnteredRef.current = true;
         setCropActive(true);
     }
@@ -3889,7 +3926,7 @@ export default function PhotoStudioModal({
             cropCanvas.height = srcH;
             cropCanvas.getContext('2d')!.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
 
-            const isPng = bgDone || activeFile!.name.toLowerCase().endsWith('.png');
+            const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
             const blob = await new Promise<Blob>((res, rej) =>
                 cropCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
             );
@@ -3909,6 +3946,7 @@ export default function PhotoStudioModal({
             setImageUrl(newUrl);
             setCompletedCrop(null);
             setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+            setCropAspectPreset('free');
             // Rotation was baked into the crop source image; reset so it isn't applied twice
             setRotation(0);
         } catch {
@@ -3935,12 +3973,13 @@ export default function PhotoStudioModal({
         cropPreBakeRef.current = null;
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
         setCompletedCrop(null);
+        setCropAspectPreset('free');
         setCropActive(false);
     }
 
     function handleDownload() {
         exportToBlob().then(blob => {
-            const isPng = bgDone || activeFile!.name.toLowerCase().endsWith('.png');
+            const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
             const ext = isPng ? 'png' : 'jpg';
             const baseName = activeFile!.name.replace(/\.[^.]+$/, '');
             const a = document.createElement('a');
@@ -4236,7 +4275,8 @@ export default function PhotoStudioModal({
 
             onSaved(); // refresca la carpeta, pero nos quedamos en el estudio
         } catch (err) {
-            toast.error('Error inesperado al guardar');
+            const message = err instanceof Error ? err.message : '';
+            toast.error(message ? `Error al guardar: ${message}` : 'Error inesperado al guardar');
             console.error('[PhotoStudio save]', err);
         } finally {
             setSaving(null);
@@ -4648,14 +4688,14 @@ export default function PhotoStudioModal({
                     <div
                         ref={canvasContainerRef}
                         className="relative flex-1 flex items-center justify-center overflow-hidden p-4 bg-[#0D0D12]"
-                        onMouseDown={canvasActive ? undefined : handleMouseDown}
+                        onMouseDown={canvasActive || cropActive ? undefined : handleMouseDown}
                         onMouseMove={canvasActive ? undefined : handleMouseMove}
                         onMouseUp={canvasActive ? undefined : handleMouseUp}
                         onMouseLeave={canvasActive ? undefined : handleMouseUp}
-                        onTouchStart={canvasActive ? undefined : handleTouchStart}
-                        onTouchMove={canvasActive ? undefined : handleTouchMove}
+                        onTouchStart={canvasActive || cropActive ? undefined : handleTouchStart}
+                        onTouchMove={canvasActive || cropActive ? undefined : handleTouchMove}
                         onTouchEnd={canvasActive ? undefined : handleTouchEnd}
-                        onDoubleClick={canvasActive ? undefined : () => { setZoom(1); setPanX(0); setPanY(0); }}
+                        onDoubleClick={canvasActive || cropActive ? undefined : () => { setZoom(1); setPanX(0); setPanY(0); }}
                         style={{ cursor: (!canvasActive && zoom > 1) ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                     >
                         {!canvasActive && selectedText && (
@@ -4700,7 +4740,11 @@ export default function PhotoStudioModal({
                             </div>
                         )}
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
-                        <div style={{ transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.05s ease-out' }}>
+                        <div style={{
+                            transform: cropActive ? 'none' : `scale(${zoom}) translate(${panX}px, ${panY}px)`,
+                            transformOrigin: 'center',
+                            transition: isDragging || cropActive ? 'none' : 'transform 0.05s ease-out',
+                        }}>
                             {!canvasActive && (brushMode !== null || healMode) ? (
                                 <canvas
                                     ref={brushCanvasRef}
@@ -4715,6 +4759,7 @@ export default function PhotoStudioModal({
                                 <div className={canvasBg} style={{ display: 'inline-block', lineHeight: 0 }}>
                                     <ReactCrop
                                         crop={crop}
+                                        aspect={activeCropAspect}
                                         onChange={c => setCrop(c)}
                                         onComplete={c => setCompletedCrop(c)}
                                     >
@@ -4727,7 +4772,12 @@ export default function PhotoStudioModal({
                                             src={imageUrl}
                                             alt={activeFile.name}
                                             crossOrigin="anonymous"
-                                            onLoad={() => setImgLoaded(true)}
+                                            onLoad={(event) => {
+                                                setImgLoaded(true);
+                                                if (activeCropAspect) {
+                                                    applyCropAspectPreset(cropAspectPreset, event.currentTarget);
+                                                }
+                                            }}
                                             style={{
                                                 display: 'block',
                                                 maxWidth: '100%',
@@ -5310,6 +5360,8 @@ export default function PhotoStudioModal({
                                 : setBrightness}
                             cropActive={cropActive}
                             setCropActive={setCropActive}
+                            cropAspectPreset={cropAspectPreset}
+                            onCropAspectPresetChange={applyCropAspectPreset}
                             hasPriorCrop={preCropImageRef.current !== null}
                             onEnterCropMode={canvasActive && canvasSelectedId
                                 // When a canvas layer is selected, crop that layer (not the main photo)
@@ -5463,20 +5515,34 @@ export default function PhotoStudioModal({
                         </div>
                         {/* Crop */}
                         {cropActive ? (
-                            <>
+                            <div className="flex items-center gap-1">
                                 <button
                                     onClick={handleConfirmCrop}
                                     className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-blue-600 text-white transition-colors"
                                 >
                                     <Check size={13} /> Confirmar
                                 </button>
+                                {CROP_ASPECT_PRESETS.map((preset) => (
+                                    <button
+                                        key={preset.id}
+                                        onClick={() => applyCropAspectPreset(preset.id)}
+                                        className={`px-2 py-1 rounded-md text-xs border transition-colors ${
+                                            cropAspectPreset === preset.id
+                                                ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/30'
+                                                : 'bg-white/10 text-white/55 border-white/10'
+                                        }`}
+                                        title={preset.title}
+                                    >
+                                        {preset.label}
+                                    </button>
+                                ))}
                                 <button
                                     onClick={handleCancelCrop}
                                     className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/50 transition-colors"
                                 >
                                     <X size={13} /> Cancelar
                                 </button>
-                            </>
+                            </div>
                         ) : (
                             <button
                                 onClick={handleEnterCropMode}
@@ -6030,6 +6096,8 @@ interface ToolsPanelProps {
     rotation: number; setRotation: (v: number | ((prev: number) => number)) => void;
     brightness: number; setBrightness: (v: number | ((prev: number) => number)) => void;
     cropActive: boolean; setCropActive: (v: boolean | ((prev: boolean) => boolean)) => void;
+    cropAspectPreset: CropAspectPresetId;
+    onCropAspectPresetChange: (presetId: CropAspectPresetId) => void;
     hasPriorCrop: boolean;
     onEnterCropMode: () => void;
     onConfirmCrop: () => void;
@@ -6090,6 +6158,7 @@ function ToolsPanel({
     rotation, setRotation,
     brightness, setBrightness,
     cropActive, setCropActive,
+    cropAspectPreset, onCropAspectPresetChange,
     hasPriorCrop,
     onEnterCropMode,
     onConfirmCrop,
@@ -6186,7 +6255,7 @@ function ToolsPanel({
                         <p className="text-xs text-white/45 uppercase tracking-wide font-semibold">Presets rápidos</p>
                         <div className="grid grid-cols-3 gap-1.5">
                             <button
-                                onClick={() => { onPushHistory(); setRotation((r: number) => { let n = r - 90; return n < -180 ? n + 360 : n; }); }}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => { const n = r - 90; return n < -180 ? n + 360 : n; }); }}
                                 className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar -90°"
                             >
@@ -6194,7 +6263,7 @@ function ToolsPanel({
                                 <span className="text-xs text-white/40 group-hover:text-white font-bold">-90°</span>
                             </button>
                             <button
-                                onClick={() => { onPushHistory(); setRotation((r: number) => { let n = r + 90; return n > 180 ? n - 360 : n; }); }}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => { const n = r + 90; return n > 180 ? n - 360 : n; }); }}
                                 className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar +90°"
                             >
@@ -6275,6 +6344,23 @@ function ToolsPanel({
                         >
                             <Check size={20} /> Confirmar recorte
                         </button>
+                        <div className="grid grid-cols-3 gap-2">
+                            {CROP_ASPECT_PRESETS.map((preset) => (
+                                <button
+                                    key={preset.id}
+                                    type="button"
+                                    onClick={() => onCropAspectPresetChange(preset.id)}
+                                    className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                                        cropAspectPreset === preset.id
+                                            ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/30'
+                                            : 'bg-white/5 text-white/50 border-white/10 hover:text-white/80 hover:bg-white/10'
+                                    }`}
+                                    title={preset.title}
+                                >
+                                    {preset.label}
+                                </button>
+                            ))}
+                        </div>
                         <button
                             onClick={onCancelCrop}
                             className="w-full py-2 rounded-lg text-white/50 text-sm hover:text-white/80 transition-colors"
