@@ -1,12 +1,11 @@
 'use client';
 
 import { Suspense, useState, useActionState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { login } from '@/app/actions/auth';
 
 function LoginForm() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const redirectPath = searchParams.get('redirect') || '/dashboard';
     const [email, setEmail] = useState('');
@@ -24,13 +23,16 @@ function LoginForm() {
     );
 
     // Handle client-side redirect after server success
+    // Must use window.location.href (hard reload) so the client-side Supabase instance
+    // re-reads the session from cookies set by the server action.
+    // router.push() keeps the existing AuthContext alive (which has user=null),
+    // causing the sidebar and role-based UI to not render until a manual refresh.
     useEffect(() => {
         const authState = state as { success?: boolean; redirect?: string; error?: string };
         if (authState?.success && authState?.redirect) {
-            console.log("Login exitoso, redirigiendo a:", authState.redirect);
-            router.push(authState.redirect);
+            window.location.href = authState.redirect;
         }
-    }, [state, router]);
+    }, [state]);
 
     const error = (state as { error?: string })?.error || localError || null;
     const isLoading = isPending;
