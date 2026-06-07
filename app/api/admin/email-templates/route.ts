@@ -92,6 +92,12 @@ export async function GET(request: Request) {
                 'birthday_greeting',
                 'post_treatment_followup',
                 'recall_6_months',
+                'recall_cleaning',
+                'upgrade_cleaning_laser',
+                'recall_veneer_control',
+                'cross_sell_cleaning_after_veneers',
+                'recall_whitening',
+                'recall_orthodontic_control',
             ],
         });
     }

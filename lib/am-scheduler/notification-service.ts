@@ -233,6 +233,114 @@ export function renderTemplate(
         </div>`,
       };
 
+    case 'recall_cleaning':
+      return {
+        subject: `Te toca tu limpieza preventiva — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* 👋\n\nYa estas en ventana para tu limpieza preventiva en *${clinic}*.\n\nSi queres, te ayudamos a reservar un horario esta semana.`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Limpieza preventiva</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            Este es un buen momento para agendar tu limpieza preventiva y mantener el resultado de tus tratamientos.
+          </p>
+          <p style="color:#6b7280;font-size:14px;">
+            Si te viene bien, podemos proponerte un horario esta semana y dejarlo resuelto por este mismo medio.
+          </p>
+          ${footer}
+        </div>`,
+      };
+
+    case 'upgrade_cleaning_laser':
+      return {
+        subject: `Tu proxima limpieza puede ser con laser — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* ✨\n\nEn tu proxima limpieza podemos ofrecerte la version con laser para una experiencia mas profunda y comoda.\n\nSi queres, te contamos opciones y valores.`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Upgrade a limpieza con laser</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            En tu proxima limpieza podemos ofrecerte la version con laser, ideal para potenciar confort, precision y mantenimiento.
+          </p>
+          <div style="background:#f8fafc;border-radius:12px;padding:18px 20px;margin-bottom:24px;border:1px solid #e2e8f0;">
+            <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#111;">¿Cuando conviene?</p>
+            <p style="margin:0;font-size:14px;color:#475569;">Especialmente cuando queres una higiene mas completa o sumar una experiencia premium a tu control habitual.</p>
+          </div>
+          <p style="color:#6b7280;font-size:14px;">
+            Si te interesa, te respondemos por este medio con disponibilidad y diferencia de valor.
+          </p>
+          ${footer}
+        </div>`,
+      };
+
+    case 'recall_veneer_control':
+      return {
+        subject: `Control recomendado de tus carillas — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* 👋\n\nYa estas en fecha para tu control de carillas en *${clinic}*.\n\nSi queres, coordinamos una revision para comprobar que todo siga impecable.`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Control de carillas</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            Ya estas en la ventana recomendada para revisar tus carillas y asegurarnos de que todo siga estable, funcional y estetico.
+          </p>
+          <p style="color:#6b7280;font-size:14px;">
+            Un control a tiempo ayuda a detectar pequenos ajustes antes de que se conviertan en un problema mayor.
+          </p>
+          ${footer}
+        </div>`,
+      };
+
+    case 'cross_sell_cleaning_after_veneers':
+      return {
+        subject: `Sumemos una limpieza a tu control de carillas — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* ✨\n\nCuando vengas a tu control de carillas, tambien podemos sumar una limpieza para mantener brillo, higiene y salud gingival en la misma visita.`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Control + limpieza en una sola visita</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            Cuando vengas a tu control de carillas, podemos aprovechar la misma visita para realizar una limpieza y mantener el entorno dental en optimas condiciones.
+          </p>
+          <div style="background:#fff7ed;border-radius:12px;padding:18px 20px;margin-bottom:24px;border:1px solid #fdba74;">
+            <p style="margin:0;font-size:14px;color:#9a3412;">
+              Es una buena combinacion cuando queres cuidar tanto la estetica de las carillas como la salud general de encia y esmalte.
+            </p>
+          </div>
+          ${footer}
+        </div>`,
+      };
+
+    case 'recall_whitening':
+      return {
+        subject: `Mantenimiento de blanqueamiento — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* ✨\n\nSi queres sostener o reforzar el resultado de tu blanqueamiento, este es un buen momento para evaluarlo juntos.`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Mantenimiento de blanqueamiento</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            Si queres mantener o refrescar el resultado de tu blanqueamiento, podemos evaluar una nueva sesion o un plan de mantenimiento segun tu caso.
+          </p>
+          <p style="color:#6b7280;font-size:14px;">
+            Te orientamos rapido para ver si conviene repetir ahora o esperar un poco mas.
+          </p>
+          ${footer}
+        </div>`,
+      };
+
+    case 'recall_orthodontic_control':
+      return {
+        subject: `Control de ortodoncia recomendado — ${clinic}`,
+        whatsapp: `Hola *${ctx.patientName}* 👋\n\nYa estas en momento de revisar tu evolucion de ortodoncia o recambio. Si queres, coordinamos un control en *${clinic}*.`,
+        html: `<div style="${baseStyle}">${logoBlock}
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Control de ortodoncia</h2>
+          <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
+            Hola <strong>${ctx.patientName}</strong>,<br>
+            Ya estas en una buena ventana para revisar tu evolucion de ortodoncia, hacer control clinico y definir si corresponde algun ajuste o recambio.
+          </p>
+          <p style="color:#6b7280;font-size:14px;">
+            Si te sirve, te proponemos un horario para dejarlo resuelto cuanto antes.
+          </p>
+          ${footer}
+        </div>`,
+      };
+
     default:
       return {
         subject: `Notificación de ${clinic}`,

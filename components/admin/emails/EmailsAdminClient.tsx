@@ -47,6 +47,12 @@ const TEMPLATES: TemplateEntry[] = [
     { key: 'birthday_greeting', label: 'Cumpleanos', description: 'Saludo automatico de cumpleanos' },
     { key: 'post_treatment_followup', label: 'Seguimiento post-tratamiento', description: 'Control posterior a cirugia o extraccion' },
     { key: 'recall_6_months', label: 'Recall 6 meses', description: 'Control preventivo semestral' },
+    { key: 'recall_cleaning', label: 'Recall limpieza', description: 'Invita a agendar limpieza preventiva' },
+    { key: 'upgrade_cleaning_laser', label: 'Upgrade a laser', description: 'Ofrece pasar de limpieza convencional a laser' },
+    { key: 'recall_veneer_control', label: 'Control carillas', description: 'Recordatorio de control para pacientes con carillas' },
+    { key: 'cross_sell_cleaning_after_veneers', label: 'Carillas + limpieza', description: 'Venta cruzada de limpieza desde control de carillas' },
+    { key: 'recall_whitening', label: 'Recall blanqueamiento', description: 'Seguimiento para repetir o mantener blanqueamiento' },
+    { key: 'recall_orthodontic_control', label: 'Control ortodoncia', description: 'Recordatorio para controles de ortodoncia y recambio' },
 ];
 
 function patientName(row: { patient?: { nombre: string | null; apellido: string | null } | null; to_name?: string | null }) {
@@ -98,6 +104,30 @@ export default function EmailsAdminClient({
     const [testEmail, setTestEmail] = useState('');
     const [testResult, setTestResult] = useState<string | null>(null);
     const [sendingTest, setSendingTest] = useState(false);
+
+    const monthlySummary = useMemo(() => {
+        const byTemplate = new Map<string, number>();
+        let sent = 0;
+        let failed = 0;
+
+        for (const row of rows) {
+            if (row.status === 'sent' || row.status === 'delivered' || row.status === 'opened' || row.status === 'clicked') sent += 1;
+            if (row.status === 'failed' || row.status === 'bounced') failed += 1;
+            const key = row.template_label || row.template_key || 'Sin plantilla';
+            byTemplate.set(key, (byTemplate.get(key) || 0) + 1);
+        }
+
+        const topTemplates = Array.from(byTemplate.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 4);
+
+        return {
+            total: rows.length,
+            sent,
+            failed,
+            topTemplates,
+        };
+    }, [rows]);
 
     const filteredRows = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -176,6 +206,9 @@ export default function EmailsAdminClient({
                             <p className="mt-1 text-sm text-slate-500">
                                 Bandeja de salida, plantillas y proveedores. Enviado significa aceptado por proveedor, no entregado.
                             </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                                El historial combina `email_messages` con `notification_logs` para recuperar al menos el ultimo mes operativo.
+                            </p>
                         </div>
                         <button
                             onClick={refreshRows}
@@ -212,7 +245,39 @@ export default function EmailsAdminClient({
 
             <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
                 {tab === 'outbox' && (
-                    <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+                    <div className="space-y-4">
+                        <section className="grid gap-3 md:grid-cols-4">
+                            <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Ultimo mes</p>
+                                <p className="mt-2 text-2xl font-bold text-slate-950">{monthlySummary.total}</p>
+                                <p className="mt-1 text-xs text-slate-500">emails visibles en bandeja</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Aceptados</p>
+                                <p className="mt-2 text-2xl font-bold text-slate-950">{monthlySummary.sent}</p>
+                                <p className="mt-1 text-xs text-slate-500">sent, delivered, opened o clicked</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Con fallo</p>
+                                <p className="mt-2 text-2xl font-bold text-slate-950">{monthlySummary.failed}</p>
+                                <p className="mt-1 text-xs text-slate-500">failed o bounced</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Top plantillas</p>
+                                <div className="mt-2 space-y-1">
+                                    {monthlySummary.topTemplates.length > 0 ? monthlySummary.topTemplates.map(([label, count]) => (
+                                        <div key={label} className="flex items-center justify-between text-sm text-slate-700">
+                                            <span className="truncate pr-3">{label}</span>
+                                            <strong>{count}</strong>
+                                        </div>
+                                    )) : (
+                                        <p className="text-xs text-slate-500">Sin datos</p>
+                                    )}
+                                </div>
+                            </div>
+                        </section>
+
+                        <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
                         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                             <div className="flex flex-col gap-3 border-b border-slate-200 p-3 md:flex-row md:items-center">
                                 <div className="relative flex-1">
@@ -301,6 +366,9 @@ export default function EmailsAdminClient({
                                     <div>
                                         <p className="text-xs uppercase tracking-wide text-slate-500">Asunto</p>
                                         <p className="font-semibold">{selected.subject}</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Fuente: {selected.data_source === 'notification_logs' ? 'notification_logs' : 'email_messages'} · Origen: {selected.source_module}
+                                        </p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -337,9 +405,15 @@ export default function EmailsAdminClient({
                                             title="Preview email enviado"
                                         />
                                     )}
+                                    {!selected.html_snapshot && (
+                                        <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500">
+                                            Este registro viene de auditoria historica. Todavia no hay snapshot HTML guardado para ese envio.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </aside>
+                        </div>
                     </div>
                 )}
 

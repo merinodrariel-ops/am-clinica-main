@@ -4,6 +4,48 @@ import { sendNotification } from '@/lib/am-scheduler/notification-service';
 import { createRecallsFromAppointment } from '@/app/actions/recalls';
 import { EmailService } from '@/lib/email-service';
 
+type RecallTemplatePlan = {
+    primaryTemplate: string;
+    secondaryTemplate?: string;
+};
+
+function errorMessage(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
+}
+
+function resolveRetentionRecallTemplates(appointmentType: string | null | undefined): RecallTemplatePlan {
+    switch (appointmentType) {
+        case 'limpieza':
+        case 'limpieza_convencional':
+            return {
+                primaryTemplate: 'recall_cleaning',
+                secondaryTemplate: 'upgrade_cleaning_laser',
+            };
+        case 'limpieza_laser':
+            return {
+                primaryTemplate: 'recall_cleaning',
+            };
+        case 'control_carilla_inmediato':
+        case 'control_carilla_anual':
+            return {
+                primaryTemplate: 'recall_veneer_control',
+                secondaryTemplate: 'cross_sell_cleaning_after_veneers',
+            };
+        case 'blanqueamiento':
+            return {
+                primaryTemplate: 'recall_whitening',
+            };
+        case 'control_ortodoncia':
+            return {
+                primaryTemplate: 'recall_orthodontic_control',
+            };
+        default:
+            return {
+                primaryTemplate: 'recall_6_months',
+            };
+    }
+}
+
 export const maxDuration = 300; // 5 minutes max duration for Vercel Cron
 
 export async function GET(request: Request) {
@@ -27,7 +69,6 @@ export async function GET(request: Request) {
 
     try {
         const today = new Date();
-        const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
 
@@ -58,8 +99,8 @@ export async function GET(request: Request) {
                     results.birthdays++;
                 }
             }
-        } catch (err: any) {
-            results.errors.push(`Birthdays error: ${err.message || String(err)}`);
+        } catch (err: unknown) {
+            results.errors.push(`Birthdays error: ${errorMessage(err)}`);
         }
 
         // ─── 2. Post-Treatment Follow-up (1 Day) ────────────────
@@ -101,8 +142,8 @@ export async function GET(request: Request) {
                     results.postTreatment++;
                 }
             }
-        } catch (err: any) {
-            results.errors.push(`Post-Treatment error: ${err.message || String(err)}`);
+        } catch (err: unknown) {
+            results.errors.push(`Post-Treatment error: ${errorMessage(err)}`);
         }
 
         // ─── 3. 6-Month Recall ──────────────────────────────────
@@ -146,22 +187,41 @@ export async function GET(request: Request) {
                         const patient = Array.isArray(apt.patient) ? apt.patient[0] : apt.patient;
                         if (!patient || (!patient.whatsapp && !patient.email)) continue;
 
+                        const templatePlan = resolveRetentionRecallTemplates(apt.type);
+                        const preferredChannel = patient.email ? 'email' : patient.whatsapp ? 'whatsapp' : null;
+                        if (!preferredChannel) continue;
+
                         await sendNotification({
                             appointmentId: apt.id, // Using their last appointment ID as reference
-                            templateKey: 'recall_6_months',
-                            channel: patient.whatsapp ? 'whatsapp' : 'email',
+                            templateKey: templatePlan.primaryTemplate,
+                            channel: preferredChannel,
                             patientName: patient.nombre || patient.full_name || 'Paciente',
                             patientEmail: patient.email || undefined,
                             patientPhone: patient.whatsapp || undefined,
                             startTime: new Date().toISOString(),
-                            endTime: new Date().toISOString()
+                            endTime: new Date().toISOString(),
+                            appointmentType: apt.type || undefined,
                         });
                         results.recalls++;
+
+                        if (templatePlan.secondaryTemplate && patient.email) {
+                            await sendNotification({
+                                appointmentId: apt.id,
+                                templateKey: templatePlan.secondaryTemplate,
+                                channel: 'email',
+                                patientName: patient.nombre || patient.full_name || 'Paciente',
+                                patientEmail: patient.email || undefined,
+                                patientPhone: patient.whatsapp || undefined,
+                                startTime: new Date().toISOString(),
+                                endTime: new Date().toISOString(),
+                                appointmentType: apt.type || undefined,
+                            });
+                        }
                     }
                 }
             }
-        } catch (err: any) {
-            results.errors.push(`Recalls error: ${err.message || String(err)}`);
+        } catch (err: unknown) {
+            results.errors.push(`Recalls error: ${errorMessage(err)}`);
         }
 
         // ─── 4. Backfill primera_consulta_fecha ─────────────────
@@ -204,8 +264,8 @@ export async function GET(request: Request) {
                     results.primeraConsultaBackfill++;
                 }
             }
-        } catch (err: any) {
-            results.errors.push(`PrimeraConsulta backfill error: ${err.message || String(err)}`);
+        } catch (err: unknown) {
+            results.errors.push(`PrimeraConsulta backfill error: ${errorMessage(err)}`);
         }
 
         // ─── 5. Recordatorio de confirmación para turnos tentativos ─
@@ -245,8 +305,8 @@ export async function GET(request: Request) {
                     endTime: apt.end_time,
                 });
             }
-        } catch (err: any) {
-            results.errors.push(`Tentative confirmation: ${err.message || String(err)}`);
+        } catch (err: unknown) {
+            results.errors.push(`Tentative confirmation: ${errorMessage(err)}`);
         }
 
         // ─── 6. Auto-completar turnos pasados no cancelados ─────
@@ -280,13 +340,13 @@ export async function GET(request: Request) {
                     try {
                         await createRecallsFromAppointment(apt.id, apt.type, apt.patient_id, apt.start_time, apt.doctor_id ?? null);
                         results.recallsCreated++;
-                    } catch (e: any) {
-                        results.errors.push(`Recall for ${apt.id}: ${e.message}`);
+                    } catch (e: unknown) {
+                        results.errors.push(`Recall for ${apt.id}: ${errorMessage(e)}`);
                     }
                 }
             }
-        } catch (err: any) {
-            results.errors.push(`Auto-complete error: ${err.message || String(err)}`);
+        } catch (err: unknown) {
+            results.errors.push(`Auto-complete error: ${errorMessage(err)}`);
         }
 
         // ─── 7. Enviar mensajes programados (fotos al paciente) ─────
@@ -342,8 +402,8 @@ export async function GET(request: Request) {
                         if (emailResult?.id) sent = true;
                         else sendError = 'Email send failed';
                     }
-                } catch (e: any) {
-                    sendError = e.message || String(e);
+                } catch (e: unknown) {
+                    sendError = errorMessage(e);
                 }
 
                 await supabase
@@ -358,8 +418,8 @@ export async function GET(request: Request) {
                 if (sent) results.scheduledMessagesSent++;
                 else results.errors.push(`ScheduledMsg ${msg.id}: ${sendError}`);
             }
-        } catch (err: any) {
-            results.errors.push(`Scheduled messages error: ${err.message || String(err)}`);
+        } catch (err: unknown) {
+            results.errors.push(`Scheduled messages error: ${errorMessage(err)}`);
         }
 
         return NextResponse.json({
@@ -368,10 +428,10 @@ export async function GET(request: Request) {
             processed: results
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[CRON] Daily Retention Error:', error);
         return NextResponse.json(
-            { success: false, error: error.message || String(error), processed: results },
+            { success: false, error: errorMessage(error), processed: results },
             { status: 500 }
         );
     }
