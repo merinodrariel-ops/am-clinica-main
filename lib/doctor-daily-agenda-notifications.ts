@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import { EmailService } from '@/lib/email-service';
 import { getLocalISODate } from '@/lib/local-date';
 import { sendWhatsAppMessage } from '@/lib/am-scheduler/notification-service';
+import { shouldSendDailyDoctorAgenda } from '@/lib/doctor-daily-agenda-policy';
 
 const DAILY_AGENDA_FROM = process.env.DAILY_AGENDA_FROM || 'AM Turnos <turnos@amesteticadental.com>';
 const DAILY_AGENDA_REPLY_TO = process.env.DAILY_AGENDA_REPLY_TO || 'dr.arielmerinopersonal@gmail.com';
@@ -432,6 +433,14 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?:
     const shouldWhatsApp = setting?.send_whatsapp ?? true;
     const result: DeliveryResult = { doctorId, doctorName: name, appointments: doctorAppointments.length, errors: [] };
     console.log(`[daily-agenda] doctor="${name}" id=${doctorId} appointments=${doctorAppointments.length} email=${email || 'none'} shouldEmail=${shouldEmail}`);
+
+    if (!forceEmail && !shouldSendDailyDoctorAgenda({ appointmentCount: doctorAppointments.length })) {
+      result.email = 'skipped';
+      result.whatsapp = 'skipped';
+      result.errors.push('Sin turnos para ese día');
+      results.push(result);
+      continue;
+    }
 
     // When forceEmail is set, skip every doctor except the target
     if (forceEmail && email !== forceEmail) {
