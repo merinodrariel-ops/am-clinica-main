@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { buildProviderStatus } from '@/lib/email-message-tracking';
-import { renderTemplate } from '@/lib/am-scheduler/notification-service';
+import { renderTemplate } from '@/lib/am-scheduler/notification-templates';
 
 const ALLOWED_EMAIL_ROLES = new Set(['owner', 'admin', 'reception', 'developer']);
 const EMAIL_HISTORY_WINDOW_DAYS = 31;

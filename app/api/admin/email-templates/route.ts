@@ -8,8 +8,11 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { renderTemplate, AppointmentNotificationContext } from '@/lib/am-scheduler/notification-service';
 import { EmailService } from '@/lib/email-service';
+import {
+    renderTemplate,
+    type AppointmentNotificationContext,
+} from '@/lib/am-scheduler/notification-templates';
 
 // Mock context used for all preview renders
 function getMockCtx(templateKey: string): AppointmentNotificationContext {

@@ -3,47 +3,10 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import { sendNotification } from '@/lib/am-scheduler/notification-service';
 import { createRecallsFromAppointment } from '@/app/actions/recalls';
 import { EmailService } from '@/lib/email-service';
-
-type RecallTemplatePlan = {
-    primaryTemplate: string;
-    secondaryTemplate?: string;
-};
+import { resolveRetentionRecallTemplates } from '@/lib/retention-email-plans';
 
 function errorMessage(error: unknown) {
     return error instanceof Error ? error.message : String(error);
-}
-
-function resolveRetentionRecallTemplates(appointmentType: string | null | undefined): RecallTemplatePlan {
-    switch (appointmentType) {
-        case 'limpieza':
-        case 'limpieza_convencional':
-            return {
-                primaryTemplate: 'recall_cleaning',
-                secondaryTemplate: 'upgrade_cleaning_laser',
-            };
-        case 'limpieza_laser':
-            return {
-                primaryTemplate: 'recall_cleaning',
-            };
-        case 'control_carilla_inmediato':
-        case 'control_carilla_anual':
-            return {
-                primaryTemplate: 'recall_veneer_control',
-                secondaryTemplate: 'cross_sell_cleaning_after_veneers',
-            };
-        case 'blanqueamiento':
-            return {
-                primaryTemplate: 'recall_whitening',
-            };
-        case 'control_ortodoncia':
-            return {
-                primaryTemplate: 'recall_orthodontic_control',
-            };
-        default:
-            return {
-                primaryTemplate: 'recall_6_months',
-            };
-    }
 }
 
 export const maxDuration = 300; // 5 minutes max duration for Vercel Cron

@@ -16,8 +16,13 @@ assert.equal(EMAIL_MESSAGE_STATUS_LABELS.failed, 'Fallido');
 
 assert.equal(resolveEmailMessageTypeLabel('survey_first_visit'), 'Encuesta primera visita');
 assert.equal(resolveEmailMessageTypeLabel('password_reset'), 'Restablecer contrasena');
+assert.equal(resolveEmailMessageTypeLabel('recall'), 'Recall preventivo');
+assert.equal(resolveEmailMessageTypeLabel('upsell'), 'Upgrade comercial');
+assert.equal(resolveEmailMessageTypeLabel('cross_sell'), 'Venta cruzada');
+assert.equal(resolveEmailMessageTypeLabel('orthodontic_followup'), 'Control ortodoncia');
 assert.equal(resolveEmailMessageTypeLabel('custom_type'), 'custom_type');
 assert.equal(EMAIL_MESSAGE_TYPE_LABELS.test, 'Prueba');
+assert.equal(EMAIL_MESSAGE_STATUS_LABELS.skipped, 'Omitido');
 
 assert.deepEqual(normalizeEmailMessageRecipients('uno@test.com'), ['uno@test.com']);
 assert.deepEqual(normalizeEmailMessageRecipients([' Uno@Test.com ', '', 'dos@test.com']), ['uno@test.com', 'dos@test.com']);
