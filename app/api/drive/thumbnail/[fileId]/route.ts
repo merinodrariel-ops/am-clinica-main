@@ -16,45 +16,58 @@ export async function GET(
     try {
         const drive = getDriveClient();
 
-        // Prefer Drive's own thumbnailLink (fast, CDN-backed) but fall back to streaming
-        // the file when thumbnailLink is missing (non-image, freshly-uploaded files).
+        // Always stream through our authenticated server — Drive thumbnailLink CDN URLs
+        // require the browser to be logged into the same Google account, which clinic
+        // users are not. Redirecting to lh3.googleusercontent.com returns a dark
+        // placeholder instead of the real image for unauthenticated browsers.
         const meta = await drive.files.get({
             fileId,
-            fields: 'thumbnailLink, mimeType',
+            fields: 'thumbnailLink, mimeType, size',
         });
 
-        const thumbUrl = meta.data.thumbnailLink;
-        if (thumbUrl) {
-            // Drive thumbnails default to s220 — bump to s800 for crisp grid cards.
-            const bigger = thumbUrl.replace(/=s\d+(-[a-z])?$/i, '=s800').replace(/=s\d+$/, '=s800');
-            return NextResponse.redirect(bigger, {
-                status: 302,
+        const mimeType = meta.data.mimeType || 'image/jpeg';
+
+        // For images: stream the file directly (authenticated proxy).
+        // For non-image Drive files (Slides, Docs): proxy the thumbnailLink via fetch
+        // so we still get a preview without downloading the full export.
+        if (mimeType.startsWith('image/')) {
+            const response = await drive.files.get(
+                { fileId, alt: 'media' },
+                { responseType: 'stream' }
+            );
+
+            const stream = new ReadableStream({
+                start(controller) {
+                    response.data.on('data', (chunk: Buffer) => controller.enqueue(chunk));
+                    response.data.on('end', () => controller.close());
+                    response.data.on('error', (err: Error) => controller.error(err));
+                },
+            });
+
+            return new Response(stream, {
                 headers: {
-                    'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+                    'Content-Type': mimeType,
+                    'Cache-Control': 'public, max-age=3600',
                 },
             });
         }
 
-        // Fallback: stream the file itself (small thumbs only).
-        const response = await drive.files.get(
-            { fileId, alt: 'media' },
-            { responseType: 'stream' }
-        );
+        // Non-image files: proxy the thumbnailLink server-side to avoid auth issues.
+        const thumbUrl = meta.data.thumbnailLink;
+        if (thumbUrl) {
+            const bigger = thumbUrl.replace(/=s\d+(-[a-z])?$/i, '=s800').replace(/=s\d+$/, '=s800');
+            const thumbRes = await fetch(bigger);
+            if (thumbRes.ok) {
+                return new Response(thumbRes.body, {
+                    headers: {
+                        'Content-Type': thumbRes.headers.get('Content-Type') || 'image/jpeg',
+                        'Cache-Control': 'public, max-age=3600',
+                    },
+                });
+            }
+        }
 
-        const stream = new ReadableStream({
-            start(controller) {
-                response.data.on('data', (chunk: Buffer) => controller.enqueue(chunk));
-                response.data.on('end', () => controller.close());
-                response.data.on('error', (err: Error) => controller.error(err));
-            },
-        });
-
-        return new Response(stream, {
-            headers: {
-                'Content-Type': meta.data.mimeType || 'image/jpeg',
-                'Cache-Control': 'public, max-age=3600',
-            },
-        });
+        return NextResponse.json({ error: 'Thumbnail unavailable' }, { status: 404 });
     } catch (error) {
         console.error('[drive/thumbnail] error:', error);
         return NextResponse.json({ error: 'Thumbnail unavailable' }, { status: 404 });
