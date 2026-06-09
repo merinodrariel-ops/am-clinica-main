@@ -47,6 +47,7 @@ export async function POST(request: Request) {
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
         const folderId = formData.get('folderId') as string | null;
+        const patientId = formData.get('patientId') as string | null;
 
         if (!file || !folderId) {
             return NextResponse.json({ error: 'Faltan campos: file y folderId' }, { status: 400 });
@@ -70,8 +71,26 @@ export async function POST(request: Request) {
             fields: 'id, webViewLink, name, thumbnailLink',
         });
 
+        const fileId = response.data.id;
+
+        // 4. Auto-set foto_perfil_url on first image upload for this patient
+        if (patientId && fileId && file.type.startsWith('image/')) {
+            const { data: patient } = await supabase
+                .from('pacientes')
+                .select('foto_perfil_url')
+                .eq('id_paciente', patientId)
+                .single();
+
+            if (patient && !patient.foto_perfil_url) {
+                await supabase
+                    .from('pacientes')
+                    .update({ foto_perfil_url: fileId })
+                    .eq('id_paciente', patientId);
+            }
+        }
+
         return NextResponse.json({
-            fileId: response.data.id,
+            fileId,
             webViewLink: response.data.webViewLink,
             name: response.data.name,
             thumbnailLink: response.data.thumbnailLink || null,
