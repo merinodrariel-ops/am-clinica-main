@@ -26,10 +26,26 @@ export async function GET(
         });
 
         const mimeType = meta.data.mimeType || 'image/jpeg';
+        const thumbUrl = meta.data.thumbnailLink;
 
-        // For images: stream the file directly (authenticated proxy).
-        // For non-image Drive files (Slides, Docs): proxy the thumbnailLink via fetch
-        // so we still get a preview without downloading the full export.
+        // Prefer thumbnailLink (small CDN image, ~100KB) proxied server-side.
+        // Direct browser redirect to lh3.googleusercontent.com returns a dark
+        // placeholder for unauthenticated browsers; server-side fetch bypasses that.
+        if (thumbUrl) {
+            const bigger = thumbUrl.replace(/=s\d+(-[a-z])?$/i, '=s800').replace(/=s\d+$/, '=s800');
+            const thumbRes = await fetch(bigger);
+            if (thumbRes.ok) {
+                return new Response(thumbRes.body, {
+                    headers: {
+                        'Content-Type': thumbRes.headers.get('Content-Type') || 'image/jpeg',
+                        'Cache-Control': 'public, max-age=3600',
+                    },
+                });
+            }
+        }
+
+        // thumbnailLink missing (freshly uploaded file): stream the file itself.
+        // Only reached for images — other types without a thumbnail are not previewable.
         if (mimeType.startsWith('image/')) {
             const response = await drive.files.get(
                 { fileId, alt: 'media' },
@@ -47,24 +63,9 @@ export async function GET(
             return new Response(stream, {
                 headers: {
                     'Content-Type': mimeType,
-                    'Cache-Control': 'public, max-age=3600',
+                    'Cache-Control': 'public, max-age=60',
                 },
             });
-        }
-
-        // Non-image files: proxy the thumbnailLink server-side to avoid auth issues.
-        const thumbUrl = meta.data.thumbnailLink;
-        if (thumbUrl) {
-            const bigger = thumbUrl.replace(/=s\d+(-[a-z])?$/i, '=s800').replace(/=s\d+$/, '=s800');
-            const thumbRes = await fetch(bigger);
-            if (thumbRes.ok) {
-                return new Response(thumbRes.body, {
-                    headers: {
-                        'Content-Type': thumbRes.headers.get('Content-Type') || 'image/jpeg',
-                        'Cache-Control': 'public, max-age=3600',
-                    },
-                });
-            }
         }
 
         return NextResponse.json({ error: 'Thumbnail unavailable' }, { status: 404 });
