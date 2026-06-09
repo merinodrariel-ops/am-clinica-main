@@ -120,11 +120,20 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
         const supabase = await createClient();
         const searchTokens = getSearchTokens(filters.search);
 
+        let selectFields = '*';
+        if (filters.onlyWithPhotos) {
+            selectFields = '*, patient_treatments!inner(metadata)';
+        }
+
         let query = supabase
             .from('pacientes')
-            .select('*')
+            .select(selectFields)
             .eq('is_deleted', false)
             .order('fecha_alta', { ascending: false });
+
+        if (filters.onlyWithPhotos) {
+            query = query.not('patient_treatments.metadata->>drive_folder_id', 'is', null);
+        }
 
         if (searchTokens.length) {
             query = query.or(buildSearchOrClause(searchTokens));
@@ -145,7 +154,7 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
         const { data, error } = await query;
         if (error) throw error;
 
-        let patients = (data || []) as Paciente[];
+        let patients = (data as unknown as Paciente[]) || [];
         if (searchTokens.length > 1) {
             const offset = filters.offset || 0;
             const limit = filters.limit || patients.length;
@@ -190,12 +199,7 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             profile_photo_url: patient.profile_photo_url || photoByPatientId.get(patient.id_paciente) || null,
         }));
 
-        let filtered = enriched;
-        if (filters.onlyWithPhotos) {
-            filtered = enriched.filter(p => p.profile_photo_url !== null);
-        }
-
-        return { success: true, data: filtered };
+        return { success: true, data: enriched };
     } catch (error) {
         console.error('Error listing patients:', error);
         return { success: false, error: 'No se pudieron cargar los pacientes' };
@@ -207,10 +211,49 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
         const supabase = await createClient();
         const searchTokens = getSearchTokens(filters.search);
 
-        let query = supabase
-            .from('pacientes')
-            .select('*')
-            .eq('is_deleted', false);
+        // If searchTokens.length > 1, we must fetch in memory to perform the AND match.
+        // We select the minimal search fields to keep it as light as possible.
+        if (searchTokens.length > 1) {
+            let selectStr = 'id_paciente, nombre, apellido, email, documento, whatsapp';
+            if (filters.onlyWithPhotos) {
+                selectStr += ', patient_treatments!inner(metadata)';
+            }
+            let dataQuery = supabase
+                .from('pacientes')
+                .select(selectStr)
+                .eq('is_deleted', false);
+
+            if (filters.onlyWithPhotos) {
+                dataQuery = dataQuery.not('patient_treatments.metadata->>drive_folder_id', 'is', null);
+            }
+            dataQuery = dataQuery.or(buildSearchOrClause(searchTokens));
+
+            if (filters.estado) {
+                dataQuery = dataQuery.eq('estado_paciente', filters.estado);
+            }
+
+            const { data, error } = await dataQuery;
+            if (error) throw error;
+
+            const patients = (data as unknown as Paciente[]) || [];
+            const filtered = patients.filter((patient) => patientMatchesSearch(patient, searchTokens));
+            return { success: true, count: filtered.length };
+        }
+
+        // For 0 or 1 search tokens, do a 100% database-side count query (head: true)
+        let query;
+        if (filters.onlyWithPhotos) {
+            query = supabase
+                .from('pacientes')
+                .select('id_paciente, patient_treatments!inner(metadata)', { count: 'exact', head: true })
+                .not('patient_treatments.metadata->>drive_folder_id', 'is', null);
+        } else {
+            query = supabase
+                .from('pacientes')
+                .select('id_paciente', { count: 'exact', head: true });
+        }
+
+        query = query.eq('is_deleted', false);
 
         if (searchTokens.length) {
             query = query.or(buildSearchOrClause(searchTokens));
@@ -220,37 +263,10 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
             query = query.eq('estado_paciente', filters.estado);
         }
 
-        const { data, error } = await query;
+        const { count, error } = await query;
         if (error) throw error;
 
-        let patients = (data || []) as Paciente[];
-        if (searchTokens.length > 1) {
-            patients = patients.filter((patient) => patientMatchesSearch(patient, searchTokens));
-        }
-
-        if (filters.onlyWithPhotos) {
-            const patientIds = patients.map((p) => p.id_paciente).filter(Boolean);
-            if (!patientIds.length) return { success: true, count: 0 };
-
-            const { data: patientFiles } = await supabase
-                .from('patient_files')
-                .select('patient_id, thumbnail_url, file_url')
-                .in('patient_id', patientIds)
-                .eq('file_type', 'photo_before');
-
-            const photoByPatientId = new Map<string, string>();
-            for (const file of patientFiles || []) {
-                const pId = file.patient_id;
-                const url = file.thumbnail_url || file.file_url;
-                if (pId && url) photoByPatientId.set(pId, url);
-            }
-
-            patients = patients.filter(
-                (p) => p.foto_perfil_url || p.profile_photo_url || photoByPatientId.has(p.id_paciente)
-            );
-        }
-
-        return { success: true, count: patients.length };
+        return { success: true, count: count || 0 };
     } catch (error) {
         console.error('Error counting patients:', error);
         return { success: false, count: 0 };
