@@ -15,6 +15,7 @@ import {
     Share2,
     Mail,
     Tag,
+    Star,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { getCategoryDef, getTagLabel } from '@/lib/photo-tag-taxonomy';
@@ -40,6 +41,8 @@ interface DriveFileCardProps {
     onTag?: (file: DriveFile) => void;
     photoTag?: PhotoTag | null;
     onSmileDesign?: (file: DriveFile) => void;
+    isPortada?: boolean;
+    onSetPortada?: (file: DriveFile) => void;
 }
 
 function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'other' {
@@ -96,7 +99,7 @@ const COLOR_MAP = {
     other: 'text-gray-400 bg-gray-400/10',
 };
 
-export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign }: DriveFileCardProps) {
+export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign, isPortada, onSetPortada }: DriveFileCardProps) {
     const [showShare, setShowShare] = useState(false);
     const category = getFileCategory(file);
     const Icon = ICON_MAP[category];
@@ -250,6 +253,15 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                         title="Clasificar foto"
                     >
                         <Tag size={13} />
+                    </button>
+                )}
+                {onSetPortada && category === 'image' && !isPortada && (
+                    <button
+                        onClick={e => { e.stopPropagation(); onSetPortada(file); }}
+                        className="absolute top-8 left-1.5 p-1.5 rounded-lg bg-black/60 text-[#C9A96E]/80 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-[#C9A96E] hover:text-black z-10"
+                        title="Usar como portada"
+                    >
+                        <Star size={13} />
                     </button>
                 )}
                 {onSmileDesign && category === 'image' && (

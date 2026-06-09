@@ -54,6 +54,7 @@ function SortableFileCard({
     onTag,
     photoTag,
     onSmileDesign,
+    onSetPortada,
 }: {
     file: DriveFile;
     isPortada: boolean;
@@ -65,6 +66,7 @@ function SortableFileCard({
     onTag?: (f: DriveFile) => void;
     photoTag?: PhotoTag | null;
     onSmileDesign?: (f: DriveFile) => void;
+    onSetPortada?: (f: DriveFile) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
     const style: CSSProperties = {
@@ -89,7 +91,7 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} />
+            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} isPortada={isPortada} onSetPortada={onSetPortada} />
         </div>
     );
 }
@@ -275,6 +277,25 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         void saveFotosOrderAction(patientId, motherFolderId, ids, coverFileId).then(result => {
             if (result.error) {
                 toast.error(`No se pudo guardar la portada: ${result.error}`);
+            }
+        });
+    }
+
+    function handleSetPortada(file: DriveFile) {
+        const photos = files.filter(f => classifyFile(f) === 'foto');
+        const idx = photos.findIndex(f => f.id === file.id);
+        if (idx <= 0) return;
+        const reordered = [photos[idx], ...photos.slice(0, idx), ...photos.slice(idx + 1)];
+        const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
+        setFiles([...reordered, ...otherFiles]);
+        const ids = reordered.map(f => f.id);
+        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
+        setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
+        void saveFotosOrderAction(patientId, motherFolderId, ids, file.id).then(result => {
+            if (result.error) {
+                toast.error(`No se pudo guardar la portada: ${result.error}`);
+            } else {
+                toast.success('Foto de portada actualizada');
             }
         });
     }
@@ -666,6 +687,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             onTag={canUpload ? setTagFile : undefined}
                                                             photoTag={photoTags[file.id]}
                                                             onSmileDesign={f => openSmileDesign(f, motherFolderId)}
+                                                            onSetPortada={canUpload ? handleSetPortada : undefined}
                                                         />
                                                     ))}
                                                 </div>
