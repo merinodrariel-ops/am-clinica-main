@@ -202,8 +202,45 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         const data = parsed.data;
         console.log('Starting admission process for:', data.nombre, data.apellido, 'DOB:', data.fecha_nacimiento, 'Keys:', Object.keys(data).join(', '));
 
-        const patientUUID = data.id_paciente || undefined;
+        let patientUUID = data.id_paciente || undefined;
         const clinicalNotes = composeClinicalNotes(data);
+
+        // Prevent duplicates: if no UUID supplied, look for an existing patient by DNI or email
+        if (!patientUUID) {
+            const cleanDni = sanitizeAdmissionDni(data.dni);
+            const cleanEmail = (data.email || '').trim().toLowerCase();
+            const orParts: string[] = [];
+            if (cleanDni) orParts.push(`documento.eq.${safeFilterValue(cleanDni)}`);
+            if (cleanEmail) orParts.push(`email.eq.${safeFilterValue(cleanEmail)}`);
+
+            if (orParts.length > 0) {
+                const { data: existing } = await supabase
+                    .from('pacientes')
+                    .select('id_paciente')
+                    .eq('is_deleted', false)
+                    .or(orParts.join(','))
+                    .limit(1)
+                    .maybeSingle();
+                if (existing?.id_paciente) {
+                    patientUUID = existing.id_paciente;
+                }
+            }
+
+            // Name-only fallback when neither DNI nor email are available
+            if (!patientUUID && data.nombre && data.apellido) {
+                const { data: byName } = await supabase
+                    .from('pacientes')
+                    .select('id_paciente')
+                    .eq('is_deleted', false)
+                    .ilike('nombre', data.nombre.trim())
+                    .ilike('apellido', data.apellido.trim())
+                    .limit(1)
+                    .maybeSingle();
+                if (byName?.id_paciente) {
+                    patientUUID = byName.id_paciente;
+                }
+            }
+        }
 
         const { data: created, error: createError } = await supabase
             .from('pacientes')

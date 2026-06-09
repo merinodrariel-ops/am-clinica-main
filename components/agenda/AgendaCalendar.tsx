@@ -20,7 +20,7 @@ import AgendaBlockModal from './AgendaBlockModal';
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus, BanIcon, AlertTriangle, Share2 } from 'lucide-react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus, BanIcon, AlertTriangle, Share2, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -185,6 +185,8 @@ export default function AgendaCalendar() {
     const [blockModalInitialStart, setBlockModalInitialStart] = useState<Date | undefined>();
     const [blockModalInitialEnd, setBlockModalInitialEnd] = useState<Date | undefined>();
     const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; start: Date; end: Date } | null>(null);
+    const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+    const [mobileShareMenuOpen, setMobileShareMenuOpen] = useState(false);
     const { canEdit: canEditModule, categoria } = useAuth();
     const router = useRouter();
 
@@ -249,6 +251,19 @@ export default function AgendaCalendar() {
     // Load doctors for filter bar
     useEffect(() => {
         getDoctors().then(setDoctors);
+    }, []);
+
+    // Detect if screen is mobile on mount and set calendar view to timeGridDay
+    useEffect(() => {
+        const checkMobile = () => {
+            const isMobile = window.innerWidth < 768;
+            if (isMobile) {
+                setCalendarView('timeGridDay');
+                calendarRef.current?.getApi()?.changeView('timeGridDay');
+            }
+        };
+        const timer = setTimeout(checkMobile, 100);
+        return () => clearTimeout(timer);
     }, []);
 
     const handleDateSelect = (selectInfo: DateSelectArg) => {
@@ -649,82 +664,326 @@ export default function AgendaCalendar() {
                 .fc-button-active { background-color:#eff6ff!important; color:#2563eb!important; border-color:#bfdbfe!important; }
                 .dark .fc-button-primary { background-color:#1f2937!important; color:#e5e7eb!important; border-color:#374151!important; }
                 .dark .fc-button-active { background-color:#1e3a8a!important; color:#93c5fd!important; border-color:#1e40af!important; }
+                
+                @media (max-width: 768px) {
+                    .fc-toolbar { padding: 0.5rem 0.75rem!important; gap: 0.5rem; flex-wrap: wrap; }
+                    .fc-toolbar-title { font-size: 1rem!important; font-weight: 700!important; }
+                    .fc-button { padding: 0.25rem 0.5rem!important; font-size: 0.75rem!important; border-radius: 6px!important; }
+                    .fc-col-header-cell-cushion { padding: 6px 0!important; font-size: 0.75rem!important; }
+                    .fc-timegrid-slot-label-cushion { font-size: 0.65rem!important; }
+                    .fc-event { padding: 2px 4px!important; font-size: 0.75rem!important; border-radius: 6px!important; }
+                }
             `}</style>
 
             {/* ── Top Control Bar ─────────────────────────────────────── */}
-            <div className="flex items-center gap-3 px-4 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800 flex-wrap">
+            <div className="flex flex-col gap-2.5 px-4 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                {/* Fila 1: Selectores de Vista y Acciones Administrativas */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* View Mode Toggle */}
+                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                            <button
+                                onClick={() => setViewMode('calendar')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'calendar'
+                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                    }`}
+                            >
+                                <Calendar size={13} />
+                                Calendario
+                            </button>
+                            <button
+                                onClick={() => setViewMode('resource')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'resource'
+                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                    }`}
+                            >
+                                <Users size={13} />
+                                Por doctor
+                            </button>
+                        </div>
 
-                {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-                    <button
-                        onClick={() => setViewMode('calendar')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'calendar'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                            }`}
-                    >
-                        <Calendar size={13} />
-                        Calendario
-                    </button>
-                    <button
-                        onClick={() => setViewMode('resource')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'resource'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                            }`}
-                    >
-                        <Users size={13} />
-                        Por doctor
-                    </button>
+                        {/* Calendar granularity */}
+                        {viewMode === 'calendar' && (
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                                <button
+                                    onClick={() => {
+                                        setCalendarView('dayGridMonth');
+                                        calendarRef.current?.getApi()?.changeView('dayGridMonth');
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'dayGridMonth'
+                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                        }`}
+                                >
+                                    Mes
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setCalendarView('timeGridWeek');
+                                        calendarRef.current?.getApi()?.changeView('timeGridWeek');
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'timeGridWeek'
+                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                        }`}
+                                >
+                                    Semana
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setCalendarView('timeGridDay');
+                                        calendarRef.current?.getApi()?.changeView('timeGridDay');
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'timeGridDay'
+                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                        }`}
+                                >
+                                    Día
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Resource View Date Navigator (aligned next to toggles) */}
+                        {viewMode === 'resource' && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setResourceDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n; })}
+                                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
+                                >
+                                    <ChevronDown className="rotate-90" size={15} />
+                                </button>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[120px] text-center">
+                                    {resourceDate.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                                </span>
+                                <button
+                                    onClick={() => setResourceDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n; })}
+                                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
+                                >
+                                    <ChevronDown className="-rotate-90" size={15} />
+                                </button>
+                                <button
+                                    onClick={() => setResourceDate(new Date())}
+                                    className="px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                >
+                                    Hoy
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bulk confirm + Block buttons / Dropdown */}
+                    <div className="flex items-center gap-2">
+                        {/* Desktop View: Actions displayed individually */}
+                        <div className="hidden lg:flex items-center gap-2">
+                            {canEdit && (
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShareMenuOpen(open => !open)}
+                                        disabled={shareLoading}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all disabled:opacity-50"
+                                        title="Copiar link temporal con una vista mínima de agenda"
+                                    >
+                                        <Share2 size={13} />
+                                        {shareLoading ? 'Copiando...' : 'Compartir agenda'}
+                                        <ChevronDown size={12} />
+                                    </button>
+                                    {shareMenuOpen && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                aria-label="Cerrar opciones de compartir"
+                                                className="fixed inset-0 z-40 cursor-default"
+                                                onClick={() => setShareMenuOpen(false)}
+                                            />
+                                            <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                                                <button
+                                                    onClick={() => void handleShareAgenda({ scope: 'all' })}
+                                                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-gray-800 hover:bg-indigo-50 dark:text-gray-100 dark:hover:bg-indigo-950/40"
+                                                >
+                                                    <Calendar size={14} className="text-indigo-500" />
+                                                    Compartir toda la agenda semanal
+                                                </button>
+                                                <div className="border-t border-gray-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:border-gray-800">
+                                                    Por doctor
+                                                </div>
+                                                <div className="max-h-72 overflow-y-auto py-1">
+                                                    {doctors.map((doctor) => (
+                                                        <button
+                                                            key={doctor.id}
+                                                            onClick={() => void handleShareAgenda({ scope: 'doctor', doctorId: doctor.id, doctorName: doctor.full_name })}
+                                                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                                                        >
+                                                            <Users size={13} className="text-gray-400" />
+                                                            {doctor.full_name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                            {canEdit && (
+                                <button
+                                    onClick={handleShareSelectedDoctorRange}
+                                    disabled={shareLoading}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all disabled:opacity-50"
+                                    title="Copiar link de los próximos 60 días del doctor seleccionado"
+                                >
+                                    <CalendarPlus size={13} />
+                                    Agenda 60 días
+                                </button>
+                            )}
+                            {canEdit && (
+                                <button
+                                    onClick={() => {
+                                        setBlockModalInitialStart(undefined);
+                                        setBlockModalInitialEnd(undefined);
+                                        setBlockModalOpen(true);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
+                                    title="Bloquear agenda para un período"
+                                >
+                                    <BanIcon size={13} />
+                                    Bloquear agenda
+                                </button>
+                            )}
+                            {canEdit && (
+                                <button
+                                    onClick={handleOpenConfirmTomorrow}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-all"
+                                    title="Enviar WhatsApp de confirmación a todos los pacientes de mañana"
+                                >
+                                    <Send size={13} />
+                                    Confirmar mañana
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Mobile/Tablet View: Actions grouped in dropdown */}
+                        <div className="lg:hidden relative">
+                            {canEdit && (
+                                <button
+                                    onClick={() => {
+                                        setMobileActionsOpen(!mobileActionsOpen);
+                                        setMobileShareMenuOpen(false);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                                >
+                                    <SlidersHorizontal size={13} />
+                                    Acciones
+                                    <ChevronDown size={12} />
+                                </button>
+                            )}
+                            {mobileActionsOpen && (
+                                <>
+                                    <button
+                                        type="button"
+                                        aria-label="Cerrar menú de acciones"
+                                        className="fixed inset-0 z-40 cursor-default"
+                                        onClick={() => {
+                                            setMobileActionsOpen(false);
+                                            setMobileShareMenuOpen(false);
+                                        }}
+                                    />
+                                    <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+                                        {!mobileShareMenuOpen ? (
+                                            <div className="py-1">
+                                                <button
+                                                    onClick={() => setMobileShareMenuOpen(true)}
+                                                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    <Share2 size={14} className="text-indigo-500" />
+                                                    Compartir agenda...
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setMobileActionsOpen(false);
+                                                        handleShareSelectedDoctorRange();
+                                                    }}
+                                                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    <CalendarPlus size={14} className="text-emerald-500" />
+                                                    Agenda 60 días
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setMobileActionsOpen(false);
+                                                        setBlockModalInitialStart(undefined);
+                                                        setBlockModalInitialEnd(undefined);
+                                                        setBlockModalOpen(true);
+                                                    }}
+                                                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    <BanIcon size={14} className="text-red-500" />
+                                                    Bloquear agenda
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setMobileActionsOpen(false);
+                                                        handleOpenConfirmTomorrow();
+                                                    }}
+                                                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    <Send size={14} className="text-green-500" />
+                                                    Confirmar mañana
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="py-1">
+                                                <button
+                                                    onClick={() => setMobileShareMenuOpen(false)}
+                                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-bold border-b border-gray-100 dark:border-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    ← Volver a acciones
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setMobileActionsOpen(false);
+                                                        setMobileShareMenuOpen(false);
+                                                        handleShareAgenda({ scope: 'all' });
+                                                    }}
+                                                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    <Calendar size={14} className="text-indigo-500" />
+                                                    Compartir semanal
+                                                </button>
+                                                <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                                                    Por doctor
+                                                </div>
+                                                <div className="max-h-48 overflow-y-auto">
+                                                    {doctors.map((doctor) => (
+                                                        <button
+                                                            key={doctor.id}
+                                                            onClick={() => {
+                                                                setMobileActionsOpen(false);
+                                                                setMobileShareMenuOpen(false);
+                                                                handleShareAgenda({ scope: 'doctor', doctorId: doctor.id, doctorName: doctor.full_name });
+                                                            }}
+                                                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                        >
+                                                            <Users size={13} className="text-gray-400" />
+                                                            {doctor.full_name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
-                {/* Calendar granularity */}
-                {viewMode === 'calendar' && (
-                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-                        <button
-                            onClick={() => {
-                                setCalendarView('dayGridMonth');
-                                calendarRef.current?.getApi()?.changeView('dayGridMonth');
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'dayGridMonth'
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                                }`}
-                        >
-                            Mes
-                        </button>
-                        <button
-                            onClick={() => {
-                                setCalendarView('timeGridWeek');
-                                calendarRef.current?.getApi()?.changeView('timeGridWeek');
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'timeGridWeek'
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                                }`}
-                        >
-                            Semana
-                        </button>
-                        <button
-                            onClick={() => {
-                                setCalendarView('timeGridDay');
-                                calendarRef.current?.getApi()?.changeView('timeGridDay');
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${calendarView === 'timeGridDay'
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                                }`}
-                        >
-                            Día
-                        </button>
-                    </div>
-                )}
-
-                {/* Doctor Filter Pills */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Fila 2: Filtros por Doctor (Scrollable en Mobile) */}
+                <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap flex-nowrap lg:flex-wrap max-w-full pb-1 -mb-1">
                     <button
                         onClick={() => toggleDoctor('all')}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${activeDoctorIds.has('all')
+                        className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all shrink-0 ${activeDoctorIds.has('all')
                             ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent'
                             : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-400'
                             }`}
@@ -739,7 +998,7 @@ export default function AgendaCalendar() {
                                 key={doc.id}
                                 onClick={() => toggleDoctor(doc.id)}
                                 style={isActive ? { backgroundColor: color, borderColor: color, color: '#fff' } : { borderColor: color + '55' }}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${isActive
+                                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all shrink-0 ${isActive
                                     ? ''
                                     : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:opacity-80'
                                     }`}
@@ -749,120 +1008,6 @@ export default function AgendaCalendar() {
                         );
                     })}
                 </div>
-
-                {/* Bulk confirm + Block buttons */}
-                <div className="ml-auto flex items-center gap-2">
-                    {canEdit && (
-                        <div className="relative">
-                            <button
-                                onClick={() => setShareMenuOpen(open => !open)}
-                                disabled={shareLoading}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all disabled:opacity-50"
-                                title="Copiar link temporal con una vista mínima de agenda"
-                            >
-                                <Share2 size={13} />
-                                {shareLoading ? 'Copiando...' : 'Compartir agenda'}
-                                <ChevronDown size={12} />
-                            </button>
-                            {shareMenuOpen && (
-                                <>
-                                    <button
-                                        type="button"
-                                        aria-label="Cerrar opciones de compartir"
-                                        className="fixed inset-0 z-40 cursor-default"
-                                        onClick={() => setShareMenuOpen(false)}
-                                    />
-                                    <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-                                        <button
-                                            onClick={() => void handleShareAgenda({ scope: 'all' })}
-                                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-gray-800 hover:bg-indigo-50 dark:text-gray-100 dark:hover:bg-indigo-950/40"
-                                        >
-                                            <Calendar size={14} className="text-indigo-500" />
-                                            Compartir toda la agenda semanal
-                                        </button>
-                                        <div className="border-t border-gray-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:border-gray-800">
-                                            Por doctor
-                                        </div>
-                                        <div className="max-h-72 overflow-y-auto py-1">
-                                            {doctors.map((doctor) => (
-                                                <button
-                                                    key={doctor.id}
-                                                    onClick={() => void handleShareAgenda({ scope: 'doctor', doctorId: doctor.id, doctorName: doctor.full_name })}
-                                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-                                                >
-                                                    <Users size={13} className="text-gray-400" />
-                                                    {doctor.full_name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-                    {canEdit && (
-                        <button
-                            onClick={handleShareSelectedDoctorRange}
-                            disabled={shareLoading}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all disabled:opacity-50"
-                            title="Copiar link de los próximos 60 días del doctor seleccionado"
-                        >
-                            <CalendarPlus size={13} />
-                            Agenda 60 días
-                        </button>
-                    )}
-                    {canEdit && (
-                        <button
-                            onClick={() => {
-                                setBlockModalInitialStart(undefined);
-                                setBlockModalInitialEnd(undefined);
-                                setBlockModalOpen(true);
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
-                            title="Bloquear agenda para un período"
-                        >
-                            <BanIcon size={13} />
-                            Bloquear agenda
-                        </button>
-                    )}
-                    {canEdit && (
-                        <button
-                            onClick={handleOpenConfirmTomorrow}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-all"
-                            title="Enviar WhatsApp de confirmación a todos los pacientes de mañana"
-                        >
-                            <Send size={13} />
-                            Confirmar mañana
-                        </button>
-                    )}
-                </div>
-
-                {/* Resource View Date Navigator */}
-                {viewMode === 'resource' && (
-                    <div className="ml-auto flex items-center gap-2">
-                        <button
-                            onClick={() => setResourceDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n; })}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
-                        >
-                            <ChevronDown className="rotate-90" size={15} />
-                        </button>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[120px] text-center">
-                            {resourceDate.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' })}
-                        </span>
-                        <button
-                            onClick={() => setResourceDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n; })}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
-                        >
-                            <ChevronDown className="-rotate-90" size={15} />
-                        </button>
-                        <button
-                            onClick={() => setResourceDate(new Date())}
-                            className="px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                        >
-                            Hoy
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* ── Main Content ─────────────────────────────────────────── */}

@@ -194,7 +194,7 @@ export default function MonthlyAgendaDashboard() {
     const activeScopeLabel = PERIOD_OPTIONS.find((option) => option.value === period)?.scopeLabel ?? 'este período';
 
     return (
-        <section className="flex-shrink-0 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-3">
+        <section className="hidden md:block flex-shrink-0 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-3">
             <div className="mb-3 flex items-center justify-between gap-3 px-1 flex-wrap">
                 <div>
                     <h2 className="text-sm font-black uppercase tracking-wide text-gray-900 dark:text-white">

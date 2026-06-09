@@ -354,62 +354,65 @@ export default function DoctorResourceView({
     }
 
     return (
-        <div className="flex flex-col h-full">
-            {/* Doctor Headers */}
-            <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 flex-shrink-0">
-                <div className="w-14 flex-shrink-0" />
-                {visibleDoctors.map((doc) => {
-                    const color = doctorColors[doctors.indexOf(doc) % doctorColors.length];
-                    const dayApts = appointments.filter((a) => a.doctor_id === doc.id && getVisibleWindow(a.start_time, a.end_time).isVisible);
-                    return (
-                        <div
-                            key={doc.id}
-                            className="flex-1 min-w-[140px] px-3 py-2.5 border-r border-gray-200 dark:border-gray-700"
-                        >
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
-                                    style={{ backgroundColor: color }}
-                                >
-                                    {doc.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-xs font-semibold text-gray-900 dark:text-white truncate leading-tight">
-                                        {doc.full_name}
-                                    </p>
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                                        {dayApts.length} turno{dayApts.length !== 1 ? 's' : ''}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Scrollable Time Grid */}
+        <div className="flex flex-col h-full overflow-hidden">
+            {/* Scrollable Container (both horizontal and vertical) */}
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto overflow-x-auto"
             >
-                <div className="flex" style={{ minHeight: TOTAL_HEIGHT }}>
-                    <TimeColumn />
-                    {visibleDoctors.map((doc) => {
-                        const color   = doctorColors[doctors.indexOf(doc) % doctorColors.length];
-                        const docApts = appointments.filter((a) => a.doctor_id === doc.id);
-                        return (
-                            <DoctorColumn
-                                key={doc.id}
-                                doctor={doc}
-                                color={color}
-                                appointments={docApts}
-                                date={date}
-                                onEventClick={onEventClick}
-                                onSlotClick={onSlotClick}
-                                canEdit={canEdit}
-                            />
-                        );
-                    })}
+                <div className="min-w-max flex flex-col">
+                    {/* Doctor Headers — Sticky at the top of the scroll container, but scrolls horizontally */}
+                    <div className="sticky top-0 z-30 flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
+                        <div className="w-14 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800" />
+                        {visibleDoctors.map((doc) => {
+                            const color = doctorColors[doctors.indexOf(doc) % doctorColors.length];
+                            const dayApts = appointments.filter((a) => a.doctor_id === doc.id && getVisibleWindow(a.start_time, a.end_time).isVisible);
+                            return (
+                                <div
+                                    key={doc.id}
+                                    className="flex-1 min-w-[140px] px-3 py-2.5 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                                            style={{ backgroundColor: color }}
+                                        >
+                                            {doc.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate leading-tight">
+                                                {doc.full_name}
+                                            </p>
+                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                                                {dayApts.length} turno{dayApts.length !== 1 ? 's' : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Columns Row */}
+                    <div className="flex" style={{ minHeight: TOTAL_HEIGHT }}>
+                        <TimeColumn />
+                        {visibleDoctors.map((doc) => {
+                            const color   = doctorColors[doctors.indexOf(doc) % doctorColors.length];
+                            const docApts = appointments.filter((a) => a.doctor_id === doc.id);
+                            return (
+                                <DoctorColumn
+                                    key={doc.id}
+                                    doctor={doc}
+                                    color={color}
+                                    appointments={docApts}
+                                    date={date}
+                                    onEventClick={onEventClick}
+                                    onSlotClick={onSlotClick}
+                                    canEdit={canEdit}
+                                />
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </div>

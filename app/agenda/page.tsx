@@ -46,14 +46,14 @@ export default function AgendaPage() {
     }, []);
 
     return (
-        <div className="h-screen flex flex-col px-4 pb-4 pt-4">
+        <div className="h-screen flex flex-col px-2 pb-2 pt-2 md:px-4 md:pb-4 md:pt-4">
             {/* Page Header */}
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
                         AM·Scheduler
                     </h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                         Sistema de agenda propietario · Reemplaza Google Calendar y Calendly
                     </p>
                 </div>
@@ -78,7 +78,7 @@ export default function AgendaPage() {
 
             {/* Tab Content */}
             {activeTab === 'calendar' && (
-                <div className="flex-1 min-h-0 flex flex-col gap-3">
+                <div className="flex-1 min-h-0 flex flex-col gap-2 md:gap-3">
                     {!authLoading && categoria && ['owner', 'admin', 'reception', 'recaptacion'].includes(categoria) && (
                         <MonthlyAgendaDashboard />
                     )}

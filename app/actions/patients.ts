@@ -127,9 +127,18 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             .order('fecha_alta', { ascending: false });
 
         if (filters.onlyWithPhotos) {
-            // Real patients have at least one of: clinical history link, Google Slides link, or profile photo.
-            // This covers both old-system patients (Slides/historia) and new-system patients (foto_perfil_url).
-            query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
+            const { data: photoFiles } = await supabase
+                .from('patient_files')
+                .select('patient_id')
+                .eq('file_type', 'photo_before');
+            const idsWithPhotos = Array.from(
+                new Set((photoFiles || []).map((f) => String(f.patient_id)).filter(Boolean))
+            );
+            if (idsWithPhotos.length > 0) {
+                query = query.or(`foto_perfil_url.gt.,id_paciente.in.(${idsWithPhotos.join(',')})`);
+            } else {
+                query = query.gt('foto_perfil_url', '');
+            }
         }
 
         if (searchTokens.length) {
@@ -217,7 +226,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
                 .eq('is_deleted', false);
 
             if (filters.onlyWithPhotos) {
-                dataQuery = dataQuery.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
+                dataQuery = dataQuery.or('foto_perfil_url.gt.');
             }
             dataQuery = dataQuery.or(buildSearchOrClause(searchTokens));
 
@@ -240,7 +249,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
             .eq('is_deleted', false);
 
         if (filters.onlyWithPhotos) {
-            query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
+            query = query.or('foto_perfil_url.gt.');
         }
 
         if (searchTokens.length) {
@@ -294,7 +303,8 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
         const duplicateFilters: string[] = [];
         if (cleanedPatientData.documento) {
             duplicateFilters.push(`documento.eq.${cleanedPatientData.documento}`);
-        } else if (cleanedPatientData.email) {
+        }
+        if (cleanedPatientData.email) {
             duplicateFilters.push(`email.eq.${cleanedPatientData.email}`);
         }
 
@@ -326,7 +336,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
             }
         }
 
-        if (!existingId && !cleanedPatientData.documento && cleanedPatientData.email) {
+        if (!existingId && cleanedPatientData.email) {
             const byEmail = duplicates?.find(p => normalization(p.email) === normalization(cleanedPatientData.email));
             if (byEmail) {
                 if (!namesLookLikeSamePatient(byEmail, cleanedPatientData)) {
@@ -337,6 +347,23 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
                 }
                 existingId = byEmail.id_paciente;
                 existingData = byEmail as Paciente;
+            }
+        }
+
+        // Last resort: name match when neither DNI nor email were provided
+        if (!existingId && !cleanedPatientData.documento && !cleanedPatientData.email &&
+            cleanedPatientData.nombre && cleanedPatientData.apellido) {
+            const { data: byName, error: nameError } = await supabase
+                .from('pacientes')
+                .select('*')
+                .eq('is_deleted', false)
+                .ilike('nombre', cleanedPatientData.nombre.trim())
+                .ilike('apellido', cleanedPatientData.apellido.trim())
+                .limit(1)
+                .maybeSingle();
+            if (!nameError && byName) {
+                existingId = (byName as Paciente).id_paciente;
+                existingData = byName as Paciente;
             }
         }
 

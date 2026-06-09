@@ -277,7 +277,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     function handleSetPortada(file: DriveFile) {
         const photos = files.filter(f => classifyFile(f) === 'foto');
         const idx = photos.findIndex(f => f.id === file.id);
-        if (idx <= 0) return;
+        if (idx < 0) return;
         const reordered = [photos[idx], ...photos.slice(0, idx), ...photos.slice(idx + 1)];
         const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
         setFiles([...reordered, ...otherFiles]);
