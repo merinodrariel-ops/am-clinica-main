@@ -14,6 +14,7 @@ import {
     renameFileInDrive,
     createDriveFolder,
     getDriveClient,
+    extractSlidesAsImages,
 } from '@/lib/google-drive';
 
 /**
@@ -491,5 +492,46 @@ export async function createCustomSubfolderAction(
         return { folderId: result.folderId, folderUrl: folderUrl || undefined };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+export async function getPatientAllFilesAction(
+    motherFolderIdOrUrl: string
+): Promise<{ files: DriveFile[]; error?: string }> {
+    try {
+        const motherFolderId = extractFolderIdFromUrl(motherFolderIdOrUrl) || motherFolderIdOrUrl;
+        if (!motherFolderId) return { files: [], error: 'ID de carpeta inválido' };
+
+        const files = await listFilesRecursive(motherFolderId, 0, 3);
+        return { files };
+    } catch (error) {
+        return {
+            files: [],
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
+export async function extractSlidesAsImagesAction(
+    presentationId: string,
+    targetFolderIdOrUrl: string
+): Promise<{ success: boolean; extractedCount: number; error?: string }> {
+    try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { success: false, extractedCount: 0, error: 'No autenticado' };
+
+        const targetFolderId = extractFolderIdFromUrl(targetFolderIdOrUrl) || targetFolderIdOrUrl;
+        if (!targetFolderId) return { success: false, extractedCount: 0, error: 'Carpeta de destino no válida' };
+
+        const result = await extractSlidesAsImages(presentationId, targetFolderId);
+        return result;
+    } catch (error) {
+        console.error('[extractSlidesAsImagesAction] Error:', error);
+        return {
+            success: false,
+            extractedCount: 0,
+            error: error instanceof Error ? error.message : String(error),
+        };
     }
 }

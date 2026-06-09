@@ -4,13 +4,17 @@ import { useState, useEffect, useCallback, useRef, type DragEvent, type CSSPrope
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FolderOpen,
-    ChevronDown,
     RefreshCw,
     Loader2,
     AlertCircle,
-    FolderPlus,
     ExternalLink,
     GripVertical,
+    FileImage,
+    Video,
+    Layers,
+    Presentation,
+    FileText,
+    FileCode,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -18,15 +22,14 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
-    getPatientDriveFolders,
+    getPatientAllFilesAction,
+    extractSlidesAsImagesAction,
     createPatientDriveFolderAction,
-    createCustomSubfolderAction,
-    loadFolderFiles,
     getPatientFotosOrder,
     saveFotosOrderAction,
     deleteDriveFileAction,
 } from '@/app/actions/patient-files-drive';
-import type { DriveFile, FolderWithFiles } from '@/app/actions/patient-files-drive';
+import type { DriveFile } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
 import DrivePreviewModal from './DrivePreviewModal';
 import DriveUploadButton from './DriveUploadButton';
@@ -102,10 +105,6 @@ function buildPatientPrefix(patientName: string, folderDisplayName: string): str
     return `${patientSlug}_am-clinica_${folderSlug}`;
 }
 
-function isPhotoCoverFolder(folderName: string): boolean {
-    return /foto|video/i.test(folderName);
-}
-
 function extractFolderIdFromUrl(url: string | null | undefined): string | null {
     if (!url) return null;
     const folderMatch = url.match(/folders\/([a-zA-Z0-9_-]{25,})/);
@@ -114,6 +113,68 @@ function extractFolderIdFromUrl(url: string | null | undefined): string | null {
     if (idMatch && idMatch[1]) return idMatch[1];
     if (/^[a-zA-Z0-9_-]{25,}$/.test(url)) return url;
     return null;
+}
+
+function classifyFile(file: DriveFile): 'foto' | 'video' | '3d' | 'presentacion' | 'documentacion' | 'otros' {
+    const name = (file.name || '').toLowerCase();
+    const mime = (file.mimeType || '').toLowerCase();
+
+    // 1. Photos
+    if (mime.startsWith('image/')) {
+        return 'foto';
+    }
+    // 2. Videos
+    if (mime.startsWith('video/')) {
+        return 'video';
+    }
+    // 3. Presentations (Google Slides, PPTX, Keynote)
+    if (
+        mime.includes('presentation') ||
+        mime.includes('powerpoint') ||
+        name.endsWith('.pptx') ||
+        name.endsWith('.ppt') ||
+        name.endsWith('.key') ||
+        name.endsWith('.gslides')
+    ) {
+        return 'presentacion';
+    }
+    // 4. 3D Files / Escaneos
+    if (
+        name.endsWith('.stl') ||
+        name.endsWith('.obj') ||
+        name.endsWith('.ply') ||
+        name.endsWith('.3dx') ||
+        mime.includes('3d') ||
+        mime.includes('mesh') ||
+        name.includes('3d') ||
+        name.includes('escaneo')
+    ) {
+        return '3d';
+    }
+    // 5. Budgets / Contracts / Documents / PDFs
+    if (
+        mime.includes('pdf') ||
+        mime.includes('word') ||
+        mime.includes('document') ||
+        mime.includes('spreadsheet') ||
+        mime.includes('excel') ||
+        name.endsWith('.pdf') ||
+        name.endsWith('.docx') ||
+        name.endsWith('.doc') ||
+        name.endsWith('.xlsx') ||
+        name.endsWith('.xls') ||
+        name.includes('presupuesto') ||
+        name.includes('contrato')
+    ) {
+        return 'documentacion';
+    }
+    return 'otros';
+}
+
+function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] {
+    if (!savedOrder.length) return files;
+    const pos = new Map(savedOrder.map((id, i) => [id, i]));
+    return [...files].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
 }
 
 const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
@@ -129,50 +190,82 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const canUpload = UPLOAD_ROLES.has(role || '');
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
-    const [folders, setFolders] = useState<FolderWithFiles[]>([]);
-    const [rootFiles, setRootFiles] = useState<DriveFile[]>([]);
+    const [files, setFiles] = useState<DriveFile[]>([]);
     const [errorMsg, setErrorMsg] = useState('');
-    const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
     const [previewFolderId, setPreviewFolderId] = useState<string>('');
     const [previewAutoSmile, setPreviewAutoSmile] = useState(false);
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
     const [creating, setCreating] = useState(false);
-    const [showNewFolderInput, setShowNewFolderInput] = useState(false);
-    const [newFolderName, setNewFolderName] = useState('');
-    const [creatingCustom, setCreatingCustom] = useState(false);
-    const [uploadTargetFolderId, setUploadTargetFolderId] = useState(() => extractFolderIdFromUrl(motherFolderUrl) || '');
     const [isGlobalDragging, setIsGlobalDragging] = useState(false);
-    const [globalDropFolderId, setGlobalDropFolderId] = useState('');
     const globalDragDepthRef = useRef(0);
     const [fotosOrder, setFotosOrder] = useState<Record<string, string[]>>({});
+    const [extractingSlidesId, setExtractingSlidesId] = useState<string | null>(null);
 
     // dnd-kit sensors — require 8px move before drag activates (avoids accidental drags on click)
     const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-    function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] {
-        if (!savedOrder.length) return files;
-        const pos = new Map(savedOrder.map((id, i) => [id, i]));
-        return [...files].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
-    }
+    const fetchFolders = useCallback(async (url: string) => {
+        const folderId = extractFolderIdFromUrl(url);
+        if (!folderId) {
+            setErrorMsg('No se pudo extraer el ID de la carpeta de Drive');
+            setStatus('error');
+            return;
+        }
 
-    function handleDragEnd(event: DragEndEvent, folderId: string) {
+        setStatus('loading');
+        const result = await getPatientAllFilesAction(folderId);
+
+        if (result.error) {
+            setErrorMsg(result.error);
+            setStatus('error');
+            return;
+        }
+
+        setFiles(result.files || []);
+
+        // Load saved photo order
+        const orderData = await getPatientFotosOrder(patientId);
+        setFotosOrder(orderData);
+
+        setStatus('loaded');
+
+        // Load photo tags for this patient
+        const tags = await getPhotoTagsForPatientAction(patientId);
+        const tagMap: Record<string, PhotoTag> = {};
+        for (const t of tags) tagMap[t.file_id] = t;
+        setPhotoTags(tagMap);
+    }, [patientId]);
+
+    useEffect(() => {
+        if (currentFolderUrl && status === 'idle') {
+            queueMicrotask(() => {
+                void fetchFolders(currentFolderUrl);
+            });
+        }
+    }, [currentFolderUrl, status, fetchFolders]);
+
+    function handleDragEnd(event: DragEndEvent) {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
-        const folder = folders.find(f => f.id === folderId);
-        if (!folder) return;
-        const oldIdx = folder.files.findIndex(f => f.id === String(active.id));
-        const newIdx = folder.files.findIndex(f => f.id === String(over.id));
+
+        const photos = files.filter(f => classifyFile(f) === 'foto');
+        const oldIdx = photos.findIndex(f => f.id === String(active.id));
+        const newIdx = photos.findIndex(f => f.id === String(over.id));
         if (oldIdx === -1 || newIdx === -1) return;
-        const reordered = arrayMove(folder.files, oldIdx, newIdx);
+
+        const reordered = arrayMove(photos, oldIdx, newIdx);
         const ids = reordered.map(f => f.id);
-        const coverFileId =
-            isPhotoCoverFolder(folder.displayName) && reordered[0]?.mimeType.startsWith('image/')
-                ? reordered[0].id
-                : undefined;
-        setFolders(prev => prev.map(f => f.id === folderId ? { ...f, files: reordered } : f));
-        setFotosOrder(prev => ({ ...prev, [folderId]: ids }));
-        void saveFotosOrderAction(patientId, folderId, ids, coverFileId).then(result => {
+        const coverFileId = reordered[0]?.id || undefined;
+
+        // Update files in state
+        const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
+        setFiles([...reordered, ...otherFiles]);
+
+        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
+        setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
+
+        void saveFotosOrderAction(patientId, motherFolderId, ids, coverFileId).then(result => {
             if (result.error) {
                 toast.error(`No se pudo guardar la portada: ${result.error}`);
             }
@@ -187,8 +280,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             return;
         }
         toast.success(`"${file.name}" eliminado`);
-        setFolders(prev => prev.map(f => ({ ...f, files: f.files.filter(fi => fi.id !== file.id) })));
-        setRootFiles(prev => prev.filter(fi => fi.id !== file.id));
+        setFiles(prev => prev.filter(fi => fi.id !== file.id));
     }
 
     function handleShareEmail(file: DriveFile) {
@@ -218,76 +310,38 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
     }
 
+    async function handleExtractSlides(fileId: string) {
+        if (extractingSlidesId) return;
+        setExtractingSlidesId(fileId);
+        
+        toast.info('Extrayendo diapositivas como imágenes PNG. Esto puede demorar unos segundos...');
+        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
+        const res = await extractSlidesAsImagesAction(fileId, motherFolderId);
+        
+        if (res.success) {
+            toast.success(`Se extrajeron ${res.extractedCount} diapositivas correctamente.`);
+            void fetchFolders(currentFolderUrl!);
+        } else {
+            toast.error(`Error al extraer diapositivas: ${res.error || 'error desconocido'}`);
+        }
+        setExtractingSlidesId(null);
+    }
+
     const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
     const [tagFile, setTagFile] = useState<DriveFile | null>(null);
     const [photoTags, setPhotoTags] = useState<Record<string, PhotoTag>>({});
 
-    const fetchFolders = useCallback(async (url: string) => {
-        const folderId = extractFolderIdFromUrl(url);
-        if (!folderId) {
-            setErrorMsg('No se pudo extraer el ID de la carpeta de Drive');
-            setStatus('error');
-            return;
-        }
-
-        setStatus('loading');
-        const result = await getPatientDriveFolders(folderId);
-
-        if (result.error) {
-            setErrorMsg(result.error);
-            setStatus('error');
-            return;
-        }
-
-        // Load saved photo order for all folders
-        const orderData = await getPatientFotosOrder(patientId);
-        setFotosOrder(orderData);
-
-        // Auto-expand the FOTO & VIDEO folder (or first folder with "foto"/"video" in name)
-        const fotoFolder = result.folders.find(f => /foto|video/i.test(f.displayName));
-        let foldersToSet = result.folders;
-        const autoOpenIds = new Set<string>();
-        if (fotoFolder) {
-            const filesResult = await loadFolderFiles(fotoFolder.id);
-            const sortedFiles = applySavedOrder(filesResult.files, orderData[fotoFolder.id] ?? []);
-            foldersToSet = result.folders.map(f =>
-                f.id === fotoFolder.id ? { ...f, files: sortedFiles, loaded: true } : f
-            );
-            autoOpenIds.add(fotoFolder.id);
-        }
-
-        setFolders(foldersToSet);
-        setRootFiles(result.rootFiles);
-        setOpenFolders(autoOpenIds);
-        setLoadingFolders(new Set());
-        setStatus('loaded');
-
-        // Load photo tags for this patient
-        const tags = await getPhotoTagsForPatientAction(patientId);
-        const tagMap: Record<string, PhotoTag> = {};
-        for (const t of tags) tagMap[t.file_id] = t;
-        setPhotoTags(tagMap);
-    }, [patientId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        if (currentFolderUrl && status === 'idle') {
-            queueMicrotask(() => {
-                void fetchFolders(currentFolderUrl);
-            });
-        }
-    }, [currentFolderUrl, status, fetchFolders]);
-
-    function openPreview(file: DriveFile, folderId: string) {
+    const openPreview = (file: DriveFile, folderId: string) => {
         setPreviewAutoSmile(false);
         setPreviewFile(file);
         setPreviewFolderId(folderId);
-    }
+    };
 
-    function openSmileDesign(file: DriveFile, folderId: string) {
+    const openSmileDesign = (file: DriveFile, folderId: string) => {
         setPreviewAutoSmile(true);
         setPreviewFile(file);
         setPreviewFolderId(folderId);
-    }
+    };
 
     const handleRefresh = () => {
         if (currentFolderUrl) {
@@ -311,125 +365,15 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
 
         if (result.motherFolderUrl) {
-            const nextMotherFolderId = extractFolderIdFromUrl(result.motherFolderUrl);
             setCurrentFolderUrl(result.motherFolderUrl);
-            if (nextMotherFolderId) setUploadTargetFolderId(nextMotherFolderId);
             setStatus('idle');
             toast.success('Carpeta de Drive creada correctamente');
         }
         setCreating(false);
     };
 
-    const handleCreateCustomFolder = async () => {
-        const name = newFolderName.trim();
-        if (!name) return;
-        if (!currentFolderUrl) {
-            toast.error('Primero creá la carpeta del paciente');
-            return;
-        }
-        setCreatingCustom(true);
-        const result = await createCustomSubfolderAction(patientId, currentFolderUrl, name);
-        if (result.error) {
-            toast.error(`Error: ${result.error}`);
-        } else {
-            toast.success(`Carpeta "${name}" creada`);
-            setNewFolderName('');
-            setShowNewFolderInput(false);
-            if (currentFolderUrl) fetchFolders(currentFolderUrl);
-        }
-        setCreatingCustom(false);
-    };
-
-    const [loadingFolders, setLoadingFolders] = useState<Set<string>>(new Set());
-
-    const toggleFolder = async (folderId: string) => {
-        if (openFolders.has(folderId)) {
-            // Collapse
-            setOpenFolders(prev => {
-                const next = new Set(prev);
-                next.delete(folderId);
-                return next;
-            });
-            return;
-        }
-
-        // Expand — lazy load files if not loaded yet
-        const folder = folders.find(f => f.id === folderId);
-        if (folder && !folder.loaded) {
-            setLoadingFolders(prev => new Set(prev).add(folderId));
-
-            const result = await loadFolderFiles(folderId);
-            const sortedFiles = applySavedOrder(result.files, fotosOrder[folderId] ?? []);
-
-            setFolders(prev => prev.map(f =>
-                f.id === folderId
-                    ? { ...f, files: sortedFiles, loaded: true }
-                    : f
-            ));
-            setLoadingFolders(prev => {
-                const next = new Set(prev);
-                next.delete(folderId);
-                return next;
-            });
-        }
-
-        // Open the folder
-        setOpenFolders(prev => new Set(prev).add(folderId));
-    };
-
-    const motherFolderId = extractFolderIdFromUrl(currentFolderUrl);
-    const validUploadTargetIds = new Set([motherFolderId, ...folders.map((folder) => folder.id)].filter(Boolean) as string[]);
-    const effectiveUploadTargetFolderId =
-        uploadTargetFolderId && validUploadTargetIds.has(uploadTargetFolderId)
-            ? uploadTargetFolderId
-            : (motherFolderId || '');
-    const primaryOpenFolderId = folders.find((folder) => openFolders.has(folder.id))?.id || '';
-    const defaultGlobalDropTargetId = primaryOpenFolderId || effectiveUploadTargetFolderId;
-    const effectiveGlobalDropFolderId =
-        globalDropFolderId && validUploadTargetIds.has(globalDropFolderId)
-            ? globalDropFolderId
-            : defaultGlobalDropTargetId;
-
-    const getFolderDestinationName = (folderId: string) => {
-        if (!folderId) return 'destino seleccionado';
-        if (folderId === motherFolderId) return 'carpeta raiz';
-        const folder = folders.find((item) => item.id === folderId);
-        return folder?.displayName || 'carpeta seleccionada';
-    };
-
-    const buildUploadSuccessMessage = (folderId: string, count: number) => {
-        const destinationName = getFolderDestinationName(folderId);
-        return `${count} archivo${count > 1 ? 's' : ''} subido${count > 1 ? 's' : ''} a ${destinationName}`;
-    };
-
-    const handleUploadedToFolder = async (folderId: string) => {
-        if (!folderId) {
-            handleRefresh();
-            return;
-        }
-
-        setUploadTargetFolderId(folderId);
-        setGlobalDropFolderId(folderId);
-
-        if (motherFolderId && folderId !== motherFolderId) {
-            setOpenFolders((prev) => {
-                const next = new Set(prev);
-                next.add(folderId);
-                return next;
-            });
-        }
-
-        // Reload only this folder's files instead of full refresh
-        if (folderId !== motherFolderId) {
-            const result = await loadFolderFiles(folderId);
-            setFolders(prev => prev.map(f =>
-                f.id === folderId
-                    ? { ...f, files: result.files, loaded: true }
-                    : f
-            ));
-        } else {
-            handleRefresh();
-        }
+    const handleUploadedToFolder = () => {
+        handleRefresh();
     };
 
     const isFileDrag = (event: DragEvent<HTMLElement>) =>
@@ -447,9 +391,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         event.preventDefault();
         globalDragDepthRef.current += 1;
         setIsGlobalDragging(true);
-        if (defaultGlobalDropTargetId) {
-            setGlobalDropFolderId(defaultGlobalDropTargetId);
-        }
     };
 
     const handleGlobalDragOver = (event: DragEvent<HTMLElement>) => {
@@ -493,7 +434,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         {creating ? (
                             <Loader2 size={16} className="animate-spin" />
                         ) : (
-                            <FolderPlus size={16} />
+                            <FolderOpen size={16} />
                         )}
                         Crear carpeta en Drive
                     </button>
@@ -507,7 +448,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         return (
             <div className="flex items-center justify-center py-16">
                 <Loader2 size={24} className="text-blue-500 animate-spin" />
-                <span className="ml-3 text-sm text-gray-500 dark:text-white/40">Cargando archivos de Drive...</span>
+                <span className="ml-3 text-sm text-gray-500 dark:text-white/40">Cargando documentación...</span>
             </div>
         );
     }
@@ -529,325 +470,240 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         );
     }
 
-    const loadedFiles = folders.reduce((acc, f) => acc + f.files.length, 0) + rootFiles.length;
-    const allFoldersLoaded = folders.every(f => f.loaded);
+    const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
+
+    // Classify files
+    const classifiedGroups = {
+        foto: { title: 'Fotos', icon: <FileImage size={16} className="text-emerald-500" />, files: [] as DriveFile[] },
+        video: { title: 'Videos', icon: <Video size={16} className="text-amber-500" />, files: [] as DriveFile[] },
+        '3d': { title: 'Escaneos y Diseños 3D', icon: <Layers size={16} className="text-indigo-500" />, files: [] as DriveFile[] },
+        presentacion: { title: 'Presentaciones', icon: <Presentation size={16} className="text-blue-500" />, files: [] as DriveFile[] },
+        documentacion: { title: 'Presupuestos y Documentación', icon: <FileText size={16} className="text-rose-500" />, files: [] as DriveFile[] },
+        otros: { title: 'Otros Archivos', icon: <FileCode size={16} className="text-slate-400" />, files: [] as DriveFile[] }
+    };
+
+    for (const file of files) {
+        const cat = classifyFile(file);
+        classifiedGroups[cat].files.push(file);
+    }
+
+    // Apply sorting to Fotos
+    const savedOrder = fotosOrder[motherFolderId] || [];
+    if (savedOrder.length > 0) {
+        classifiedGroups.foto.files = applySavedOrder(classifiedGroups.foto.files, savedOrder);
+    }
 
     return (
         <div className="flex gap-0 items-start">
-        <div
-            className="flex-1 min-w-0 space-y-4 relative"
-            onDragEnterCapture={handleGlobalDragEnter}
-            onDragOverCapture={handleGlobalDragOver}
-            onDragLeaveCapture={handleGlobalDragLeave}
-            onDrop={handleGlobalDrop}
-            onDragEnd={resetGlobalDrag}
-        >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <FolderOpen size={18} className="text-blue-500" />
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {allFoldersLoaded
-                            ? `${loadedFiles} archivo${loadedFiles !== 1 ? 's' : ''} en `
-                            : ''
-                        }{folders.length} carpeta{folders.length !== 1 ? 's' : ''}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2">
-                    {canUpload && (
-                        <div className="flex items-center gap-1">
-                            {showNewFolderInput ? (
-                                <>
-                                    <input
-                                        autoFocus
-                                        type="text"
-                                        value={newFolderName}
-                                        onChange={e => setNewFolderName(e.target.value)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') handleCreateCustomFolder();
-                                            if (e.key === 'Escape') { setShowNewFolderInput(false); setNewFolderName(''); }
-                                        }}
-                                        placeholder="Nombre de carpeta..."
-                                        className="px-2 py-1 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
-                                    />
-                                    <button
-                                        onClick={handleCreateCustomFolder}
-                                        disabled={creatingCustom || !newFolderName.trim()}
-                                        className="px-2 py-1 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                                    >
-                                        {creatingCustom ? <Loader2 size={14} className="animate-spin" /> : 'Crear'}
-                                    </button>
-                                    <button
-                                        onClick={() => { setShowNewFolderInput(false); setNewFolderName(''); }}
-                                        className="px-2 py-1 rounded-lg text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-                                    >
-                                        ✕
-                                    </button>
-                                </>
-                            ) : (
-                                <button
-                                    onClick={() => setShowNewFolderInput(true)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                >
-                                    <FolderPlus size={14} />
-                                    Nueva carpeta
-                                </button>
-                            )}
-                        </div>
-                    )}
-                    <a
-                        href={currentFolderUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-white/40 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-                    >
-                        <ExternalLink size={14} />
-                        Abrir en Drive
-                    </a>
-                    <button
-                        onClick={handleRefresh}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-white/40 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-                    >
-                        <RefreshCw size={14} />
-                        Refrescar
-                    </button>
-                </div>
-            </div>
-
-            {rootFiles.length > 0 && (
-                <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-500 dark:text-white/30 uppercase tracking-wider">
-                        Archivos raíz
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                        {rootFiles.map(file => (
-                            <DriveFileCard key={file.id} file={file} onPreview={f => openPreview(f, motherFolderId || '')} onDelete={canUpload ? handleDeleteFile : undefined} onShare={handleShareFile} onShareWithPatient={setSharePatientFile} onShareEmail={handleShareEmail} onTag={canUpload ? setTagFile : undefined} photoTag={photoTags[file.id]} onSmileDesign={f => openSmileDesign(f, motherFolderId || '')} />
-                        ))}
+            <div
+                className="flex-1 min-w-0 space-y-4 relative"
+                onDragEnterCapture={handleGlobalDragEnter}
+                onDragOverCapture={handleGlobalDragOver}
+                onDragLeaveCapture={handleGlobalDragLeave}
+                onDrop={handleGlobalDrop}
+                onDragEnd={resetGlobalDrag}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between bg-white/5 dark:bg-navy-900/40 p-4 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-2">
+                        <FolderOpen size={18} className="text-blue-500" />
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {files.length} archivo{files.length !== 1 ? 's' : ''} en total
+                        </span>
                     </div>
-                </div>
-            )}
-
-            {/* Subfolders as accordion */}
-            <div className="space-y-2">
-                {folders.map(folder => {
-                    const isOpen = openFolders.has(folder.id);
-                    const isDropTarget = isGlobalDragging && effectiveGlobalDropFolderId === folder.id;
-                    const isLoading = loadingFolders.has(folder.id);
-                    const isCoverFolder = isPhotoCoverFolder(folder.displayName);
-
-                    return (
-                        <motion.div
-                            key={folder.id}
-                            animate={{
-                                scale: isDropTarget ? 1.01 : 1,
-                                y: isDropTarget ? -2 : 0,
-                            }}
-                            transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-                            className={`rounded-xl border overflow-hidden transition-all ${isDropTarget
-                                ? 'border-blue-500 ring-2 ring-blue-500/40'
-                                : 'border-gray-200 dark:border-white/10'
-                                }`}
+                    <div className="flex items-center gap-2">
+                        {canUpload && (
+                            <DriveUploadButton
+                                folderId={motherFolderId}
+                                patientId={patientId}
+                                onUploaded={handleUploadedToFolder}
+                                successMessage={(count) => `${count} archivo(s) subido(s) correctamente`}
+                                fileNamePrefix={buildPatientPrefix(patientName, 'archivos')}
+                            />
+                        )}
+                        <a
+                            href={currentFolderUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-white/40 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                         >
-                            {/* Folder header — div instead of button to allow nested DriveUploadButton */}
-                            <div
-                                role="button"
-                                tabIndex={isLoading ? -1 : 0}
-                                aria-expanded={isOpen}
-                                onClick={() => !isLoading && toggleFolder(folder.id)}
-                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); !isLoading && toggleFolder(folder.id); } }}
-                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer select-none${isLoading ? ' opacity-70 pointer-events-none' : ''}`}
-                            >
-                                {isLoading ? (
-                                    <Loader2 size={16} className="text-blue-400 animate-spin" />
-                                ) : (
-                                    <motion.div
-                                        animate={{ rotate: isOpen ? 180 : 0 }}
-                                        transition={{ duration: 0.2 }}
-                                    >
-                                        <ChevronDown size={16} className="text-gray-400" />
-                                    </motion.div>
-                                )}
-                                <FolderOpen size={16} className="text-yellow-500" />
-                                <span className="text-sm font-medium text-gray-900 dark:text-white flex-1 text-left">
-                                    {folder.displayName}
-                                </span>
-                                <span className="text-xs text-gray-400 dark:text-white/30 mr-2">
-                                    {isLoading
-                                        ? 'Cargando...'
-                                        : folder.loaded
-                                            ? `${folder.files.length} archivo${folder.files.length !== 1 ? 's' : ''}`
-                                            : 'Clic para ver'
-                                    }
-                                </span>
-                                {canUpload && (
-                                    <span onClick={e => e.stopPropagation()}>
-                                        <DriveUploadButton
-                                            folderId={folder.id}
-                                            patientId={patientId}
-                                            onUploaded={() => handleUploadedToFolder(folder.id)}
-                                            successMessage={(count) => buildUploadSuccessMessage(folder.id, count)}
-                                            fileNamePrefix={buildPatientPrefix(patientName, folder.displayName)}
-                                        />
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Folder contents */}
-                            <AnimatePresence>
-                                {isOpen && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="px-4 pb-4 pt-1">
-                                            {folder.files.length === 0 ? (
-                                                <p className="text-sm text-gray-400 dark:text-white/20 py-4 text-center">
-                                                    Carpeta vacía
-                                                </p>
-                                            ) : (
-                                                <DndContext
-                                                    sensors={dndSensors}
-                                                    collisionDetection={closestCenter}
-                                                    onDragEnd={e => handleDragEnd(e, folder.id)}
-                                                >
-                                                    <SortableContext
-                                                        items={folder.files.map(f => f.id)}
-                                                        strategy={rectSortingStrategy}
-                                                    >
-                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                                            {folder.files.map((file, idx) => (
-                                                                <SortableFileCard
-                                                                    key={file.id}
-                                                                    file={file}
-                                                                    isPortada={isCoverFolder && idx === 0 && file.mimeType.startsWith('image/')}
-                                                                    onPreview={f => openPreview(f, folder.id)}
-                                                                    onDelete={canUpload ? handleDeleteFile : undefined}
-                                                                    onShare={handleShareFile}
-                                                                    onShareWithPatient={setSharePatientFile}
-                                                                    onShareEmail={handleShareEmail}
-                                                                    onTag={canUpload ? setTagFile : undefined}
-                                                                    photoTag={photoTags[file.id]}
-                                                                    onSmileDesign={f => openSmileDesign(f, folder.id)}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    </SortableContext>
-                                                </DndContext>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
-                    );
-                })}
-            </div>
-
-            {canUpload && isGlobalDragging && effectiveGlobalDropFolderId && (
-                <div className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] p-4 sm:p-8">
-                    <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-blue-400/35 bg-slate-950/85 p-4 shadow-2xl">
-                        <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <p className="text-sm font-semibold text-white">
-                                Soltá archivos para subir a Drive
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-300">Destino</span>
-                                <select
-                                    value={effectiveGlobalDropFolderId}
-                                    onChange={(event) => setGlobalDropFolderId(event.target.value)}
-                                    className="text-xs rounded-md px-2 py-1 bg-slate-900 border border-slate-700 text-slate-100"
-                                >
-                                    {motherFolderId && (
-                                        <option value={motherFolderId}>Carpeta raíz del paciente</option>
-                                    )}
-                                    {folders.map((folder) => (
-                                        <option key={folder.id} value={folder.id}>
-                                            {folder.displayName}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <DriveUploadButton
-                            variant="dropzone"
-                            folderId={effectiveGlobalDropFolderId}
-                            patientId={patientId}
-                            successMessage={(count) => buildUploadSuccessMessage(effectiveGlobalDropFolderId, count)}
-                            onUploaded={() => {
-                                resetGlobalDrag();
-                                handleUploadedToFolder(effectiveGlobalDropFolderId);
-                            }}
-                            dropzoneTitle="Soltá archivos en cualquier parte"
-                            dropzoneHint="También podés hacer clic para elegir archivos"
-                            dropzoneClassName="p-10 border-blue-400/70 bg-blue-500/5"
-                            fileNamePrefix={
-                                effectiveGlobalDropFolderId === motherFolderId
-                                    ? buildPatientPrefix(patientName, 'archivos')
-                                    : buildPatientPrefix(patientName, folders.find(f => f.id === effectiveGlobalDropFolderId)?.displayName || 'archivos')
-                            }
-                        />
+                            <ExternalLink size={14} />
+                            Abrir en Drive
+                        </a>
+                        <button
+                            onClick={handleRefresh}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-white/40 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                        >
+                            <RefreshCw size={14} />
+                            Refrescar
+                        </button>
                     </div>
                 </div>
-            )}
 
-            {/* Compartir con paciente */}
-            {sharePatientFile && (
-                <ShareWithPatientModal
-                    files={[{
-                        id: sharePatientFile.id,
-                        name: sharePatientFile.name,
-                        driveFileId: sharePatientFile.id,
-                    }]}
-                    folderId={previewFolderId || motherFolderId || undefined}
+                {files.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center bg-white/5 dark:bg-navy-950/10 rounded-xl border border-dashed border-white/5">
+                        <p className="text-sm text-gray-400 dark:text-white/20 mb-2">La carpeta del paciente está vacía</p>
+                        <p className="text-xs text-gray-500 dark:text-white/10">Arrastra archivos aquí para subirlos a la documentación del paciente</p>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {Object.entries(classifiedGroups).map(([key, group]) => {
+                            if (group.files.length === 0) return null;
+
+                            const isCoverFolder = key === 'foto';
+
+                            return (
+                                <div key={key} className="space-y-3 p-4 rounded-xl border border-white/5 bg-white/5 dark:bg-navy-950/20 backdrop-blur-sm shadow-md">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                                            {group.icon}
+                                            <span>{group.title}</span>
+                                            <span className="text-xs bg-white/10 text-slate-400 px-2 py-0.5 rounded-full lowercase">
+                                                {group.files.length} archivo{group.files.length !== 1 ? 's' : ''}
+                                            </span>
+                                        </h3>
+                                    </div>
+
+                                    {key === 'foto' ? (
+                                        <DndContext
+                                            sensors={dndSensors}
+                                            collisionDetection={closestCenter}
+                                            onDragEnd={handleDragEnd}
+                                        >
+                                            <SortableContext
+                                                items={group.files.map(f => f.id)}
+                                                strategy={rectSortingStrategy}
+                                            >
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                                    {group.files.map((file, idx) => (
+                                                        <SortableFileCard
+                                                            key={file.id}
+                                                            file={file}
+                                                            isPortada={idx === 0}
+                                                            onPreview={f => openPreview(f, motherFolderId)}
+                                                            onDelete={canUpload ? handleDeleteFile : undefined}
+                                                            onShare={handleShareFile}
+                                                            onShareWithPatient={setSharePatientFile}
+                                                            onShareEmail={handleShareEmail}
+                                                            onTag={canUpload ? setTagFile : undefined}
+                                                            photoTag={photoTags[file.id]}
+                                                            onSmileDesign={f => openSmileDesign(f, motherFolderId)}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </SortableContext>
+                                        </DndContext>
+                                    ) : (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                            {group.files.map(file => (
+                                                <div key={file.id} className="relative group">
+                                                    {key === 'presentacion' && canUpload && (
+                                                        <button
+                                                            onClick={() => handleExtractSlides(file.id)}
+                                                            disabled={extractingSlidesId === file.id}
+                                                            className="absolute top-1.5 left-1.5 z-10 px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold shadow transition-opacity opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                                                            title="Extraer diapositivas como fotos"
+                                                        >
+                                                            {extractingSlidesId === file.id ? 'Extrayendo...' : 'Extraer fotos'}
+                                                        </button>
+                                                    )}
+                                                    <DriveFileCard
+                                                        file={file}
+                                                        onPreview={f => openPreview(f, motherFolderId)}
+                                                        onDelete={canUpload ? handleDeleteFile : undefined}
+                                                        onShare={handleShareFile}
+                                                        onShareWithPatient={setSharePatientFile}
+                                                        onShareEmail={handleShareEmail}
+                                                        onTag={canUpload ? setTagFile : undefined}
+                                                        photoTag={photoTags[file.id]}
+                                                        onSmileDesign={f => openSmileDesign(f, motherFolderId)}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Global dropzone overlay */}
+                {canUpload && isGlobalDragging && motherFolderId && (
+                    <div className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] p-4 sm:p-8 flex items-center justify-center">
+                        <div className="w-full max-w-3xl rounded-2xl border border-blue-400/35 bg-slate-950/85 p-6 shadow-2xl space-y-4">
+                            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                <p className="text-sm font-semibold text-white">
+                                    Subir archivos a la carpeta del paciente
+                                </p>
+                            </div>
+
+                            <DriveUploadButton
+                                variant="dropzone"
+                                folderId={motherFolderId}
+                                patientId={patientId}
+                                successMessage={(count) => `${count} archivo(s) subido(s) correctamente`}
+                                onUploaded={() => {
+                                    resetGlobalDrag();
+                                    handleUploadedToFolder();
+                                }}
+                                dropzoneTitle="Soltá tus archivos acá"
+                                dropzoneHint="También podés hacer clic para elegir archivos"
+                                dropzoneClassName="p-10 border-blue-400/70 bg-blue-500/5"
+                                fileNamePrefix={buildPatientPrefix(patientName, 'archivos')}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Share with patient */}
+                {sharePatientFile && (
+                    <ShareWithPatientModal
+                        files={[{
+                            id: sharePatientFile.id,
+                            name: sharePatientFile.name,
+                            driveFileId: sharePatientFile.id,
+                        }]}
+                        folderId={motherFolderId || undefined}
+                        patientId={patientId}
+                        patientName={patientName}
+                        onClose={() => setSharePatientFile(null)}
+                    />
+                )}
+
+                {/* Preview modal */}
+                <DrivePreviewModal
+                    file={previewFile}
+                    folderId={previewFolderId}
                     patientId={patientId}
                     patientName={patientName}
-                    onClose={() => setSharePatientFile(null)}
+                    canSave={canUpload}
+                    allFolderFiles={files.filter(f => classifyFile(f) === 'foto')}
+                    autoStartSmile={previewAutoSmile}
+                    onClose={() => { setPreviewFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
+                    onSaved={() => {
+                        handleUploadedToFolder();
+                    }}
+                />
+            </div>
+
+            {/* Tag panel — right sidebar */}
+            {tagFile && (
+                <PhotoTagPanel
+                    file={tagFile}
+                    patientId={patientId}
+                    currentTag={photoTags[tagFile.id] ?? null}
+                    onClose={() => setTagFile(null)}
+                    onTagSaved={(tag) => {
+                        setPhotoTags(prev => {
+                            const next = { ...prev };
+                            if (tag) next[tag.file_id] = tag;
+                            else delete next[tagFile.id];
+                            return next;
+                        });
+                    }}
                 />
             )}
-
-            {/* Preview modal */}
-            <DrivePreviewModal
-                file={previewFile}
-                folderId={previewFolderId}
-                patientId={patientId}
-                patientName={patientName}
-                canSave={canUpload}
-                allFolderFiles={
-                    previewFolderId === motherFolderId
-                        ? rootFiles.filter(f => f.mimeType.toLowerCase().startsWith('image/'))
-                        : (folders.find(f => f.id === previewFolderId)?.files ?? [])
-                            .filter(f => f.mimeType.toLowerCase().startsWith('image/'))
-                }
-                autoStartSmile={previewAutoSmile}
-                onClose={() => { setPreviewFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
-                onSaved={() => {
-                    // Refresca la carpeta pero mantiene el estudio abierto
-                    handleUploadedToFolder(previewFolderId);
-                }}
-            />
-        </div>
-
-        {/* Tag panel — right sidebar */}
-        {tagFile && (
-            <PhotoTagPanel
-                file={tagFile}
-                patientId={patientId}
-                currentTag={photoTags[tagFile.id] ?? null}
-                onClose={() => setTagFile(null)}
-                onTagSaved={(tag) => {
-                    setPhotoTags(prev => {
-                        const next = { ...prev };
-                        if (tag) next[tag.file_id] = tag;
-                        else delete next[tagFile.id];
-                        return next;
-                    });
-                }}
-            />
-        )}
         </div>
     );
 }

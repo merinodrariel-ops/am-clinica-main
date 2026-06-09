@@ -21,6 +21,7 @@ export interface ListPatientsFilters {
     ciudad?: string;
     limit?: number;
     offset?: number;
+    onlyWithPhotos?: boolean;
 }
 
 function normalizePatientText(value: string | null | undefined): string {
@@ -189,7 +190,12 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             profile_photo_url: patient.profile_photo_url || photoByPatientId.get(patient.id_paciente) || null,
         }));
 
-        return { success: true, data: enriched };
+        let filtered = enriched;
+        if (filters.onlyWithPhotos) {
+            filtered = enriched.filter(p => p.profile_photo_url !== null);
+        }
+
+        return { success: true, data: filtered };
     } catch (error) {
         console.error('Error listing patients:', error);
         return { success: false, error: 'No se pudieron cargar los pacientes' };
@@ -203,7 +209,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
 
         let query = supabase
             .from('pacientes')
-            .select(searchTokens.length > 1 ? '*' : '*', { count: 'exact', head: searchTokens.length <= 1 })
+            .select('*')
             .eq('is_deleted', false);
 
         if (searchTokens.length) {
@@ -214,17 +220,37 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
             query = query.eq('estado_paciente', filters.estado);
         }
 
-        const { data, count, error } = await query;
+        const { data, error } = await query;
         if (error) throw error;
 
+        let patients = (data || []) as Paciente[];
         if (searchTokens.length > 1) {
-            return {
-                success: true,
-                count: ((data || []) as Paciente[]).filter((patient) => patientMatchesSearch(patient, searchTokens)).length,
-            };
+            patients = patients.filter((patient) => patientMatchesSearch(patient, searchTokens));
         }
 
-        return { success: true, count: count || 0 };
+        if (filters.onlyWithPhotos) {
+            const patientIds = patients.map((p) => p.id_paciente).filter(Boolean);
+            if (!patientIds.length) return { success: true, count: 0 };
+
+            const { data: patientFiles } = await supabase
+                .from('patient_files')
+                .select('patient_id, thumbnail_url, file_url')
+                .in('patient_id', patientIds)
+                .eq('file_type', 'photo_before');
+
+            const photoByPatientId = new Map<string, string>();
+            for (const file of patientFiles || []) {
+                const pId = file.patient_id;
+                const url = file.thumbnail_url || file.file_url;
+                if (pId && url) photoByPatientId.set(pId, url);
+            }
+
+            patients = patients.filter(
+                (p) => p.foto_perfil_url || p.profile_photo_url || photoByPatientId.has(p.id_paciente)
+            );
+        }
+
+        return { success: true, count: patients.length };
     } catch (error) {
         console.error('Error counting patients:', error);
         return { success: false, count: 0 };

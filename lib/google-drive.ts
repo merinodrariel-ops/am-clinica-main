@@ -514,15 +514,7 @@ export async function ensureStandardPatientFolders(
         const finalMotherFolderId = resolvedMotherFolderId;
 
         // 2. Create the 3 standard subfolders
-        const subfolders = [
-            `[FOTO & VIDEO] ${motherFolderName}`,
-            `[PRESENTACION] ${motherFolderName}`,
-            `[PRESUPUESTO] ${motherFolderName}`
-        ];
-
-        for (const subName of subfolders) {
-            await createDriveFolder(drive, finalMotherFolderId, subName);
-        }
+        // Omit subfolder creation for a flat folder structure by default (documents will be saved in mother folder)
 
         // 3. Get Mother Folder URL
         const motherUrl = await getFolderWebViewLink(finalMotherFolderId);
@@ -576,18 +568,20 @@ export async function ensurePatientContractFolder(
             resolvedMotherFolderId = motherResult.folderId;
         }
 
-        const contractResult = await createDriveFolder(drive, resolvedMotherFolderId, contractFolderName);
-        if (contractResult.error || !contractResult.folderId) {
-            return { error: contractResult.error || 'No se pudo crear carpeta de contrato del paciente' };
+        // Check if an existing contract subfolder exists
+        const existingFolders = await listExactFoldersByName(drive, resolvedMotherFolderId, contractFolderName);
+        let contractFolderId = resolvedMotherFolderId;
+        if (existingFolders.length > 0 && existingFolders[0].id) {
+            contractFolderId = existingFolders[0].id;
         }
 
         const motherFolderUrl = await getFolderWebViewLink(resolvedMotherFolderId);
-        const contractFolderUrl = await getFolderWebViewLink(contractResult.folderId);
+        const contractFolderUrl = await getFolderWebViewLink(contractFolderId);
 
         return {
             motherFolderId: resolvedMotherFolderId,
             motherFolderUrl: motherFolderUrl || undefined,
-            contractFolderId: contractResult.folderId,
+            contractFolderId: contractFolderId,
             contractFolderUrl: contractFolderUrl || undefined,
         };
     } catch (error) {
@@ -638,18 +632,20 @@ export async function ensurePatientPresentationFolder(
             resolvedMotherFolderId = motherResult.folderId;
         }
 
-        const presentationResult = await createDriveFolder(drive, resolvedMotherFolderId, presentationFolderName);
-        if (presentationResult.error || !presentationResult.folderId) {
-            return { error: presentationResult.error || 'No se pudo crear carpeta de presentacion del paciente' };
+        // Check if an existing presentation subfolder exists
+        const existingFolders = await listExactFoldersByName(drive, resolvedMotherFolderId, presentationFolderName);
+        let presentationFolderId = resolvedMotherFolderId;
+        if (existingFolders.length > 0 && existingFolders[0].id) {
+            presentationFolderId = existingFolders[0].id;
         }
 
         const motherFolderUrl = await getFolderWebViewLink(resolvedMotherFolderId);
-        const presentationFolderUrl = await getFolderWebViewLink(presentationResult.folderId);
+        const presentationFolderUrl = await getFolderWebViewLink(presentationFolderId);
 
         return {
             motherFolderId: resolvedMotherFolderId,
             motherFolderUrl: motherFolderUrl || undefined,
-            presentationFolderId: presentationResult.folderId,
+            presentationFolderId: presentationFolderId,
             presentationFolderUrl: presentationFolderUrl || undefined,
         };
     } catch (error) {
@@ -970,9 +966,8 @@ export async function createPatientDocuments(
             }
         }
 
-        if (!presentacionFolder || !presupuestoFolder) {
-            return { error: 'Standard subfolders not found in mother folder' };
-        }
+        const presentacionDestId = presentacionFolder?.id || motherFolderId;
+        const presupuestoDestId = presupuestoFolder?.id || motherFolderId;
 
         const results: { fichaUrl?: string; presupuestoUrl?: string } = {};
 
@@ -986,7 +981,7 @@ export async function createPatientDocuments(
                 supportsAllDrives: true,
                 requestBody: {
                     name: newFichaName,
-                    parents: [presentacionFolder.id!],
+                    parents: [presentacionDestId],
                 },
             });
 
@@ -1006,7 +1001,7 @@ export async function createPatientDocuments(
                 supportsAllDrives: true,
                 requestBody: {
                     name: newPresuName,
-                    parents: [presupuestoFolder.id!],
+                    parents: [presupuestoDestId],
                 },
             });
 
@@ -1270,5 +1265,78 @@ export async function getDriveFileContent(
         return { content: res.data as string };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Extracts all slides from a Google Slide presentation as PNG images
+ * and uploads them to the specified target folder.
+ */
+export async function extractSlidesAsImages(
+    presentationId: string,
+    targetFolderId: string
+): Promise<{ success: boolean; extractedCount: number; error?: string }> {
+    try {
+        const auth = getAuth();
+        const slides = google.slides({ version: 'v1', auth });
+
+        // 1. Fetch the presentation
+        const presentation = await slides.presentations.get({ presentationId });
+        const pages = presentation.data.slides || [];
+        const title = presentation.data.title || 'Presentacion';
+
+        if (pages.length === 0) {
+            return { success: true, extractedCount: 0 };
+        }
+
+        let extractedCount = 0;
+
+        // 2. Fetch thumbnail for each page and save it
+        for (let i = 0; i < pages.length; i++) {
+            const page = pages[i];
+            const pageObjectId = page.objectId!;
+
+            try {
+                // Get thumbnail URL
+                const thumbnailRes = await slides.presentations.pages.getThumbnail({
+                    presentationId,
+                    pageObjectId,
+                    'thumbnailProperties.mimeType': 'PNG',
+                    'thumbnailProperties.thumbnailSize': 'LARGE',
+                });
+
+                const contentUrl = thumbnailRes.data.contentUrl;
+                if (!contentUrl) {
+                    console.warn(`[extractSlidesAsImages] No contentUrl for slide ${i + 1}`);
+                    continue;
+                }
+
+                // Download thumbnail image
+                const imgRes = await fetch(contentUrl);
+                if (!imgRes.ok) {
+                    console.warn(`[extractSlidesAsImages] Failed to fetch slide ${i + 1} from contentUrl`);
+                    continue;
+                }
+
+                const buffer = Buffer.from(await imgRes.arrayBuffer());
+                
+                // Format naming
+                const slideNum = String(i + 1).padStart(2, '0');
+                const fileName = `Diapositiva ${slideNum} - ${title}.png`;
+
+                // Upload to the patient folder
+                const uploadRes = await uploadFileToFolder(targetFolderId, fileName, buffer, 'image/png');
+                if (uploadRes.success) {
+                    extractedCount++;
+                }
+            } catch (err) {
+                console.error(`[extractSlidesAsImages] Error on slide ${i + 1}:`, err);
+            }
+        }
+
+        return { success: true, extractedCount };
+    } catch (error) {
+        console.error('Error in extractSlidesAsImages:', error);
+        return { success: false, extractedCount: 0, error: error instanceof Error ? error.message : String(error) };
     }
 }

@@ -29,6 +29,7 @@ export default function PatientsPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
+    const [onlyWithPhotosFilter, setOnlyWithPhotosFilter] = useState(true);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -70,6 +71,7 @@ export default function PatientsPage() {
             const res = await listPatientsAction({
                 search: searchTerm || undefined,
                 estado: estadoFilter || undefined,
+                onlyWithPhotos: onlyWithPhotosFilter,
                 limit: 1000,
             });
 
@@ -81,6 +83,7 @@ export default function PatientsPage() {
             const countRes = await getPatientsCountAction({
                 search: searchTerm || undefined,
                 estado: estadoFilter || undefined,
+                onlyWithPhotos: onlyWithPhotosFilter,
             });
 
             if (countRes.success) {
@@ -91,7 +94,7 @@ export default function PatientsPage() {
         } finally {
             setLoading(false);
         }
-    }, [searchTerm, estadoFilter]);
+    }, [searchTerm, estadoFilter, onlyWithPhotosFilter]);
 
     // Initial load only on mount
     useEffect(() => {
@@ -214,6 +217,18 @@ export default function PatientsPage() {
                                     <span className="hidden sm:inline">Lista</span>
                                 </button>
                             </div>
+                            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-navy-900/50 text-slate-300 text-sm cursor-pointer hover:bg-white/5 transition-colors select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={onlyWithPhotosFilter}
+                                    onChange={(e) => {
+                                        setOnlyWithPhotosFilter(e.target.checked);
+                                        setTimeout(loadPatients, 100);
+                                    }}
+                                    className="rounded border-white/20 bg-transparent text-teal-500 focus:ring-teal-500 focus:ring-offset-navy-900 h-4 w-4"
+                                />
+                                <span className="hidden sm:inline">Sólo con fotos</span>
+                            </label>
                             <select
                                 value={estadoFilter}
                                 onChange={(e) => {
