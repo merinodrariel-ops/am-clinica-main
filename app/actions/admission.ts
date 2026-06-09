@@ -333,17 +333,10 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         }
 
         try {
-            const todoResult = await createFirstDiagnosisTodo({
-                patientId: created.id_paciente,
-                patientName: `${created.apellido || data.apellido}, ${created.nombre || data.nombre}`,
-                reason: data.motivo_consulta,
-                healthAlerts: data.health_alerts,
-                driveLink,
-                slidesLink: docResult?.fichaUrl,
-            });
-            triggers.todo = todoResult;
+            // Deshabilitado por solicitud del usuario: Se omite la creación automática del todo "Primer Diagnóstico" para evitar saturar el módulo de tareas internas
+            triggers.todo = { ok: true, detail: 'Omitido (deshabilitado por solicitud)' };
         } catch (todoErr) {
-            console.error('Error creating first diagnosis todo:', todoErr);
+            console.error('Error:', todoErr);
             triggers.todo = { ok: false, detail: todoErr instanceof Error ? todoErr.message : String(todoErr) };
         }
 
