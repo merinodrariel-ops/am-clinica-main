@@ -120,19 +120,16 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
         const supabase = await createClient();
         const searchTokens = getSearchTokens(filters.search);
 
-        let selectFields = '*';
-        if (filters.onlyWithPhotos) {
-            selectFields = '*, patient_treatments!inner(metadata)';
-        }
-
         let query = supabase
             .from('pacientes')
-            .select(selectFields)
+            .select('*')
             .eq('is_deleted', false)
             .order('fecha_alta', { ascending: false });
 
         if (filters.onlyWithPhotos) {
-            query = query.not('patient_treatments.metadata->>drive_folder_id', 'is', null);
+            // Real patients have at least one of: clinical history link, Google Slides link, or profile photo.
+            // This covers both old-system patients (Slides/historia) and new-system patients (foto_perfil_url).
+            query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
         }
 
         if (searchTokens.length) {
@@ -196,7 +193,7 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
 
         const enriched = patients.map((patient) => ({
             ...patient,
-            profile_photo_url: patient.profile_photo_url || photoByPatientId.get(patient.id_paciente) || null,
+            profile_photo_url: patient.foto_perfil_url || photoByPatientId.get(patient.id_paciente) || null,
         }));
 
         return { success: true, data: enriched };
@@ -214,17 +211,13 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
         // If searchTokens.length > 1, we must fetch in memory to perform the AND match.
         // We select the minimal search fields to keep it as light as possible.
         if (searchTokens.length > 1) {
-            let selectStr = 'id_paciente, nombre, apellido, email, documento, whatsapp';
-            if (filters.onlyWithPhotos) {
-                selectStr += ', patient_treatments!inner(metadata)';
-            }
             let dataQuery = supabase
                 .from('pacientes')
-                .select(selectStr)
+                .select('id_paciente, nombre, apellido, email, documento, whatsapp')
                 .eq('is_deleted', false);
 
             if (filters.onlyWithPhotos) {
-                dataQuery = dataQuery.not('patient_treatments.metadata->>drive_folder_id', 'is', null);
+                dataQuery = dataQuery.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
             }
             dataQuery = dataQuery.or(buildSearchOrClause(searchTokens));
 
@@ -241,19 +234,14 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
         }
 
         // For 0 or 1 search tokens, do a 100% database-side count query (head: true)
-        let query;
-        if (filters.onlyWithPhotos) {
-            query = supabase
-                .from('pacientes')
-                .select('id_paciente, patient_treatments!inner(metadata)', { count: 'exact', head: true })
-                .not('patient_treatments.metadata->>drive_folder_id', 'is', null);
-        } else {
-            query = supabase
-                .from('pacientes')
-                .select('id_paciente', { count: 'exact', head: true });
-        }
+        let query = supabase
+            .from('pacientes')
+            .select('id_paciente', { count: 'exact', head: true })
+            .eq('is_deleted', false);
 
-        query = query.eq('is_deleted', false);
+        if (filters.onlyWithPhotos) {
+            query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
+        }
 
         if (searchTokens.length) {
             query = query.or(buildSearchOrClause(searchTokens));
