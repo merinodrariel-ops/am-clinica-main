@@ -472,7 +472,8 @@ function CreateRecallModal({ open, onClose, onCreate }: {
     // Update interval when type changes
     useEffect(() => {
         const intervals: Record<RecallType, number> = {
-            limpieza: 6, botox: 4, control_carillas: 12,
+            limpieza: 6, limpieza_convencional: 6, limpieza_laser: 4,
+            botox: 4, control_carillas: 12,
             blanqueamiento: 6, control_ortodoncia: 6, mantenimiento_implantes: 12, otro: 6,
         };
         setIntervalMonths(intervals[recallType]);

@@ -16,6 +16,7 @@ const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerWorkflowFromSenaPayment } from '@/app/actions/clinical-workflows';
+import { triggerRecallFromCajaPayment } from '@/app/actions/recalls';
 import { getLocalISODate } from '@/lib/local-date';
 import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
@@ -808,6 +809,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     )
                 );
             }
+
+            // 10. Limpieza recall trigger — fires when caja registers a limpieza payment
+            // regardless of what appointment type is on the calendar that day.
+            triggerRecallFromCajaPayment({
+                patientId: formData.paciente_id,
+                conceptoNombre: conceptoFinal,
+                paymentDate: fechaMovimiento,
+                cajaMovementId: mainMovement.id,
+                doctorId: null,
+            }).catch(e => console.error('[caja] limpieza recall trigger failed:', e));
 
             onSuccess();
             setStep(5);

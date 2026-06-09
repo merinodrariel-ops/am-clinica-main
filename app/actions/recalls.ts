@@ -687,3 +687,48 @@ export async function deleteRecallRule(ruleId: string) {
     revalidatePath('/recalls');
     return { success: true };
 }
+
+// ─── TRIGGER FROM CAJA PAYMENT ────────────────────────────────────────────────
+
+function normalizeConcept(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function detectLimpiezaType(conceptoNombre: string): 'limpieza_laser' | 'limpieza_convencional' | null {
+    const n = normalizeConcept(conceptoNombre);
+    if (!n.includes('limpieza') && !n.includes('profilaxis')) return null;
+    if (n.includes('laser') || n.includes('lazer')) return 'limpieza_laser';
+    return 'limpieza_convencional';
+}
+
+/**
+ * Triggered from the caja when a limpieza payment is registered.
+ * The appointment type on the calendar may differ (e.g. "control") — the caja
+ * is the source of truth for what was actually performed.
+ */
+export async function triggerRecallFromCajaPayment(params: {
+    patientId: string;
+    conceptoNombre: string;
+    paymentDate: string;       // 'YYYY-MM-DD'
+    cajaMovementId: string;    // UUID of the caja_movimientos row (used as linked ref)
+    doctorId?: string | null;
+}): Promise<{ triggered: boolean; appointmentType?: string }> {
+    const { patientId, conceptoNombre, paymentDate, cajaMovementId, doctorId } = params;
+
+    const appointmentType = detectLimpiezaType(conceptoNombre);
+    if (!appointmentType) return { triggered: false };
+
+    await createRecallsFromAppointment(
+        cajaMovementId,
+        appointmentType,
+        patientId,
+        `${paymentDate}T12:00:00`,
+        doctorId ?? null
+    );
+
+    return { triggered: true, appointmentType };
+}

@@ -3,6 +3,8 @@
 
 export type RecallType =
     | 'limpieza'
+    | 'limpieza_convencional'
+    | 'limpieza_laser'
     | 'botox'
     | 'control_carillas'
     | 'blanqueamiento'
@@ -65,6 +67,8 @@ export interface RecallActivityLogEntry {
 
 export const RECALL_TYPE_LABELS: Record<RecallType, string> = {
     limpieza: 'Limpieza Dental',
+    limpieza_convencional: 'Limpieza convencional',
+    limpieza_laser: 'Limpieza con láser',
     botox: 'Botox',
     control_carillas: 'Control Carillas',
     blanqueamiento: 'Blanqueamiento',
@@ -84,6 +88,8 @@ export const RECALL_STATE_LABELS: Record<RecallState, string> = {
 
 export const RECALL_TYPE_COLORS: Record<RecallType, string> = {
     limpieza: '#06b6d4',
+    limpieza_convencional: '#06b6d4',
+    limpieza_laser: '#0ea5e9',
     botox: '#a855f7',
     control_carillas: '#f59e0b',
     blanqueamiento: '#3b82f6',
@@ -94,6 +100,8 @@ export const RECALL_TYPE_COLORS: Record<RecallType, string> = {
 
 export const RECALL_TYPE_INTERVALS: Record<RecallType, number> = {
     limpieza: 6,
+    limpieza_convencional: 6,
+    limpieza_laser: 4,
     botox: 4,
     control_carillas: 12,
     blanqueamiento: 6,
