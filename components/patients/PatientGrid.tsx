@@ -70,11 +70,6 @@ function resolvePatientPhotoSrc(patient: Paciente): string | null {
     const profilePhoto = patient.profile_photo_url?.trim();
     if (profilePhoto) return profilePhoto;
 
-    const slidesFileId = extractGoogleFileIdFromUrl(patient.link_google_slides);
-    if (slidesFileId) {
-        return `/api/drive/thumbnail/${encodeURIComponent(slidesFileId)}`;
-    }
-
     return null;
 }
 

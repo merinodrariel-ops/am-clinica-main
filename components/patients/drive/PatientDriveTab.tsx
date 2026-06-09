@@ -15,9 +15,6 @@ import {
     Presentation,
     FileText,
     FileCode,
-    ClipboardList,
-    X,
-    Check,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -39,7 +36,6 @@ import DriveUploadButton from './DriveUploadButton';
 import ShareWithPatientModal from './ShareWithPatientModal';
 import PhotoTagPanel from './PhotoTagPanel';
 import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo-tags';
-import { createHistoriaClinicaEntry } from '@/app/actions/patients';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -207,9 +203,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const globalDragDepthRef = useRef(0);
     const [fotosOrder, setFotosOrder] = useState<Record<string, string[]>>({});
     const [extractingSlidesId, setExtractingSlidesId] = useState<string | null>(null);
-    const [hcOpen, setHcOpen] = useState(false);
-    const [hcText, setHcText] = useState('');
-    const [hcSaving, setHcSaving] = useState(false);
 
     // dnd-kit sensors — require 8px move before drag activates (avoids accidental drags on click)
     const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -353,27 +346,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             toast.error(`Error al extraer diapositivas: ${res.error || 'error desconocido'}`);
         }
         setExtractingSlidesId(null);
-    }
-
-    async function handleSaveHC() {
-        const text = hcText.trim();
-        if (!text) return;
-        setHcSaving(true);
-        const today = new Date().toISOString().split('T')[0];
-        const res = await createHistoriaClinicaEntry({
-            paciente_id: patientId,
-            fecha: today,
-            profesional: '',
-            historia_texto: text,
-        });
-        setHcSaving(false);
-        if (res.error) {
-            toast.error(`No se pudo guardar: ${res.error}`);
-        } else {
-            toast.success('Nota clínica guardada');
-            setHcText('');
-            setHcOpen(false);
-        }
     }
 
     const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
@@ -586,58 +558,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                             <RefreshCw size={14} />
                             Refrescar
                         </button>
-                        <button
-                            onClick={() => setHcOpen(true)}
-                            title="Agregar nota a Historia Clínica"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 border border-teal-200 dark:border-teal-800/40 transition-colors"
-                        >
-                            <ClipboardList size={14} />
-                            <span className="hidden sm:inline">HC</span>
-                        </button>
                     </div>
                 </div>
-
-                {/* Historia Clínica quick-entry modal */}
-                <AnimatePresence>
-                    {hcOpen && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            className="rounded-xl border border-teal-500/30 bg-white dark:bg-navy-900 p-4 shadow-lg"
-                        >
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-teal-600 dark:text-teal-400">
-                                    <ClipboardList size={15} />
-                                    Nueva nota clínica
-                                </div>
-                                <button onClick={() => { setHcOpen(false); setHcText(''); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-white/60">
-                                    <X size={16} />
-                                </button>
-                            </div>
-                            <textarea
-                                autoFocus
-                                value={hcText}
-                                onChange={e => setHcText(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSaveHC(); }}
-                                placeholder="Escribí la nota clínica de hoy..."
-                                rows={3}
-                                className="w-full rounded-lg border border-white/10 bg-white/5 dark:bg-navy-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                            />
-                            <div className="flex items-center justify-between mt-2">
-                                <span className="text-xs text-gray-400 dark:text-white/30">⌘+Enter para guardar</span>
-                                <button
-                                    onClick={handleSaveHC}
-                                    disabled={hcSaving || !hcText.trim()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-teal-500 hover:bg-teal-600 text-white disabled:opacity-40 transition-colors"
-                                >
-                                    {hcSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                                    Guardar
-                                </button>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
 
                 {files.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-center bg-white/5 dark:bg-navy-950/10 rounded-xl border border-dashed border-white/5">

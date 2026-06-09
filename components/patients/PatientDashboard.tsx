@@ -472,179 +472,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                         />
                     </PatientSection>
 
-                    {/* 2. Datos Personales — solo roles con acceso a contacto */}
-                    {!hideContactData && <PatientSection id="datos" title="Datos Personales" icon={User} defaultOpen>
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-semibold">Datos Personales</h2>
-                            {!isEditingIdentity ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditingIdentity(true)}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
-                                >
-                                    <Edit2 size={16} />
-                                    Editar
-                                </button>
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => void handleSaveIdentity()}
-                                        disabled={savingIdentity}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-60"
-                                    >
-                                        <Save size={14} />
-                                        {savingIdentity ? 'Guardando...' : 'Guardar'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsEditingIdentity(false);
-                                            setEditNombre(patient.nombre || '');
-                                            setEditApellido(patient.apellido || '');
-                                            setEditDocumento(patient.documento || '');
-                                        }}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200"
-                                    >
-                                        Cancelar
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {isEditingIdentity ? (
-                                <>
-                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                        <p className="text-xs text-gray-500 mb-1">Nombre</p>
-                                        <input
-                                            type="text"
-                                            value={editNombre}
-                                            onChange={e => setEditNombre(e.target.value)}
-                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                        <p className="text-xs text-gray-500 mb-1">Apellido</p>
-                                        <input
-                                            type="text"
-                                            value={editApellido}
-                                            onChange={e => setEditApellido(e.target.value)}
-                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                        <p className="text-xs text-gray-500 mb-1">Documento (DNI)</p>
-                                        <input
-                                            type="text"
-                                            value={editDocumento}
-                                            onChange={e => setEditDocumento(e.target.value)}
-                                            placeholder="Sin documento"
-                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <InfoCard
-                                        icon={<User size={18} />}
-                                        label="Nombre Completo"
-                                        value={`${patient.nombre} ${patient.apellido}`}
-                                    />
-                                    <InfoCard
-                                        icon={<FileIcon size={18} />}
-                                        label="Documento"
-                                        value={patient.documento || 'No registrado'}
-                                    />
-                                </>
-                            )}
-                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <div className="flex items-start gap-3">
-                                    <div className="text-gray-400"><CreditCard size={18} /></div>
-                                    <div className="flex-1">
-                                        <p className="text-xs text-gray-500">CUIT/CUIL</p>
-                                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                                            <input
-                                                type="text"
-                                                value={editableCuit}
-                                                onChange={(e) => setEditableCuit(e.target.value)}
-                                                placeholder="Ingresar CUIT/CUIL"
-                                                className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => void handleSaveCuit()}
-                                                disabled={savingCuit}
-                                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-                                            >
-                                                <Save size={14} />
-                                                {savingCuit ? 'Guardando...' : 'Guardar'}
-                                            </button>
-                                        </div>
-                                        <p className="mt-2 text-xs text-gray-500">Dato usado para validar si la paciente puede financiarse.</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <InfoCard
-                                icon={<Calendar size={18} />}
-                                label="Fecha de Nacimiento"
-                                value={patient.fecha_nacimiento ? formatDateForLocale(patient.fecha_nacimiento) : 'No registrada'}
-                            />
-                            <InfoCard
-                                icon={<Calendar size={18} />}
-                                label="Edad"
-                                value={age ? `${age} años` : 'No calculable'}
-                            />
-                            <InfoCard
-                                icon={<Phone size={18} />}
-                                label="WhatsApp"
-                                value={whatsappNumber || 'No registrado'}
-                            />
-                            <InfoCard
-                                icon={<Mail size={18} />}
-                                label="Email"
-                                value={patient.email || 'No registrado'}
-                            />
-                            <InfoCard
-                                icon={<MapPin size={18} />}
-                                label="Ciudad"
-                                value={patient.ciudad || 'No registrada'}
-                            />
-                            <InfoCard
-                                icon={<MapPin size={18} />}
-                                label="Zona/Barrio"
-                                value={patient.zona_barrio || 'No registrado'}
-                            />
-                        </div>
-
-                        {patient.observaciones_generales && (
-                            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <label className="text-xs text-gray-500 uppercase tracking-wider">Observaciones</label>
-                                <p className="mt-1 text-gray-900 dark:text-gray-100">{patient.observaciones_generales}</p>
-                            </div>
-                        )}
-
-                        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                                <span className="text-gray-500">Fecha Alta:</span>
-                                <p className="font-medium">{patient.fecha_alta ? new Date(patient.fecha_alta).toLocaleDateString('es-AR') : '-'}</p>
-                            </div>
-                            <div>
-                                <span className="text-gray-500">Origen:</span>
-                                <p className="font-medium">{patient.origen_registro || '-'}</p>
-                            </div>
-                            <div>
-                                <span className="text-gray-500">Consentimiento:</span>
-                                <p className="font-medium">{patient.consentimiento_comunicacion ? '✓ Sí' : '✗ No'}</p>
-                            </div>
-                            <div>
-                                <span className="text-gray-500">ID:</span>
-                                <p className="font-mono text-xs">{patient.id_paciente.slice(0, 8)}...</p>
-                            </div>
-                        </div>
-                    </PatientSection>}
-
-                    {/* 3. Historia Clínica + Prestaciones + Materiales — expanded by default */}
+                    {/* 2. Historia Clínica + Prestaciones + Materiales — moved up for quick access */}
                     <PatientSection id="historia" title="Historia Clínica" icon={FileText} defaultOpen>
                         <div className="border-b border-gray-100 dark:border-gray-800 flex justify-between items-center pb-4 mb-4">
                             <h2 className="text-lg font-semibold">Historia Clínica</h2>
@@ -827,6 +655,179 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             ) : null}
                         </div>
                     </PatientSection>
+
+                    {/* 3. Datos Personales — solo roles con acceso a contacto */}
+                    {!hideContactData && <PatientSection id="datos" title="Datos Personales" icon={User} defaultOpen>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-lg font-semibold">Datos Personales</h2>
+                            {!isEditingIdentity ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditingIdentity(true)}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    <Edit2 size={16} />
+                                    Editar
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleSaveIdentity()}
+                                        disabled={savingIdentity}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-60"
+                                    >
+                                        <Save size={14} />
+                                        {savingIdentity ? 'Guardando...' : 'Guardar'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsEditingIdentity(false);
+                                            setEditNombre(patient.nombre || '');
+                                            setEditApellido(patient.apellido || '');
+                                            setEditDocumento(patient.documento || '');
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {isEditingIdentity ? (
+                                <>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Nombre</p>
+                                        <input
+                                            type="text"
+                                            value={editNombre}
+                                            onChange={e => setEditNombre(e.target.value)}
+                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Apellido</p>
+                                        <input
+                                            type="text"
+                                            value={editApellido}
+                                            onChange={e => setEditApellido(e.target.value)}
+                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Documento (DNI)</p>
+                                        <input
+                                            type="text"
+                                            value={editDocumento}
+                                            onChange={e => setEditDocumento(e.target.value)}
+                                            placeholder="Sin documento"
+                                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <InfoCard
+                                        icon={<User size={18} />}
+                                        label="Nombre Completo"
+                                        value={`${patient.nombre} ${patient.apellido}`}
+                                    />
+                                    <InfoCard
+                                        icon={<FileIcon size={18} />}
+                                        label="Documento"
+                                        value={patient.documento || 'No registrado'}
+                                    />
+                                </>
+                            )}
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                    <div className="text-gray-400"><CreditCard size={18} /></div>
+                                    <div className="flex-1">
+                                        <p className="text-xs text-gray-500">CUIT/CUIL</p>
+                                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                                            <input
+                                                type="text"
+                                                value={editableCuit}
+                                                onChange={(e) => setEditableCuit(e.target.value)}
+                                                placeholder="Ingresar CUIT/CUIL"
+                                                className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-900 dark:text-white"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleSaveCuit()}
+                                                disabled={savingCuit}
+                                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                            >
+                                                <Save size={14} />
+                                                {savingCuit ? 'Guardando...' : 'Guardar'}
+                                            </button>
+                                        </div>
+                                        <p className="mt-2 text-xs text-gray-500">Dato usado para validar si la paciente puede financiarse.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <InfoCard
+                                icon={<Calendar size={18} />}
+                                label="Fecha de Nacimiento"
+                                value={patient.fecha_nacimiento ? formatDateForLocale(patient.fecha_nacimiento) : 'No registrada'}
+                            />
+                            <InfoCard
+                                icon={<Calendar size={18} />}
+                                label="Edad"
+                                value={age ? `${age} años` : 'No calculable'}
+                            />
+                            <InfoCard
+                                icon={<Phone size={18} />}
+                                label="WhatsApp"
+                                value={whatsappNumber || 'No registrado'}
+                            />
+                            <InfoCard
+                                icon={<Mail size={18} />}
+                                label="Email"
+                                value={patient.email || 'No registrado'}
+                            />
+                            <InfoCard
+                                icon={<MapPin size={18} />}
+                                label="Ciudad"
+                                value={patient.ciudad || 'No registrada'}
+                            />
+                            <InfoCard
+                                icon={<MapPin size={18} />}
+                                label="Zona/Barrio"
+                                value={patient.zona_barrio || 'No registrado'}
+                            />
+                        </div>
+
+                        {patient.observaciones_generales && (
+                            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <label className="text-xs text-gray-500 uppercase tracking-wider">Observaciones</label>
+                                <p className="mt-1 text-gray-900 dark:text-gray-100">{patient.observaciones_generales}</p>
+                            </div>
+                        )}
+
+                        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <span className="text-gray-500">Fecha Alta:</span>
+                                <p className="font-medium">{patient.fecha_alta ? new Date(patient.fecha_alta).toLocaleDateString('es-AR') : '-'}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">Origen:</span>
+                                <p className="font-medium">{patient.origen_registro || '-'}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">Consentimiento:</span>
+                                <p className="font-medium">{patient.consentimiento_comunicacion ? '✓ Sí' : '✗ No'}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">ID:</span>
+                                <p className="font-mono text-xs">{patient.id_paciente.slice(0, 8)}...</p>
+                            </div>
+                        </div>
+                    </PatientSection>}
+
 
                     {/* 4. Finanzas — collapsed, hidden for odontologo/recaptacion */}
                     {!hidePaymentTabs && (
