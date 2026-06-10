@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { Paciente, softDeletePaciente, updatePaciente } from '@/lib/patients';
 import { buildFreeTextHistoriaEntry } from '@/lib/clinical-history';
 
@@ -127,18 +128,8 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             .order('fecha_alta', { ascending: false });
 
         if (filters.onlyWithPhotos) {
-            const { data: photoFiles } = await supabase
-                .from('patient_files')
-                .select('patient_id')
-                .eq('file_type', 'photo_before');
-            const idsWithPhotos = Array.from(
-                new Set((photoFiles || []).map((f) => String(f.patient_id)).filter(Boolean))
-            );
-            if (idsWithPhotos.length > 0) {
-                query = query.or(`foto_perfil_url.gt.,id_paciente.in.(${idsWithPhotos.join(',')})`);
-            } else {
-                query = query.gt('foto_perfil_url', '');
-            }
+            // Real patients have at least one of: clinical history link, Google Slides link, or profile photo.
+            query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
         }
 
         if (searchTokens.length) {
@@ -226,7 +217,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
                 .eq('is_deleted', false);
 
             if (filters.onlyWithPhotos) {
-                dataQuery = dataQuery.or('foto_perfil_url.gt.');
+                dataQuery = dataQuery.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
             }
             dataQuery = dataQuery.or(buildSearchOrClause(searchTokens));
 
@@ -249,7 +240,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
             .eq('is_deleted', false);
 
         if (filters.onlyWithPhotos) {
-            query = query.or('foto_perfil_url.gt.');
+            query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
         }
 
         if (searchTokens.length) {
@@ -526,7 +517,9 @@ export async function createHistoriaClinicaEntry(entry: {
             text: entry.historia_texto ?? entry.observaciones_clinicas ?? entry.tratamiento_realizado ?? '',
         });
 
-        const { data, error } = await supabase
+        // Use admin client to bypass RLS — auth is already verified above
+        const admin = createAdminClient();
+        const { data, error } = await admin
             .from('historia_clinica')
             .insert({
                 paciente_id: entry.paciente_id,

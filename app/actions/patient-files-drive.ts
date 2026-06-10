@@ -514,8 +514,9 @@ export async function getPatientAllFilesAction(
 
 export async function extractSlidesAsImagesAction(
     presentationId: string,
-    targetFolderIdOrUrl: string
-): Promise<{ success: boolean; extractedCount: number; error?: string }> {
+    targetFolderIdOrUrl: string,
+    options?: { patientId?: string; profesional?: string }
+): Promise<{ success: boolean; extractedCount: number; textSaved?: boolean; error?: string }> {
     try {
         const supabaseServer = await createServerClient();
         const { data: { user } } = await supabaseServer.auth.getUser();
@@ -525,7 +526,21 @@ export async function extractSlidesAsImagesAction(
         if (!targetFolderId) return { success: false, extractedCount: 0, error: 'Carpeta de destino no válida' };
 
         const result = await extractSlidesAsImages(presentationId, targetFolderId);
-        return result;
+
+        // If text was extracted and a patientId was provided, save to historia clínica
+        let textSaved = false;
+        if (result.success && result.textContent && options?.patientId) {
+            const { createHistoriaClinicaEntry } = await import('@/app/actions/patients');
+            const hcResult = await createHistoriaClinicaEntry({
+                paciente_id: options.patientId,
+                fecha: new Date().toISOString().split('T')[0],
+                profesional: options.profesional || 'Importación automática',
+                historia_texto: result.textContent,
+            });
+            textSaved = !hcResult.error;
+        }
+
+        return { ...result, textSaved };
     } catch (error) {
         console.error('[extractSlidesAsImagesAction] Error:', error);
         return {

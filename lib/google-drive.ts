@@ -1269,13 +1269,50 @@ export async function getDriveFileContent(
 }
 
 /**
+ * Extracts plain text from a single slide's page elements (shapes + tables).
+ */
+function extractTextFromSlide(pageElements: unknown[]): string {
+    const lines: string[] = [];
+    for (const el of pageElements as Record<string, unknown>[]) {
+        // Text shapes
+        const shape = el.shape as Record<string, unknown> | undefined;
+        const textElements = (shape?.text as Record<string, unknown> | undefined)?.textElements as Record<string, unknown>[] | undefined;
+        if (textElements) {
+            const text = textElements
+                .map((te) => (te.textRun as Record<string, unknown> | undefined)?.content as string || '')
+                .join('')
+                .replace(/\n$/, '')
+                .trim();
+            if (text) lines.push(text);
+        }
+        // Tables
+        const table = el.table as Record<string, unknown> | undefined;
+        if (table) {
+            for (const row of (table.tableRows as Record<string, unknown>[] | undefined) || []) {
+                for (const cell of (row.tableCells as Record<string, unknown>[] | undefined) || []) {
+                    const cellTextEls = ((cell.text as Record<string, unknown> | undefined)?.textElements as Record<string, unknown>[] | undefined) || [];
+                    const cellText = cellTextEls
+                        .map((te) => (te.textRun as Record<string, unknown> | undefined)?.content as string || '')
+                        .join('')
+                        .replace(/\n$/, '')
+                        .trim();
+                    if (cellText) lines.push(cellText);
+                }
+            }
+        }
+    }
+    return lines.join('\n');
+}
+
+/**
  * Extracts all slides from a Google Slide presentation as PNG images
  * and uploads them to the specified target folder.
+ * Also returns the text content found across all slides.
  */
 export async function extractSlidesAsImages(
     presentationId: string,
     targetFolderId: string
-): Promise<{ success: boolean; extractedCount: number; error?: string }> {
+): Promise<{ success: boolean; extractedCount: number; textContent?: string; error?: string }> {
     try {
         const auth = getAuth();
         const slides = google.slides({ version: 'v1', auth });
@@ -1290,11 +1327,16 @@ export async function extractSlidesAsImages(
         }
 
         let extractedCount = 0;
+        const slideTexts: string[] = [];
 
-        // 2. Fetch thumbnail for each page and save it
+        // 2. Fetch thumbnail for each page and save it; also collect text
         for (let i = 0; i < pages.length; i++) {
             const page = pages[i];
             const pageObjectId = page.objectId!;
+
+            // Extract text from this slide
+            const slideText = extractTextFromSlide(page.pageElements as unknown[] || []);
+            if (slideText) slideTexts.push(slideText);
 
             try {
                 // Get thumbnail URL
@@ -1319,7 +1361,7 @@ export async function extractSlidesAsImages(
                 }
 
                 const buffer = Buffer.from(await imgRes.arrayBuffer());
-                
+
                 // Format naming
                 const slideNum = String(i + 1).padStart(2, '0');
                 const fileName = `Diapositiva ${slideNum} - ${title}.png`;
@@ -1334,7 +1376,11 @@ export async function extractSlidesAsImages(
             }
         }
 
-        return { success: true, extractedCount };
+        const textContent = slideTexts.length > 0
+            ? `[Importado de: ${title}]\n\n${slideTexts.join('\n\n---\n\n')}`
+            : undefined;
+
+        return { success: true, extractedCount, textContent };
     } catch (error) {
         console.error('Error in extractSlidesAsImages:', error);
         return { success: false, extractedCount: 0, error: error instanceof Error ? error.message : String(error) };

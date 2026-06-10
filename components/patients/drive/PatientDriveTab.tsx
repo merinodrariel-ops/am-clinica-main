@@ -188,7 +188,7 @@ interface PatientDriveTabProps {
 }
 
 export default function PatientDriveTab({ patientId, patientName, motherFolderUrl }: PatientDriveTabProps) {
-    const { categoria: role } = useAuth();
+    const { categoria: role, profile } = useAuth();
     const canUpload = UPLOAD_ROLES.has(role || '');
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
@@ -334,13 +334,15 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     async function handleExtractSlides(fileId: string) {
         if (extractingSlidesId) return;
         setExtractingSlidesId(fileId);
-        
+
         toast.info('Extrayendo diapositivas como imágenes PNG. Esto puede demorar unos segundos...');
         const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
-        const res = await extractSlidesAsImagesAction(fileId, motherFolderId);
-        
+        const profesional = profile?.full_name || role || 'Importación automática';
+        const res = await extractSlidesAsImagesAction(fileId, motherFolderId, { patientId, profesional });
+
         if (res.success) {
-            toast.success(`Se extrajeron ${res.extractedCount} diapositivas correctamente.`);
+            const textMsg = res.textSaved ? ' El texto se guardó en la historia clínica.' : '';
+            toast.success(`Se extrajeron ${res.extractedCount} diapositivas correctamente.${textMsg}`);
             void fetchFolders(currentFolderUrl!);
         } else {
             toast.error(`Error al extraer diapositivas: ${res.error || 'error desconocido'}`);
@@ -618,17 +620,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                     ) : (
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                                             {group.files.map(file => (
-                                                <div key={file.id} className="relative group">
-                                                    {key === 'presentacion' && canUpload && (
-                                                        <button
-                                                            onClick={() => handleExtractSlides(file.id)}
-                                                            disabled={extractingSlidesId === file.id}
-                                                            className="absolute top-1.5 left-1.5 z-10 px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold shadow transition-opacity opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                                                            title="Extraer diapositivas como fotos"
-                                                        >
-                                                            {extractingSlidesId === file.id ? 'Extrayendo...' : 'Extraer fotos'}
-                                                        </button>
-                                                    )}
+                                                <div key={file.id} className="flex flex-col gap-1.5">
                                                     <DriveFileCard
                                                         file={file}
                                                         onPreview={f => openPreview(f, motherFolderId)}
@@ -640,6 +632,16 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         photoTag={photoTags[file.id]}
                                                         onSmileDesign={f => openSmileDesign(f, motherFolderId)}
                                                     />
+                                                    {key === 'presentacion' && canUpload && (
+                                                        <button
+                                                            onClick={() => handleExtractSlides(file.id)}
+                                                            disabled={extractingSlidesId === file.id}
+                                                            className="w-full py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-400 hover:text-blue-300 text-[11px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                                            title="Extraer diapositivas como fotos e importar texto a historia clínica"
+                                                        >
+                                                            {extractingSlidesId === file.id ? 'Extrayendo...' : 'Extraer fotos'}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
