@@ -8,13 +8,13 @@ import {
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
-    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles
+    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Folder, Eraser
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
-import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction } from '@/app/actions/patient-files-drive';
+import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
@@ -905,6 +905,10 @@ export default function PhotoStudioModal({
 
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
+    const [magicWandActive, setMagicWandActive] = useState(false);
+    const [magicWandTolerance, setMagicWandTolerance] = useState(15);
+    const [exportFileName, setExportFileName] = useState('');
+    const [exportDestination, setExportDestination] = useState<'patient' | 'social'>('patient');
     const [healMode, setHealMode] = useState(false);
     const [healSize, setHealSize] = useState(28);
     const [healPreviewNonce, setHealPreviewNonce] = useState(0);
@@ -1261,7 +1265,7 @@ export default function PhotoStudioModal({
     }, [canvasLayerCropRotation, canvasLayerCropId]);
 
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-    const [saving, setSaving] = useState<'replace' | 'copy' | null>(null);
+    const [saving, setSaving] = useState<'replace' | 'copy' | 'redes' | null>(null);
 
     const [editedFileIds, setEditedFileIds] = useState<Set<string>>(() => {
         if (typeof window === 'undefined') return new Set();
@@ -1457,6 +1461,8 @@ export default function PhotoStudioModal({
         setPanY(0);
         setShowGrid(false);
         setBrushMode(null);
+        setMagicWandActive(false);
+        setMagicWandTolerance(15);
         setHealMode(false);
         hideHealCursor();
         offscreenCanvasRef.current = null;
@@ -1954,6 +1960,144 @@ export default function PhotoStudioModal({
         originalImgForRestoreRef.current = origImg;
     }
 
+    async function startManualEraser(initialMode: 'restore' | 'erase' | 'magic') {
+        if (!bgDone) {
+            const toastId = toast.loading('Inicializando editor de fondo...');
+            try {
+                preBgUrlRef.current = imageUrl; // save for undo/restore
+                
+                // Wait for the image to load into offscreen canvas
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = () => reject(new Error('No se pudo cargar la imagen para editar'));
+                    img.src = imageUrl;
+                });
+                
+                const oc = document.createElement('canvas');
+                oc.width = img.naturalWidth;
+                oc.height = img.naturalHeight;
+                oc.getContext('2d')!.drawImage(img, 0, 0);
+                offscreenCanvasRef.current = oc;
+                
+                const origImg = new Image();
+                origImg.crossOrigin = 'anonymous';
+                await new Promise((resolve) => {
+                    origImg.onload = resolve;
+                    origImg.onerror = resolve; // fallback
+                    origImg.src = imageUrl;
+                });
+                originalImgForRestoreRef.current = origImg;
+                
+                pushHistory();
+                setBgDone(true);
+                setBgColor('transparent');
+                toast.success('Editor manual inicializado', { id: toastId });
+            } catch (err) {
+                toast.error('Error al inicializar editor manual', { id: toastId });
+                return;
+            }
+        }
+        
+        if (initialMode === 'magic') {
+            setMagicWandActive(true);
+            setBrushMode(null);
+        } else {
+            setMagicWandActive(false);
+            setBrushMode(initialMode);
+        }
+        setHealMode(false);
+        setDrawMode('idle');
+        setMousePos(null);
+    }
+
+    function scanlineFloodFillErase(ctx: CanvasRenderingContext2D, startX: number, startY: number, tolerancePercent: number) {
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+        
+        const tolerance = (tolerancePercent / 100) * 441.67;
+        const startIdx = (startY * width + startX) * 4;
+        const targetR = data[startIdx];
+        const targetG = data[startIdx + 1];
+        const targetB = data[startIdx + 2];
+        const targetA = data[startIdx + 3];
+        
+        if (targetA === 0) return;
+        
+        const visited = new Uint8Array(width * height);
+        
+        function match(x: number, y: number): boolean {
+            const idx = (y * width + x) * 4;
+            if (data[idx + 3] === 0) return false;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const dist = Math.sqrt((r - targetR) ** 2 + (g - targetG) ** 2 + (b - targetB) ** 2);
+            return dist <= tolerance;
+        }
+        
+        const queueX: number[] = [startX];
+        const queueY: number[] = [startY];
+        
+        while (queueX.length > 0) {
+            const cx = queueX.pop()!;
+            const cy = queueY.pop()!;
+            
+            let lx = cx;
+            while (lx > 0 && match(lx - 1, cy) && !visited[cy * width + (lx - 1)]) {
+                lx--;
+            }
+            
+            let rx = cx;
+            while (rx < width - 1 && match(rx + 1, cy) && !visited[cy * width + (rx + 1)]) {
+                rx++;
+            }
+            
+            for (let x = lx; x <= rx; x++) {
+                const idx = cy * width + x;
+                visited[idx] = 1;
+                const pIdx = idx * 4;
+                data[pIdx + 3] = 0;
+            }
+            
+            let scanUp = false;
+            let scanDown = false;
+            for (let x = lx; x <= rx; x++) {
+                if (cy > 0) {
+                    const isMatch = match(x, cy - 1);
+                    const isVisited = visited[(cy - 1) * width + x];
+                    if (isMatch && !isVisited) {
+                        if (!scanUp) {
+                            queueX.push(x);
+                            queueY.push(cy - 1);
+                            scanUp = true;
+                        }
+                    } else {
+                        scanUp = false;
+                    }
+                }
+                if (cy < height - 1) {
+                    const isMatch = match(x, cy + 1);
+                    const isVisited = visited[(cy + 1) * width + x];
+                    if (isMatch && !isVisited) {
+                        if (!scanDown) {
+                            queueX.push(x);
+                            queueY.push(cy + 1);
+                            scanDown = true;
+                        }
+                    } else {
+                        scanDown = false;
+                    }
+                }
+            }
+        }
+        
+        ctx.putImageData(imgData, 0, 0);
+    }
+
     async function createEditableCanvasFromSource(src: string) {
         const img = await loadCanvasImage(src);
         const canvas = document.createElement('canvas');
@@ -2161,6 +2305,7 @@ export default function PhotoStudioModal({
         const prev = preBgUrlRef.current;
         if (!prev) return;
         setBrushMode(null);
+        setMagicWandActive(false);
         offscreenCanvasRef.current = null;
         // Revoke the bg-removed object URL
         if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -2173,7 +2318,7 @@ export default function PhotoStudioModal({
     }
 
     useEffect(() => {
-        if (!brushMode && !healMode) return;
+        if (!brushMode && !healMode && !magicWandActive) return;
         if (canvasActive) return;
         const oc = offscreenCanvasRef.current;
         const vc = brushCanvasRef.current;
@@ -2185,7 +2330,7 @@ export default function PhotoStudioModal({
             vc.getContext('2d')!.drawImage(oc, 0, 0);
         };
         sync();
-    }, [brushMode, healMode, canvasActive]);
+    }, [brushMode, healMode, magicWandActive, canvasActive]);
 
     useEffect(() => {
         if (!healMode || canvasActive) return;
@@ -3169,6 +3314,33 @@ export default function PhotoStudioModal({
             setImageUrl(newUrl);
             if (healMode) setHealMode(false);
         }, 'image/png');
+    }
+
+    function handleMagicWandClick(e: React.PointerEvent<HTMLCanvasElement>) {
+        const oc = offscreenCanvasRef.current;
+        if (!oc || oc.width === 0) return;
+        const { x, y } = getCanvasXY(e);
+        pushHistory();
+        
+        const octx = oc.getContext('2d')!;
+        scanlineFloodFillErase(octx, Math.round(x), Math.round(y), magicWandTolerance);
+        
+        // Redraw on the visible canvas
+        const vctx = e.currentTarget.getContext('2d')!;
+        vctx.clearRect(0, 0, e.currentTarget.width, e.currentTarget.height);
+        vctx.drawImage(oc, 0, 0);
+        
+        // Commit changes to imageUrl
+        oc.toBlob(blob => {
+            if (!blob) return;
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+            const newUrl = URL.createObjectURL(blob);
+            objectUrlRef.current = newUrl;
+            setImageUrl(newUrl);
+            preCropImageRef.current = null;
+        }, 'image/png');
+        
+        toast.success('Fondo removido en la zona seleccionada');
     }
 
     // ── Draw tool helpers ─────────────────────────────────────────────────────
@@ -4283,12 +4455,23 @@ export default function PhotoStudioModal({
             const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
             const isPng = blob.type === 'image/png';
             const ext = isPng ? 'png' : 'jpg';
-            const baseName = activeFile.name.replace(/\.[^.]+$/, '');
+            
+            const customBase = exportFileName.trim() || activeFile.name.replace(/\.[^.]+$/, '');
+            const filename = `${customBase}.${ext}`;
 
-            if (mode === 'replace') {
+            if (exportDestination === 'social') {
+                const formData = new FormData();
+                formData.append('file', blob, filename);
+                const result = await uploadPhotoForSocialAction(folderId, filename, formData);
+                if (result.error) {
+                    toast.error(`Error al guardar en Redes: ${result.error}`);
+                    return;
+                }
+                toast.success('Guardado en la carpeta "Redes" para Redes Sociales');
+            } else if (mode === 'replace') {
                 // Update existing file content in-place (preserves file ID, no duplicate)
                 const formData = new FormData();
-                formData.append('file', blob, `${baseName}.${ext}`);
+                formData.append('file', blob, filename);
                 const result = await replaceEditedPhotoAction(activeFile.id, formData);
                 if (result.error) {
                     toast.error(`Error al reemplazar: ${result.error}`);
@@ -4306,13 +4489,11 @@ export default function PhotoStudioModal({
                 setHistory([]);
             } else {
                 // Save as a new copy
-                const cleanPatientName = patientName.replace(/\s+/g, '_');
-                const copyName = `${cleanPatientName}_${baseName}_editada.${ext}`;
                 const formData = new FormData();
-                formData.append('file', blob, copyName);
-                const result = await uploadEditedPhotoAction(folderId, copyName, formData);
+                formData.append('file', blob, filename);
+                const result = await uploadEditedPhotoAction(folderId, filename, formData);
                 if (result.error) {
-                    toast.error(`Error al guardar: ${result.error}`);
+                    toast.error(`Error al guardar copia: ${result.error}`);
                     return;
                 }
                 // Store the new file ID so the sync effect places it at the end of the filmstrip
@@ -4326,7 +4507,7 @@ export default function PhotoStudioModal({
             setSaveDialogOpen(false);
 
             // For copies, wait a moment for Drive consistency before refreshing the list
-            if (mode === 'copy') {
+            if (exportDestination === 'social' || mode === 'copy') {
                 const toastId = toast.loading('Sincronizando con Google Drive...');
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 toast.dismiss(toastId);
@@ -4499,6 +4680,10 @@ export default function PhotoStudioModal({
                                         toast.error('Confirmá o cancelá el recorte antes de guardar');
                                         return;
                                     }
+                                    const baseName = activeFile?.name.replace(/\.[^.]+$/, '') ?? 'foto';
+                                    const cleanPatientName = patientName.replace(/\s+/g, '_');
+                                    setExportFileName(`${cleanPatientName}_${baseName}_editada`);
+                                    setExportDestination(bgDone || canvasActive ? 'social' : 'patient');
                                     setSaveDialogOpen(true);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#b8924e] transition-colors"
@@ -4802,15 +4987,15 @@ export default function PhotoStudioModal({
                             transformOrigin: 'center',
                             transition: isDragging || cropActive ? 'none' : 'transform 0.05s ease-out',
                         }}>
-                            {!canvasActive && (brushMode !== null || healMode) ? (
+                            {!canvasActive && (brushMode !== null || healMode || magicWandActive) ? (
                                 <canvas
                                     ref={brushCanvasRef}
                                     className={canvasBg}
                                     style={{ ...imageStyle, cursor: 'crosshair' }}
-                                    onPointerDown={handleBrushDown}
-                                    onPointerMove={handleBrushMove}
-                                    onPointerUp={handleBrushUp}
-                                    onPointerLeave={(e) => { handleBrushUp(e); hideHealCursor(); }}
+                                    onPointerDown={magicWandActive ? handleMagicWandClick : handleBrushDown}
+                                    onPointerMove={magicWandActive ? undefined : handleBrushMove}
+                                    onPointerUp={magicWandActive ? undefined : handleBrushUp}
+                                    onPointerLeave={magicWandActive ? undefined : (e) => { handleBrushUp(e); hideHealCursor(); }}
                                 />
                             ) : cropActive ? (
                                 <div className={canvasBg} style={{ display: 'inline-block', lineHeight: 0 }}>
@@ -5450,10 +5635,24 @@ export default function PhotoStudioModal({
                                     setHealMode(false);
                                     setDrawMode('idle');
                                     setMousePos(null);
+                                    setMagicWandActive(false);
                                 }
                             }}
                             brushSize={brushSize}
                             onSetBrushSize={setBrushSize}
+                            magicWandActive={magicWandActive}
+                            onSetMagicWandActive={(active) => {
+                                setMagicWandActive(active);
+                                if (active) {
+                                    setBrushMode(null);
+                                    setHealMode(false);
+                                    setDrawMode('idle');
+                                    setMousePos(null);
+                                }
+                            }}
+                            magicWandTolerance={magicWandTolerance}
+                            onSetMagicWandTolerance={setMagicWandTolerance}
+                            onStartManualEraser={startManualEraser}
                             healMode={healMode}
                             onSetHealMode={(next) => {
                                 if (next) {
@@ -5727,67 +5926,128 @@ export default function PhotoStudioModal({
                                 animate={{ y: 0, opacity: 1 }}
                                 exit={{ y: 40, opacity: 0 }}
                                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                                className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm"
+                                className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl"
                             >
-                                {canvasActive ? (
-                                    // Canvas mode: always a new file, no "replace original" option
-                                    <>
-                                        <h3 className="text-white font-semibold mb-1">Guardar lienzo</h3>
-                                        <p className="text-white/50 text-sm mb-5">
-                                            Se guardará como una nueva foto en la carpeta del paciente.
-                                        </p>
-                                        <div className="flex flex-col gap-3">
-                                            <button
-                                                onClick={() => handleSaveToDrive('copy')}
-                                                disabled={!!saving}
-                                                className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                            >
-                                                {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                                Guardar lienzo
-                                            </button>
-                                            <button
-                                                onClick={() => setSaveDialogOpen(false)}
-                                                disabled={!!saving}
-                                                className="w-full py-2 rounded-xl text-white/50 text-sm hover:text-white/70 transition-colors"
-                                            >
-                                                Cancelar
-                                            </button>
+                                <h3 className="text-white font-semibold text-lg mb-2">Guardar cambios</h3>
+                                
+                                {/* 1. Filename field */}
+                                <div className="space-y-1.5 mb-5">
+                                    <label className="text-xs text-white/50 font-bold uppercase tracking-wider">
+                                        Nombre del archivo (SEO / Metadatos)
+                                    </label>
+                                    <div className="relative flex items-center bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 focus-within:border-[#C9A96E]/50 focus-within:ring-1 focus-within:ring-[#C9A96E]/30 transition-all">
+                                        <PenLine size={16} className="text-white/40 mr-2" />
+                                        <input
+                                            type="text"
+                                            value={exportFileName}
+                                            onChange={(e) => setExportFileName(e.target.value.replace(/[^a-zA-Z0-9_\-]/g, '_'))}
+                                            className="bg-transparent border-none outline-none text-white text-sm w-full font-medium"
+                                            placeholder="Nombre del archivo"
+                                            disabled={!!saving}
+                                        />
+                                        <span className="text-xs text-white/35 font-mono ml-2 select-none">
+                                            {bgDone || canvasActive ? '.png' : '.jpg'}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-white/40 leading-relaxed">
+                                        Se recomienda un nombre descriptivo para optimizar el posicionamiento y búsqueda (evitar espacios).
+                                    </p>
+                                </div>
+
+                                {/* 2. Destination Folder Selector */}
+                                <div className="space-y-2 mb-6">
+                                    <label className="text-xs text-white/50 font-bold uppercase tracking-wider block">
+                                        Destino de Guardado
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            disabled={!!saving}
+                                            onClick={() => setExportDestination('patient')}
+                                            className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${
+                                                exportDestination === 'patient'
+                                                    ? 'bg-[#C9A96E]/10 border-[#C9A96E] text-white'
+                                                    : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
+                                            }`}
+                                        >
+                                            <ImageIcon size={18} className={`mb-2 ${exportDestination === 'patient' ? 'text-[#C9A96E]' : 'text-white/40'}`} />
+                                            <span className="text-xs font-bold block mb-0.5">Historial Clínico</span>
+                                            <span className="text-[10px] opacity-65 leading-tight">Carpeta principal del paciente</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            disabled={!!saving}
+                                            onClick={() => setExportDestination('social')}
+                                            className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${
+                                                exportDestination === 'social'
+                                                    ? 'bg-purple-600/10 border-purple-500 text-white'
+                                                    : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
+                                            }`}
+                                        >
+                                            <Sparkles size={18} className={`mb-2 ${exportDestination === 'social' ? 'text-purple-400' : 'text-white/40'}`} />
+                                            <span className="text-xs font-bold block mb-0.5">Carpeta Redes</span>
+                                            <span className="text-[10px] opacity-65 leading-tight font-medium">Subcarpeta "Redes" optimizada</span>
+                                        </button>
+                                    </div>
+                                    {exportDestination === 'social' && (
+                                        <div className="bg-purple-950/20 border border-purple-500/20 rounded-xl p-3 text-[11px] text-purple-300/90 leading-relaxed flex gap-2">
+                                            <Globe2 size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                                            <span>
+                                                Las fotos guardadas en <strong>Redes</strong> se limpian de metadatos (GPS, EXIF, cámara) para proteger la privacidad al ser publicadas.
+                                            </span>
                                         </div>
-                                    </>
-                                ) : (
-                                    // Normal photo edit mode: offer replace or copy
-                                    <>
-                                        <h3 className="text-white font-semibold mb-1">Guardar en Drive</h3>
-                                        <p className="text-white/50 text-sm mb-5">
-                                            ¿Reemplazás la foto original o guardás una copia?
-                                        </p>
-                                        <div className="flex flex-col gap-3">
+                                    )}
+                                </div>
+
+                                {/* 3. Actions */}
+                                <div className="flex flex-col gap-3">
+                                    {exportDestination === 'social' ? (
+                                        <button
+                                            onClick={() => handleSaveToDrive('copy')}
+                                            disabled={!!saving}
+                                            className="w-full py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-600/10 active:scale-[0.98]"
+                                        >
+                                            {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                            Guardar en carpeta 'Redes'
+                                        </button>
+                                    ) : canvasActive ? (
+                                        <button
+                                            onClick={() => handleSaveToDrive('copy')}
+                                            disabled={!!saving}
+                                            className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                                        >
+                                            {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                            Guardar lienzo en Drive
+                                        </button>
+                                    ) : (
+                                        <>
                                             <button
                                                 onClick={() => handleSaveToDrive('replace')}
                                                 disabled={!!saving}
-                                                className="w-full py-3 rounded-xl bg-red-600/80 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                                className="w-full py-3 rounded-xl bg-red-600/25 border border-red-500/30 text-red-300 font-semibold hover:bg-red-600/40 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                                             >
                                                 {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
-                                                Reemplazar original
+                                                Reemplazar foto original
                                             </button>
                                             <button
                                                 onClick={() => handleSaveToDrive('copy')}
                                                 disabled={!!saving}
-                                                className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                                className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                                             >
                                                 {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                                Guardar como copia
+                                                Guardar como nueva copia
                                             </button>
-                                            <button
-                                                onClick={() => setSaveDialogOpen(false)}
-                                                disabled={!!saving}
-                                                className="w-full py-2 rounded-xl text-white/50 text-sm hover:text-white/70 transition-colors"
-                                            >
-                                                Cancelar
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setSaveDialogOpen(false)}
+                                        disabled={!!saving}
+                                        className="w-full py-2 rounded-xl text-white/50 text-sm hover:text-white/70 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
                             </motion.div>
                         </motion.div>
                     )}
@@ -6196,6 +6456,11 @@ interface ToolsPanelProps {
     onSetBrushMode: (mode: 'restore' | 'erase' | null) => void;
     brushSize: number;
     onSetBrushSize: (v: number) => void;
+    magicWandActive: boolean;
+    onSetMagicWandActive: (active: boolean) => void;
+    magicWandTolerance: number;
+    onSetMagicWandTolerance: (v: number) => void;
+    onStartManualEraser: (mode: 'restore' | 'erase' | 'magic') => void;
     healMode: boolean;
     onSetHealMode: (v: boolean) => void;
     healSize: number;
@@ -6259,6 +6524,11 @@ function ToolsPanel({
     onSetBrushMode,
     brushSize,
     onSetBrushSize,
+    magicWandActive,
+    onSetMagicWandActive,
+    magicWandTolerance,
+    onSetMagicWandTolerance,
+    onStartManualEraser,
     healMode,
     onSetHealMode,
     healSize,
@@ -6510,101 +6780,136 @@ function ToolsPanel({
             {/* Background removal */}
             <div className="space-y-2">
                 <p className="flex items-center gap-2 text-white/75 text-sm font-semibold">
-                    <Wand2 size={18} className="text-violet-400" /> Fondo
+                    <Wand2 size={18} className="text-violet-400" /> Fondo y Recortes
                 </p>
                 {bgProcessing ? (
                     <>
-                        <div className="flex items-center gap-2 text-violet-300 text-sm">
-                            <Loader2 size={18} className="animate-spin" /> Removiendo fondo...
+                        <div className="flex items-center gap-2 text-violet-300 text-sm bg-violet-950/20 border border-violet-500/20 p-3 rounded-xl">
+                            <Loader2 size={18} className="animate-spin text-purple-400" /> Removiendo fondo por IA...
                         </div>
                         <button
                             onClick={onCancelBg}
                             className="w-full py-2 rounded-lg bg-white/10 text-white/60 text-sm hover:text-white/80 transition-colors"
                         >
-                            Cancelar
+                            Cancelar IA
                         </button>
                     </>
                 ) : (
-                    <button
-                        onClick={onRemoveBg}
-                        disabled={canvasActive ? !canvasSelectedId : bgDone}
-                        className="w-full py-3 rounded-xl bg-violet-600/30 text-violet-200 text-base font-semibold hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {canvasActive
-                            ? <><Wand2 size={20} /> Remover fondo de capa</>
-                            : bgDone
-                                ? <><Check size={20} /> Fondo removido</>
-                                : <><Wand2 size={20} /> Remover fondo</>
-                        }
-                    </button>
-                )}
-
-                {/* Move/scale subject (Canva-style) */}
-                {bgDone && !bgProcessing && (
-                    <button
-                        onClick={onMoveSubject}
-                        className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
-                    >
-                        <ArrowLeftRight size={18} /> Mover / escalar sujeto
-                    </button>
-                )}
-
-                {/* Undo bg removal */}
-                {bgDone && !bgProcessing && (
-                    <button
-                        onClick={onUndoBg}
-                        className="w-full py-2 rounded-lg text-white/50 text-sm hover:text-white/80 transition-colors"
-                    >
-                        Deshacer remoción de fondo
-                    </button>
-                )}
-
-                {/* Brush editing controls */}
-                {bgDone && !bgProcessing && (
-                    <div className="space-y-2 pt-1 border-t border-white/10">
-                        <p className="text-white/50 text-sm">Corrección de máscara:</p>
-                        {brushMode === null ? (
+                    <div className="space-y-3 bg-white/5 p-4 rounded-xl border border-white/5">
+                        {/* IA BG removal button - only if not done */}
+                        {!bgDone && (
                             <button
-                                onClick={() => onSetBrushMode('restore')}
-                                className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
+                                onClick={onRemoveBg}
+                                disabled={canvasActive && !canvasSelectedId}
+                                className="w-full py-3 rounded-xl bg-violet-600/30 text-violet-200 text-sm font-semibold hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                Editar máscara
+                                <Wand2 size={18} /> Remover fondo por IA
                             </button>
-                        ) : (
-                            <>
+                        )}
+
+                        {/* Manual Clipping Tools Selector */}
+                        <div className="space-y-2">
+                            <p className="text-xs text-white/45 uppercase tracking-wider font-semibold">Recorte Manual</p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => onStartManualEraser(brushMode === 'restore' ? 'erase' : 'restore')}
+                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                        brushMode !== null
+                                            ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-md'
+                                            : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
+                                    }`}
+                                >
+                                    <Eraser size={14} /> Pincel
+                                </button>
+                                <button
+                                    onClick={() => onStartManualEraser('magic')}
+                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                        magicWandActive
+                                            ? 'bg-purple-600/20 border-purple-500 text-purple-200 shadow-md'
+                                            : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
+                                    }`}
+                                >
+                                    <Sparkles size={14} /> Varita Mágica
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Brush controls when active */}
+                        {brushMode !== null && (
+                            <div className="space-y-2 pt-2 border-t border-white/5">
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => onSetBrushMode('restore')}
-                                        className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${brushMode === 'restore' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'}`}
+                                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                            brushMode === 'restore' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'
+                                        }`}
                                     >
                                         Restaurar
                                     </button>
                                     <button
                                         onClick={() => onSetBrushMode('erase')}
-                                        className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${brushMode === 'erase' ? 'bg-red-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'}`}
+                                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                            brushMode === 'erase' ? 'bg-red-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'
+                                        }`}
                                     >
                                         Borrar más
                                     </button>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-white/50 text-sm w-16">Tamaño</span>
+                                <div className="flex items-center gap-2 pt-1">
+                                    <span className="text-white/50 text-xs w-16">Tamaño</span>
                                     <input
                                         type="range" min={5} max={120} step={5}
                                         value={brushSize}
                                         onChange={e => onSetBrushSize(Number(e.target.value))}
                                         className="flex-1 accent-white/70"
                                     />
-                                    <span className="text-white/50 text-sm w-8">{brushSize}</span>
+                                    <span className="text-white/50 text-xs w-8 text-right">{brushSize}</span>
                                 </div>
-                                <button
-                                    onClick={() => onSetBrushMode(null)}
-                                    className="w-full py-2 rounded-lg bg-[#C9A96E]/20 text-[#C9A96E] text-sm font-semibold hover:bg-[#C9A96E]/30 transition-colors"
-                                >
-                                    Terminar edición
-                                </button>
-                            </>
+                            </div>
+                        )}
+
+                        {/* Magic Wand controls when active */}
+                        {magicWandActive && (
+                            <div className="space-y-2 pt-2 border-t border-white/5">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-white/50 text-xs w-16">Tolerancia</span>
+                                    <input
+                                        type="range" min={1} max={100} step={1}
+                                        value={magicWandTolerance}
+                                        onChange={e => onSetMagicWandTolerance(Number(e.target.value))}
+                                        className="flex-1 accent-purple-500"
+                                    />
+                                    <span className="text-purple-300 text-xs w-8 text-right">{magicWandTolerance}%</span>
+                                </div>
+                                <p className="text-[10px] text-purple-200/50 leading-normal">
+                                    Hacé clic en un color de la imagen (ej: los bordes negros de fotos intraorales) para borrar esa área contigua. Ajustá la tolerancia si borra de más o de menos.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Close manual tools when either is active */}
+                        {(brushMode !== null || magicWandActive) && (
+                            <button
+                                onClick={() => {
+                                    onSetBrushMode(null);
+                                    onSetMagicWandActive(false);
+                                }}
+                                className="w-full py-2 mt-1 rounded-lg bg-white/10 text-white/80 text-xs font-semibold hover:bg-white/15 transition-colors"
+                            >
+                                Terminar edición manual
+                            </button>
                         )}
                     </div>
+                )}
+
+                {/* Move/scale subject (Canva-style) */}
+                {bgDone && !bgProcessing && (
+                    <button
+                        onClick={onMoveSubject}
+                        className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-sm font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <ArrowLeftRight size={16} /> Mover / escalar sujeto
+                    </button>
                 )}
 
                 {/* Background color selector — only visible after bg removed */}

@@ -45,6 +45,7 @@ export interface DriveFile {
     createdTime: string;
     thumbnailLink?: string;
     size?: string;
+    parentName?: string;
 }
 
 export interface FolderWithFiles {
@@ -84,6 +85,7 @@ function getFolderDisplayName(folderName: string): string {
  */
 async function listFilesRecursive(
     folderId: string,
+    folderName?: string,
     depth: number = 0,
     maxDepth: number = 3
 ): Promise<DriveFile[]> {
@@ -93,20 +95,23 @@ async function listFilesRecursive(
     if (result.error || !result.files) return [];
 
     const files: DriveFile[] = [];
-    const subfolders: { id: string }[] = [];
+    const subfolders: { id: string; name: string }[] = [];
 
     for (const item of result.files) {
         if (item.mimeType === FOLDER_MIME) {
-            subfolders.push({ id: item.id });
+            subfolders.push({ id: item.id, name: item.name });
         } else {
-            files.push(item as DriveFile);
+            files.push({
+                ...item,
+                parentName: folderName,
+            } as DriveFile);
         }
     }
 
     // Recurse into subfolders
     if (subfolders.length > 0 && depth < maxDepth) {
         const nestedResults = await Promise.all(
-            subfolders.map(sf => listFilesRecursive(sf.id, depth + 1, maxDepth))
+            subfolders.map(sf => listFilesRecursive(sf.id, sf.name, depth + 1, maxDepth))
         );
         for (const nested of nestedResults) {
             files.push(...nested);
@@ -174,7 +179,7 @@ export async function loadFolderFiles(
     folderId: string
 ): Promise<{ files: DriveFile[]; error?: string }> {
     try {
-        const files = await listFilesRecursive(folderId, 0, 3);
+        const files = await listFilesRecursive(folderId, undefined, 0, 3);
         return { files };
     } catch (error) {
         return {
@@ -324,6 +329,58 @@ export async function uploadEditedPhotoAction(
 
         if (!result.success) return { error: result.error };
         return { fileId: result.fileId, webViewLink: result.webViewLink };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Upload an edited photo to the patient's "Redes" subfolder (created on demand).
+ * Curated exports ready for social media: re-encoded by the photo studio so
+ * they carry no EXIF/GPS metadata.
+ */
+export async function uploadPhotoForSocialAction(
+    patientFolderId: string,
+    fileName: string,
+    formData: FormData
+): Promise<{ fileId?: string; error?: string }> {
+    try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { error: 'No autenticado' };
+
+        const { data: profile } = await supabaseServer
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .single();
+        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
+            return { error: 'Sin permisos para guardar archivos en Drive' };
+        }
+
+        if (!patientFolderId || !DRIVE_ID_RE.test(patientFolderId)) return { error: 'Carpeta inválida' };
+
+        const file = formData.get('file') as File | null;
+        if (!file) return { error: 'No file in FormData' };
+
+        const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!ALLOWED_MIME.includes(file.type)) return { error: 'Tipo de archivo no permitido' };
+        if (file.size > 20 * 1024 * 1024) return { error: 'El archivo supera el límite de 20 MB' };
+
+        const drive = getDriveClient();
+        const { folderId: redesFolderId, error: folderError } = await createDriveFolder(
+            drive,
+            patientFolderId,
+            'Redes'
+        );
+        if (!redesFolderId) return { error: folderError ?? 'No se pudo crear la carpeta Redes' };
+
+        const safeName = fileName.replace(/[/\\]/g, '_');
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const result = await uploadFileToFolder(redesFolderId, safeName, buffer, file.type || 'image/jpeg');
+
+        if (!result.success) return { error: result.error };
+        return { fileId: result.fileId };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
     }
@@ -502,7 +559,7 @@ export async function getPatientAllFilesAction(
         const motherFolderId = extractFolderIdFromUrl(motherFolderIdOrUrl) || motherFolderIdOrUrl;
         if (!motherFolderId) return { files: [], error: 'ID de carpeta inválido' };
 
-        const files = await listFilesRecursive(motherFolderId, 0, 3);
+        const files = await listFilesRecursive(motherFolderId, undefined, 0, 3);
         return { files };
     } catch (error) {
         return {

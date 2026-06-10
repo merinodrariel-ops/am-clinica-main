@@ -15,6 +15,7 @@ import {
     Presentation,
     FileText,
     FileCode,
+    Sparkles,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -117,7 +118,10 @@ function extractFolderIdFromUrl(url: string | null | undefined): string | null {
     return null;
 }
 
-function classifyFile(file: DriveFile): 'foto' | 'video' | '3d' | 'presentacion' | 'documentacion' | 'otros' {
+function classifyFile(file: DriveFile): 'redes' | 'foto' | 'video' | '3d' | 'presentacion' | 'documentacion' | 'otros' {
+    if (file.parentName === 'Redes') {
+        return 'redes';
+    }
     const name = (file.name || '').toLowerCase();
     const mime = (file.mimeType || '').toLowerCase();
 
@@ -497,6 +501,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
     // Classify files
     const classifiedGroups = {
+        redes: { title: 'Selección para Redes Sociales', icon: <Sparkles size={16} className="text-purple-400" />, files: [] as DriveFile[] },
         foto: { title: 'Fotos', icon: <FileImage size={16} className="text-emerald-500" />, files: [] as DriveFile[] },
         video: { title: 'Videos', icon: <Video size={16} className="text-amber-500" />, files: [] as DriveFile[] },
         '3d': { title: 'Escaneos y Diseños 3D', icon: <Layers size={16} className="text-indigo-500" />, files: [] as DriveFile[] },
@@ -702,7 +707,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     patientId={patientId}
                     patientName={patientName}
                     canSave={canUpload}
-                    allFolderFiles={files.filter(f => classifyFile(f) === 'foto')}
+                    allFolderFiles={files.filter(f => ['foto', 'redes'].includes(classifyFile(f)))}
                     autoStartSmile={previewAutoSmile}
                     onClose={() => { setPreviewFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
                     onSaved={() => {
