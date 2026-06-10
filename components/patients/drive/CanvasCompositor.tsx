@@ -297,7 +297,7 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
         // From thumbnail strip
         const fileId = e.dataTransfer.getData('driveFileId');
         if (fileId) {
-            const src = `/api/drive/file/${fileId}`;
+            const src = `/api/drive/file/${fileId}?cors=1`;
             try {
                 const img = await loadImage(src);
                 setLayers(prev => [...prev, makeLayer(img, src, fileId, dropX, dropY)]);
@@ -487,7 +487,7 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
 
     // ── Add photo via click (mobile) ──────────────────────────────────────────
     async function addPhotoFromFile(f: DriveFile) {
-        const src = `/api/drive/file/${f.id}`;
+        const src = `/api/drive/file/${f.id}?cors=1`;
         try {
             const img = await loadImage(src);
             setLayers(prev => [...prev, makeLayer(img, src, f.id, 0.5, 0.5)]);

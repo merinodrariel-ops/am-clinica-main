@@ -501,13 +501,13 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
     // Classify files
     const classifiedGroups = {
-        redes: { title: 'Selección para Redes Sociales', icon: <Sparkles size={16} className="text-purple-400" />, files: [] as DriveFile[] },
         foto: { title: 'Fotos', icon: <FileImage size={16} className="text-emerald-500" />, files: [] as DriveFile[] },
         video: { title: 'Videos', icon: <Video size={16} className="text-amber-500" />, files: [] as DriveFile[] },
         '3d': { title: 'Escaneos y Diseños 3D', icon: <Layers size={16} className="text-indigo-500" />, files: [] as DriveFile[] },
         presentacion: { title: 'Presentaciones', icon: <Presentation size={16} className="text-blue-500" />, files: [] as DriveFile[] },
         documentacion: { title: 'Presupuestos y Documentación', icon: <FileText size={16} className="text-rose-500" />, files: [] as DriveFile[] },
-        otros: { title: 'Otros Archivos', icon: <FileCode size={16} className="text-slate-400" />, files: [] as DriveFile[] }
+        otros: { title: 'Otros Archivos', icon: <FileCode size={16} className="text-slate-400" />, files: [] as DriveFile[] },
+        redes: { title: 'Selección para Redes Sociales', icon: <Sparkles size={16} className="text-purple-400" />, files: [] as DriveFile[] }
     };
 
     for (const file of files) {

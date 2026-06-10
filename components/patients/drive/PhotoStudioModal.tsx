@@ -888,7 +888,7 @@ export default function PhotoStudioModal({
 
     // Active file in the studio (may differ from initial file when user clicks thumbnails)
     const [activeFile, setActiveFile] = useState<DriveFile | null>(file);
-    const [imageUrl, setImageUrl] = useState(() => file ? `/api/drive/file/${file.id}` : '');
+    const [imageUrl, setImageUrl] = useState(() => file ? `/api/drive/file/${file.id}?cors=1` : '');
     const [imgLoaded, setImgLoaded] = useState(false);
 
     // Reset loading flag whenever we switch to a Drive-proxied URL (not local blobs/base64)
@@ -914,9 +914,9 @@ export default function PhotoStudioModal({
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
     const [magicWandActive, setMagicWandActive] = useState(false);
-    const [magicWandTolerance, setMagicWandTolerance] = useState(15);
+    const [magicWandTolerance, setMagicWandTolerance] = useState(8);
     const [exportFileName, setExportFileName] = useState('');
-    const [exportDestination, setExportDestination] = useState<'patient' | 'social'>('patient');
+    const [exportDestination, setExportDestination] = useState<'patient' | 'social'>('social');
     const [healMode, setHealMode] = useState(false);
     const [healSize, setHealSize] = useState(28);
     const [healPreviewNonce, setHealPreviewNonce] = useState(0);
@@ -1502,7 +1502,7 @@ export default function PhotoStudioModal({
     useEffect(() => {
         if (file && file.id !== activeFile?.id) {
             setActiveFile(file);
-            setImageUrl(`/api/drive/file/${file.id}`);
+            setImageUrl(`/api/drive/file/${file.id}?cors=1`);
             resetEdits();
         }
     }, [file?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1735,7 +1735,7 @@ export default function PhotoStudioModal({
             setTextAnnotations(saved.textAnnotations);
         }
         setActiveFile(newFile);
-        setImageUrl(`/api/drive/file/${newFile.id}`);
+        setImageUrl(`/api/drive/file/${newFile.id}?cors=1`);
     }
 
     function clearMultiSelection() {
@@ -2230,10 +2230,11 @@ export default function PhotoStudioModal({
     function updateHealCursor(clientX: number, clientY: number) {
         const rect = canvasContainerRef.current?.getBoundingClientRect();
         if (!rect) return;
+        const size = brushMode !== null ? brushSize * 2 : healSize * 2;
         setHealCursor({
             x: clientX - rect.left,
             y: clientY - rect.top,
-            size: healSize * 2,
+            size: size,
             visible: true,
         });
     }
@@ -3015,8 +3016,8 @@ export default function PhotoStudioModal({
         const fileId = e.dataTransfer.getData('driveFileId');
         if (fileId) {
             try {
-                const img = await loadCanvasImage(`/api/drive/file/${fileId}`);
-                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, `/api/drive/file/${fileId}`, fileId, dropX, dropY)]);
+                const img = await loadCanvasImage(`/api/drive/file/${fileId}?cors=1`);
+                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, `/api/drive/file/${fileId}?cors=1`, fileId, dropX, dropY)]);
             } catch { toast.error('No se pudo cargar la foto'); }
             return;
         }
@@ -3321,11 +3322,17 @@ export default function PhotoStudioModal({
         if (!oc || oc.width === 0) return;
         const octx = oc.getContext('2d')!;
         const scaleX = oc.width / canvasEl.getBoundingClientRect().width;
-        const brushPx = brushSize * scaleX;
+        const brushPx = Math.max(1, brushSize * scaleX);
 
         if (brushMode === 'erase') {
             octx.save();
+            const grad = octx.createRadialGradient(x, y, 0, x, y, brushPx);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+            grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.8)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+            
             octx.globalCompositeOperation = 'destination-out';
+            octx.fillStyle = grad;
             octx.beginPath();
             octx.arc(x, y, brushPx, 0, Math.PI * 2);
             octx.fill();
@@ -3333,11 +3340,34 @@ export default function PhotoStudioModal({
         } else {
             const origImg = originalImgForRestoreRef.current;
             if (!origImg?.complete) return;
+            
+            const size = Math.max(1, Math.ceil(brushPx * 2));
+            const left = Math.floor(x - brushPx);
+            const top = Math.floor(y - brushPx);
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            const tempCtx = tempCanvas.getContext('2d')!;
+
+            // Draw the soft brush in local coordinates
+            const grad = tempCtx.createRadialGradient(brushPx, brushPx, 0, brushPx, brushPx, brushPx);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+            grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.8)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+
+            tempCtx.fillStyle = grad;
+            tempCtx.beginPath();
+            tempCtx.arc(brushPx, brushPx, brushPx, 0, Math.PI * 2);
+            tempCtx.fill();
+
+            // Draw original image cropped to the brush bounding box
+            tempCtx.globalCompositeOperation = 'source-in';
+            tempCtx.drawImage(origImg, -left, -top, oc.width, oc.height);
+
+            // Draw the resulting soft patch back onto the offscreen canvas
             octx.save();
-            octx.beginPath();
-            octx.arc(x, y, brushPx, 0, Math.PI * 2);
-            octx.clip();
-            octx.drawImage(origImg, 0, 0, oc.width, oc.height);
+            octx.drawImage(tempCanvas, left, top);
             octx.restore();
         }
 
@@ -4812,7 +4842,7 @@ export default function PhotoStudioModal({
                                     const baseName = activeFile?.name.replace(/\.[^.]+$/, '') ?? 'foto';
                                     const cleanPatientName = patientName.replace(/\s+/g, '_');
                                     setExportFileName(`${cleanPatientName}_${baseName}_editada`);
-                                    setExportDestination(bgDone || canvasActive ? 'social' : 'patient');
+                                    setExportDestination('social');
                                     setSaveDialogOpen(true);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#b8924e] transition-colors"
@@ -5142,7 +5172,7 @@ export default function PhotoStudioModal({
                                             ref={imgRef}
                                             src={imageUrl}
                                             alt={activeFile.name}
-                                            crossOrigin="anonymous"
+                                            crossOrigin={imageUrl.startsWith('blob:') || imageUrl.startsWith('data:') ? undefined : 'anonymous'}
                                             onLoad={(event) => {
                                                 setImgLoaded(true);
                                                 if (activeCropAspect) {
@@ -5231,7 +5261,7 @@ export default function PhotoStudioModal({
                                                                         maxWidth: 'min(100%, calc(100vw - 100px))',
                                                                         maxHeight: 'calc(60vh - 120px)',
                                                                     }}
-                                                                    crossOrigin="anonymous"
+                                                                    crossOrigin={cropSrc.startsWith('blob:') || cropSrc.startsWith('data:') ? undefined : 'anonymous'}
                                                                 />
                                                             </ReactCrop>
                                                         </div>
@@ -5404,6 +5434,22 @@ export default function PhotoStudioModal({
                         {healMode && healCursor.visible && (
                             <div
                                 className="pointer-events-none absolute rounded-full border border-cyan-300/90 bg-cyan-200/10 shadow-[0_0_0_1px_rgba(0,0,0,0.45)] z-20"
+                                style={{
+                                    width: `${healCursor.size}px`,
+                                    height: `${healCursor.size}px`,
+                                    left: `${healCursor.x - healCursor.size / 2}px`,
+                                    top: `${healCursor.y - healCursor.size / 2}px`,
+                                }}
+                            />
+                        )}
+
+                        {brushMode !== null && healCursor.visible && (
+                            <div
+                                className={`pointer-events-none absolute rounded-full border shadow-[0_0_0_1px_rgba(0,0,0,0.45)] z-20 ${
+                                    brushMode === 'erase'
+                                        ? 'border-red-500 bg-red-500/15'
+                                        : 'border-emerald-500 bg-emerald-500/15'
+                                }`}
                                 style={{
                                     width: `${healCursor.size}px`,
                                     height: `${healCursor.size}px`,
@@ -5807,7 +5853,7 @@ export default function PhotoStudioModal({
                             onSetHealSize={setHealSize}
                             onReset={() => {
                                 resetEdits();
-                                setImageUrl(`/api/drive/file/${activeFile.id}`);
+                                setImageUrl(`/api/drive/file/${activeFile.id}?cors=1`);
                             }}
                             onUndo={handleUndo}
                             onPushHistory={pushHistory}
@@ -6083,92 +6129,24 @@ export default function PhotoStudioModal({
                                     </p>
                                 </div>
 
-                                {/* 2. Destination Folder Selector */}
-                                <div className="space-y-2 mb-6">
-                                    <label className="text-xs text-white/50 font-bold uppercase tracking-wider block">
-                                        Destino de Guardado
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            type="button"
-                                            disabled={!!saving}
-                                            onClick={() => setExportDestination('patient')}
-                                            className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${
-                                                exportDestination === 'patient'
-                                                    ? 'bg-[#C9A96E]/10 border-[#C9A96E] text-white'
-                                                    : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
-                                            }`}
-                                        >
-                                            <ImageIcon size={18} className={`mb-2 ${exportDestination === 'patient' ? 'text-[#C9A96E]' : 'text-white/40'}`} />
-                                            <span className="text-xs font-bold block mb-0.5">Historial Clínico</span>
-                                            <span className="text-[10px] opacity-65 leading-tight">Carpeta principal del paciente</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            disabled={!!saving}
-                                            onClick={() => setExportDestination('social')}
-                                            className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${
-                                                exportDestination === 'social'
-                                                    ? 'bg-purple-600/10 border-purple-500 text-white'
-                                                    : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
-                                            }`}
-                                        >
-                                            <Sparkles size={18} className={`mb-2 ${exportDestination === 'social' ? 'text-purple-400' : 'text-white/40'}`} />
-                                            <span className="text-xs font-bold block mb-0.5">Carpeta Redes</span>
-                                            <span className="text-[10px] opacity-65 leading-tight font-medium">Subcarpeta "Redes" optimizada</span>
-                                        </button>
-                                    </div>
-                                    {exportDestination === 'social' && (
-                                        <div className="bg-purple-950/20 border border-purple-500/20 rounded-xl p-3 text-[11px] text-purple-300/90 leading-relaxed flex gap-2">
-                                            <Globe2 size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
-                                            <span>
-                                                Las fotos guardadas en <strong>Redes</strong> se limpian de metadatos (GPS, EXIF, cámara) para proteger la privacidad al ser publicadas.
-                                            </span>
-                                        </div>
-                                    )}
+                                {/* Informative metadata cleanup warning */}
+                                <div className="bg-purple-950/20 border border-purple-500/20 rounded-xl p-3.5 text-[11px] text-purple-300/95 leading-relaxed flex gap-2.5 mb-6">
+                                    <Globe2 size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                                    <span>
+                                        Las fotos editadas se guardan automáticamente en la subcarpeta <strong>Redes</strong>, optimizadas y sin metadatos (GPS, EXIF, datos de cámara) para proteger la privacidad al publicarse.
+                                    </span>
                                 </div>
 
-                                {/* 3. Actions */}
+                                {/* 2. Actions */}
                                 <div className="flex flex-col gap-3">
-                                    {exportDestination === 'social' ? (
-                                        <button
-                                            onClick={() => handleSaveToDrive('copy')}
-                                            disabled={!!saving}
-                                            className="w-full py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-600/10 active:scale-[0.98]"
-                                        >
-                                            {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                            Guardar en carpeta 'Redes'
-                                        </button>
-                                    ) : canvasActive ? (
-                                        <button
-                                            onClick={() => handleSaveToDrive('copy')}
-                                            disabled={!!saving}
-                                            className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
-                                        >
-                                            {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                            Guardar lienzo en Drive
-                                        </button>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => handleSaveToDrive('replace')}
-                                                disabled={!!saving}
-                                                className="w-full py-3 rounded-xl bg-red-600/25 border border-red-500/30 text-red-300 font-semibold hover:bg-red-600/40 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
-                                            >
-                                                {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
-                                                Reemplazar foto original
-                                            </button>
-                                            <button
-                                                onClick={() => handleSaveToDrive('copy')}
-                                                disabled={!!saving}
-                                                className="w-full py-3 rounded-xl bg-[#C9A96E] text-black font-semibold hover:bg-[#b8924e] transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
-                                            >
-                                                {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                                Guardar como nueva copia
-                                            </button>
-                                        </>
-                                    )}
+                                    <button
+                                        onClick={() => handleSaveToDrive('copy')}
+                                        disabled={!!saving}
+                                        className="w-full py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-600/10 active:scale-[0.98]"
+                                    >
+                                        {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                        Guardar copia optimizada para Redes
+                                    </button>
                                     <button
                                         onClick={() => setSaveDialogOpen(false)}
                                         disabled={!!saving}
@@ -7003,7 +6981,7 @@ function ToolsPanel({
                                 <div className="flex items-center gap-2">
                                     <span className="text-white/50 text-xs w-16">Tolerancia</span>
                                     <input
-                                        type="range" min={1} max={100} step={1}
+                                        type="range" min={1} max={25} step={1}
                                         value={magicWandTolerance}
                                         onChange={e => onSetMagicWandTolerance(Number(e.target.value))}
                                         className="flex-1 accent-purple-500"
