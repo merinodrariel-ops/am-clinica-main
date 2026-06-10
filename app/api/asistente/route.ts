@@ -174,9 +174,8 @@ export async function POST(request: Request) {
     try {
         for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
             const response = await client.messages.create({
-                model: 'claude-opus-4-8',
-                max_tokens: 4096,
-                thinking: { type: 'adaptive' },
+                model: 'claude-haiku-4-5',
+                max_tokens: 1024,
                 system: [
                     { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
                     { type: 'text', text: `Hoy es ${today} (hora de Argentina).` },
