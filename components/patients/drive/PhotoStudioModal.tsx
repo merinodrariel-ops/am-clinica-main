@@ -1161,7 +1161,10 @@ export default function PhotoStudioModal({
                 ctx.rotate(radians);
                 ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                const isPng = shouldExportPhotoAsPng({ fileName: activeFile?.name ?? '', bgDone, bgColor });
+                // While the cutout is active the bg color is only a CSS preview — a JPEG
+                // bake here would flatten the transparency to black and the chosen color
+                // could never be applied at export time. Keep PNG until bg is confirmed.
+                const isPng = bgDone || shouldExportPhotoAsPng({ fileName: activeFile?.name ?? '', bgDone, bgColor });
                 const blob = await new Promise<Blob>((res, rej) =>
                     canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
                 );
@@ -1901,6 +1904,10 @@ export default function PhotoStudioModal({
             setBgDone(true);
             setBgColor('transparent');
             initBrushCanvas(newUrl, preBgUrlRef.current!);
+            // Canva-style: open the subject transform editor right away so the
+            // cutout is immediately draggable/scalable as its own layer.
+            setSubjectTransformOpen(true);
+            toast.success('Fondo eliminado — arrastrá el sujeto para moverlo', { duration: 4000 });
         } catch (err) {
             console.error('[bg-removal]', err);
             if (!cancelBgRef.current) {
@@ -2863,6 +2870,11 @@ export default function PhotoStudioModal({
     async function handleDeleteCanvas(canvasId: string) {
         const { deletePatientCanvasAction } = await import('@/app/actions/patient-canvases');
         await deletePatientCanvasAction(canvasId);
+        // Legacy canvases live in localStorage — clear the key or the photo
+        // resurrects on the next mount via the localStorage fallback.
+        if (canvasId.startsWith('legacy-') && patientId) {
+            localStorage.removeItem(`am-clinica-canvas-${patientId}`);
+        }
         setCanvases(prev => {
             const next = prev.filter(c => c.id !== canvasId);
             if (activeCanvasId === canvasId) {
@@ -3910,7 +3922,8 @@ export default function PhotoStudioModal({
             ctx.rotate(radians);
             ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
-            const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
+            // Keep alpha while the cutout is active (bg color is preview-only until export)
+            const isPng = bgDone || shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
             const blob = await new Promise<Blob>((res, rej) =>
                 canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
             );
@@ -3971,7 +3984,8 @@ export default function PhotoStudioModal({
             cropCanvas.height = srcH;
             cropCanvas.getContext('2d')!.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
 
-            const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
+            // Keep alpha while the cutout is active (bg color is preview-only until export)
+            const isPng = bgDone || shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
             const blob = await new Promise<Blob>((res, rej) =>
                 cropCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
             );
@@ -4704,16 +4718,14 @@ export default function PhotoStudioModal({
                                             </span>
                                         )}
                                     </button>
-                                    {/* Delete button on hover */}
-                                    {canvases.length > 1 && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteCanvas(cv.id); }}
-                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white hidden group-hover:flex items-center justify-center z-10"
-                                            title="Eliminar lienzo"
-                                        >
-                                            <X size={8} />
-                                        </button>
-                                    )}
+                                    {/* Delete button — always visible so it works on touch and with a single canvas */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteCanvas(cv.id); }}
+                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center z-10"
+                                        title="Eliminar lienzo"
+                                    >
+                                        <X size={8} />
+                                    </button>
                                 </div>
                             ))}
 
@@ -5523,6 +5535,7 @@ export default function PhotoStudioModal({
                                 setCanvasSelectedId(null);
                                 if (patientId) localStorage.removeItem(`am-clinica-canvas-${patientId}`);
                             }}
+                            onDeleteActiveCanvas={activeCanvasId ? () => handleDeleteCanvas(activeCanvasId) : undefined}
                             onDeleteSelection={handleDeleteSelection}
                             canvasBgColor={activeCanvas?.bgColor}
                             onSetCanvasBgColor={setActiveCanvasBgColor}
@@ -6221,6 +6234,7 @@ interface ToolsPanelProps {
     onCanvasRatioChange: (r: CanvasRatio) => void;
     canvasLayerCount: number;
     onClearCanvasLayers: () => void;
+    onDeleteActiveCanvas?: () => void;
     onDeleteSelection: () => void;
     canvasBgColor?: string;
     onSetCanvasBgColor?: (color: string) => void;
@@ -6270,6 +6284,7 @@ function ToolsPanel({
     selectedShapeIsGroup, onUngroupShape,
     canvasActive, canvasSelectedId, canvasRatio, onCanvasRatioChange,
     canvasLayerCount, onClearCanvasLayers,
+    onDeleteActiveCanvas,
     onDeleteSelection,
     canvasBgColor, onSetCanvasBgColor,
 }: ToolsPanelProps) {
@@ -6838,9 +6853,17 @@ function ToolsPanel({
                                 onClick={onClearCanvasLayers}
                                 className="text-red-400/60 hover:text-red-400 transition-colors"
                             >
-                                Limpiar
+                                Vaciar lienzo
                             </button>
                         </div>
+                    )}
+                    {onDeleteActiveCanvas && (
+                        <button
+                            onClick={onDeleteActiveCanvas}
+                            className="w-full py-2 rounded-lg border border-red-500/20 text-red-400/70 text-xs font-semibold hover:text-red-400 hover:border-red-500/40 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                            <X size={12} /> Eliminar este lienzo
+                        </button>
                     )}
                     {/* Canvas background color */}
                     {onSetCanvasBgColor && (
