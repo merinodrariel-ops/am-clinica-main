@@ -202,7 +202,7 @@ function parseDateOnlyLocal(date: string | null | undefined): Date | null {
 function getInstallmentNumberForMonth(plan: PlanFinanciacionDashboard, targetDate: Date): number | null {
     const startDate = parseDateOnlyLocal(plan.fecha_inicio);
     if (!startDate) return null;
-    return ((targetDate.getFullYear() - startDate.getFullYear()) * 12) + (targetDate.getMonth() - startDate.getMonth()) + 1;
+    return ((targetDate.getFullYear() - startDate.getFullYear()) * 12) + (targetDate.getMonth() - startDate.getMonth());
 }
 
 function isPlanScheduledForMonth(plan: PlanFinanciacionDashboard, targetDate: Date): boolean {

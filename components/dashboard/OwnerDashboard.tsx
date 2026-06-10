@@ -549,7 +549,7 @@ function parseDateOnlyLocal(date: string | null | undefined): Date | null {
 function getInstallmentNumberForMonth(plan: { fecha_inicio?: string | null }, targetDate: Date): number | null {
     const startDate = parseDateOnlyLocal(plan.fecha_inicio);
     if (!startDate) return null;
-    return ((targetDate.getFullYear() - startDate.getFullYear()) * 12) + (targetDate.getMonth() - startDate.getMonth()) + 1;
+    return ((targetDate.getFullYear() - startDate.getFullYear()) * 12) + (targetDate.getMonth() - startDate.getMonth());
 }
 
 export default function OwnerDashboard() {

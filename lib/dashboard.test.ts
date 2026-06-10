@@ -46,7 +46,7 @@ test('keeps programmed financing as the main monthly asset and separates collect
 
     assert.deepEqual(resumen, {
         programadoUsd: 2400,
-        cobradoUsd: 900,
-        pendienteUsd: 1500,
+        cobradoUsd: 1900,
+        pendienteUsd: 500,
     });
 });
