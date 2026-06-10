@@ -119,7 +119,7 @@ function extractFolderIdFromUrl(url: string | null | undefined): string | null {
 }
 
 function classifyFile(file: DriveFile): 'redes' | 'foto' | 'video' | '3d' | 'presentacion' | 'documentacion' | 'otros' {
-    if (file.parentName === 'Redes') {
+    if (file.parentName === 'Redes' || (file.parentName && (file.parentName.startsWith('[Selección]') || file.parentName.includes('Selección') || file.parentName.includes('Seleccion')))) {
         return 'redes';
     }
     const name = (file.name || '').toLowerCase();
@@ -507,7 +507,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         presentacion: { title: 'Presentaciones', icon: <Presentation size={16} className="text-blue-500" />, files: [] as DriveFile[] },
         documentacion: { title: 'Presupuestos y Documentación', icon: <FileText size={16} className="text-rose-500" />, files: [] as DriveFile[] },
         otros: { title: 'Otros Archivos', icon: <FileCode size={16} className="text-slate-400" />, files: [] as DriveFile[] },
-        redes: { title: 'Selección para Redes Sociales', icon: <Sparkles size={16} className="text-purple-400" />, files: [] as DriveFile[] }
+        redes: { title: 'Selección', icon: <Sparkles size={16} className="text-purple-400" />, files: [] as DriveFile[] }
     };
 
     for (const file of files) {

@@ -2904,8 +2904,12 @@ export default function PhotoStudioModal({
                 }
                 return { ...l, rotation: deg };
             }
-            const dist = Math.sqrt(dx * dx + dy * dy) * (dx + dy >= 0 ? -1 : 1);
-            const newW = Math.max(0.05, origLayer.w + dist * 1.5);
+            const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
+            const distSqStart = Math.pow((startX - origLayer.x) * W, 2) + Math.pow((startY - origLayer.y) * H, 2);
+            const distSqNow = Math.pow((nx - origLayer.x) * W, 2) + Math.pow((ny - origLayer.y) * H, 2);
+            if (distSqStart < 1) return l;
+            const ratio = Math.sqrt(distSqNow / distSqStart);
+            const newW = Math.max(0.05, origLayer.w * ratio);
             return { ...l, w: newW, h: newW / (origLayer.w / (origLayer.h || 1)) };
         }));
     }
@@ -4584,10 +4588,10 @@ export default function PhotoStudioModal({
                 formData.append('file', blob, filename);
                 const result = await uploadPhotoForSocialAction(folderId, filename, formData);
                 if (result.error) {
-                    toast.error(`Error al guardar en Redes: ${result.error}`);
+                    toast.error(`Error al guardar en Selección: ${result.error}`);
                     return;
                 }
-                toast.success('Guardado en la carpeta "Redes" para Redes Sociales');
+                toast.success('Guardado en la carpeta de Selección');
             } else if (mode === 'replace') {
                 // Update existing file content in-place (preserves file ID, no duplicate)
                 const formData = new FormData();
@@ -6133,7 +6137,7 @@ export default function PhotoStudioModal({
                                 <div className="bg-purple-950/20 border border-purple-500/20 rounded-xl p-3.5 text-[11px] text-purple-300/95 leading-relaxed flex gap-2.5 mb-6">
                                     <Globe2 size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
                                     <span>
-                                        Las fotos editadas se guardan automáticamente en la subcarpeta <strong>Redes</strong>, optimizadas y sin metadatos (GPS, EXIF, datos de cámara) para proteger la privacidad al publicarse.
+                                        Las fotos editadas se guardan automáticamente en la subcarpeta <strong>Selección</strong>, optimizadas y sin metadatos (GPS, EXIF, datos de cámara) para proteger la privacidad al publicarse.
                                     </span>
                                 </div>
 
@@ -6145,7 +6149,7 @@ export default function PhotoStudioModal({
                                         className="w-full py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-600/10 active:scale-[0.98]"
                                     >
                                         {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                        Guardar copia optimizada para Redes
+                                        Guardar copia en Selección
                                     </button>
                                     <button
                                         onClick={() => setSaveDialogOpen(false)}

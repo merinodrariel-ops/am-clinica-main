@@ -324,8 +324,34 @@ export async function uploadEditedPhotoAction(
             return { error: 'El archivo supera el límite de 20 MB' };
         }
 
+        const drive = getDriveClient();
+        const parentFolder = await drive.files.get({
+            fileId: folderId,
+            fields: 'name',
+            supportsAllDrives: true,
+        });
+        const parentName = parentFolder.data.name || '';
+        const isSelectionFolder = parentName.startsWith('[Selección]') ||
+                                  parentName.includes('Selección') ||
+                                  parentName.includes('Seleccion') ||
+                                  parentName === 'Redes';
+
+        let targetFolderId = folderId;
+        if (!isSelectionFolder) {
+            const targetFolderName = `[Selección] ${parentName}`;
+            const { folderId: subFolderId, error: folderError } = await createDriveFolder(
+                drive,
+                folderId,
+                targetFolderName
+            );
+            if (!subFolderId) {
+                return { error: folderError ?? 'No se pudo crear la carpeta de selección' };
+            }
+            targetFolderId = subFolderId;
+        }
+
         const buffer = Buffer.from(await file.arrayBuffer());
-        const result = await uploadFileToFolder(folderId, safeName, buffer, file.type || 'image/jpeg');
+        const result = await uploadFileToFolder(targetFolderId, safeName, buffer, file.type || 'image/jpeg');
 
         if (!result.success) return { error: result.error };
         return { fileId: result.fileId, webViewLink: result.webViewLink };
@@ -368,16 +394,34 @@ export async function uploadPhotoForSocialAction(
         if (file.size > 20 * 1024 * 1024) return { error: 'El archivo supera el límite de 20 MB' };
 
         const drive = getDriveClient();
-        const { folderId: redesFolderId, error: folderError } = await createDriveFolder(
-            drive,
-            patientFolderId,
-            'Redes'
-        );
-        if (!redesFolderId) return { error: folderError ?? 'No se pudo crear la carpeta Redes' };
+        const parentFolder = await drive.files.get({
+            fileId: patientFolderId,
+            fields: 'name',
+            supportsAllDrives: true,
+        });
+        const parentName = parentFolder.data.name || '';
+        const isSelectionFolder = parentName.startsWith('[Selección]') ||
+                                  parentName.includes('Selección') ||
+                                  parentName.includes('Seleccion') ||
+                                  parentName === 'Redes';
+
+        let targetFolderId = patientFolderId;
+        if (!isSelectionFolder) {
+            const targetFolderName = `[Selección] ${parentName}`;
+            const { folderId: subFolderId, error: folderError } = await createDriveFolder(
+                drive,
+                patientFolderId,
+                targetFolderName
+            );
+            if (!subFolderId) {
+                return { error: folderError ?? 'No se pudo crear la carpeta de selección' };
+            }
+            targetFolderId = subFolderId;
+        }
 
         const safeName = fileName.replace(/[/\\]/g, '_');
         const buffer = Buffer.from(await file.arrayBuffer());
-        const result = await uploadFileToFolder(redesFolderId, safeName, buffer, file.type || 'image/jpeg');
+        const result = await uploadFileToFolder(targetFolderId, safeName, buffer, file.type || 'image/jpeg');
 
         if (!result.success) return { error: result.error };
         return { fileId: result.fileId };
