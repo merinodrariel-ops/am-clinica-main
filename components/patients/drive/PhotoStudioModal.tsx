@@ -3065,18 +3065,22 @@ export default function PhotoStudioModal({
 
     async function handleNewCanvas() {
         const name = `Lienzo ${canvases.length + 1}`;
-        const { createPatientCanvasAction } = await import('@/app/actions/patient-canvases');
-        const { data, error } = await createPatientCanvasAction({ patientId, name, ratio: '1:1' });
-        if (error || !data) {
+        try {
+            const { createPatientCanvasAction } = await import('@/app/actions/patient-canvases');
+            const { data, error } = await createPatientCanvasAction({ patientId, name, ratio: '1:1' });
+            if (error || !data) {
+                throw new Error(error || 'No data returned');
+            }
+            const newCanvas: CanvasDoc = { id: data.id, name: data.name, ratio: data.ratio as CanvasRatio, layers: [], bgColor: data.bg_color };
+            setCanvases(prev => [...prev, newCanvas]);
+            setActiveCanvasId(data.id);
+        } catch (err) {
+            console.error('[handleNewCanvas] error, falling back to local:', err);
             // Fallback: create locally with temp ID
             const tempId = 'temp-' + Date.now();
             const newCanvas: CanvasDoc = { id: tempId, name, ratio: '1:1', layers: [], bgColor: '#ffffff' };
             setCanvases(prev => [...prev, newCanvas]);
             setActiveCanvasId(tempId);
-        } else {
-            const newCanvas: CanvasDoc = { id: data.id, name: data.name, ratio: data.ratio as CanvasRatio, layers: [], bgColor: data.bg_color };
-            setCanvases(prev => [...prev, newCanvas]);
-            setActiveCanvasId(data.id);
         }
         setCanvasActive(true);
         setHasCanvas(true);
@@ -3089,8 +3093,12 @@ export default function PhotoStudioModal({
     }
 
     async function handleDeleteCanvas(canvasId: string) {
-        const { deletePatientCanvasAction } = await import('@/app/actions/patient-canvases');
-        await deletePatientCanvasAction(canvasId);
+        try {
+            const { deletePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+            await deletePatientCanvasAction(canvasId);
+        } catch (err) {
+            console.error('[handleDeleteCanvas] error deleting from DB:', err);
+        }
         // Legacy canvases live in localStorage — clear the key or the photo
         // resurrects on the next mount via the localStorage fallback.
         if (canvasId.startsWith('legacy-') && patientId) {
@@ -4682,19 +4690,58 @@ export default function PhotoStudioModal({
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {/* Canvas toggle */}
                         {canvasActive ? (
-                            <button
-                                onClick={() => setCanvasActive(false)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E]/20 text-[#C9A96E] text-sm border border-[#C9A96E]/40 hover:bg-[#C9A96E]/30 transition-colors"
-                            >
-                                ✕ Ver fotos
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {/* Canvas selector */}
+                                {canvases.length > 0 && (
+                                    <select
+                                        value={activeCanvasId ?? ''}
+                                        onChange={(e) => {
+                                            handleActivateCanvas(e.target.value);
+                                            clearMultiSelection();
+                                        }}
+                                        className="bg-white/10 text-white text-xs rounded-lg px-2.5 py-1.5 border border-white/10 outline-none font-medium cursor-pointer"
+                                    >
+                                        {canvases.map((cv) => (
+                                            <option key={cv.id} value={cv.id} className="bg-gray-900 text-white">
+                                                {cv.name} ({cv.layers.length} {cv.layers.length === 1 ? 'capa' : 'capas'})
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                                {/* Create new canvas button */}
+                                <button
+                                    onClick={handleNewCanvas}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E]/80 text-black text-xs font-bold hover:bg-[#C9A96E] transition-colors"
+                                    title="Nuevo lienzo"
+                                >
+                                    <Plus size={12} />
+                                    <span>Lienzo</span>
+                                </button>
+                                {/* Exit canvas view */}
+                                <button
+                                    onClick={() => setCanvasActive(false)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white/70 text-xs border border-white/10 hover:bg-white/15 transition-colors"
+                                >
+                                    ✕ Ver fotos
+                                </button>
+                            </div>
                         ) : (
-                            <button
-                                onClick={() => canvases.length > 0 ? handleActivateCanvas() : handleNewCanvas()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white/70 text-sm border border-white/10 hover:bg-white/15 hover:text-white transition-colors"
-                            >
-                                {canvases.length > 0 ? `⊞ Lienzos (${canvases.length})` : '+ Lienzo'}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {canvases.length > 0 && (
+                                    <button
+                                        onClick={() => handleActivateCanvas()}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white/70 text-sm border border-white/10 hover:bg-white/15 hover:text-white transition-colors"
+                                    >
+                                        ⊞ Lienzos ({canvases.length})
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleNewCanvas}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E]/80 text-black text-sm font-semibold hover:bg-[#C9A96E] transition-colors"
+                                >
+                                    + Nuevo Lienzo
+                                </button>
+                            </div>
                         )}
                         {selectedIds.size > 0 && (
                             <button
