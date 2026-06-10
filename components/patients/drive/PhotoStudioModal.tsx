@@ -26,6 +26,7 @@ import { useSmileMotion } from '@/hooks/useSmileMotion';
 import SmileDesignPanel from './SmileDesignPanel';
 import WarpBrush from './WarpBrush';
 import BeforeAfterSlider from './BeforeAfterSlider';
+import SubjectTransformOverlay from './SubjectTransformOverlay';
 import { saveSmileDesignResult, getSmileShareUrl, saveSmileMotionVideos } from '@/app/actions/smile-design';
 
 /**
@@ -892,6 +893,7 @@ export default function PhotoStudioModal({
     const [brightness, setBrightness] = useState(100);
     const [bgProcessing, setBgProcessing] = useState(false);
     const [bgDone, setBgDone] = useState(false);
+    const [subjectTransformOpen, setSubjectTransformOpen] = useState(false);
     const [bgColor, setBgColor] = useState<BgColor>('transparent');
     const [cropActive, setCropActive] = useState(false);
     const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
@@ -1915,6 +1917,17 @@ export default function PhotoStudioModal({
         cancelBgRef.current = true;
         preBgUrlRef.current = null;
         setBgProcessing(false);
+    }
+
+    // Flattened result of moving/scaling the cutout (Canva-style). Keeps the
+    // transparent background so the bg color selector and save flow are untouched.
+    function handleSubjectTransformApply(blob: Blob) {
+        pushHistory();
+        const newUrl = URL.createObjectURL(blob);
+        objectUrlRef.current = newUrl;
+        preCropImageRef.current = null;
+        setImageUrl(newUrl);
+        setSubjectTransformOpen(false);
     }
 
     function initBrushCanvas(bgRemovedUrl: string, origUrl: string) {
@@ -5417,6 +5430,7 @@ export default function PhotoStudioModal({
                             onRemoveBg={handleRemoveBackground}
                             onUndoBg={handleUndoBgRemoval}
                             onCancelBg={handleCancelBgProcessing}
+                            onMoveSubject={() => setSubjectTransformOpen(true)}
                             brushMode={brushMode}
                             onSetBrushMode={(mode) => {
                                 setBrushMode(mode);
@@ -5619,6 +5633,15 @@ export default function PhotoStudioModal({
                         >
                             <Grid size={13} /> Grilla
                         </button>
+                        {/* Mover sujeto — mobile */}
+                        {bgDone && (
+                            <button
+                                onClick={() => setSubjectTransformOpen(true)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/70 transition-colors"
+                            >
+                                <ArrowLeftRight size={13} /> Mover
+                            </button>
+                        )}
                         {/* Cancelar / Confirmar bg removal — mobile */}
                         {bgDone && (
                             <button
@@ -5659,6 +5682,22 @@ export default function PhotoStudioModal({
                         )}
                     </div>
                 </div>
+
+                {/* ── Mover/escalar sujeto (Canva-style) ──────────────────── */}
+                {subjectTransformOpen && (
+                    <SubjectTransformOverlay
+                        cutoutUrl={imageUrl}
+                        bgPreview={
+                            bgColor === 'white'
+                                ? '#fff'
+                                : bgColor === 'black'
+                                    ? '#111'
+                                    : 'repeating-conic-gradient(#bbb 0% 25%, #e5e5e5 0% 50%) 0 / 16px 16px'
+                        }
+                        onApply={handleSubjectTransformApply}
+                        onClose={() => setSubjectTransformOpen(false)}
+                    />
+                )}
 
                 {/* ── Save dialog (bottom sheet) ──────────────────────────── */}
                 <AnimatePresence>
@@ -6139,6 +6178,7 @@ interface ToolsPanelProps {
     onRemoveBg: () => void;
     onUndoBg: () => void;
     onCancelBg: () => void;
+    onMoveSubject: () => void;
     brushMode: 'restore' | 'erase' | null;
     onSetBrushMode: (mode: 'restore' | 'erase' | null) => void;
     brushSize: number;
@@ -6200,6 +6240,7 @@ function ToolsPanel({
     onRemoveBg,
     onUndoBg,
     onCancelBg,
+    onMoveSubject,
     brushMode,
     onSetBrushMode,
     brushSize,
@@ -6480,6 +6521,16 @@ function ToolsPanel({
                                 ? <><Check size={20} /> Fondo removido</>
                                 : <><Wand2 size={20} /> Remover fondo</>
                         }
+                    </button>
+                )}
+
+                {/* Move/scale subject (Canva-style) */}
+                {bgDone && !bgProcessing && (
+                    <button
+                        onClick={onMoveSubject}
+                        className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <ArrowLeftRight size={18} /> Mover / escalar sujeto
                     </button>
                 )}
 
