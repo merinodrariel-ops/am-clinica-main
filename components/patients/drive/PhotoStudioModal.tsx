@@ -903,6 +903,7 @@ export default function PhotoStudioModal({
     const [bgDone, setBgDone] = useState(false);
     const [subjectTransformOpen, setSubjectTransformOpen] = useState(false);
     const [bgColor, setBgColor] = useState<BgColor>('transparent');
+    const [hasTransparentBg, setHasTransparentBg] = useState(false);
     const [cropActive, setCropActive] = useState(false);
     const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
@@ -922,7 +923,7 @@ export default function PhotoStudioModal({
     const [healPreviewNonce, setHealPreviewNonce] = useState(0);
     const [healCursor, setHealCursor] = useState<{ x: number; y: number; size: number; visible: boolean }>({ x: 0, y: 0, size: 28, visible: false });
 
-    type PhotoSnapshot = { kind: 'photo'; imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor };
+    type PhotoSnapshot = { kind: 'photo'; imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor; hasTransparentBg?: boolean };
     type CanvasLayerSnapshot = { kind: 'canvas-layer'; canvasId: string; layerId: string; layerSrc: string };
     type Snapshot = PhotoSnapshot | CanvasLayerSnapshot;
     const [history, setHistory] = useState<Snapshot[]>([]);
@@ -1178,7 +1179,13 @@ export default function PhotoStudioModal({
                 // While the cutout is active the bg color is only a CSS preview — a JPEG
                 // bake here would flatten the transparency to black and the chosen color
                 // could never be applied at export time. Keep PNG until bg is confirmed.
-                const isPng = bgDone || shouldExportPhotoAsPng({ fileName: activeFile?.name ?? '', bgDone, bgColor });
+                const isPng = bgDone || shouldExportPhotoAsPng({
+                    fileName: activeFile?.name ?? '',
+                    mimeType: activeFile?.mimeType,
+                    bgDone,
+                    bgColor,
+                    hasTransparentBg
+                });
                 const blob = await new Promise<Blob>((res, rej) =>
                     canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
                 );
@@ -1465,6 +1472,7 @@ export default function PhotoStudioModal({
         setBgDone(false);
         setBgProcessing(false);
         setBgColor('transparent');
+        setHasTransparentBg(false);
         setCropActive(false);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
         setCompletedCrop(null);
@@ -1855,7 +1863,7 @@ export default function PhotoStudioModal({
     }
 
     function pushHistory(snap?: Snapshot) {
-        const entry: Snapshot = snap ?? { kind: 'photo', imageUrl, rotation, brightness, bgDone, bgColor };
+        const entry: Snapshot = snap ?? { kind: 'photo', imageUrl, rotation, brightness, bgDone, bgColor, hasTransparentBg };
         setHistory(prev => [...prev.slice(-19), entry]);
     }
 
@@ -1889,6 +1897,7 @@ export default function PhotoStudioModal({
         setBrightness(snap.brightness);
         setBgDone(snap.bgDone);
         setBgColor(snap.bgColor);
+        setHasTransparentBg(snap.hasTransparentBg ?? false);
         setCropActive(false);
         setCompletedCrop(null);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
@@ -2340,6 +2349,7 @@ export default function PhotoStudioModal({
             imageUrl: preBgUrlRef.current ?? imageUrl,
             rotation, brightness,
             bgDone: false, bgColor: 'transparent',
+            hasTransparentBg,
         });
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
             const el = new Image();
@@ -2371,6 +2381,7 @@ export default function PhotoStudioModal({
             setImageUrl(newUrl);
             setBgDone(false);
             setBgColor('transparent');
+            setHasTransparentBg(isPng);
             setBrushMode(null);
             offscreenCanvasRef.current = null;
             preBgUrlRef.current = null;
@@ -2392,6 +2403,7 @@ export default function PhotoStudioModal({
         preBgUrlRef.current = null;
         setBgDone(false);
         setBgColor('transparent');
+        setHasTransparentBg(false);
     }
 
     useEffect(() => {
@@ -4090,7 +4102,13 @@ export default function PhotoStudioModal({
         const outH = img.naturalHeight;
         if (outW === 0 || outH === 0) throw new Error('Imagen vacía o sin dimensiones');
 
-        const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
+        const isPng = shouldExportPhotoAsPng({
+            fileName: activeFile!.name,
+            mimeType: activeFile!.mimeType,
+            bgDone,
+            bgColor,
+            hasTransparentBg
+        });
         const mime = isPng ? 'image/png' : 'image/jpeg';
 
         const radians = (rotation * Math.PI) / 180;
@@ -4217,7 +4235,13 @@ export default function PhotoStudioModal({
             ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             // Keep alpha while the cutout is active (bg color is preview-only until export)
-            const isPng = bgDone || shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
+            const isPng = bgDone || shouldExportPhotoAsPng({
+                fileName: activeFile!.name,
+                mimeType: activeFile!.mimeType,
+                bgDone,
+                bgColor,
+                hasTransparentBg
+            });
             const blob = await new Promise<Blob>((res, rej) =>
                 canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
             );
@@ -4281,7 +4305,13 @@ export default function PhotoStudioModal({
             cropCanvas.getContext('2d')!.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
 
             // Keep alpha while the cutout is active (bg color is preview-only until export)
-            const isPng = bgDone || shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
+            const isPng = bgDone || shouldExportPhotoAsPng({
+                fileName: activeFile!.name,
+                mimeType: activeFile!.mimeType,
+                bgDone,
+                bgColor,
+                hasTransparentBg
+            });
             const blob = await new Promise<Blob>((res, rej) =>
                 cropCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
             );
@@ -4334,7 +4364,13 @@ export default function PhotoStudioModal({
 
     function handleDownload() {
         exportToBlob().then(blob => {
-            const isPng = shouldExportPhotoAsPng({ fileName: activeFile!.name, bgDone, bgColor });
+            const isPng = shouldExportPhotoAsPng({
+                fileName: activeFile!.name,
+                mimeType: activeFile!.mimeType,
+                bgDone,
+                bgColor,
+                hasTransparentBg
+            });
             const ext = isPng ? 'png' : 'jpg';
             const baseName = activeFile!.name.replace(/\.[^.]+$/, '');
             const a = document.createElement('a');
@@ -4603,11 +4639,13 @@ export default function PhotoStudioModal({
                 }
                 toast.success('Foto reemplazada en Drive');
                 markAsEdited(activeFile.id);
+                setActiveFile(prev => prev ? { ...prev, mimeType: isPng ? 'image/png' : 'image/jpeg' } : null);
                 // Reset edit state and reload fresh from Drive (cache-busted)
                 setImageUrl(`/api/drive/file/${activeFile.id}?t=${Date.now()}`);
                 setRotation(0);
                 setBrightness(100);
                 setBgDone(false);
+                setHasTransparentBg(false);
                 preCropImageRef.current = null;
                 prevCroppedUrlRef.current = null;
                 setHistory([]);

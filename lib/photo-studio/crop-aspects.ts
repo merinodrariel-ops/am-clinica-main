@@ -50,7 +50,10 @@ export function shouldExportPhotoAsPng(options: {
     fileName: string;
     bgDone: boolean;
     bgColor: ExportBgColor;
+    hasTransparentBg?: boolean;
+    mimeType?: string;
 }) {
     if (options.bgDone) return options.bgColor === 'transparent';
-    return options.fileName.toLowerCase().endsWith('.png');
+    const isOriginalPng = options.fileName.toLowerCase().endsWith('.png') || options.mimeType === 'image/png';
+    return !!options.hasTransparentBg || isOriginalPng;
 }

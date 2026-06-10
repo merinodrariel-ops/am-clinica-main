@@ -26,5 +26,8 @@ describe('photo studio crop aspect helpers', () => {
         assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: true, bgColor: 'transparent' }), true);
         assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: true, bgColor: 'white' }), false);
         assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.png', bgDone: false, bgColor: 'transparent' }), true);
+        assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: false, bgColor: 'transparent', hasTransparentBg: true }), true);
+        assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: false, bgColor: 'transparent', mimeType: 'image/png' }), true);
+        assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: false, bgColor: 'transparent', mimeType: 'image/jpeg' }), false);
     });
 });
