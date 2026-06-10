@@ -17,6 +17,37 @@ export interface AppointmentNotificationContext {
   idempotencyKey?: string;
 }
 
+// Extract short name: "Agustín" → "Agus", "María" → "Mar", "Juan" → "Juan"
+function getShortName(fullName: string): string {
+  if (!fullName) return '';
+  const parts = fullName.split(' ');
+  const firstName = parts[0];
+  if (firstName.length <= 4) return firstName;
+  // Return first 3-4 chars, preferring to end on a vowel
+  for (let i = 4; i >= 3; i--) {
+    const char = firstName[i];
+    if (char && 'aeiouáéíóú'.includes(char.toLowerCase())) {
+      return firstName.slice(0, i + 1);
+    }
+  }
+  return firstName.slice(0, 4);
+}
+
+// Personalize survey question based on appointment type
+function getSurveyQuestion(appointmentType?: string): string {
+  if (!appointmentType) return 'tu visita';
+
+  const typeMap: Record<string, string> = {
+    'control': 'tu control',
+    'limpieza': 'tu limpieza',
+    'tratamiento': 'tu tratamiento',
+    'consulta': 'tu consulta',
+    'urgencia': 'tu urgencia',
+  };
+
+  return typeMap[appointmentType.toLowerCase()] || 'tu visita';
+}
+
 export interface TemplateOutput {
   subject: string;
   html: string;
@@ -155,25 +186,37 @@ export function renderTemplate(
         </div>`,
       };
 
-    case 'survey_post_appointment':
+    case 'survey_post_appointment': {
+      const surveyQuestion = getSurveyQuestion(ctx.appointmentType);
+      const shortName = getShortName(ctx.patientName);
+      const typeLabel = ctx.appointmentType ? ctx.appointmentType.toLowerCase() : 'visita';
+
       return {
-        subject: `¿Cómo fue tu visita? — ${clinic}`,
-        whatsapp: `😊 Hola ${ctx.patientName}!\n\n¿Cómo fue tu turno con *${doctor}*?\n\nNos tomaría solo 30 segundos si dejás tu opinión aquí:\n👉 ${APP_URL}/survey/${ctx.surveyToken}\n\n¡Gracias! ⭐ *${clinic}*`,
+        subject: `Hola ${shortName}, ¿cómo fue ${surveyQuestion} hoy? — ${clinic}`,
+        whatsapp: `Hola ${shortName} 👋\n\n¿Cómo te fue con ${surveyQuestion} hoy con *${doctor}*? Espero que bien.\n\nTu opinión es muy importante para nosotros. Si tenés un minuto, nos gustaría saber cómo estuvo tu experiencia:\n👉 ${APP_URL}/survey/${ctx.surveyToken}\n\n¡Gracias! ⭐ *${clinic}*`,
         html: `<div style="${baseStyle}">${logoBlock}
-          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">¿Cómo fue tu visita?</h2>
+          <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 8px;">Hola ${shortName}, ¿cómo te fue hoy?</h2>
           <p style="color:#6b7280;font-size:15px;margin:0 0 24px;">
-            Hola <strong>${ctx.patientName}</strong>,<br>
-            Nos interesa saber cómo fue tu experiencia en ${clinic}.
+            Esperamos que hayas tenido una buena experiencia en tu ${typeLabel} de hoy.
+            <br><br>
+            <strong>Tu opinión es muy importante para nosotros</strong> — nos ayuda a mejorar cada día y brindar un mejor servicio.
           </p>
-          <a href="${APP_URL}/survey/${ctx.surveyToken}"
-            style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;
-                   padding:14px 28px;border-radius:10px;font-weight:600;font-size:15px;
-                   margin-bottom:24px;">
-            Dejar mi opinión →
-          </a>
+          <div style="background:#f0fdf4;border-radius:12px;padding:20px 24px;margin-bottom:24px;border-left:4px solid #10b981;">
+            <p style="margin:0 0 12px;font-size:14px;color:#111;font-weight:600;">Contanos cómo estuvo tu experiencia</p>
+            <p style="margin:0 0 16px;font-size:14px;color:#6b7280;">Solo toma 30 segundos dejar tu opinión, y es muy valioso para el equipo.</p>
+            <a href="${APP_URL}/survey/${ctx.surveyToken}"
+              style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;
+                     padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;">
+              Dejar mi reseña ⭐
+            </a>
+          </div>
+          <p style="color:#6b7280;font-size:14px;line-height:1.6;">
+            Si tuviste una excelente experiencia, también nos encantaría que lo compartas en <strong>Google</strong> — esto nos ayuda mucho a que otras personas conozcan nuestro trabajo.
+          </p>
           ${footer}
         </div>`,
       };
+    }
 
     case 'birthday_greeting':
       return {

@@ -236,20 +236,24 @@ export async function createAndSendSurvey(
   patientName: string,
   patientPhone: string | null,
   patientEmail: string | null,
-  doctorName: string | null
+  doctorName: string | null,
+  appointmentType?: string
 ) {
   const supabase = createAdminClient();
 
-  // Resolve actual patient_id if not provided
+  // Resolve actual patient_id and appointment type if not provided
   let actualPatientId = patientId;
-  if (!actualPatientId) {
+  let actualAppointmentType = appointmentType;
+
+  if (!actualPatientId || !actualAppointmentType) {
     const { data: appt } = await supabase
       .from('agenda_appointments')
-      .select('patient_id')
+      .select('patient_id, type')
       .eq('id', appointmentId)
       .single();
     if (appt) {
       actualPatientId = appt.patient_id;
+      actualAppointmentType = actualAppointmentType || appt.type;
     }
   }
 
@@ -309,6 +313,7 @@ export async function createAndSendSurvey(
     patientEmail,
     patientPhone,
     doctorName,
+    appointmentType: actualAppointmentType,
     startTime: new Date().toISOString(),
     endTime: new Date().toISOString(),
     surveyToken: survey.token,
