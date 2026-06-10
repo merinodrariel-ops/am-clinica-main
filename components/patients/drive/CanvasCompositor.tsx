@@ -38,7 +38,9 @@ const HANDLE_SIZE = 8;
 export function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (src && !src.startsWith('blob:') && !src.startsWith('data:')) {
+            img.crossOrigin = 'anonymous';
+        }
         img.onload = () => resolve(img);
         img.onerror = reject;
         img.src = src;

@@ -81,8 +81,12 @@ async function generateComparisonBase64(beforeUrl: string, afterDataUrl: string)
         imgBefore.onerror = () => resolve(null);
         imgAfter.onerror = () => resolve(null);
 
-        imgBefore.crossOrigin = "anonymous";
-        imgAfter.crossOrigin = "anonymous";
+        if (beforeUrl && !beforeUrl.startsWith('blob:') && !beforeUrl.startsWith('data:')) {
+            imgBefore.crossOrigin = "anonymous";
+        }
+        if (afterDataUrl && !afterDataUrl.startsWith('blob:') && !afterDataUrl.startsWith('data:')) {
+            imgAfter.crossOrigin = "anonymous";
+        }
         imgBefore.src = beforeUrl;
         imgAfter.src = afterDataUrl;
     });
@@ -159,8 +163,12 @@ async function generateSliceBase64(beforeUrl: string, afterDataUrl: string, pos:
         imgAfter.onload = onBothLoaded;
         imgBefore.onerror = () => resolve(null);
         imgAfter.onerror = () => resolve(null);
-        imgBefore.crossOrigin = 'anonymous';
-        imgAfter.crossOrigin = 'anonymous';
+        if (beforeUrl && !beforeUrl.startsWith('blob:') && !beforeUrl.startsWith('data:')) {
+            imgBefore.crossOrigin = 'anonymous';
+        }
+        if (afterDataUrl && !afterDataUrl.startsWith('blob:') && !afterDataUrl.startsWith('data:')) {
+            imgAfter.crossOrigin = 'anonymous';
+        }
         imgBefore.src = beforeUrl;
         imgAfter.src = afterDataUrl;
     });
@@ -1147,7 +1155,9 @@ export default function PhotoStudioModal({
             try {
                 const img = await new Promise<HTMLImageElement>((res, rej) => {
                     const i = new Image();
-                    i.crossOrigin = 'anonymous';
+                    if (base && !base.startsWith('blob:') && !base.startsWith('data:')) {
+                        i.crossOrigin = 'anonymous';
+                    }
                     i.onload = () => res(i);
                     i.onerror = () => rej(new Error('load failed'));
                     i.src = base;
@@ -1232,7 +1242,10 @@ export default function PhotoStudioModal({
             }
             try {
                 const img = await new Promise<HTMLImageElement>((res, rej) => {
-                    const i = new Image(); i.crossOrigin = 'anonymous';
+                    const i = new Image();
+                    if (base && !base.startsWith('blob:') && !base.startsWith('data:')) {
+                        i.crossOrigin = 'anonymous';
+                    }
                     i.onload = () => res(i); i.onerror = () => rej(new Error('load'));
                     i.src = base;
                 });
@@ -1891,35 +1904,88 @@ export default function PhotoStudioModal({
     async function handleRemoveBackground() {
         cancelBgRef.current = false;
         setBgProcessing(true);
-        preBgUrlRef.current = imageUrl; // save for undo
+        
+        const selectedLayer = canvasActive && canvasSelectedId
+            ? canvasLayers.find(l => l.id === canvasSelectedId)
+            : null;
+        
+        const srcToUse = selectedLayer ? selectedLayer.src : imageUrl;
+        if (!selectedLayer) {
+            preBgUrlRef.current = imageUrl; // save for undo only for main image
+        }
+        
         try {
             const { removeBackground: removeBg } = await import('@imgly/background-removal');
-            const response = await fetch(imageUrl);
+            const response = await fetch(srcToUse);
             const blob = await response.blob();
             const resultBlob = await removeBg(blob);
             if (cancelBgRef.current) {
-                preBgUrlRef.current = null;
+                if (!selectedLayer) preBgUrlRef.current = null;
                 return;
             }
-            pushHistory();
-            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+            
+            if (selectedLayer && activeCanvasId) {
+                pushHistory({
+                    kind: 'canvas-layer',
+                    canvasId: activeCanvasId,
+                    layerId: selectedLayer.id,
+                    layerSrc: selectedLayer.src
+                });
+            } else {
+                pushHistory();
+            }
+            
             const newUrl = URL.createObjectURL(resultBlob);
-            objectUrlRef.current = newUrl;
-            preCropImageRef.current = null; // bg changed — crop reference must be refreshed
-            setImageUrl(newUrl);
-            setBgDone(true);
-            setBgColor('transparent');
-            initBrushCanvas(newUrl, preBgUrlRef.current!);
-            // Canva-style: open the subject transform editor right away so the
-            // cutout is immediately draggable/scalable as its own layer.
-            setSubjectTransformOpen(true);
-            toast.success('Fondo eliminado — arrastrá el sujeto para moverlo', { duration: 4000 });
+            
+            if (selectedLayer) {
+                let baseName = 'recorte';
+                if (selectedLayer.fileId) {
+                    baseName = `recorte_${selectedLayer.fileId}`;
+                }
+                const filename = `${baseName}_${Date.now()}.png`;
+                
+                const formData = new FormData();
+                formData.append('file', new File([resultBlob], filename, { type: 'image/png' }));
+                
+                const saveToastId = toast.loading('Guardando recorte en Drive...');
+                try {
+                    const uploadRes = await uploadEditedPhotoAction(folderId, filename, formData);
+                    if (uploadRes.error || !uploadRes.fileId) {
+                        console.error('[canvas-layer-bg-upload] error:', uploadRes.error);
+                        const img = await loadCanvasImage(newUrl);
+                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img } : l));
+                        toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
+                    } else {
+                        const driveUrl = `/api/drive/file/${uploadRes.fileId}`;
+                        const img = await loadCanvasImage(driveUrl);
+                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: driveUrl, img, fileId: uploadRes.fileId } : l));
+                        toast.success('Fondo de capa eliminado y guardado en Drive', { id: saveToastId });
+                    }
+                } catch (uploadErr) {
+                    console.error('[canvas-layer-bg-upload] exception:', uploadErr);
+                    const img = await loadCanvasImage(newUrl);
+                    setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img } : l));
+                    toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
+                }
+            } else {
+                if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = newUrl;
+                preCropImageRef.current = null; // bg changed — crop reference must be refreshed
+                setImageUrl(newUrl);
+                setBgDone(true);
+                setBgColor('transparent');
+                initBrushCanvas(newUrl, preBgUrlRef.current!);
+                // Canva-style: open the subject transform editor right away so the
+                // cutout is immediately draggable/scalable as its own layer.
+                setSubjectTransformOpen(true);
+                toast.success('Fondo eliminado — arrastrá el sujeto para moverlo', { duration: 4000 });
+            }
         } catch (err) {
             console.error('[bg-removal]', err);
             if (!cancelBgRef.current) {
                 toast.error('Error al remover fondo');
             }
-            preBgUrlRef.current = null;
+            if (!selectedLayer) preBgUrlRef.current = null;
         } finally {
             cancelBgRef.current = false;
             setBgProcessing(false);
@@ -1945,7 +2011,9 @@ export default function PhotoStudioModal({
 
     function initBrushCanvas(bgRemovedUrl: string, origUrl: string) {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (bgRemovedUrl && !bgRemovedUrl.startsWith('blob:') && !bgRemovedUrl.startsWith('data:')) {
+            img.crossOrigin = 'anonymous';
+        }
         img.onload = () => {
             const oc = document.createElement('canvas');
             oc.width = img.naturalWidth;
@@ -1955,7 +2023,9 @@ export default function PhotoStudioModal({
         };
         img.src = bgRemovedUrl;
         const origImg = new Image();
-        origImg.crossOrigin = 'anonymous';
+        if (origUrl && !origUrl.startsWith('blob:') && !origUrl.startsWith('data:')) {
+            origImg.crossOrigin = 'anonymous';
+        }
         origImg.src = origUrl;
         originalImgForRestoreRef.current = origImg;
     }
@@ -1968,7 +2038,9 @@ export default function PhotoStudioModal({
                 
                 // Wait for the image to load into offscreen canvas
                 const img = new Image();
-                img.crossOrigin = 'anonymous';
+                if (imageUrl && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('data:')) {
+                    img.crossOrigin = 'anonymous';
+                }
                 await new Promise((resolve, reject) => {
                     img.onload = resolve;
                     img.onerror = () => reject(new Error('No se pudo cargar la imagen para editar'));
@@ -1982,7 +2054,9 @@ export default function PhotoStudioModal({
                 offscreenCanvasRef.current = oc;
                 
                 const origImg = new Image();
-                origImg.crossOrigin = 'anonymous';
+                if (imageUrl && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('data:')) {
+                    origImg.crossOrigin = 'anonymous';
+                }
                 await new Promise((resolve) => {
                     origImg.onload = resolve;
                     origImg.onerror = resolve; // fallback
@@ -2268,7 +2342,9 @@ export default function PhotoStudioModal({
         });
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
             const el = new Image();
-            el.crossOrigin = 'anonymous';
+            if (imageUrl && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('data:')) {
+                el.crossOrigin = 'anonymous';
+            }
             el.onload = () => resolve(el);
             el.onerror = reject;
             el.src = imageUrl;
@@ -3960,7 +4036,9 @@ export default function PhotoStudioModal({
         // This function only needs to apply remaining rotation + brightness.
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
             const i = new Image();
-            i.crossOrigin = 'anonymous';
+            if (imageUrl && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('data:')) {
+                i.crossOrigin = 'anonymous';
+            }
             i.onload = () => resolve(i);
             i.onerror = () => reject(new Error('No se pudo cargar la imagen para exportar'));
             i.src = imageUrl;
@@ -4076,7 +4154,9 @@ export default function PhotoStudioModal({
         try {
             const img = await new Promise<HTMLImageElement>((res, rej) => {
                 const i = new Image();
-                i.crossOrigin = 'anonymous';
+                if (imageUrl && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('data:')) {
+                    i.crossOrigin = 'anonymous';
+                }
                 i.onload = () => res(i);
                 i.onerror = () => rej(new Error('load failed'));
                 i.src = imageUrl;
@@ -4135,7 +4215,9 @@ export default function PhotoStudioModal({
             pushHistory();
             const img = await new Promise<HTMLImageElement>((res, rej) => {
                 const i = new Image();
-                i.crossOrigin = 'anonymous';
+                if (sourceUrl && !sourceUrl.startsWith('blob:') && !sourceUrl.startsWith('data:')) {
+                    i.crossOrigin = 'anonymous';
+                }
                 i.onload = () => res(i);
                 i.onerror = () => rej(new Error('load failed'));
                 i.src = sourceUrl;
