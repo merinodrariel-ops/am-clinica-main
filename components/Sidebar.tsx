@@ -25,6 +25,7 @@ import {
     Mail,
     Megaphone,
     ShieldCheck,
+    Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -46,6 +47,13 @@ const MENU_ITEMS = [
         href: '/agenda',
         key: 'agenda',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
+    },
+    {
+        icon: Sparkles,
+        label: 'Asistente',
+        href: '/asistente',
+        key: 'agenda',
+        roles: ['owner', 'admin', 'reception', 'dr', 'developer', 'recaptacion']
     },
     {
         icon: Users,
