@@ -539,6 +539,19 @@ function MonthlyTrendsPanel({
     );
 }
 
+function parseDateOnlyLocal(date: string | null | undefined): Date | null {
+    if (!date) return null;
+    const [yearRaw, monthRaw, dayRaw] = date.split('T')[0].split('-').map(Number);
+    if (!yearRaw || !monthRaw || !dayRaw) return null;
+    return new Date(yearRaw, monthRaw - 1, dayRaw);
+}
+
+function getInstallmentNumberForMonth(plan: { fecha_inicio?: string | null }, targetDate: Date): number | null {
+    const startDate = parseDateOnlyLocal(plan.fecha_inicio);
+    if (!startDate) return null;
+    return ((targetDate.getFullYear() - startDate.getFullYear()) * 12) + (targetDate.getMonth() - startDate.getMonth()) + 1;
+}
+
 export default function OwnerDashboard() {
     const [stats, setStats] = useState<OwnerDashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
@@ -781,6 +794,33 @@ export default function OwnerDashboard() {
 
     if (!stats) return null;
 
+    const targetDateForFinanc = new Date(selectedYear, selectedMonth, 1);
+
+    const pendingPlanes = stats.planesFinanciacion.filter((p) => {
+        const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
+        const total = Number(p.cuotas_total || 0);
+        const paid = Number(p.cuotas_pagadas || 0);
+        const isFuture = instNum !== null && instNum < 1;
+        const hasLeft = paid < total;
+        return !isFuture && hasLeft && (
+            (instNum !== null && paid < instNum) ||
+            (instNum !== null && instNum > total && paid < total)
+        );
+    });
+
+    const okPlanes = stats.planesFinanciacion.filter((p) => {
+        const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
+        const total = Number(p.cuotas_total || 0);
+        const paid = Number(p.cuotas_pagadas || 0);
+        const isFuture = instNum !== null && instNum < 1;
+        const hasLeft = paid < total;
+        const isPending = !isFuture && hasLeft && (
+            (instNum !== null && paid < instNum) ||
+            (instNum !== null && instNum > total && paid < total)
+        );
+        return !isPending;
+    });
+
     const cardData: Partial<Record<CardId, Omit<KpiCardProps, 'isEditing' | 'isHidden' | 'canRemove' | 'onToggleVisibility' | 'onRemove'>>> = {
         'total-pacientes': {
             id: 'total-pacientes',
@@ -875,34 +915,82 @@ export default function OwnerDashboard() {
             iconBg: 'hsla(270, 67%, 55%, 0.15)',
             iconColor: 'hsl(270 67% 65%)',
             expandContent: stats.planesFinanciacion.length > 0 ? (
-                <ul className="space-y-2">
-                    {stats.planesFinanciacion.map((p) => (
-                        <li key={p.id} className="text-xs" style={{ color: 'hsl(210 20% 80%)' }}>
-                            <div className="flex items-center justify-between">
-                                <span className="font-medium">{p.paciente_nombre}</span>
-                                <span style={{ color: 'hsl(270 67% 65%)' }}>
-                                    {p.cuotas_pagadas}/{p.cuotas_total} cuotas
+                <div className="space-y-4">
+                    {/* Lista de Pendientes */}
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-bold tracking-wider uppercase text-amber-500/80">
+                                Cuotas Pendientes ({pendingPlanes.length})
+                            </span>
+                            {pendingPlanes.length > 0 && (
+                                <span className="text-[10px] text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded font-mono font-medium">
+                                    Deuda: ${pendingPlanes.reduce((sum, p) => sum + (Number(p.monto_cuota_usd) || 0), 0).toLocaleString()} USD
+                                </span>
+                            )}
+                        </div>
+                        {pendingPlanes.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic">Todos los planes están al día.</p>
+                        ) : (
+                            <ul className="space-y-1.5">
+                                {pendingPlanes.map((p) => {
+                                    const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
+                                    const total = Number(p.cuotas_total || 0);
+                                    const isOverdue = instNum !== null && instNum > total;
+                                    return (
+                                        <li key={p.id} className="text-xs p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-medium text-slate-200">{p.paciente_nombre}</span>
+                                                <span className="font-mono text-amber-500 font-bold">
+                                                    ${(Number(p.monto_cuota_usd) || 0).toLocaleString()} USD
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
+                                                <span>{p.tratamiento}</span>
+                                                <span>
+                                                    {isOverdue
+                                                        ? `Vencido (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
+                                                        : `Cuota ${instNum} pendiente (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
+                                                    }
+                                                </span>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+
+                    {/* Lista de Al Día / Futuros */}
+                    {okPlanes.length > 0 && (
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold tracking-wider uppercase text-teal-500/80">
+                                    Al Día / Futuros ({okPlanes.length})
                                 </span>
                             </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                                <span style={{ color: 'hsl(230 10% 45%)' }}>{p.tratamiento}</span>
-                                <span style={{ color: 'hsl(25 95% 60%)' }}>
-                                    ${Number(p.saldo_restante_usd).toLocaleString()} USD
-                                </span>
-                            </div>
-                            {/* Progress bar */}
-                            <div className="h-1 rounded-full mt-1.5" style={{ background: 'hsla(230, 15%, 25%, 0.5)' }}>
-                                <div
-                                    className="h-full rounded-full transition-all"
-                                    style={{
-                                        width: `${(p.cuotas_pagadas / p.cuotas_total) * 100}%`,
-                                        background: 'linear-gradient(90deg, hsl(270 67% 55%), hsl(285 65% 50%))',
-                                    }}
-                                />
-                            </div>
-                        </li>
-                    ))}
-                </ul>
+                            <ul className="space-y-1 opacity-60 hover:opacity-100 transition-opacity max-h-48 overflow-y-auto pr-1">
+                                {okPlanes.map((p) => {
+                                    const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
+                                    const isFuture = instNum !== null && instNum < 1;
+                                    return (
+                                        <li key={p.id} className="text-[11px] flex items-center justify-between py-1 border-b border-white/[0.03]">
+                                            <div className="truncate pr-2">
+                                                <span className="font-medium text-slate-300">{p.paciente_nombre}</span>
+                                                <span className="text-[9px] text-slate-500 ml-1.5 font-normal">({p.tratamiento})</span>
+                                            </div>
+                                            <div className="text-right flex-shrink-0 text-slate-400 font-mono text-[10px]">
+                                                {isFuture
+                                                    ? 'Inicia pronto'
+                                                    : `Al día (${p.cuotas_pagadas}/${p.cuotas_total})`
+                                                }
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    )}
+                </div>
             ) : undefined,
         },
         'deuda-total': {

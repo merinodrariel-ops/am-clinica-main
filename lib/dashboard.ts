@@ -217,12 +217,16 @@ export function getFinanciacionMensualResumen(
     planes: PlanFinanciacionDashboard[] = [],
     targetDate = new Date(),
 ): FinanciacionMensualResumen {
-    const programadoUsd = getCobroMensualFinanciacionUsd(planes);
-    const cobradoUsd = planes.reduce((sum, plan) => {
+    const activePlanes = planes.filter((plan) => {
+        const installmentNumber = getInstallmentNumberForMonth(plan, targetDate);
+        return installmentNumber !== null && installmentNumber >= 1;
+    });
+
+    const programadoUsd = getCobroMensualFinanciacionUsd(activePlanes);
+    const cobradoUsd = activePlanes.reduce((sum, plan) => {
         const totalInstallments = Number(plan.cuotas_total || 0);
         const paidInstallments = Number(plan.cuotas_pagadas || 0);
         if (paidInstallments >= totalInstallments) return sum;
-        if (!isPlanScheduledForMonth(plan, targetDate)) return sum;
 
         const monthlyAmount = Number(plan.monto_cuota_usd) || 0;
         const installmentNumber = getInstallmentNumberForMonth(plan, targetDate);
