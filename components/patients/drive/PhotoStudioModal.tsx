@@ -1584,7 +1584,7 @@ export default function PhotoStudioModal({
             if (cropActiveRef.current) return;
             const delta = e.deltaY > 0 ? -0.15 : 0.15;
             setZoom(prev => {
-                const next = Math.min(5, Math.max(1, prev + delta));
+                const next = Math.min(5, Math.max(0.25, prev + delta));
                 if (next <= 1) { setPanX(0); setPanY(0); }
                 return next;
             });
@@ -1844,7 +1844,7 @@ export default function PhotoStudioModal({
         if (e.touches.length === 2 && touchRef.current) {
             const newDist = getTouchDist(e.touches);
             const scale = newDist / touchRef.current.dist;
-            const next = Math.min(5, Math.max(1, touchRef.current.startZoom * scale));
+            const next = Math.min(5, Math.max(0.25, touchRef.current.startZoom * scale));
             if (next <= 1) { setPanX(0); setPanY(0); }
             setZoom(next);
         }
