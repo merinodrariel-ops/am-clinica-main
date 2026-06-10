@@ -64,7 +64,8 @@ function resolvePatientPhotoSrc(patient: Paciente): string | null {
     const cover = patient.foto_perfil_url?.trim();
     if (cover) {
         if (/^https?:\/\//i.test(cover)) return cover;
-        return `/api/drive/thumbnail/${encodeURIComponent(cover)}`;
+        // s=400 is plenty for grid cards and halves the payload vs the default 800.
+        return `/api/drive/thumbnail/${encodeURIComponent(cover)}?s=400`;
     }
 
     const profilePhoto = patient.profile_photo_url?.trim();
@@ -173,9 +174,6 @@ interface PatientGridProps {
 }
 
 export default function PatientGrid({ patients }: PatientGridProps) {
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 48;
-
     if (patients.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500">
@@ -185,72 +183,11 @@ export default function PatientGrid({ patients }: PatientGridProps) {
         );
     }
 
-    const totalPages = Math.ceil(patients.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const current = patients.slice(startIndex, startIndex + itemsPerPage);
-
-    function goToPage(page: number) {
-        if (page >= 1 && page <= totalPages) {
-            setCurrentPage(page);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    }
-
     return (
-        <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                {current.map((p, i) => (
-                    <PatientCard key={p.id_paciente} patient={p} index={i} />
-                ))}
-            </div>
-
-            {totalPages > 1 && (
-                <div className="glass-card flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
-                    <p className="text-sm text-slate-400">
-                        Mostrando <span className="font-medium text-white">{startIndex + 1}</span> a{' '}
-                        <span className="font-medium text-white">
-                            {Math.min(startIndex + itemsPerPage, patients.length)}
-                        </span>{' '}
-                        de <span className="font-medium text-white">{patients.length}</span>
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => goToPage(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="rounded-lg border border-white/10 px-3 py-1 text-sm text-slate-300 transition-colors hover:bg-white/5 disabled:opacity-50"
-                        >
-                            Anterior
-                        </button>
-                        {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                            let p = i + 1;
-                            if (totalPages > 5) {
-                                if (currentPage > 3) p = currentPage - 2 + i;
-                                if (p > totalPages) p = totalPages - (4 - i);
-                            }
-                            if (p < 1) p = 1;
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => goToPage(p)}
-                                    className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-all ${currentPage === p
-                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                                        : 'border border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-white'
-                                        }`}
-                                >
-                                    {p}
-                                </button>
-                            );
-                        })}
-                        <button
-                            onClick={() => goToPage(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="rounded-lg border border-white/10 px-3 py-1 text-sm text-slate-300 transition-colors hover:bg-white/5 disabled:opacity-50"
-                        >
-                            Siguiente
-                        </button>
-                    </div>
-                </div>
-            )}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {patients.map((p, i) => (
+                <PatientCard key={p.id_paciente} patient={p} index={i} />
+            ))}
         </div>
     );
 }

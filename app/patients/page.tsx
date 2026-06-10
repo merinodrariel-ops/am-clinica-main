@@ -17,10 +17,13 @@ import {
 import Link from 'next/link';
 import PatientList from '@/components/patients/PatientList';
 import PatientGrid from '@/components/patients/PatientGrid';
+import PaginationBar from '@/components/patients/PaginationBar';
 import { listPatientsAction, getPatientsCountAction } from '@/app/actions/patients';
 import { type Paciente } from '@/lib/patients';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import { useAuth } from '@/contexts/AuthContext';
+
+const PAGE_SIZE = 48;
 
 export default function PatientsPage() {
     const { canEdit } = useAuth();
@@ -30,6 +33,7 @@ export default function PatientsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
     const [onlyWithPhotosFilter, setOnlyWithPhotosFilter] = useState(true);
+    const [page, setPage] = useState(1);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -65,46 +69,53 @@ export default function PatientsPage() {
         setTimeout(() => setCopiedKey(null), 2000);
     };
 
-    const loadPatients = useCallback(async () => {
+    const loadPatients = useCallback(async (targetPage: number) => {
         setLoading(true);
         try {
-            const res = await listPatientsAction({
+            const filters = {
                 search: searchTerm || undefined,
                 estado: estadoFilter || undefined,
                 onlyWithPhotos: onlyWithPhotosFilter,
-                limit: 1000,
-            });
+            };
+
+            const [res, countRes] = await Promise.all([
+                listPatientsAction({
+                    ...filters,
+                    limit: PAGE_SIZE,
+                    offset: (targetPage - 1) * PAGE_SIZE,
+                }),
+                getPatientsCountAction(filters),
+            ]);
 
             if (res.success && res.data) {
                 setPatients(res.data);
             }
-
-            // Get accurate count
-            const countRes = await getPatientsCountAction({
-                search: searchTerm || undefined,
-                estado: estadoFilter || undefined,
-                onlyWithPhotos: onlyWithPhotosFilter,
-            });
-
             if (countRes.success) {
-                setTotalCount(countRes.count);
+                setTotalCount(countRes.count ?? 0);
             }
         } catch (error) {
             console.error('Error loading patients:', error);
         } finally {
             setLoading(false);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm, estadoFilter, onlyWithPhotosFilter]);
 
-    // Initial load only on mount
+    // Reload when filters change (search is applied on Enter/button via handleSearch)
     useEffect(() => {
-        loadPatients();
+        setPage(1);
+        loadPatients(1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Intentionally only on mount
+    }, [estadoFilter, onlyWithPhotosFilter]);
 
-    // Reload when filters change (debounced manually by user pressing Enter or button)
     function handleSearch() {
-        loadPatients();
+        setPage(1);
+        loadPatients(1);
+    }
+
+    function handlePageChange(nextPage: number) {
+        setPage(nextPage);
+        loadPatients(nextPage);
     }
 
     return (
@@ -221,20 +232,14 @@ export default function PatientsPage() {
                                 <input
                                     type="checkbox"
                                     checked={onlyWithPhotosFilter}
-                                    onChange={(e) => {
-                                        setOnlyWithPhotosFilter(e.target.checked);
-                                        setTimeout(loadPatients, 100);
-                                    }}
+                                    onChange={(e) => setOnlyWithPhotosFilter(e.target.checked)}
                                     className="rounded border-white/20 bg-transparent text-teal-500 focus:ring-teal-500 focus:ring-offset-navy-900 h-4 w-4"
                                 />
                                 <span className="hidden sm:inline">Sólo con fotos</span>
                             </label>
                             <select
                                 value={estadoFilter}
-                                onChange={(e) => {
-                                    setEstadoFilter(e.target.value);
-                                    setTimeout(loadPatients, 100);
-                                }}
+                                onChange={(e) => setEstadoFilter(e.target.value)}
                                 className="px-4 py-2.5 rounded-lg border border-white/10 bg-navy-900/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500/50 transition-colors backdrop-blur-sm [&>option]:bg-navy-900"
                             >
                                 <option value="">Todos los estados</option>
@@ -250,7 +255,7 @@ export default function PatientsPage() {
                                 <Search size={18} />
                             </button>
                             <button
-                                onClick={loadPatients}
+                                onClick={() => loadPatients(page)}
                                 className="px-4 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-slate-300 transition-colors border border-white/5"
                             >
                                 <RefreshCw size={18} />
@@ -264,10 +269,20 @@ export default function PatientsPage() {
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="animate-spin text-gray-400" size={32} />
                     </div>
-                ) : viewMode === 'grid' ? (
-                    <PatientGrid patients={patients} onRefresh={loadPatients} />
                 ) : (
-                    <PatientList patients={patients} onRefresh={loadPatients} />
+                    <div className="space-y-4">
+                        {viewMode === 'grid' ? (
+                            <PatientGrid patients={patients} onRefresh={() => loadPatients(page)} />
+                        ) : (
+                            <PatientList patients={patients} onRefresh={() => loadPatients(page)} />
+                        )}
+                        <PaginationBar
+                            page={page}
+                            pageSize={PAGE_SIZE}
+                            totalCount={totalCount}
+                            onPageChange={handlePageChange}
+                        />
+                    </div>
                 )}
             </div>
         </CategoriaGuard>

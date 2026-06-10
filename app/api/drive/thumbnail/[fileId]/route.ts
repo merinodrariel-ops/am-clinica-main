@@ -3,8 +3,14 @@ import { getDriveClient } from '@/lib/google-drive';
 
 const DRIVE_ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
 
+// Drive file contents are immutable per fileId, so the proxied thumbnail can live
+// a week on Vercel's edge cache — after the first hit per region, images are
+// served without touching the Drive API at all.
+const EDGE_CACHE_HEADERS = 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400';
+const ALLOWED_SIZES = new Set([200, 400, 800, 1600]);
+
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ fileId: string }> }
 ) {
     const { fileId } = await params;
@@ -12,6 +18,9 @@ export async function GET(
     if (!fileId || !DRIVE_ID_RE.test(fileId)) {
         return NextResponse.json({ error: 'Invalid file ID' }, { status: 400 });
     }
+
+    const requestedSize = Number(new URL(request.url).searchParams.get('s'));
+    const size = ALLOWED_SIZES.has(requestedSize) ? requestedSize : 800;
 
     try {
         const drive = getDriveClient();
@@ -32,13 +41,13 @@ export async function GET(
         // Direct browser redirect to lh3.googleusercontent.com returns a dark
         // placeholder for unauthenticated browsers; server-side fetch bypasses that.
         if (thumbUrl) {
-            const bigger = thumbUrl.replace(/=s\d+(-[a-z])?$/i, '=s800').replace(/=s\d+$/, '=s800');
-            const thumbRes = await fetch(bigger);
+            const sized = thumbUrl.replace(/=s\d+(-[a-z])?$/i, `=s${size}`).replace(/=s\d+$/, `=s${size}`);
+            const thumbRes = await fetch(sized);
             if (thumbRes.ok) {
                 return new Response(thumbRes.body, {
                     headers: {
                         'Content-Type': thumbRes.headers.get('Content-Type') || 'image/jpeg',
-                        'Cache-Control': 'public, max-age=3600',
+                        'Cache-Control': EDGE_CACHE_HEADERS,
                     },
                 });
             }
@@ -63,6 +72,7 @@ export async function GET(
             return new Response(stream, {
                 headers: {
                     'Content-Type': mimeType,
+                    // Short cache: thumbnailLink may become available shortly after upload.
                     'Cache-Control': 'public, max-age=60',
                 },
             });

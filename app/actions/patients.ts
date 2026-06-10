@@ -116,6 +116,31 @@ function patientMatchesSearch(patient: Paciente, tokens: string[]): boolean {
     return tokens.every((token) => haystack.includes(token));
 }
 
+// Only the columns the patients list/grid actually renders — keeps the payload
+// small (drops observaciones, dirección, financing, etc.) for the 1000-row case.
+const PATIENT_LIST_COLUMNS = [
+    'id_paciente',
+    'nombre',
+    'apellido',
+    'documento',
+    'fecha_nacimiento',
+    'email',
+    'whatsapp',
+    'whatsapp_pais_code',
+    'whatsapp_numero',
+    'ciudad',
+    'zona_barrio',
+    'estado_paciente',
+    'origen_registro',
+    'referencia_origen',
+    'como_nos_conocio',
+    'primera_consulta_fecha',
+    'fecha_alta',
+    'foto_perfil_url',
+    'link_google_slides',
+    'link_historia_clinica',
+].join(', ');
+
 export async function listPatientsAction(filters: ListPatientsFilters = {}) {
     try {
         const supabase = await createClient();
@@ -123,7 +148,7 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
 
         let query = supabase
             .from('pacientes')
-            .select('*')
+            .select(PATIENT_LIST_COLUMNS)
             .eq('is_deleted', false)
             .order('fecha_alta', { ascending: false });
 
@@ -164,7 +189,16 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             return { success: true, data: patients };
         }
 
-        const patientIds = patients.map((p) => p.id_paciente).filter(Boolean);
+        // Fallback profile photos are only needed for patients without foto_perfil_url.
+        const patientIds = patients
+            .filter((p) => !p.foto_perfil_url)
+            .map((p) => p.id_paciente)
+            .filter(Boolean);
+
+        if (!patientIds.length) {
+            return { success: true, data: patients };
+        }
+
         const { data: patientFiles, error: filesError } = await supabase
             .from('patient_files')
             .select('patient_id, thumbnail_url, file_url, created_at')

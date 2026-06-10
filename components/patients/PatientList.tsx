@@ -196,9 +196,6 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
         }
     }
 
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 20;
-
     if (patients.length === 0) {
         return (
             <div className="text-center py-20 text-slate-500">
@@ -206,16 +203,6 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                 <p>No se encontraron pacientes.</p>
             </div>
         );
-    }
-
-    const totalPages = Math.ceil(patients.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const currentPatients = patients.slice(startIndex, startIndex + itemsPerPage);
-
-    function goToPage(page: number) {
-        if (page >= 1 && page <= totalPages) {
-            setCurrentPage(page);
-        }
     }
 
     return (
@@ -232,7 +219,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                        {currentPatients.map((patient, index) => {
+                        {patients.map((patient, index) => {
                             const whatsapp = getWhatsAppNumber(patient);
                             const email = patient.email;
                             const missingCount = getMissingCount(patient);
@@ -416,52 +403,6 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                     </tbody>
                 </table>
             </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-                <div className="flex justify-between items-center glass-card px-4 py-3 rounded-xl border border-white/10">
-                    <p className="text-sm text-slate-400">
-                        Mostrando <span className="font-medium text-white">{startIndex + 1}</span> a <span className="font-medium text-white">{Math.min(startIndex + itemsPerPage, patients.length)}</span> de <span className="font-medium text-white">{patients.length}</span> resultados
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => goToPage(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="px-3 py-1 text-sm border border-white/10 rounded-lg disabled:opacity-50 text-slate-300 hover:bg-white/5 transition-colors"
-                        >
-                            Anterior
-                        </button>
-                        {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                            let p = i + 1;
-                            if (totalPages > 5) {
-                                if (currentPage > 3) p = currentPage - 2 + i;
-                                if (p > totalPages) p = totalPages - (4 - i);
-                            }
-                            if (p < 1) p = 1;
-
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => goToPage(p)}
-                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-all ${currentPage === p
-                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                                        : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent hover:border-white/10'
-                                        }`}
-                                >
-                                    {p}
-                                </button>
-                            );
-                        })}
-                        <button
-                            onClick={() => goToPage(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="px-3 py-1 text-sm border border-white/10 rounded-lg disabled:opacity-50 text-slate-300 hover:bg-white/5 transition-colors"
-                        >
-                            Siguiente
-                        </button>
-                    </div>
-                </div>
-            )}
 
             <DeleteModal
                 isOpen={!!patientToDelete}
