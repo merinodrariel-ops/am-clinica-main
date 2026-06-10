@@ -840,6 +840,7 @@ export default function PhotoStudioModal({
     const [canvasSelectedId, setCanvasSelectedId] = useState<string | null>(null);
     const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
     const [canvasLayerCropId, setCanvasLayerCropId] = useState<string | null>(null);
+    const [canvasLayerCropAspectPreset, setCanvasLayerCropAspectPreset] = useState<CropAspectPresetId>('free');
     const [canvasLayerCropSel, setCanvasLayerCropSel] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     const [canvasLayerCompletedCrop, setCanvasLayerCompletedCrop] = useState<PixelCrop | null>(null);
     const [canvasLayerCropRotation, setCanvasLayerCropRotation] = useState(0);
@@ -911,6 +912,9 @@ export default function PhotoStudioModal({
     const activeCropAspect = getCropAspectPreset(cropAspectPreset).aspect;
     const cropActiveRef = useRef(false);
     useEffect(() => { cropActiveRef.current = cropActive; }, [cropActive]);
+    const isCropActive = cropActive || !!canvasLayerCropId;
+    const isCropActiveRef = useRef(false);
+    useEffect(() => { isCropActiveRef.current = isCropActive; }, [isCropActive]);
 
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
@@ -1226,6 +1230,30 @@ export default function PhotoStudioModal({
         const nextCrop = buildCenteredAspectCrop(img.width, img.height, preset.aspect);
         setCrop(nextCrop);
         setCompletedCrop({
+            unit: 'px',
+            x: Math.round((nextCrop.x / 100) * img.width),
+            y: Math.round((nextCrop.y / 100) * img.height),
+            width: Math.round((nextCrop.width / 100) * img.width),
+            height: Math.round((nextCrop.height / 100) * img.height),
+        });
+    }, []);
+
+    const applyCanvasLayerCropAspectPreset = useCallback((presetId: CropAspectPresetId, img = canvasLayerCropImgRef.current) => {
+        setCanvasLayerCropAspectPreset(presetId);
+        const preset = getCropAspectPreset(presetId);
+
+        if (!img || img.width === 0 || img.height === 0) {
+            setCanvasLayerCompletedCrop(null);
+            return;
+        }
+
+        if (!preset.aspect) {
+            return;
+        }
+
+        const nextCrop = buildCenteredAspectCrop(img.width, img.height, preset.aspect);
+        setCanvasLayerCropSel(nextCrop);
+        setCanvasLayerCompletedCrop({
             unit: 'px',
             x: Math.round((nextCrop.x / 100) * img.width),
             y: Math.round((nextCrop.y / 100) * img.height),
@@ -1589,7 +1617,7 @@ export default function PhotoStudioModal({
 
         const wheelHandler = (e: WheelEvent) => {
             e.preventDefault();
-            if (cropActiveRef.current) return;
+            if (isCropActiveRef.current) return;
             const delta = e.deltaY > 0 ? -0.15 : 0.15;
             setZoom(prev => {
                 const next = Math.min(5, Math.max(0.25, prev + delta));
@@ -1927,7 +1955,10 @@ export default function PhotoStudioModal({
             const { removeBackground: removeBg } = await import('@imgly/background-removal');
             const response = await fetch(srcToUse);
             const blob = await response.blob();
-            const resultBlob = await removeBg(blob);
+            const resultBlob = await removeBg(blob, {
+                model: 'isnet_quint8',
+                device: 'gpu'
+            });
             if (cancelBgRef.current) {
                 if (!selectedLayer) preBgUrlRef.current = null;
                 return;
@@ -5184,9 +5215,9 @@ export default function PhotoStudioModal({
                         )}
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
                         <div style={{
-                            transform: cropActive ? 'none' : `scale(${zoom}) translate(${panX}px, ${panY}px)`,
+                            transform: isCropActive ? 'none' : `scale(${zoom}) translate(${panX}px, ${panY}px)`,
                             transformOrigin: 'center',
-                            transition: isDragging || cropActive ? 'none' : 'transform 0.05s ease-out',
+                            transition: isDragging || isCropActive ? 'none' : 'transform 0.05s ease-out',
                         }}>
                             {!canvasActive && (brushMode !== null || healMode || magicWandActive) ? (
                                 <canvas
@@ -5817,11 +5848,11 @@ export default function PhotoStudioModal({
                             setBrightness={canvasActive && canvasSelectedId
                                 ? (v) => setCanvasLayers(prev => prev.map(l => l.id === canvasSelectedId ? { ...l, brightness: typeof v === 'function' ? (v as any)(l.brightness) : v } : l))
                                 : setBrightness}
-                            cropActive={cropActive}
-                            setCropActive={setCropActive}
-                            cropAspectPreset={cropAspectPreset}
-                            onCropAspectPresetChange={applyCropAspectPreset}
-                            hasPriorCrop={preCropImageRef.current !== null}
+                            cropActive={cropActive || !!canvasLayerCropId}
+                            setCropActive={canvasLayerCropId ? () => {} : setCropActive}
+                            cropAspectPreset={canvasLayerCropId ? canvasLayerCropAspectPreset : cropAspectPreset}
+                            onCropAspectPresetChange={canvasLayerCropId ? applyCanvasLayerCropAspectPreset : applyCropAspectPreset}
+                            hasPriorCrop={canvasLayerCropId ? (canvasLayerCropPreBakeRef.current !== null) : (preCropImageRef.current !== null)}
                             onEnterCropMode={canvasActive && canvasSelectedId
                                 // When a canvas layer is selected, crop that layer (not the main photo)
                                 ? () => {
@@ -5834,11 +5865,19 @@ export default function PhotoStudioModal({
                                     const initialCrop: Crop = { unit: '%', width: 100, height: 100, x: 0, y: 0 };
                                     setCanvasLayerCropSel(initialCrop);
                                     setCanvasLayerCompletedCrop(initialCrop as any);
+                                    setCanvasLayerCropAspectPreset('free');
                                     setCanvasSelectedId(null);
                                 }
                                 : handleEnterCropMode}
-                            onConfirmCrop={handleConfirmCrop}
-                            onCancelCrop={handleCancelCrop}
+                            onConfirmCrop={canvasLayerCropId ? handleConfirmCanvasLayerCrop : handleConfirmCrop}
+                            onCancelCrop={canvasLayerCropId ? () => {
+                                setCanvasLayerCropBakedSrc(prev => {
+                                    if (prev && prev !== canvasLayerCropPreBakeRef.current) URL.revokeObjectURL(prev);
+                                    return null;
+                                });
+                                canvasLayerCropPreBakeRef.current = null;
+                                setCanvasLayerCropId(null);
+                            } : handleCancelCrop}
                             bgProcessing={bgProcessing} bgDone={bgDone}
                             bgColor={bgColor} setBgColor={setBgColor}
                             onRemoveBg={handleRemoveBackground}
@@ -6826,21 +6865,7 @@ function ToolsPanel({
                 <p className="flex items-center gap-2 text-white/75 text-sm font-semibold">
                     <CropIcon size={18} /> Recortar
                 </p>
-                {canvasActive ? (
-                    // Canvas mode: crop operates on the selected layer, not the main photo
-                    canvasSelectedId ? (
-                        <button
-                            onClick={onEnterCropMode}
-                            className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <CropIcon size={20} /> Recortar capa seleccionada
-                        </button>
-                    ) : (
-                        <p className="text-white/45 text-sm text-center py-2">
-                            Seleccioná una foto del lienzo para recortarla
-                        </p>
-                    )
-                ) : cropActive ? (
+                {cropActive ? (
                     <>
                         <p className="text-white/45 text-sm">
                             Seleccioná el área a conservar.
@@ -6875,6 +6900,20 @@ function ToolsPanel({
                             Cancelar
                         </button>
                     </>
+                ) : canvasActive ? (
+                    // Canvas mode: crop operates on the selected layer, not the main photo
+                    canvasSelectedId ? (
+                        <button
+                            onClick={onEnterCropMode}
+                            className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-base font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <CropIcon size={20} /> Recortar capa seleccionada
+                        </button>
+                    ) : (
+                        <p className="text-white/45 text-sm text-center py-2">
+                            Seleccioná una foto del lienzo para recortarla
+                        </p>
+                    )
                 ) : (
                     <button
                         onClick={onEnterCropMode}
