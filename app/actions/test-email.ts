@@ -1,6 +1,6 @@
 'use server';
 
-import { sendEmail } from '@/lib/nodemailer';
+import { sendEmail } from '@/lib/email-service';
 
 export async function testEmailAction(toEmail: string) {
     const result = await sendEmail({

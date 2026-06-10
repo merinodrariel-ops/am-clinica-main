@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { sendEmail } from '@/lib/nodemailer';
+import { sendEmail } from '@/lib/email-service';
 import { generateTreatmentTimelineEmail } from '@/lib/email-templates';
 import type {
     ClinicalWorkflow,
@@ -958,7 +958,7 @@ async function ensurePatientDriveFolder(treatmentId: string) {
         .eq('id', treatmentId);
 
     // 6. Send notification email to lab
-    const { sendEmail } = await import('@/lib/nodemailer');
+    const { sendEmail } = await import('@/lib/email-service');
     const labEmail = 'amesteticadentallab@gmail.com';
     const subject = `Nueva Carpeta de Paciente: ${folderName}`;
     const html = `

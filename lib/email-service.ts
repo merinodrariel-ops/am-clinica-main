@@ -300,3 +300,9 @@ export const EmailService = {
         });
     }
 };
+
+// Convenience alias kept for callers that send ad-hoc emails (replaces the old
+// lib/nodemailer.ts and lib/emailjs.ts proxies — Resend is the only provider).
+export async function sendEmail(input: SendEmailInput) {
+    return EmailService.send(input);
+}

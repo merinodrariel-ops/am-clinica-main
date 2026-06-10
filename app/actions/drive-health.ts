@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/utils/supabase/admin';
 import { runDriveHealthCheck, type DriveHealthCheckResult } from '@/lib/drive-health';
-import { sendEmail } from '@/lib/nodemailer';
+import { sendEmail } from '@/lib/email-service';
 
 interface RunDriveHealthInput {
     sampleLimit?: number;

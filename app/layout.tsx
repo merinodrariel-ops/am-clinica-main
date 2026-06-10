@@ -1,6 +1,7 @@
 
 import type { Metadata } from "next";
 import { Inter, Geist_Mono, Cormorant_Garamond } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Providers from "@/components/Providers";
@@ -49,6 +50,7 @@ export default function RootLayout({
           </MainLayout>
           <CategoriaSwitcher />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );

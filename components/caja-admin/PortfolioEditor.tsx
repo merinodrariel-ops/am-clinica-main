@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, forwardRef } from 'react';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence } from 'framer-motion';
 import { X, Upload, Trash2, Loader2, ExternalLink, FolderOpen, Wand2, Check } from 'lucide-react';
 import type { PrestacionRealizada } from '@/lib/caja-admin-prestaciones';
 import type { Personal } from '@/lib/caja-admin/types';

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ArrowRight, ArrowLeft, User, Mail, Phone, MapPin, Briefcase, Building2, CreditCard, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { registerPrestadorPublico } from '@/app/actions/prestador-registro';
