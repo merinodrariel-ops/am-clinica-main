@@ -6,17 +6,21 @@ import {
     CheckCircle2,
     Clock3,
     Eye,
+    HeartHandshake,
     Mail,
     RefreshCw,
     Search,
     Send,
     Server,
+    Star,
     XCircle,
 } from 'lucide-react';
 import {
+    CommunicationOutcomes,
     EmailMessageDetail,
     EmailMessageListRow,
     ScheduledEmailRow,
+    getCommunicationOutcomesAction,
     getEmailMessageDetailAction,
     getEmailProviderStatusAction,
     listEmailMessagesAction,
@@ -29,7 +33,19 @@ import {
     resolveEmailMessageTypeLabel,
 } from '@/lib/email-message-tracking';
 
-type TabKey = 'outbox' | 'scheduled' | 'templates' | 'providers';
+type TabKey = 'outbox' | 'resultados' | 'scheduled' | 'templates' | 'providers';
+
+const RECALL_TYPE_SHORT_LABELS: Record<string, string> = {
+    limpieza: 'Limpieza',
+    limpieza_convencional: 'Limpieza',
+    limpieza_laser: 'Limpieza láser',
+    botox: 'Botox',
+    control_carillas: 'Carillas',
+    blanqueamiento: 'Blanqueamiento',
+    control_ortodoncia: 'Ortodoncia',
+    mantenimiento_implantes: 'Implantes',
+    otro: 'Otro',
+};
 
 type TemplateEntry = {
     key: string;
@@ -104,14 +120,20 @@ export default function EmailsAdminClient({
     const [testEmail, setTestEmail] = useState('');
     const [testResult, setTestResult] = useState<string | null>(null);
     const [sendingTest, setSendingTest] = useState(false);
+    const [outcomes, setOutcomes] = useState<CommunicationOutcomes | null>(null);
+    const [outcomesLoading, setOutcomesLoading] = useState(false);
 
     const monthlySummary = useMemo(() => {
         const byTemplate = new Map<string, number>();
         let sent = 0;
+        let delivered = 0;
+        let opened = 0;
         let failed = 0;
 
         for (const row of rows) {
             if (row.status === 'sent' || row.status === 'delivered' || row.status === 'opened' || row.status === 'clicked') sent += 1;
+            if (row.delivered_at || row.status === 'delivered' || row.status === 'opened' || row.status === 'clicked') delivered += 1;
+            if (row.opened_at || row.status === 'opened' || row.status === 'clicked') opened += 1;
             if (row.status === 'failed' || row.status === 'bounced') failed += 1;
             const key = row.template_label || row.template_key || 'Sin plantilla';
             byTemplate.set(key, (byTemplate.get(key) || 0) + 1);
@@ -121,13 +143,28 @@ export default function EmailsAdminClient({
             .sort((a, b) => b[1] - a[1])
             .slice(0, 4);
 
+        const pct = (n: number) => (sent > 0 ? `${Math.round((n / sent) * 100)}%` : '-');
+
         return {
             total: rows.length,
             sent,
+            delivered,
+            deliveredPct: pct(delivered),
+            opened,
+            openedPct: pct(opened),
             failed,
             topTemplates,
         };
     }, [rows]);
+
+    useEffect(() => {
+        if (tab !== 'resultados' || outcomes || outcomesLoading) return;
+        setOutcomesLoading(true);
+        getCommunicationOutcomesAction()
+            .then(setOutcomes)
+            .catch(() => setOutcomes(null))
+            .finally(() => setOutcomesLoading(false));
+    }, [tab, outcomes, outcomesLoading]);
 
     const filteredRows = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -222,6 +259,7 @@ export default function EmailsAdminClient({
                     <div className="flex flex-wrap gap-2">
                         {[
                             ['outbox', 'Salida', Mail],
+                            ['resultados', 'Resultados', HeartHandshake],
                             ['scheduled', 'Programados', Clock3],
                             ['templates', 'Plantillas', Send],
                             ['providers', 'Proveedores', Server],
@@ -246,7 +284,7 @@ export default function EmailsAdminClient({
             <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
                 {tab === 'outbox' && (
                     <div className="space-y-4">
-                        <section className="grid gap-3 md:grid-cols-4">
+                        <section className="grid gap-3 md:grid-cols-5">
                             <div className="rounded-lg border border-slate-200 bg-white p-4">
                                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Ultimo mes</p>
                                 <p className="mt-2 text-2xl font-bold text-slate-950">{monthlySummary.total}</p>
@@ -255,12 +293,17 @@ export default function EmailsAdminClient({
                             <div className="rounded-lg border border-slate-200 bg-white p-4">
                                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Aceptados</p>
                                 <p className="mt-2 text-2xl font-bold text-slate-950">{monthlySummary.sent}</p>
-                                <p className="mt-1 text-xs text-slate-500">sent, delivered, opened o clicked</p>
+                                <p className="mt-1 text-xs text-slate-500">aceptados por Resend</p>
                             </div>
                             <div className="rounded-lg border border-slate-200 bg-white p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Con fallo</p>
-                                <p className="mt-2 text-2xl font-bold text-slate-950">{monthlySummary.failed}</p>
-                                <p className="mt-1 text-xs text-slate-500">failed o bounced</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Entregados</p>
+                                <p className="mt-2 text-2xl font-bold text-emerald-700">{monthlySummary.deliveredPct}</p>
+                                <p className="mt-1 text-xs text-slate-500">{monthlySummary.delivered} llegaron a destino</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Abiertos</p>
+                                <p className="mt-2 text-2xl font-bold text-violet-700">{monthlySummary.openedPct}</p>
+                                <p className="mt-1 text-xs text-slate-500">{monthlySummary.opened} abiertos · {monthlySummary.failed} con fallo</p>
                             </div>
                             <div className="rounded-lg border border-slate-200 bg-white p-4">
                                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Top plantillas</p>
@@ -414,6 +457,131 @@ export default function EmailsAdminClient({
                             )}
                         </aside>
                         </div>
+                    </div>
+                )}
+
+                {tab === 'resultados' && (
+                    <div className="space-y-4">
+                        {outcomesLoading && <p className="p-8 text-center text-sm text-slate-500">Cargando resultados...</p>}
+                        {!outcomesLoading && !outcomes && (
+                            <p className="p-8 text-center text-sm text-slate-500">No se pudieron cargar los resultados.</p>
+                        )}
+                        {!outcomesLoading && outcomes && (
+                            <>
+                                <section className="grid gap-3 md:grid-cols-4">
+                                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Recuperados</p>
+                                        <p className="mt-2 text-2xl font-bold text-emerald-700">{outcomes.recovered.length}</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            recalls agendados o realizados (últimos {outcomes.windowDays} días)
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">En gestión</p>
+                                        <p className="mt-2 text-2xl font-bold text-slate-950">
+                                            {outcomes.recallPipeline.pending + outcomes.recallPipeline.contacted}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {outcomes.recallPipeline.pending} sin contactar · {outcomes.recallPipeline.contacted} contactados
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Opiniones</p>
+                                        <p className="mt-2 text-2xl font-bold text-violet-700">{outcomes.surveysResponded}</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            de {outcomes.surveysSent} encuestas enviadas
+                                            {outcomes.surveysSent > 0 && ` (${Math.round((outcomes.surveysResponded / outcomes.surveysSent) * 100)}%)`}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Satisfacción</p>
+                                        <p className="mt-2 flex items-center gap-1 text-2xl font-bold text-amber-600">
+                                            {outcomes.averageRating ?? '-'}
+                                            <Star size={18} className="fill-amber-400 text-amber-400" />
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-500">{outcomes.promoters} dieron 4-5 estrellas (van a Google)</p>
+                                    </div>
+                                </section>
+
+                                <div className="grid gap-4 lg:grid-cols-2">
+                                    <section className="rounded-lg border border-slate-200 bg-white">
+                                        <div className="border-b border-slate-200 p-4">
+                                            <h2 className="text-sm font-bold">Pacientes recuperados</h2>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Recalls que terminaron en turno agendado o tratamiento realizado.
+                                            </p>
+                                        </div>
+                                        <div className="max-h-[480px] divide-y divide-slate-100 overflow-y-auto">
+                                            {outcomes.recovered.map((row) => (
+                                                <div key={row.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                                                    <div className="min-w-0">
+                                                        <a
+                                                            href={`/patients/${row.patient_id}`}
+                                                            className="truncate font-semibold text-slate-900 hover:text-emerald-700"
+                                                        >
+                                                            {row.patient_name}
+                                                        </a>
+                                                        <p className="text-xs text-slate-500">
+                                                            {row.custom_label || RECALL_TYPE_SHORT_LABELS[row.recall_type] || row.recall_type}
+                                                            {' · '}{formatDate(row.updated_at)}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-semibold ${row.state === 'completed'
+                                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                        : 'border-blue-200 bg-blue-50 text-blue-700'
+                                                        }`}>
+                                                        {row.state === 'completed' ? 'Realizado' : 'Agendado'}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            {outcomes.recovered.length === 0 && (
+                                                <p className="p-8 text-center text-sm text-slate-500">
+                                                    Todavía no hay recalls agendados o realizados en este período.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    <section className="rounded-lg border border-slate-200 bg-white">
+                                        <div className="border-b border-slate-200 p-4">
+                                            <h2 className="text-sm font-bold">Opiniones de pacientes</h2>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Encuestas de satisfacción respondidas. 4-5 estrellas se redirigen a Google Reviews.
+                                            </p>
+                                        </div>
+                                        <div className="max-h-[480px] divide-y divide-slate-100 overflow-y-auto">
+                                            {outcomes.opinions.map((row) => (
+                                                <div key={row.id} className="p-3 text-sm">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <p className="truncate font-semibold text-slate-900">{row.patient_name}</p>
+                                                        <span className="flex shrink-0 items-center gap-0.5">
+                                                            {[1, 2, 3, 4, 5].map((n) => (
+                                                                <Star
+                                                                    key={n}
+                                                                    size={14}
+                                                                    className={(row.rating ?? 0) >= n
+                                                                        ? 'fill-amber-400 text-amber-400'
+                                                                        : 'text-slate-200'}
+                                                                />
+                                                            ))}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-0.5 text-xs text-slate-500">{formatDate(row.responded_at)}</p>
+                                                    {row.feedback && (
+                                                        <p className="mt-1 rounded-md bg-slate-50 p-2 text-xs text-slate-700">{row.feedback}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {outcomes.opinions.length === 0 && (
+                                                <p className="p-8 text-center text-sm text-slate-500">
+                                                    Todavía no hay encuestas respondidas en este período.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </section>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

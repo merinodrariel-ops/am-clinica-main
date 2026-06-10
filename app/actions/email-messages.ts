@@ -41,6 +41,8 @@ export interface EmailMessageListRow {
     error_message: string | null;
     sent_at: string | null;
     delivered_at: string | null;
+    opened_at?: string | null;
+    clicked_at?: string | null;
     data_source?: 'email_messages' | 'notification_logs';
     source_reference?: string | null;
     patient?: {
@@ -295,6 +297,8 @@ export async function listEmailMessagesAction(filters: EmailMessageListFilters =
             error_message,
             sent_at,
             delivered_at,
+            opened_at,
+            clicked_at,
             patient:patient_id(nombre, apellido)
         `)
         .eq('direction', 'outbound')
@@ -491,4 +495,150 @@ export async function getEmailProviderStatusAction() {
         resendFrom: process.env.RESEND_FROM_EMAIL ?? process.env.RESEND_FROM,
         brevoApiKey: process.env.BREVO_API_KEY,
     });
+}
+
+// ─── Resultados: pacientes recuperados y opiniones ──────────────────────────
+
+const OUTCOMES_WINDOW_DAYS = 90;
+
+export interface RecoveredPatientRow {
+    id: string;
+    patient_id: string;
+    patient_name: string;
+    recall_type: string;
+    custom_label: string | null;
+    state: 'scheduled' | 'completed';
+    updated_at: string;
+}
+
+export interface PatientOpinionRow {
+    id: string;
+    patient_id: string | null;
+    patient_name: string;
+    rating: number | null;
+    feedback: string | null;
+    responded_at: string;
+}
+
+export interface CommunicationOutcomes {
+    windowDays: number;
+    recovered: RecoveredPatientRow[];
+    opinions: PatientOpinionRow[];
+    recallPipeline: { pending: number; contacted: number; scheduled: number; completed: number };
+    surveysSent: number;
+    surveysResponded: number;
+    averageRating: number | null;
+    promoters: number; // ratings >= 4 (redirected to Google review)
+}
+
+async function fetchPatientNames(
+    admin: ReturnType<typeof createAdminClient>,
+    ids: string[]
+): Promise<Map<string, string>> {
+    const names = new Map<string, string>();
+    const unique = Array.from(new Set(ids.filter(Boolean)));
+    if (!unique.length) return names;
+
+    const { data } = await admin
+        .from('pacientes')
+        .select('id_paciente, nombre, apellido')
+        .in('id_paciente', unique);
+
+    for (const p of data ?? []) {
+        names.set(p.id_paciente, `${p.nombre ?? ''} ${p.apellido ?? ''}`.trim());
+    }
+    return names;
+}
+
+export async function getCommunicationOutcomesAction(): Promise<CommunicationOutcomes> {
+    await requireEmailAccess();
+    const admin = createAdminClient();
+    const windowStart = new Date(Date.now() - OUTCOMES_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    const [recallsRes, surveysRes] = await Promise.all([
+        admin
+            .from('recall_rules')
+            .select('id, patient_id, recall_type, custom_label, state, updated_at')
+            .eq('is_active', true)
+            .gte('updated_at', windowStart)
+            .order('updated_at', { ascending: false })
+            .limit(500),
+        admin
+            .from('satisfaction_surveys')
+            .select('id, patient_id, rating, feedback, sent_at, responded_at')
+            .gte('sent_at', windowStart)
+            .order('responded_at', { ascending: false, nullsFirst: false })
+            .limit(500),
+    ]);
+
+    if (recallsRes.error) console.warn('[email-messages] outcomes recalls skipped:', recallsRes.error.message);
+    if (surveysRes.error) console.warn('[email-messages] outcomes surveys skipped:', surveysRes.error.message);
+
+    type RecallRow = {
+        id: string;
+        patient_id: string;
+        recall_type: string;
+        custom_label: string | null;
+        state: string;
+        updated_at: string;
+    };
+    type SurveyRow = {
+        id: string;
+        patient_id: string | null;
+        rating: number | null;
+        feedback: string | null;
+        sent_at: string | null;
+        responded_at: string | null;
+    };
+
+    const recalls = (recallsRes.data ?? []) as RecallRow[];
+    const surveys = (surveysRes.data ?? []) as SurveyRow[];
+
+    const patientNames = await fetchPatientNames(admin, [
+        ...recalls.map((r) => r.patient_id as string),
+        ...surveys.map((s) => s.patient_id as string),
+    ]);
+
+    const recallPipeline = { pending: 0, contacted: 0, scheduled: 0, completed: 0 };
+    const recovered: RecoveredPatientRow[] = [];
+    for (const r of recalls) {
+        if (r.state === 'pending_contact') recallPipeline.pending += 1;
+        else if (r.state === 'contacted') recallPipeline.contacted += 1;
+        else if (r.state === 'scheduled') recallPipeline.scheduled += 1;
+        else if (r.state === 'completed') recallPipeline.completed += 1;
+
+        if (r.state === 'scheduled' || r.state === 'completed') {
+            recovered.push({
+                id: r.id,
+                patient_id: r.patient_id,
+                patient_name: patientNames.get(r.patient_id) || 'Paciente',
+                recall_type: r.recall_type,
+                custom_label: r.custom_label,
+                state: r.state,
+                updated_at: r.updated_at,
+            });
+        }
+    }
+
+    const responded = surveys.filter((s) => s.responded_at);
+    const ratings = responded.map((s) => s.rating).filter((r): r is number => typeof r === 'number');
+    const opinions: PatientOpinionRow[] = responded.map((s) => ({
+        id: s.id,
+        patient_id: s.patient_id,
+        patient_name: s.patient_id ? (patientNames.get(s.patient_id) || 'Paciente') : 'Paciente',
+        rating: s.rating,
+        feedback: s.feedback,
+        responded_at: s.responded_at as string,
+    }));
+
+    return {
+        windowDays: OUTCOMES_WINDOW_DAYS,
+        recovered,
+        opinions,
+        recallPipeline,
+        surveysSent: surveys.length,
+        surveysResponded: responded.length,
+        averageRating: ratings.length ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : null,
+        promoters: ratings.filter((r) => r >= 4).length,
+    };
 }
