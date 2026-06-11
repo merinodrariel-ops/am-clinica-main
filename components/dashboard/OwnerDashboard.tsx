@@ -1002,6 +1002,37 @@ export default function OwnerDashboard() {
             gradient: 'linear-gradient(135deg, hsl(35 95% 55%), hsl(25 90% 48%))',
             iconBg: 'hsla(35, 95%, 55%, 0.15)',
             iconColor: 'hsl(35 95% 60%)',
+            expandContent: (() => {
+                const planesConSaldo = stats.planesFinanciacion
+                    .filter((p) => (Number(p.saldo_restante_usd) || 0) > 0)
+                    .sort((a, b) => (Number(b.saldo_restante_usd) || 0) - (Number(a.saldo_restante_usd) || 0));
+                if (planesConSaldo.length === 0) return (
+                    <p className="text-xs text-slate-500 italic">Sin saldos pendientes.</p>
+                );
+                return (
+                    <div className="space-y-1">
+                        <div className="text-[10px] font-bold tracking-wider uppercase text-amber-500/80 mb-2">
+                            Pacientes con saldo ({planesConSaldo.length})
+                        </div>
+                        <ul className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                            {planesConSaldo.map((p) => (
+                                <li key={p.id} className="text-xs p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium text-slate-200 truncate pr-2">{p.paciente_nombre}</span>
+                                        <span className="font-mono text-amber-400 font-bold flex-shrink-0">
+                                            ${(Number(p.saldo_restante_usd) || 0).toLocaleString()} USD
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-0.5 text-[10px] text-slate-500">
+                                        <span className="truncate pr-2">{p.tratamiento}</span>
+                                        <span className="flex-shrink-0">{p.cuotas_pagadas}/{p.cuotas_total} cuotas</span>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                );
+            })(),
         },
     };
 
