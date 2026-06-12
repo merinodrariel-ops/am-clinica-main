@@ -146,7 +146,9 @@ export async function inviteUser(formData: FormData) {
 
     const publicUrl = getAppPublicUrl();
 
-    if (PROVIDER_MANAGED_CATEGORIES.has(categoria)) {
+    // 'asistente' se puede crear directamente desde gestión de usuarios (cuenta compartida de acceso)
+    const INVITE_BLOCKED_CATEGORIES = new Set([...PROVIDER_MANAGED_CATEGORIES].filter(c => c !== 'asistente'));
+    if (INVITE_BLOCKED_CATEGORIES.has(categoria)) {
         return {
             success: false,
             error: 'Las altas de prestadores se gestionan desde Prestadores / Personal. Este módulo no permite asignar esta categoría.',
