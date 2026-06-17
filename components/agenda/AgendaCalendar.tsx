@@ -25,6 +25,7 @@ import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { stripAppointmentMeta } from '@/lib/agenda-appointment-meta';
+import { canScheduleCleaningFollowupFromAppointment, getCleaningFollowupDate } from '@/lib/cleaning-followup-policy';
 import { useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 interface AppointmentModalData {
@@ -1524,7 +1525,10 @@ export default function AgendaCalendar() {
                         {/* Próximo control */}
                         {quickPopup.fullData.patientId && canEdit && (
                             <div className="px-3 pb-2">
-                                {(['limpieza', 'limpieza_convencional', 'limpieza_laser'].includes(quickPopup.fullData.type) ? (
+                                {(canScheduleCleaningFollowupFromAppointment({
+                                    type: quickPopup.fullData.type,
+                                    status: quickPopup.fullData.status,
+                                }) ? (
                                     <div>
                                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">Programar próxima limpieza</p>
                                         <div className="grid grid-cols-3 gap-2">
@@ -1536,8 +1540,7 @@ export default function AgendaCalendar() {
                                                 onClick={async () => {
                                                     const sourceStart = new Date(quickPopup.fullData.start);
                                                     const durationMs = Math.max(30 * 60 * 1000, new Date(quickPopup.fullData.end).getTime() - sourceStart.getTime());
-                                                    const nextDate = new Date(sourceStart);
-                                                    nextDate.setMonth(nextDate.getMonth() + months);
+                                                    const nextDate = getCleaningFollowupDate(sourceStart, months);
                                                     const nextEnd = new Date(nextDate.getTime() + durationMs);
                                                     const cleaningType = inferCleaningType(quickPopup.fullData.type, quickPopup.fullData.title);
                                                     // Save preferred interval to patient record

@@ -12,6 +12,12 @@ import {
 } from 'lucide-react';
 import { ImageComparator } from '../patients/ImageComparator';
 import { IntensitySlider } from '../patients/IntensitySlider';
+import {
+    getSmileExportPreset,
+    getSupportedSmileVideoMimeType,
+    type SmileExportPreset,
+    type SmileExportPresetId,
+} from '@/lib/smile-content-export';
 
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
@@ -115,104 +121,137 @@ function loadImg(src: string): Promise<HTMLImageElement> {
     });
 }
 
-/** Create and download a branded 1080px before/after comparison image */
-async function downloadComparison(beforeUrl: string, afterUrl: string, intensity: number) {
-    const [before, after] = await Promise.all([loadImg(beforeUrl), loadImg(afterUrl)]);
+function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+    const sw = w / scale;
+    const sh = h / scale;
+    const sx = (img.naturalWidth - sw) / 2;
+    const sy = (img.naturalHeight - sh) / 2;
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
 
-    const W = 1080;
-    const HEADER = 90;
-    const FOOTER = 70;
-    const GAP = 16;
-    const PADDING = 24;
-    const imgW = W - PADDING * 2;
-    const imgH = Math.round(imgW * (before.naturalHeight / before.naturalWidth));
-    const totalH = HEADER + imgH * 2 + GAP * 3 + FOOTER;
+function drawPremiumFrame(ctx: CanvasRenderingContext2D, preset: SmileExportPreset, title: string) {
+    const { width: W, height: H } = preset;
+    ctx.fillStyle = '#080808';
+    ctx.fillRect(0, 0, W, H);
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, H);
+    gradient.addColorStop(0, 'rgba(201,169,110,0.16)');
+    gradient.addColorStop(0.42, 'rgba(8,8,8,0)');
+    gradient.addColorStop(1, 'rgba(201,169,110,0.10)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#f7f2e8';
+    ctx.font = '700 34px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, W / 2, 76);
+
+    ctx.fillStyle = 'rgba(247,242,232,0.58)';
+    ctx.font = '15px Arial';
+    ctx.fillText('AM ESTETICA DENTAL · DISEÑO DIGITAL DE SONRISA', W / 2, 108);
+}
+
+function drawSplitComparison(ctx: CanvasRenderingContext2D, before: HTMLImageElement, after: HTMLImageElement, preset: SmileExportPreset, split = 0.5) {
+    const W = preset.width;
+    const H = preset.height;
+    const margin = preset.id === 'story' ? 72 : 54;
+    const top = preset.id === 'story' ? 160 : 146;
+    const footer = preset.id === 'story' ? 126 : 96;
+    const frameW = W - margin * 2;
+    const frameH = H - top - footer;
+    const x = margin;
+    const y = top;
+    const splitX = x + frameW * split;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, frameW, frameH, 18);
+    ctx.clip();
+
+    drawImageCover(ctx, before, x, y, frameW, frameH);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, frameW * split, frameH);
+    ctx.clip();
+    drawImageCover(ctx, after, x, y, frameW, frameH);
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.20)';
+    ctx.fillRect(x, y, frameW, frameH);
+
+    if (split > 0.01 && split < 0.99) {
+        ctx.strokeStyle = '#F4EFE4';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(splitX, y);
+        ctx.lineTo(splitX, y + frameH);
+        ctx.stroke();
+
+        ctx.fillStyle = '#C9A96E';
+        ctx.beginPath();
+        ctx.roundRect(splitX - 34, y + frameH / 2 - 17, 68, 34, 17);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.54)';
+    ctx.fillRect(x, y, frameW / 2, 54);
+    ctx.fillRect(x + frameW / 2, y, frameW / 2, 54);
+    ctx.fillStyle = '#F7F2E8';
+    ctx.font = '700 18px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('ANTES', x + 24, y + 35);
+    ctx.textAlign = 'right';
+    ctx.fillText('SIMULACION', x + frameW - 24, y + 35);
+
+    ctx.fillStyle = 'rgba(247,242,232,0.58)';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Simulacion visual orientativa. El resultado clinico puede variar.', W / 2, H - 42);
+}
+
+/** Create and download a branded before/after comparison image */
+async function downloadComparison(beforeUrl: string, afterUrl: string, presetId: SmileExportPresetId) {
+    const [before, after] = await Promise.all([loadImg(beforeUrl), loadImg(afterUrl)]);
+    const preset = getSmileExportPreset(presetId);
 
     const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = totalH;
+    canvas.width = preset.width;
+    canvas.height = preset.height;
     const ctx = canvas.getContext('2d')!;
-
-    // Background
-    const bg = ctx.createLinearGradient(0, 0, 0, totalH);
-    bg.addColorStop(0, '#0f0f18');
-    bg.addColorStop(1, '#1a1a2e');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, totalH);
-
-    // Header
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.fillRect(0, 0, W, HEADER);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px -apple-system, Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('SMILE DESIGN · AM Clínica', W / 2, 36);
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.font = '15px Arial';
-    ctx.fillText(`Intensidad ${intensity}/10 · Puerto Madero, CABA`, W / 2, 62);
-
-    // ANTES label + image
-    const y1 = HEADER + GAP;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.font = 'bold 13px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText('ANTES', PADDING, y1 - 6);
-    ctx.drawImage(before, PADDING, y1, imgW, imgH);
-
-    // DESPUÉS label + image
-    const y2 = y1 + imgH + GAP;
-    ctx.fillStyle = '#a78bfa';
-    ctx.fillText('DESPUÉS', PADDING, y2 - 6);
-    ctx.drawImage(after, PADDING, y2, imgW, imgH);
-
-    // Footer
-    const yFoot = y2 + imgH + GAP;
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.fillRect(0, yFoot, W, FOOTER);
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = '13px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Simulación generada con IA · AM Clínica · amclinica.com.ar', W / 2, yFoot + 28);
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = '11px Arial';
-    ctx.fillText('Este resultado es una simulación. Los resultados reales pueden variar.', W / 2, yFoot + 50);
+    drawPremiumFrame(ctx, preset, 'Smile Design');
+    drawSplitComparison(ctx, before, after, preset, 0.5);
 
     // Download
     const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = `smile_design_am_${new Date().toISOString().split('T')[0]}.png`;
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = `am_smile_design_${preset.id}_${new Date().toISOString().split('T')[0]}.jpg`;
     link.click();
 }
 
 /** Create and download a branded before/after comparison video (swipe animation). Returns the Blob URL for preview. */
-async function downloadComparisonVideo(beforeUrl: string, afterUrl: string, intensity: number): Promise<string> {
+async function downloadComparisonVideo(beforeUrl: string, afterUrl: string): Promise<{ url: string; extension: 'mp4' | 'webm' }> {
     const [before, after] = await Promise.all([loadImg(beforeUrl), loadImg(afterUrl)]);
-
-    const W = 1080;
-    const HEADER = 100;
-    const FOOTER = 80;
-    const imgW = W;
-    const imgH = Math.round(imgW * (before.naturalHeight / before.naturalWidth));
-    const totalH = HEADER + imgH + FOOTER;
+    const preset = getSmileExportPreset('story');
 
     const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = totalH;
+    canvas.width = preset.width;
+    canvas.height = preset.height;
     const ctx = canvas.getContext('2d', { alpha: false })!;
 
     // Stream & Recorder
     const fps = 30;
     const stream = canvas.captureStream(fps);
-
-    // Try to find a supported mime type
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
+    const videoFormat = getSupportedSmileVideoMimeType((candidate) => MediaRecorder.isTypeSupported(candidate));
 
     const recorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: 5000000 // 5Mbps for high quality
+        mimeType: videoFormat.mimeType,
+        videoBitsPerSecond: 8000000
     });
 
     const chunks: Blob[] = [];
@@ -220,18 +259,18 @@ async function downloadComparisonVideo(beforeUrl: string, afterUrl: string, inte
         if (e.data.size > 0) chunks.push(e.data);
     };
 
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<{ url: string; extension: 'mp4' | 'webm' }>((resolve, reject) => {
         recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
+            const blob = new Blob(chunks, { type: videoFormat.mimeType });
             const url = URL.createObjectURL(blob);
 
             // Auto-download
             const link = document.createElement('a');
             link.href = url;
-            link.download = `smile_design_am_${new Date().toISOString().split('T')[0]}.webm`;
+            link.download = `am_smile_design_historia_${new Date().toISOString().split('T')[0]}.${videoFormat.extension}`;
             link.click();
 
-            resolve(url);
+            resolve({ url, extension: videoFormat.extension });
         };
 
         recorder.onerror = () => reject(new Error('Video recording failed'));
@@ -254,76 +293,8 @@ async function downloadComparisonVideo(beforeUrl: string, afterUrl: string, inte
             else if (progress < 0.8) swipe = (progress - 0.2) / 0.6;
             else swipe = 1;
 
-            const splitX = W * swipe;
-
-            // 1. Background
-            ctx.fillStyle = '#0f0f18';
-            ctx.fillRect(0, 0, W, totalH);
-
-            // 2. Draw Images
-            // Draw Before (Full width)
-            ctx.drawImage(before, 0, HEADER, imgW, imgH);
-
-            // Draw After (Clipped left part)
-            if (swipe > 0) {
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(0, HEADER, splitX, imgH);
-                ctx.clip();
-                ctx.drawImage(after, 0, HEADER, imgW, imgH);
-                ctx.restore();
-
-                // Divider Line
-                if (swipe < 1) {
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = 'rgba(167, 139, 250, 0.8)';
-                    ctx.strokeStyle = '#a78bfa';
-                    ctx.lineWidth = 4;
-                    ctx.beginPath();
-                    ctx.moveTo(splitX, HEADER);
-                    ctx.lineTo(splitX, HEADER + imgH);
-                    ctx.stroke();
-                    ctx.shadowBlur = 0;
-
-                    // Handle/Diamond transition
-                    ctx.fillStyle = '#a78bfa';
-                    ctx.beginPath();
-                    ctx.arc(splitX, HEADER + imgH / 2, 10, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
-            }
-
-            // 3. Branded Overlays
-            // Header
-            ctx.fillStyle = 'rgba(15, 15, 24, 0.8)';
-            ctx.fillRect(0, 0, W, HEADER);
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 32px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('SMILE DESIGN · AM CLÍNICA', W / 2, 45);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.font = '18px Arial';
-            ctx.fillText('Simulación Digital Progresiva · Puerto Madero', W / 2, 75);
-
-            // Labels
-            ctx.font = 'bold 20px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.fillText('ANTES', 30, HEADER + 40);
-            ctx.textAlign = 'right';
-            ctx.fillStyle = '#a78bfa';
-            ctx.fillText('DESPUÉS (IA)', W - 30, HEADER + 40);
-
-            // Footer
-            ctx.fillStyle = 'rgba(15, 15, 24, 0.9)';
-            ctx.fillRect(0, totalH - FOOTER, W, FOOTER);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.font = '16px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('amclinica.com.ar · Este resultado es una simulación visual', W / 2, totalH - 35);
+            drawPremiumFrame(ctx, preset, 'Antes y después');
+            drawSplitComparison(ctx, before, after, preset, swipe);
 
             if (progress < 1) {
                 requestAnimationFrame(drawFrame);
@@ -357,7 +328,7 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
     const [isPreparingManualPair, setIsPreparingManualPair] = useState(false);
     const [isCreatingFollowupTask, setIsCreatingFollowupTask] = useState(false);
     const [followupTaskCreated, setFollowupTaskCreated] = useState(false);
-    const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+    const [videoPreview, setVideoPreview] = useState<{ url: string; extension: 'mp4' | 'webm' } | null>(null);
     const [intensity, setIntensity] = useState(5);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [runtimeBaseUrl] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''));
@@ -670,11 +641,11 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
         }
     };
 
-    const handleDownload = async () => {
+    const handleDownload = async (presetId: SmileExportPresetId) => {
         if (!beforeStoredUrl || !afterStoredUrl) return;
         setIsDownloading(true);
         try {
-            await downloadComparison(beforeStoredUrl, afterStoredUrl, intensity);
+            await downloadComparison(beforeStoredUrl, afterStoredUrl, presetId);
         } catch {
             toast.error('Error al generar imagen compartible');
         } finally {
@@ -685,11 +656,11 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
     const handleDownloadVideo = async () => {
         if (!beforeStoredUrl || !afterStoredUrl) return;
         setIsDownloadingVideo(true);
-        toast.info('Generando video de comparación...');
+        toast.info('Generando video vertical de comparación...');
         try {
-            const url = await downloadComparisonVideo(beforeStoredUrl, afterStoredUrl, intensity);
-            setVideoPreviewUrl(url);
-            toast.success('Video generado correctamente');
+            const preview = await downloadComparisonVideo(beforeStoredUrl, afterStoredUrl);
+            setVideoPreview(preview);
+            toast.success(preview.extension === 'mp4' ? 'Video MP4 generado correctamente' : 'Video generado en WebM: este navegador no soporta grabación MP4');
         } catch (err) {
             console.error(err);
             toast.error('Error al generar video. Asegurate de estar en un navegador moderno.');
@@ -1135,12 +1106,21 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
                             </button>
 
                             <button
-                                onClick={handleDownload}
+                                onClick={() => handleDownload('post')}
                                 disabled={isDownloading || isDownloadingVideo}
                                 className="flex-1 flex items-center justify-center gap-3 px-6 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-300 hover:bg-white/5 transition-all disabled:opacity-30"
                             >
                                 {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                                Imagen
+                                Post
+                            </button>
+
+                            <button
+                                onClick={() => handleDownload('story')}
+                                disabled={isDownloading || isDownloadingVideo}
+                                className="flex-1 flex items-center justify-center gap-3 px-6 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-300 hover:bg-white/5 transition-all disabled:opacity-30"
+                            >
+                                {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                Historia
                             </button>
 
                             <button
@@ -1149,7 +1129,7 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
                                 className="flex-1 flex items-center justify-center gap-3 px-6 py-5 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border border-white/5 text-slate-300 hover:bg-white/5 transition-all disabled:opacity-30"
                             >
                                 {isDownloadingVideo ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />}
-                                Video
+                                Video MP4
                             </button>
 
                             <button
@@ -1227,7 +1207,7 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
 
                 {/* ── VIDEO PREVIEW MODAL ────────────────────────────────────── */}
                 <AnimatePresence>
-                    {videoPreviewUrl && (
+                    {videoPreview && (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1245,8 +1225,8 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
                                     <button
                                         onClick={() => {
                                             const link = document.createElement('a');
-                                            link.href = videoPreviewUrl;
-                                            link.download = `smile_design_am_${new Date().toISOString().split('T')[0]}.webm`;
+                                            link.href = videoPreview.url;
+                                            link.download = `am_smile_design_historia_${new Date().toISOString().split('T')[0]}.${videoPreview.extension}`;
                                             link.click();
                                         }}
                                         className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
@@ -1256,8 +1236,8 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
                                     </button>
                                     <button
                                         onClick={() => {
-                                            URL.revokeObjectURL(videoPreviewUrl);
-                                            setVideoPreviewUrl(null);
+                                            URL.revokeObjectURL(videoPreview.url);
+                                            setVideoPreview(null);
                                         }}
                                         className="p-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 transition-colors"
                                         title="Cerrar"
@@ -1279,7 +1259,7 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
 
                                     <div className="aspect-[1080/1260] max-h-[60vh] mx-auto rounded-3xl overflow-hidden bg-black border border-white/5 relative group">
                                         <video
-                                            src={videoPreviewUrl}
+                                            src={videoPreview.url}
                                             controls
                                             autoPlay
                                             loop
@@ -1290,8 +1270,8 @@ export default function SmileDesign({ patientId, patientName, onSaved }: Props) 
                                     <div className="mt-8 flex justify-center">
                                         <button
                                             onClick={() => {
-                                                URL.revokeObjectURL(videoPreviewUrl);
-                                                setVideoPreviewUrl(null);
+                                                URL.revokeObjectURL(videoPreview.url);
+                                                setVideoPreview(null);
                                             }}
                                             className="px-10 py-4 rounded-2xl bg-white text-slate-950 text-xs font-black uppercase tracking-[0.2em] hover:bg-slate-200 transition-all active:scale-95"
                                         >

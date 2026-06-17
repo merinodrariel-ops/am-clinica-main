@@ -20,6 +20,7 @@ import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage 
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
+import { shouldStartPhotoStudioInPresentation } from '@/lib/photo-studio/mobile-presentation';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -1479,6 +1480,19 @@ export default function PhotoStudioModal({
     // Presentation mode state
     const [presentationMode, setPresentationMode] = useState(false);
     const [presentationIdx, setPresentationIdx] = useState(0);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (!shouldStartPhotoStudioInPresentation({
+            viewportWidth: window.innerWidth,
+            imageCount: imageFiles.length,
+            autoStartSmile: autoStartSmileRef.current,
+        })) return;
+
+        const idx = imageFiles.findIndex(f => f.id === activeFile?.id);
+        setPresentationIdx(Math.max(0, idx));
+        setPresentationMode(true);
+    }, [activeFile?.id, imageFiles]);
 
     const isDirty =
         rotation !== 0 ||
@@ -4863,10 +4877,10 @@ export default function PhotoStudioModal({
                                     setPresentationIdx(Math.max(0, idx));
                                     setPresentationMode(true);
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#C9A96E] text-black text-sm font-bold border border-[#C9A96E]/70 hover:bg-[#d9bb7d] transition-colors shadow-lg shadow-black/20"
                             >
                                 <Play size={14} />
-                                <span className="hidden sm:inline">Presentación</span>
+                                <span>Presentación</span>
                             </button>
                         )}
                         {!canvasActive && (
@@ -6332,6 +6346,15 @@ export default function PhotoStudioModal({
                             ))}
                         </div>
                     )}
+
+                    <button
+                        type="button"
+                        onClick={() => setPresentationMode(false)}
+                        className="absolute bottom-7 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-white px-5 py-3 text-sm font-bold text-black shadow-2xl md:hidden"
+                    >
+                        <Edit2 size={16} />
+                        Editar foto
+                    </button>
                 </motion.div>
             )}
         </AnimatePresence>
