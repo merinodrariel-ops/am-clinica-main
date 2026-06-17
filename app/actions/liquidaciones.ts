@@ -1396,3 +1396,35 @@ export async function recalcularTotalesLiquidacion(
         return { success: false, error: e instanceof Error ? e.message : 'Error' };
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVERT LIQUIDACIÓN TO PENDING
+// Admin utility: reset a paid/approved liquidación back to pending.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function revertLiquidacionToPending(personalId: string, mes: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const admin = getAdminClient();
+        const mesDate = mes.length === 7 ? `${mes}-01` : mes;
+
+        let lastError: { message?: string } | null = null;
+        for (const estadoDb of ESTADO_DB_CANDIDATES.pending) {
+            const { error } = await admin
+                .from('liquidaciones_mensuales')
+                .update({ estado: estadoDb, fecha_pago: null })
+                .eq('personal_id', personalId)
+                .eq('mes', mesDate);
+
+            if (!error) { lastError = null; break; }
+            lastError = error;
+            if (!isEstadoConstraintError(error.message)) break;
+        }
+
+        if (lastError) throw new Error(lastError.message || 'Error al revertir liquidación');
+        revalidatePath('/admin/liquidaciones');
+        revalidatePath('/caja-admin/liquidaciones');
+        revalidatePath('/portal/liquidation');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'Error' };
+    }
+}
