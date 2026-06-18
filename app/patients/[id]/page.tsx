@@ -5,12 +5,15 @@ import { getPrestacionesByPaciente } from '@/app/actions/prestaciones';
 import { getMovimientosPorPaciente } from '@/lib/caja-recepcion';
 import type { PlanFinanciacion } from '@/lib/financiacion';
 import { getPatientDesignReview } from '@/app/actions/design-review';
+import { getUserAppProfile } from '@/app/actions/worker-portal';
 
 export const revalidate = 0; // Always get fresh data
 
 export default async function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const supabase = await createClient();
+    const appProfile = await getUserAppProfile();
+    const canViewFinancialData = ['admin', 'owner'].includes(appProfile?.categoria || '');
 
     let patient;
     let historiaClinica;
@@ -30,30 +33,32 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             // Fetch related data
             const relatedData = await Promise.all([
                 getHistoriaClinica(supabase, id),
-                getPlanesTratamiento(supabase, id),
-                getMovimientosPorPaciente(id, supabase),
                 supabase
                     .from('agenda_appointments')
                     .select('id, patient_id, doctor_id, start_time, status, type')
                     .eq('patient_id', id)
                     .order('start_time', { ascending: false }),
-                getPrestacionesByPaciente(id),
+                canViewFinancialData ? getPlanesTratamiento(supabase, id) : Promise.resolve([]),
+                canViewFinancialData ? getMovimientosPorPaciente(id, supabase) : Promise.resolve([]),
+                canViewFinancialData ? getPrestacionesByPaciente(id) : Promise.resolve([]),
             ]);
 
             historiaClinica = relatedData[0];
-            planes = relatedData[1];
-            payments = relatedData[2] || [];
-            appointments = relatedData[3].data || [];
+            appointments = relatedData[1].data || [];
+            planes = relatedData[2];
+            payments = relatedData[3] || [];
             prestaciones = relatedData[4];
 
-            const { data: fpData } = await supabase
-                .from('planes_financiacion')
-                .select('*')
-                .eq('paciente_id', id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-            financingPlan = fpData as PlanFinanciacion | null;
+            if (canViewFinancialData) {
+                const { data: fpData } = await supabase
+                    .from('planes_financiacion')
+                    .select('*')
+                    .eq('paciente_id', id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                financingPlan = fpData as PlanFinanciacion | null;
+            }
 
             const { review: dr } = await getPatientDesignReview(patient.id_paciente);
             designReview = dr;
@@ -82,9 +87,20 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         );
     }
 
+    const safePatient = canViewFinancialData
+        ? patient
+        : {
+            ...patient,
+            financ_estado: undefined,
+            financ_monto_total: undefined,
+            financ_cuotas_total: undefined,
+            saldo_a_favor_usd: undefined,
+            presupuesto_total: undefined,
+        };
+
     return (
         <PatientDashboard
-            patient={patient}
+            patient={safePatient}
             historiaClinica={historiaClinica || []}
             planes={planes || []}
             payments={payments || []}
