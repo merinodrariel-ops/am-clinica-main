@@ -13,6 +13,56 @@ function getSupabase() {
     return createClient(supabaseUrl, serviceKey);
 }
 
+function getSignedStorageUrl(
+    supabase: ReturnType<typeof getSupabase>,
+    storedValue: string | null | undefined,
+    bucketHint?: string,
+    expiresIn = 60 * 60 * 24 * 7,
+) {
+    const trimmed = storedValue?.trim();
+    if (!trimmed) return Promise.resolve(null);
+
+    let bucket = bucketHint || '';
+    let path = trimmed;
+
+    if (trimmed.startsWith('storage:')) {
+        const parts = trimmed.split(':');
+        if (parts.length < 3) return Promise.resolve(trimmed);
+        bucket = parts[1];
+        path = parts.slice(2).join(':');
+    } else if (trimmed.startsWith('https://')) {
+        try {
+            const url = new URL(trimmed);
+            const match = url.pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)/);
+            if (match?.[1] && match[2]) {
+                bucket = match[1];
+                path = decodeURIComponent(match[2]);
+            } else {
+                return Promise.resolve(trimmed);
+            }
+        } catch {
+            return Promise.resolve(trimmed);
+        }
+    } else if (!bucket) {
+        return Promise.resolve(trimmed);
+    }
+
+    return supabase.storage
+        .from(bucket)
+        .createSignedUrl(path, expiresIn)
+        .then(({ data }) => data?.signedUrl || trimmed)
+        .catch(() => trimmed);
+}
+
+type PortalFileRow = {
+    id: string;
+    file_type: string;
+    label: string;
+    file_url: string | null;
+    thumbnail_url: string | null;
+    created_at: string;
+};
+
 export async function GET(
     _request: Request,
     { params }: { params: Promise<{ token: string }> }
@@ -112,17 +162,22 @@ export async function GET(
     // 3. Si hay tratamiento activo, buscar su workflow + etapas
     let treatment = null;
     let allStages = null;
-    const allFiles = [...(filesRes.data || [])];
+    const allFiles: PortalFileRow[] = await Promise.all((filesRes.data || []).map(async (file: PortalFileRow) => ({
+        ...file,
+        file_url: await getSignedStorageUrl(supabase, file.file_url, 'patient-portal-files'),
+        thumbnail_url: await getSignedStorageUrl(supabase, file.thumbnail_url, 'patient-portal-files'),
+    })));
 
     if (treatmentRes.data && treatmentRes.data.length > 0) {
         const t = treatmentRes.data[0];
 
         // Fetch de Drive si hay carpeta configurada
-        const metadata = (t.metadata as Record<string, any>) || {};
-        if (metadata.drive_folder_id) {
+        const metadata = (t.metadata as Record<string, unknown>) || {};
+        const driveFolderId = typeof metadata.drive_folder_id === 'string' ? metadata.drive_folder_id : null;
+        if (driveFolderId) {
             try {
                 const { listFolderFiles } = await import('@/lib/google-drive');
-                const driveFiles = await listFolderFiles(metadata.drive_folder_id);
+                const driveFiles = await listFolderFiles(driveFolderId);
 
                 if (driveFiles.files) {
                     // Agregar archivos de Drive a la lista (especialmente STLs)

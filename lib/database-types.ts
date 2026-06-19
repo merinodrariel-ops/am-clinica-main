@@ -36,7 +36,7 @@ export interface CajaMovimiento {
     precio_lista_usd: number | null;
     monto: number;
     moneda: 'USD' | 'ARS' | 'USDT';
-    metodo_pago: 'Efectivo' | 'Transferencia' | 'MercadoPago' | 'Cripto';
+    metodo_pago: 'Efectivo' | 'Transferencia' | 'MercadoPago' | 'Cripto' | 'Tarjeta_Credito' | 'Tarjeta_Debito';
     canal_destino: 'Empresa' | 'Personal' | 'MP' | 'USDT' | null;
     tipo_comprobante: 'Factura A' | 'Tipo C' | 'Sin factura' | 'Otro' | null;
     cuota_nro: number | null;

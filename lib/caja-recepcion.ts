@@ -124,7 +124,7 @@ export interface NuevoMovimientoInput {
   precio_lista_usd?: number;
   monto: number;
   moneda: "USD" | "ARS" | "USDT";
-  metodo_pago: "Efectivo" | "Transferencia" | "MercadoPago" | "Cripto";
+  metodo_pago: "Efectivo" | "Transferencia" | "MercadoPago" | "Cripto" | "Tarjeta_Credito" | "Tarjeta_Debito";
   canal_destino?: "Empresa" | "Personal" | "MP" | "USDT";
   tipo_comprobante?: "Factura A" | "Tipo C" | "Sin factura" | "Otro";
   cuota_nro?: number;

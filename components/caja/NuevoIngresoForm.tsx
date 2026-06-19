@@ -851,8 +851,14 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
             console.error('Error saving income:', error);
             const errorMessage = error instanceof Error
                 ? error.message
-                : typeof error === 'object' && error !== null && 'details' in error
-                    ? String((error as { details?: unknown }).details || 'Error desconocido')
+                : typeof error === 'object' && error !== null
+                    ? String(
+                        (error as { message?: unknown }).message
+                        || (error as { details?: unknown }).details
+                        || (error as { hint?: unknown }).hint
+                        || (error as { code?: unknown }).code
+                        || 'Error desconocido'
+                    )
                     : typeof error === 'string' ? error : 'Error desconocido';
             alert('Error al guardar el ingreso: ' + errorMessage);
         } finally {

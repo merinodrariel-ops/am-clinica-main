@@ -202,6 +202,8 @@ function normalizeMetodoPago(value: string): string {
     if (normalized.includes('transfer')) return 'Transferencia';
     if (normalized.includes('mercado') || normalized.includes('mp')) return 'MercadoPago';
     if (normalized.includes('cripto') || normalized.includes('usdt')) return 'Cripto';
+    if (normalized.includes('tarjeta') && normalized.includes('deb')) return 'Tarjeta_Debito';
+    if (normalized.includes('tarjeta') && normalized.includes('cred')) return 'Tarjeta_Credito';
     return 'Efectivo';
 }
 
@@ -258,4 +260,3 @@ async function findOrCreatePatient(
 
     return { id: newPatient.id_paciente };
 }
-
