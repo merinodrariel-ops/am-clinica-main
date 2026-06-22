@@ -173,24 +173,17 @@ const InputField = ({
     const isEmpty = !value || (typeof value === 'string' && !value.trim());
     const isRequiredError = error && isEmpty;
     const showError = submitAttempted ? !!error : (touched && !isEmpty && !!error && !isRequiredError);
-    const [inputType, setInputType] = useState(type === 'date' ? 'text' : type);
 
     return (
         <div className="flex flex-col gap-1 w-full">
             <div className="relative group">
                 <Icon className={`absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${showError ? 'text-red-500' : 'text-zinc-600 group-focus-within:text-white'}`} />
                 <input
-                    type={inputType}
+                    type={type}
                     placeholder={placeholder}
                     value={value}
                     onChange={onChange}
-                    onFocus={() => {
-                        if (type === 'date') setInputType('date');
-                    }}
-                    onBlur={(e) => {
-                        if (type === 'date' && !e.target.value) setInputType('text');
-                        if (onBlur) onBlur(e);
-                    }}
+                    onBlur={onBlur}
                     className={`w-full bg-transparent border-b-2 py-4 pl-10 text-lg font-light text-white placeholder:text-zinc-600 focus:outline-none transition-colors font-sans ${showError ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-white'} ${type === 'date' ? '[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:hover:opacity-100' : ''}`}
                     {...props}
                 />
@@ -598,6 +591,8 @@ export default function PremiumAdmissionForm() {
                             error={errors.dob}
                             touched={touched.dob}
                             submitAttempted={submitAttempted}
+                            autoComplete="bday"
+                            lang="es-AR"
                             max={getLocalISODate()}
                             min="1900-01-01"
                         />
