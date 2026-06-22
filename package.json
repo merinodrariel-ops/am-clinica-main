@@ -8,6 +8,7 @@
     "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "start": "next start",
     "lint": "eslint",
+    "test:admission-mobile": "playwright test tests/admission-mobile.spec.ts",
     "drive:simulate": "node scripts/drive-watcher.js",
     "drive:organize": "node scripts/drive-watcher.js --organize",
     "drive:watch": "node scripts/drive-watcher.js --watch",
@@ -64,6 +65,7 @@
   },
   "devDependencies": {
     "@googleworkspace/cli": "^0.8.0",
+    "@playwright/test": "^1.55.0",
     "@react-email/components": "^1.0.10",
     "@react-email/render": "^2.0.4",
     "@tailwindcss/postcss": "^4",

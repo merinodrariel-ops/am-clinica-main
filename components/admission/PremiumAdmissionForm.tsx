@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     ArrowRight,
     ArrowLeft,
@@ -61,6 +61,14 @@ type FormData = {
 
 type FormErrors = Partial<Record<keyof FormData, string>>;
 type FormTouched = Partial<Record<keyof FormData, boolean>>;
+type ExistingPatientRedirect = {
+    url: string;
+    patientName?: string;
+};
+type IdentityCheckResult = {
+    canContinue: boolean;
+    redirect?: ExistingPatientRedirect;
+};
 
 // --- Constants ---
 const COUNTRY_CODES = [
@@ -155,6 +163,11 @@ function calculateAgeFromDateOnly(value: string): number | null {
     return age;
 }
 
+function buildPatientUpdateUrl(dni?: string | null) {
+    const cleanDni = (dni || '').replace(/\D/g, '');
+    return cleanDni ? `/actualizar-datos?d=${encodeURIComponent(cleanDni)}` : '/actualizar-datos';
+}
+
 const InputField = ({
     icon: Icon,
     type,
@@ -222,6 +235,7 @@ const ProgressBar = ({ currentStep, totalSteps }: { currentStep: number; totalSt
 
 export default function PremiumAdmissionForm() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [step, setStep] = useState(0);
     const [formData, setFormData] = useState<FormData>({
         id_paciente: '',
@@ -249,9 +263,12 @@ export default function PremiumAdmissionForm() {
         status: 'idle' | 'checking' | 'ok' | 'exists' | 'error';
         message?: string;
         patientName?: string;
+        redirectUrl?: string;
     }>({ status: 'idle' });
     const lastIdentitySignatureRef = useRef('');
     const lastIdentityExistsRef = useRef(false);
+    const lastIdentityRedirectRef = useRef<ExistingPatientRedirect | null>(null);
+    const redirectTimeoutRef = useRef<number | null>(null);
 
     const allowDuplicateForTesting =
         process.env.NODE_ENV !== 'production'
@@ -294,14 +311,41 @@ export default function PremiumAdmissionForm() {
         return hasValidDni || hasValidEmail;
     }, [formData.dni, formData.email]);
 
-    const runIdentityCheck = useCallback(async (force = false) => {
+    const redirectToPatientUpdate = useCallback((redirect?: ExistingPatientRedirect) => {
+        const url = redirect?.url || identityState.redirectUrl || buildPatientUpdateUrl(formData.dni);
+
+        toast.message('Ya sos paciente.', {
+            description: 'Te llevamos a actualizar tus datos para completar la información pendiente.',
+        });
+
+        if (redirectTimeoutRef.current) {
+            window.clearTimeout(redirectTimeoutRef.current);
+        }
+        redirectTimeoutRef.current = window.setTimeout(() => {
+            router.push(url);
+        }, 900);
+    }, [formData.dni, identityState.redirectUrl, router]);
+
+    useEffect(() => {
+        return () => {
+            if (redirectTimeoutRef.current) {
+                window.clearTimeout(redirectTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const runIdentityCheck = useCallback(async (force = false): Promise<IdentityCheckResult> => {
         if (!canCheckIdentity) {
             setIdentityState((prev) => (prev.status === 'idle' ? prev : { status: 'idle' }));
-            return true;
+            lastIdentityRedirectRef.current = null;
+            return { canContinue: true };
         }
 
         if (!force && identitySignature === lastIdentitySignatureRef.current) {
-            return !lastIdentityExistsRef.current;
+            return {
+                canContinue: !lastIdentityExistsRef.current,
+                redirect: lastIdentityExistsRef.current ? lastIdentityRedirectRef.current || undefined : undefined,
+            };
         }
 
         lastIdentitySignatureRef.current = identitySignature;
@@ -312,36 +356,46 @@ export default function PremiumAdmissionForm() {
 
             if (!res.success) {
                 lastIdentityExistsRef.current = false;
+                lastIdentityRedirectRef.current = null;
                 setIdentityState({
                     status: 'error',
                     message: res.error || 'No se pudo validar identidad en este momento.',
                 });
-                return false;
+                return { canContinue: false };
             }
 
             if (res.exists) {
                 lastIdentityExistsRef.current = true;
                 const patientName = [res.patient?.nombre, res.patient?.apellido].filter(Boolean).join(' ').trim();
+                const redirectUrl = buildPatientUpdateUrl(res.patient?.documento || formData.dni);
+                const redirect = { url: redirectUrl, patientName };
+                lastIdentityRedirectRef.current = redirect;
                 setIdentityState({
                     status: 'exists',
                     patientName,
+                    redirectUrl,
                     message: patientName
-                        ? `Ya existe un paciente registrado: ${patientName}.`
-                        : 'Este DNI o correo ya se encuentra registrado.',
+                        ? `Ya sos paciente, ${patientName}. Te llevamos a actualizar tus datos.`
+                        : 'Ya sos paciente. Te llevamos a actualizar tus datos.',
                 });
-                return allowDuplicateForTesting;
+                if (!allowDuplicateForTesting) {
+                    return { canContinue: false, redirect };
+                }
+                return { canContinue: true };
             }
 
             lastIdentityExistsRef.current = false;
+            lastIdentityRedirectRef.current = null;
             setIdentityState({ status: 'ok', message: 'DNI y correo disponibles.' });
-            return true;
+            return { canContinue: true };
         } catch (error) {
             lastIdentityExistsRef.current = false;
+            lastIdentityRedirectRef.current = null;
             setIdentityState({
                 status: 'error',
                 message: error instanceof Error ? error.message : 'Error inesperado de validación',
             });
-            return false;
+            return { canContinue: false };
         }
     }, [allowDuplicateForTesting, canCheckIdentity, formData.dni, formData.email, identitySignature]);
 
@@ -575,7 +629,8 @@ export default function PremiumAdmissionForm() {
                             onChange={(e) => updateData({ dni: e.target.value })}
                             onBlur={async () => {
                                 handleBlur('dni');
-                                await runIdentityCheck(true);
+                                const result = await runIdentityCheck(true);
+                                if (result.redirect) redirectToPatientUpdate(result.redirect);
                             }}
                             error={errors.dni}
                             touched={touched.dni}
@@ -651,7 +706,8 @@ export default function PremiumAdmissionForm() {
                             onChange={(e) => updateData({ email: e.target.value })}
                             onBlur={async () => {
                                 handleBlur('email');
-                                await runIdentityCheck(true);
+                                const result = await runIdentityCheck(true);
+                                if (result.redirect) redirectToPatientUpdate(result.redirect);
                             }}
                             error={errors.email}
                             touched={touched.email}
@@ -734,8 +790,17 @@ export default function PremiumAdmissionForm() {
                                     : identityState.message}
                                 {identityState.status === 'exists' && (
                                     <div className="mt-2 text-xs text-amber-100/80">
-                                        Si ya sos paciente, usá el formulario de actualización de datos.
+                                        Abrimos el formulario correcto para que actualices tu ficha.
                                         {allowDuplicateForTesting && ' (Modo prueba activo: podés continuar igualmente).'}
+                                        {identityState.redirectUrl && !allowDuplicateForTesting && (
+                                            <button
+                                                type="button"
+                                                onClick={() => redirectToPatientUpdate({ url: identityState.redirectUrl!, patientName: identityState.patientName })}
+                                                className="mt-3 block text-left font-semibold text-white underline underline-offset-4"
+                                            >
+                                                Actualizar mis datos ahora
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </motion.div>
@@ -755,11 +820,15 @@ export default function PremiumAdmissionForm() {
                             if (isStepValid) {
                                 setIsValidating(true);
                                 try {
-                                    const canContinue = await runIdentityCheck(true);
-                                    if (!canContinue) {
-                                        toast.error('Este DNI o correo ya se encuentra registrado.', {
-                                            description: 'Si ya sos paciente, por favor contactanos por WhatsApp para agendar tu cita.'
-                                        });
+                                    const identityResult = await runIdentityCheck(true);
+                                    if (!identityResult.canContinue) {
+                                        if (identityResult.redirect) {
+                                            redirectToPatientUpdate(identityResult.redirect);
+                                        } else {
+                                            toast.error('No pudimos validar tus datos.', {
+                                                description: 'Intentá nuevamente en unos segundos.'
+                                            });
+                                        }
                                         setIsValidating(false);
                                         return;
                                     }
