@@ -475,11 +475,8 @@ export async function createWorkflowFolder(folderName: string, parentId?: string
 }
 
 /**
- * Ensures the standard patient hierarchy exists:
- * Mother Folder (APELLIDO, Nombre)
- *   ├── APELLIDO, Nombre - FOTO & VIDEO
- *   ├── APELLIDO, Nombre - PRESENTACION
- *   └── APELLIDO, Nombre - PRESUPUESTO
+ * Ensures the patient's root Drive folder exists.
+ * New patients intentionally get no presentation or admin subfolders by default.
  */
 export async function ensureStandardPatientFolders(
     apellido: string,
@@ -513,10 +510,6 @@ export async function ensureStandardPatientFolders(
 
         const finalMotherFolderId = resolvedMotherFolderId;
 
-        // 2. Create the 3 standard subfolders
-        // Omit subfolder creation for a flat folder structure by default (documents will be saved in mother folder)
-
-        // 3. Get Mother Folder URL
         const motherUrl = await getFolderWebViewLink(finalMotherFolderId);
 
         return {
@@ -590,9 +583,8 @@ export async function ensurePatientContractFolder(
 }
 
 /**
- * Ensures a patient's mother folder and presentation subfolder exist.
- * - Mother: "APELLIDO, Nombre"
- * - Subfolder: "APELLIDO, Nombre - PRESENTACION"
+ * Resolves a patient's root folder and reuses an existing presentation subfolder if present.
+ * It does not create presentation subfolders; new patients use the root folder directly.
  */
 export async function ensurePatientPresentationFolder(
     apellido: string,

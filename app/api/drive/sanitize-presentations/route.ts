@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { createAdminClient } from '@/utils/supabase/admin';
-import { extractFolderIdFromUrl, getPatientFolderName } from '@/lib/google-drive';
+import { extractFolderIdFromUrl } from '@/lib/google-drive';
 
 type SanitizerPayload = {
     dryRun?: boolean;
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     const rows = (patients || []) as PatientRow[];
 
     let scanned = 0;
-    let createdPresentationFolders = 0;
+    let skippedWithoutPresentationFolder = 0;
     let movedPresentations = 0;
     let patientsWithActions = 0;
     let skippedInvalidMotherLink = 0;
@@ -121,30 +121,13 @@ export async function POST(request: NextRequest) {
                 (f) => f.mimeType === 'application/vnd.google-apps.folder' && (f.name || '').toUpperCase().includes('PRESENTACION')
             );
 
-            let presentationFolderId = existingPresentationFolder?.id;
+            const presentationFolderId = existingPresentationFolder?.id;
             let touchedPatient = false;
 
             if (!presentationFolderId) {
-                const presentationFolderName = `${getPatientFolderName(patient.apellido || '', patient.nombre || '')} - PRESENTACION`;
-                if (!dryRun) {
-                    const created = await drive.files.create({
-                        supportsAllDrives: true,
-                        requestBody: {
-                            name: presentationFolderName,
-                            mimeType: 'application/vnd.google-apps.folder',
-                            parents: [motherFolderId],
-                        },
-                        fields: 'id',
-                    });
-                    presentationFolderId = created.data.id || undefined;
-                } else {
-                    presentationFolderId = `DRY:${patient.id_paciente}`;
-                }
-
-                createdPresentationFolders += 1;
-                touchedPatient = true;
+                skippedWithoutPresentationFolder += 1;
                 if (samples.length < SAMPLE_LIMIT) {
-                    samples.push(`${dryRun ? '[DRY]' : '[CREATE]'} ${patientLabel} -> ${presentationFolderName}`);
+                    samples.push(`[SKIP] ${patientLabel} -> sin carpeta PRESENTACION existente`);
                 }
             }
 
@@ -196,7 +179,8 @@ export async function POST(request: NextRequest) {
         summary: {
             scanned,
             patientsWithActions,
-            createdPresentationFolders,
+            createdPresentationFolders: 0,
+            skippedWithoutPresentationFolder,
             movedPresentations,
             skippedInvalidMotherLink,
             errors: errors.length,

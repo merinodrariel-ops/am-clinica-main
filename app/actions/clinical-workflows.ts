@@ -865,39 +865,29 @@ async function ensurePatientDriveFolder(treatmentId: string) {
     if (treatmentError || !treatment) return;
 
     // 2. Check if folder already exists in metadata
-    const metadata = (treatment.metadata as Record<string, any>) || {};
+    const metadata = (treatment.metadata as Record<string, unknown>) || {};
     if (metadata.drive_folder_id) return;
 
     // 3. Determine workflow type and folder suffix
-    const workflowData = treatment.workflow as any;
-    const workflowName = Array.isArray(workflowData) ? workflowData[0]?.name : workflowData?.name;
-    const workflowType = Array.isArray(workflowData) ? workflowData[0]?.type : workflowData?.type;
+    const workflowData = normalizeWorkflowData(treatment.workflow as WorkflowSummary | WorkflowSummary[] | null);
+    const workflowName = workflowData?.name;
+    const workflowType = workflowData?.type;
 
     // Skip folder creation for recurrent/maintenance workflows (Control Carillas, Limpieza, etc.)
     if (workflowType === 'recurrent') return;
 
     const lowerName = (workflowName || '').toLowerCase();
 
-    let suffix = (workflowName || 'TRATAMIENTO').toUpperCase();
-    if (lowerName.includes('ortodoncia') || lowerName.includes('alineador')) {
-        suffix = 'AM ALINEADORES';
-    } else if (lowerName.includes('sonrisa') || lowerName.includes('exocad')) {
-        suffix = 'EXOCAD';
-    } else if (lowerName.includes('cirugia') || lowerName.includes('implante')) {
-        suffix = 'CIRUGIA';
-    }
-
-    const patientData = treatment.patient as any;
+    const patientField = treatment.patient as unknown;
+    const patientData = (Array.isArray(patientField) ? patientField[0] : patientField) as PatientSummary | null | undefined;
+    if (!patientData) return;
+    const isExocadWorkflow = lowerName.includes('sonrisa') || lowerName.includes('exocad');
     const patientRootName = `${(patientData.apellido || '').toUpperCase()}, ${(patientData.nombre || '').charAt(0).toUpperCase() + (patientData.nombre || '').slice(1).toLowerCase()}`.trim();
-    const folderName = `[${suffix}] ${patientRootName}`;
 
-    // 4. Ensure Hierarchy on Google Drive
-    const {
-        ensureStandardPatientFolders,
-        createWorkflowFolder
-    } = await import('@/lib/google-drive');
+    // 4. Ensure root folder on Google Drive
+    const { ensureStandardPatientFolders } = await import('@/lib/google-drive');
 
-    // Step A: Ensure Mother Folder and Admin subfolders exist
+    // Step A: Ensure the patient root folder exists. No admin/treatment subfolders by default.
     const hierarchy = await ensureStandardPatientFolders(
         patientData.apellido,
         patientData.nombre,
@@ -917,13 +907,12 @@ async function ensurePatientDriveFolder(treatmentId: string) {
             .eq('id_paciente', patientData.id_paciente);
     }
 
-    // Step B: Create the specific treatment subfolder inside the parent
-    // For EXOCAD (Diseño de Sonrisa), also create the HTML subfolder inside [EXOCAD]
+    // Step B: only EXOCAD/Diseño workflows get dedicated subfolders.
     let workflowFolderId: string;
     let workflowFolderUrl: string;
     let htmlFolderNote = '';
 
-    if (suffix === 'EXOCAD') {
+    if (isExocadWorkflow) {
         const { ensureExocadHtmlFolder } = await import('@/lib/google-drive');
         const exocadResult = await ensureExocadHtmlFolder(hierarchy.motherFolderId);
         if (exocadResult.error || !exocadResult.exocadFolderId) {
@@ -936,13 +925,8 @@ async function ensurePatientDriveFolder(treatmentId: string) {
             ? `<li><strong>Subcarpeta HTML (subir caso aquí):</strong> <a href="https://drive.google.com/drive/folders/${exocadResult.htmlFolderId}">Abrir subcarpeta HTML</a></li>`
             : '';
     } else {
-        const result = await createWorkflowFolder(folderName, hierarchy.motherFolderId);
-        if (result.error || !result.folderId) {
-            console.error('Error creating workflow subfolder:', result.error);
-            return;
-        }
-        workflowFolderId = result.folderId;
-        workflowFolderUrl = result.webViewLink || `https://drive.google.com/drive/folders/${result.folderId}`;
+        workflowFolderId = hierarchy.motherFolderId;
+        workflowFolderUrl = hierarchy.motherFolderUrl || `https://drive.google.com/drive/folders/${hierarchy.motherFolderId}`;
     }
 
     // 5. Update treatment metadata
@@ -960,13 +944,15 @@ async function ensurePatientDriveFolder(treatmentId: string) {
     // 6. Send notification email to lab
     const { sendEmail } = await import('@/lib/email-service');
     const labEmail = 'amesteticadentallab@gmail.com';
-    const subject = `Nueva Carpeta de Paciente: ${folderName}`;
+    const subject = isExocadWorkflow
+        ? `Nueva Carpeta EXOCAD: ${patientRootName}`
+        : `Carpeta de Paciente: ${patientRootName}`;
     const html = `
         <div style="font-family: Arial, sans-serif; color: #111827;">
-            <h2 style="margin: 0 0 8px;">Nueva Carpeta en Google Drive</h2>
-            <p style="margin: 0 0 8px;">Se ha creado automáticamente la carpeta para el paciente.</p>
+            <h2 style="margin: 0 0 8px;">Carpeta en Google Drive</h2>
+            <p style="margin: 0 0 8px;">Se ha preparado la carpeta correspondiente para este workflow.</p>
             <ul style="margin: 0; padding-left: 18px;">
-                <li><strong>Paciente:</strong> ${folderName}</li>
+                <li><strong>Paciente:</strong> ${patientRootName}</li>
                 <li><strong>Workflow:</strong> ${workflowName}</li>
                 <li><strong>Carpeta principal:</strong> <a href="${workflowFolderUrl}">Ver Carpeta en Drive</a></li>
                 ${htmlFolderNote}

@@ -1,7 +1,7 @@
 /**
  * Script masivo para:
- * 1. Crear carpetas estándar en Drive para todos los pacientes que no la tienen
- * 2. Buscar presentaciones sueltas en PACIENTES root y moverlas a la subcarpeta PRESENTACION
+ * 1. Crear o vincular la carpeta raíz en Drive para pacientes que no la tienen
+ * 2. Detectar presentaciones sueltas sin moverlas ni crear subcarpetas
  *
  * Ejecutar en modo DRY RUN (solo muestra qué haría):
  *   npx tsx scripts/bulk-create-drive-folders.ts
@@ -116,33 +116,17 @@ async function getFolderWebViewLink(folderId: string): Promise<string | null> {
     }
 }
 
-async function moveFileToFolder(fileId: string, newParentId: string): Promise<void> {
-    if (DRY_RUN) return;
-    try {
-        const file = await drive.files.get({
-            fileId: fileId,
-            fields: 'parents'
-        });
-        const currentParents = file.data.parents?.join(',') || '';
-
-        await drive.files.update({
-            fileId,
-            supportsAllDrives: true,
-            enforceSingleParent: true,
-            addParents: newParentId,
-            removeParents: currentParents,
-            fields: 'id',
-        });
-    } catch (err: any) {
-        throw new Error(`Error en moveFileToFolder: ${err.message}`);
-    }
-}
-
 interface PatientRow {
     id_paciente: string;
     nombre: string | null;
     apellido: string | null;
     link_historia_clinica: string | null;
+}
+
+interface DriveRootItem {
+    id: string;
+    name: string;
+    mimeType: string;
 }
 
 async function main() {
@@ -199,7 +183,7 @@ async function main() {
 
     // 4. Index existing folders in PACIENTES ROOT to detect pre-existing presentations
     console.log('Indexando carpetas existentes en Drive...');
-    let existingDriveFolders: { id: string; name: string }[] = [];
+    const existingDriveFolders: DriveRootItem[] = [];
     let pageToken: string | undefined;
 
     do {
@@ -214,7 +198,11 @@ async function main() {
 
         const files = res.data.files || [];
         // We want both folders and non-folders (presentations might be files at root)
-        existingDriveFolders.push(...files.map(f => ({ id: f.id!, name: f.name!, mimeType: f.mimeType || '' })) as any);
+        existingDriveFolders.push(
+            ...files
+                .filter((f): f is { id: string; name: string; mimeType?: string | null } => Boolean(f.id && f.name))
+                .map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType || '' }))
+        );
         pageToken = res.data.nextPageToken || undefined;
     } while (pageToken);
 
@@ -222,8 +210,8 @@ async function main() {
 
     // Separate into folders and loose files
     const FOLDER_MIME = 'application/vnd.google-apps.folder';
-    const rootFolders = (existingDriveFolders as any[]).filter(f => f.mimeType === FOLDER_MIME);
-    const rootLooseFiles = (existingDriveFolders as any[]).filter(f => f.mimeType !== FOLDER_MIME);
+    const rootFolders = existingDriveFolders.filter(f => f.mimeType === FOLDER_MIME);
+    const rootLooseFiles = existingDriveFolders.filter(f => f.mimeType !== FOLDER_MIME);
 
     const rootFoldersByName = new Map(rootFolders.map(f => [f.name, f.id]));
 
@@ -262,12 +250,8 @@ async function main() {
     let linkedExisting = 0;
     let createdNew = 0;
     let skipped = 0;
-    let moved = 0;
-    let matchedPatients = 0;
-    let ambiguousMatches = 0;
-    const moveSamples: string[] = [];
-    const claimedLooseFileIds = new Set<string>();
-    const ambiguousMatchesRows: any[] = [];
+    let loosePresentationMatches = 0;
+    const loosePresentationSamples: string[] = [];
     const errors: string[] = [];
 
     for (const patient of needsFolder) {
@@ -292,22 +276,6 @@ async function main() {
                 }
             }
 
-            // Create standard subfolders
-            const subfolders = [
-                `[FOTO & VIDEO] ${folderName}`,
-                `[PRESENTACION] ${folderName}`,
-                `[PRESUPUESTO] ${folderName}`,
-            ];
-
-            let presentationFolderId: string | null = null;
-
-            for (const subName of subfolders) {
-                const subId = await findOrCreateFolder(motherFolderId, subName);
-                if (subName.includes('PRESENTACION')) {
-                    presentationFolderId = subId;
-                }
-            }
-
             // Update patient record with folder URL
             const folderUrl = await getFolderWebViewLink(motherFolderId);
             if (folderUrl && !DRY_RUN) {
@@ -317,40 +285,22 @@ async function main() {
                     .eq('id_paciente', patient.id_paciente);
             }
 
-            // Look for loose presentations matching this patient name
-            // Presentations are usually named like "APELLIDO, Nombre" or similar
-            if (presentationFolderId) {
-                const matchingFiles = rootLooseFiles.filter(f => {
-                    if (claimedLooseFileIds.has(f.id)) return false;
-                    const fName = normalizeLooseName(f.name);
-                    const pNombre = normalizeLooseName(patient.nombre || '');
-                    const pApellido = normalizeLooseName(patient.apellido || '');
-                    return (
-                        fName.includes(pApellido) && fName.includes(pNombre) ||
-                        fName === normalizeLooseName(folderName)
-                    );
-                });
+            const matchingLoosePresentations = rootLooseFiles.filter(f => {
+                const fName = normalizeLooseName(f.name);
+                const pNombre = normalizeLooseName(patient.nombre || '');
+                const pApellido = normalizeLooseName(patient.apellido || '');
+                return (
+                    fName.includes(pApellido) && fName.includes(pNombre) ||
+                    fName === normalizeLooseName(folderName)
+                );
+            });
 
-                if (matchingFiles.length > 1) {
-                    ambiguousMatches++;
-                    ambiguousMatchesRows.push({
-                        patient_id: patient.id_paciente,
-                        patient_name: folderName,
-                        matches: matchingFiles.map(f => f.name).join(' | ')
-                    });
-                }
-                if (matchingFiles.length > 0) matchedPatients++;
-
-                for (const file of matchingFiles) {
-                    claimedLooseFileIds.add(file.id);
-                    if (VERBOSE) {
-                        console.log(`    ↳ Moviendo "${file.name}" → PRESENTACION`);
+            if (matchingLoosePresentations.length > 0) {
+                loosePresentationMatches += matchingLoosePresentations.length;
+                for (const file of matchingLoosePresentations) {
+                    if (loosePresentationSamples.length < MOVE_SAMPLE_LIMIT) {
+                        loosePresentationSamples.push(`${file.name} -> ${folderName}`);
                     }
-                    if (moveSamples.length < MOVE_SAMPLE_LIMIT) {
-                        moveSamples.push(`${file.name} -> ${folderName}`);
-                    }
-                    await moveFileToFolder(file.id, presentationFolderId);
-                    moved++;
                 }
             }
 
@@ -361,7 +311,7 @@ async function main() {
                 if (VERBOSE) {
                     console.log(`  ... ${created}/${needsFolder.length} procesados, pausando 2s...`);
                 } else {
-                    console.log(`  Progreso: ${created}/${needsFolder.length} | movidas: ${moved} | errores: ${errors.length}`);
+                    console.log(`  Progreso: ${created}/${needsFolder.length} | presentaciones sueltas detectadas: ${loosePresentationMatches} | errores: ${errors.length}`);
                 }
                 await new Promise(r => setTimeout(r, 2000));
             }
@@ -380,18 +330,16 @@ async function main() {
     console.log(`  Carpetas creadas/vinculadas: ${created}`);
     console.log(`  - Nuevas: ${createdNew}`);
     console.log(`  - Ya existentes (solo link DB): ${linkedExisting}`);
-    console.log(`  Presentaciones movidas: ${moved}`);
-    console.log(`  Pacientes con matches: ${matchedPatients}`);
-    console.log(`  Pacientes con >1 match: ${ambiguousMatches}`);
-    console.log(`  Archivos sueltos no asignados: ${rootLooseFiles.length - claimedLooseFileIds.size}`);
+    console.log(`  - Omitidas por error: ${skipped}`);
+    console.log(`  Presentaciones sueltas detectadas (no movidas): ${loosePresentationMatches}`);
     console.log(`  Errores: ${errors.length}`);
-    if (moveSamples.length > 0) {
-        console.log('\n  Muestras de movimientos:');
-        for (const sample of moveSamples) {
+    if (loosePresentationSamples.length > 0) {
+        console.log('\n  Muestras de presentaciones sueltas detectadas:');
+        for (const sample of loosePresentationSamples) {
             console.log(`    - ${sample}`);
         }
-        if (moved > moveSamples.length) {
-            console.log(`    ... +${moved - moveSamples.length} movimientos adicionales`);
+        if (loosePresentationMatches > loosePresentationSamples.length) {
+            console.log(`    ... +${loosePresentationMatches - loosePresentationSamples.length} detecciones adicionales`);
         }
     }
     if (errors.length > 0) {
@@ -399,16 +347,6 @@ async function main() {
         errors.forEach(e => console.log(`    - ${e}`));
     }
 
-    // 8. Export report
-    if (ambiguousMatchesRows.length > 0) {
-        const reportPath = 'scripts/output/ambiguous_presentations.json';
-        const fs = require('fs');
-        const path = require('path');
-        const dir = path.dirname(reportPath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(reportPath, JSON.stringify(ambiguousMatchesRows, null, 2));
-        console.log(`\n📄 Reporte de ambigüedades exportado a: ${reportPath}`);
-    }
     if (DRY_RUN) {
         console.log('\n  ⚠️  Esto fue un DRY RUN. Para ejecutar de verdad:');
         console.log('     npx tsx scripts/bulk-create-drive-folders.ts --execute');

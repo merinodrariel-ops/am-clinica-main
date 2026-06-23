@@ -1,12 +1,11 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
-import { ensureStandardPatientFolders, createPatientDocuments } from '@/lib/google-drive';
+import { ensureStandardPatientFolders } from '@/lib/google-drive';
 import { syncPatientToSheet } from '@/lib/google-sheets';
 import { EmailService } from '@/lib/email-service';
 import { admissionSubmissionSchema, type AdmissionSubmission } from '@/lib/admission-schema';
 import type { Paciente } from '@/lib/patients';
-import { formatDateForLocale } from '@/lib/local-date';
 
 function getAdmissionSupabase() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,30 +24,6 @@ type TriggerStatus = {
     ok: boolean;
     detail: string;
 };
-
-type PatientDocumentsResult = Awaited<ReturnType<typeof createPatientDocuments>>;
-
-function calculateAgeFromDateOnly(value?: string | null): string {
-    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '-';
-    const [year, month, day] = value.split('-').map(Number);
-    const dob = new Date(year, month - 1, day);
-    if (
-        dob.getFullYear() !== year ||
-        dob.getMonth() !== month - 1 ||
-        dob.getDate() !== day
-    ) {
-        return '-';
-    }
-
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-        age--;
-    }
-
-    return age >= 0 && age <= 120 ? `${age} años` : '-';
-}
 
 export type AdmissionTriggerMap = {
     database: TriggerStatus;
@@ -128,61 +103,6 @@ function composeClinicalNotes(data: AdmissionSubmission) {
     }
 
     return sections.join('\n');
-}
-
-async function createFirstDiagnosisTodo(params: {
-    patientId: string;
-    patientName: string;
-    reason?: string;
-    healthAlerts: string[];
-    driveLink?: string;
-    slidesLink?: string;
-}) {
-    const supabase = getAdmissionSupabase();
-
-    const { data: doctor, error: doctorError } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('is_active', true)
-        .ilike('full_name', '%Ariel%Merino%')
-        .limit(1)
-        .maybeSingle();
-
-    if (doctorError) {
-        return { ok: false, detail: `Sin responsable: ${doctorError.message}` };
-    }
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 1);
-
-    const descriptionParts = [
-        `Paciente: ${params.patientName}`,
-        `ID paciente: ${params.patientId}`,
-        params.reason ? `Motivo: ${params.reason}` : null,
-        params.healthAlerts.length ? `Alertas clínicas: ${params.healthAlerts.join('; ')}` : null,
-        params.driveLink ? `Carpeta Drive: ${params.driveLink}` : null,
-        params.slidesLink ? `Presentación diagnóstico: ${params.slidesLink}` : null,
-        'Origen: formulario de admisión',
-    ].filter(Boolean);
-
-    const { error } = await supabase.from('todos').insert({
-        title: `Primer Diagnóstico · ${params.patientName}`,
-        description: descriptionParts.join('\n'),
-        status: 'pending',
-        priority: params.healthAlerts.length > 0 ? 'urgent' : 'high',
-        created_by: null,
-        created_by_name: 'Motor de Admisión',
-        assigned_to_id: doctor?.id || null,
-        assigned_to_name: doctor?.full_name || 'Dr. Ariel Merino',
-        due_date: dueDate.toISOString().slice(0, 10),
-        is_pinned: params.healthAlerts.length > 0,
-    });
-
-    if (error) {
-        return { ok: false, detail: error.message };
-    }
-
-    return { ok: true, detail: `Asignada a ${doctor?.full_name || 'Dr. Ariel Merino'}` };
 }
 
 export async function submitAdmissionAction(rawData: AdmissionData) {
@@ -269,7 +189,6 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         triggers.database = { ok: true, detail: 'Paciente registrado en Supabase' };
 
         let driveLink = '';
-        let docResult: PatientDocumentsResult | null = null;
 
         try {
             console.log('Starting Drive folder creation for:', data.apellido, data.nombre);
@@ -289,52 +208,12 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                         ? 'Carpeta de paciente creada/validada' 
                         : 'Carpeta creada (URL generada manualmente)' 
                 };
-
-                console.log('Creating patient documents in folder:', driveResult.motherFolderId);
-
-                // Calculate age from DOB
-                const edad = calculateAgeFromDateOnly(data.fecha_nacimiento);
-
-                // Build health alert strings
-                const alertParts: string[] = [];
-                if (data.health_alerts?.length) {
-                    alertParts.push(...data.health_alerts);
-                }
-                const alergiaAlert = data.health_alerts?.find(a => a.toLowerCase().includes('alergia'));
-                const medicacionAlert = data.health_alerts?.find(a => a.toLowerCase().includes('medicaci'));
-
-                docResult = await createPatientDocuments(driveResult.motherFolderId, {
-                    nombre: data.nombre,
-                    apellido: data.apellido,
-                    dni: data.dni || '-',
-                    fecha: new Date().toLocaleDateString('es-AR'),
-                    fechaNacimiento: data.fecha_nacimiento
-                        ? formatDateForLocale(data.fecha_nacimiento)
-                        : undefined,
-                    edad,
-                    whatsapp: data.whatsapp,
-                    email: data.email,
-                    ciudad: data.ciudad || undefined,
-                    barrio: data.zona_barrio || undefined,
-                    motivoConsulta: data.motivo_consulta || undefined,
-                    comoNosConocio: data.referencia_origen || undefined,
-                    alergias: alergiaAlert || undefined,
-                    medicacion: medicacionAlert || undefined,
-                    observacionesGenerales: data.health_notes || clinicalNotes || undefined,
-                });
-                console.log('Documents result:', JSON.stringify(docResult));
-
-                if (docResult?.fichaUrl || docResult?.presupuestoUrl) {
-                    triggers.slides = { ok: true, detail: 'Presentación diagnóstica generada desde template' };
-                } else {
-                    triggers.slides = { ok: false, detail: docResult?.error || 'No se pudo generar Google Slides' };
-                }
+                triggers.slides = { ok: true, detail: 'Omitido: las admisiones ya no generan presentaciones' };
 
                 await supabase
                     .from('pacientes')
                     .update({
                         link_historia_clinica: driveLink,
-                        link_google_slides: docResult?.fichaUrl || null
                     })
                     .eq('id_paciente', created.id_paciente);
             } else {
@@ -343,7 +222,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
         } catch (driveErr) {
             console.error('Error creating Drive folders:', driveErr);
             triggers.drive = { ok: false, detail: driveErr instanceof Error ? driveErr.message : String(driveErr) };
-            triggers.slides = { ok: false, detail: 'No ejecutado por error de Drive' };
+            triggers.slides = { ok: true, detail: 'Omitido: las admisiones ya no generan presentaciones' };
         }
 
         try {
@@ -358,7 +237,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
                 fecha_nacimiento: data.fecha_nacimiento || null,
                 ciudad: data.ciudad || undefined,
                 observaciones_generales: clinicalNotes,
-                link_google_slides: docResult?.fichaUrl || null,
+                link_google_slides: null,
                 origen_registro: 'Admisión Directa',
             };
 
@@ -393,7 +272,7 @@ export async function submitAdmissionAction(rawData: AdmissionData) {
             triggers,
             links: {
                 drive: driveLink || null,
-                slides: docResult?.fichaUrl || null,
+                slides: null,
             },
         };
     } catch (error) {

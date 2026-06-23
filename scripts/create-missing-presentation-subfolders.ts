@@ -4,8 +4,8 @@
  * Dry run (default):
  *   npx tsx scripts/create-missing-presentation-subfolders.ts
  *
- * Execute real creation:
- *   npx tsx scripts/create-missing-presentation-subfolders.ts --execute
+ * Execute real creation for legacy recovery only:
+ *   npx tsx scripts/create-missing-presentation-subfolders.ts --execute --allow-legacy-presentation-folders
  *
  * Optional filters:
  *   --limit=100
@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { google } from 'googleapis';
 
 const DRY_RUN = !process.argv.includes('--execute');
+const ALLOW_LEGACY_PRESENTATION_FOLDERS = process.argv.includes('--allow-legacy-presentation-folders');
 const VERBOSE = process.argv.includes('--verbose');
 
 const limitArg = process.argv.find((arg) => arg.startsWith('--limit='));
@@ -82,6 +83,13 @@ function getAuth() {
 }
 
 async function main() {
+    if (!DRY_RUN && !ALLOW_LEGACY_PRESENTATION_FOLDERS) {
+        throw new Error(
+            'Bloqueado: el modelo actual no crea subcarpetas PRESENTACION. ' +
+            'Para una recuperacion legacy deliberada, agregue --allow-legacy-presentation-folders.'
+        );
+    }
+
     const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -226,7 +234,7 @@ async function main() {
 
     if (DRY_RUN) {
         console.log('\nPara ejecutar en modo real:');
-        console.log('npx tsx scripts/create-missing-presentation-subfolders.ts --execute');
+        console.log('npx tsx scripts/create-missing-presentation-subfolders.ts --execute --allow-legacy-presentation-folders');
     }
 
     console.log();
