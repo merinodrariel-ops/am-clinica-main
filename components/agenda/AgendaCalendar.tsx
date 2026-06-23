@@ -115,6 +115,7 @@ const DOCTOR_COLORS = [
 ];
 
 const SURGERY_APPOINTMENT_TYPES = new Set(['cirugia_implantes', 'cirugia']);
+const DETAILED_DAY_APPOINTMENT_TYPES = new Set(['turno_detallado', 'tallado']);
 
 function inferCleaningType(type: string | null | undefined, title: string | null | undefined): CleaningAppointmentType {
     if (type === 'limpieza_laser') return 'limpieza_laser';
@@ -457,6 +458,7 @@ export default function AgendaCalendar() {
                 const isConflict = conflictMap.has(apt.id);
                 const isCancelled = apt.status === 'cancelled';
                 const isSurgery = SURGERY_APPOINTMENT_TYPES.has(apt.type);
+                const isDetailedDay = DETAILED_DAY_APPOINTMENT_TYPES.has(apt.type);
                 const isInternal = apt.type === 'recordatorio_interno';
 
                 // Recordatorios internos: color naranja distintivo, sin lógica de doctor/cirugía
@@ -495,7 +497,7 @@ export default function AgendaCalendar() {
                 const color = isSurgery ? '#dc2626' : normalizeEventColor(apt.color_tag, fallbackColor);
                 const textColor = isCancelled ? '#4b5563' : getReadableTextColor(color);
                 const backgroundColor = isConflict ? '#ef4444' : isCancelled ? '#e5e7eb' : color;
-                const borderColor = isConflict ? '#dc2626' : isCancelled ? '#9ca3af' : color;
+                const borderColor = isConflict ? '#dc2626' : isCancelled ? '#9ca3af' : isDetailedDay ? '#facc15' : color;
 
                 return {
                     id: apt.id,
@@ -505,7 +507,7 @@ export default function AgendaCalendar() {
                     backgroundColor,
                     borderColor,
                     textColor: isConflict ? '#ffffff' : textColor,
-                    className: `premium-event ${isConflict ? 'animate-pulse ring-2 ring-red-500' : ''} ${apt.status === 'pending' ? 'tentative-event' : ''} ${isCancelled ? 'cancelled-event' : ''}`,
+                    className: `premium-event ${isDetailedDay ? 'turno-detallado-event' : ''} ${isConflict ? 'animate-pulse ring-2 ring-red-500' : ''} ${apt.status === 'pending' ? 'tentative-event' : ''} ${isCancelled ? 'cancelled-event' : ''}`,
                     extendedProps: {
                         status: apt.status,
                         type: apt.type,
@@ -650,6 +652,8 @@ export default function AgendaCalendar() {
                 .fc-event { border-radius:8px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:4px 8px; font-size:.85rem; font-weight:600; }
                 .premium-event { transition:all .2s ease; }
                 .premium-event:hover { transform:scale(1.02); box-shadow:0 8px 20px rgba(0,0,0,.12); z-index:50; }
+                .turno-detallado-event { border:2px solid #facc15!important; box-shadow:0 0 0 2px rgba(250,204,21,.25), 0 8px 18px rgba(180,83,9,.18)!important; overflow:visible!important; }
+                .turno-detallado-event::before { content:''; position:absolute; inset:-5px; border-radius:12px; border:1px solid rgba(250,204,21,.55); pointer-events:none; }
                 .cancelled-event { border:2px dashed #9ca3af!important; box-shadow:none!important; opacity:.92; }
                 .cancelled-event:hover { transform:none; box-shadow:0 4px 12px rgba(107,114,128,.18)!important; }
                 .fc-scrollgrid { border:none!important; }
@@ -1130,9 +1134,11 @@ export default function AgendaCalendar() {
                                 urgencia: 'Control / urgencia',
                                 limpieza: 'Limpieza',
                                 cementado: 'Cementado',
-                                tallado: 'Tallado',
+                                turno_detallado: 'Día detallado',
+                                tallado: 'Día detallado',
                                 botox: 'Botox',
                             };
+                            const isDetailedDay = DETAILED_DAY_APPOINTMENT_TYPES.has(props.type || '');
                             const typeLabel = isPrimeraVez ? '⭐ 1ª vez' : (TYPE_LABELS[props.type ?? ''] ?? null);
                             const primaryLine = patientName || event.title || 'Cita';
                             const treatmentLine = event.title && event.title !== primaryLine ? event.title : '';
@@ -1144,6 +1150,11 @@ export default function AgendaCalendar() {
                                             <span className="truncate">{primaryLine}</span>
                                             <span className="flex items-center gap-0.5 flex-shrink-0 ml-1">
                                                 {props.conflict && <span title="Conflicto de horario" className="text-white">⚠️</span>}
+                                                {isDetailedDay && !props.conflict && (
+                                                    <span title="Día detallado — caso de laboratorio activo">
+                                                        <AlertTriangle size={10} className="text-yellow-200" />
+                                                    </span>
+                                                )}
                                                 {isBlocked && !props.conflict && (
                                                     <span title="Pendiente de notificar — agenda bloqueada">
                                                         <AlertTriangle size={9} className="text-amber-300" />

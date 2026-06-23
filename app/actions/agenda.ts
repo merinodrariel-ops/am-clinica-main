@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
+import { sendEmail } from '@/lib/email-service';
 
 // Service-role client bypasses RLS for agenda mutations.
 // Auth is still verified via SSR client before calling these.
@@ -12,6 +13,296 @@ function getAdminClient() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+}
+
+const DETAILED_DAY_APPOINTMENT_TYPES = new Set(['turno_detallado', 'tallado']);
+const DETAILED_DAY_WORKFLOW_NAME = 'Diseño de Sonrisa';
+const DETAILED_DAY_LAB_RECIPIENTS =
+    process.env.WORKFLOW_LAB_NOTIFICATION_RECIPIENTS ||
+    'amesteticadentallab@gmail.com,juliian_97@outlook.com,drarielmerino@gmail.com,lourdesfreire031@gmail.com';
+
+function createDetailedDayEventKey(parts: string[]) {
+    return parts.join('::');
+}
+
+function getArgentinaDateString(value: string | Date) {
+    return new Date(value).toLocaleDateString('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+    });
+}
+
+function addDaysToDateString(dateString: string, days: number) {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
+    return date.toISOString().slice(0, 10);
+}
+
+function formatPatientName(patient?: { nombre?: string | null; apellido?: string | null } | null) {
+    return `${patient?.apellido || ''}, ${patient?.nombre || ''}`.replace(/^,\s*|\s*,\s*$/g, '').trim() || 'Paciente';
+}
+
+async function logDetailedDayWorkflowNotification(params: {
+    workflowId?: string | null;
+    stageId?: string | null;
+    treatmentId?: string | null;
+    eventType: string;
+    recipientEmail?: string | null;
+    subject?: string | null;
+    status: 'sent' | 'failed' | 'skipped';
+    errorMessage?: string | null;
+    eventKey: string;
+}) {
+    try {
+        const adminClient = getAdminClient();
+        const { error } = await adminClient.from('workflow_notifications_log').insert({
+            workflow_id: params.workflowId || null,
+            stage_id: params.stageId || null,
+            treatment_id: params.treatmentId || null,
+            event_type: params.eventType,
+            recipient_email: params.recipientEmail || null,
+            subject: params.subject || null,
+            status: params.status,
+            error_message: params.errorMessage || null,
+            event_key: params.eventKey,
+        });
+
+        if (error && error.code !== '23505') {
+            console.error('[turno-detallado] notification log failed:', error.message);
+        }
+    } catch (error) {
+        console.error('[turno-detallado] notification log crashed:', error);
+    }
+}
+
+async function ensureDetailedDayWorkflowCase(appointmentId: string) {
+    const adminClient = getAdminClient();
+
+    const { data: appointment, error: appointmentError } = await adminClient
+        .from('agenda_appointments')
+        .select(`
+            id,
+            title,
+            patient_id,
+            doctor_id,
+            start_time,
+            end_time,
+            type,
+            notes,
+            patient:pacientes(id_paciente, nombre, apellido, documento)
+        `)
+        .eq('id', appointmentId)
+        .maybeSingle();
+
+    if (appointmentError || !appointment) {
+        console.error('[turno-detallado] appointment lookup failed:', appointmentError?.message);
+        return;
+    }
+
+    if (!DETAILED_DAY_APPOINTMENT_TYPES.has(appointment.type || '')) return;
+    if (!appointment.patient_id) return;
+
+    const dedupeEventKey = createDetailedDayEventKey(['turno_detallado_case_created', appointment.id]);
+    const { data: existingTreatment, error: existingTreatmentError } = await adminClient
+        .from('patient_treatments')
+        .select('id')
+        .contains('metadata', { source_appointment_id: appointment.id })
+        .limit(1)
+        .maybeSingle();
+
+    if (existingTreatmentError) {
+        console.error('[turno-detallado] existing treatment lookup failed:', existingTreatmentError.message);
+    }
+
+    if (existingTreatment?.id) {
+        await logDetailedDayWorkflowNotification({
+            eventType: 'turno_detallado_case_created',
+            treatmentId: existingTreatment.id,
+            status: 'skipped',
+            errorMessage: 'existing_case',
+            eventKey: dedupeEventKey,
+        });
+        return;
+    }
+
+    const { data: workflow, error: workflowError } = await adminClient
+        .from('clinical_workflows')
+        .select('id, name')
+        .eq('name', DETAILED_DAY_WORKFLOW_NAME)
+        .eq('active', true)
+        .maybeSingle();
+
+    if (workflowError || !workflow) {
+        console.error('[turno-detallado] workflow not found:', workflowError?.message || DETAILED_DAY_WORKFLOW_NAME);
+        return;
+    }
+
+    const { data: stages, error: stagesError } = await adminClient
+        .from('clinical_workflow_stages')
+        .select('id, name, order_index, is_initial')
+        .eq('workflow_id', workflow.id)
+        .order('order_index', { ascending: true });
+
+    if (stagesError || !stages?.length) {
+        console.error('[turno-detallado] workflow stages not found:', stagesError?.message);
+        return;
+    }
+
+    const normalize = (value?: string | null) => (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    const targetStage =
+        stages.find(stage => normalize(stage.name).includes('escaneo final')) ||
+        stages.find(stage => normalize(stage.name).includes('preparacion dental')) ||
+        stages.find(stage => Boolean(stage.is_initial)) ||
+        stages[0];
+
+    const appointmentDate = getArgentinaDateString(appointment.start_time);
+    const now = new Date().toISOString();
+    const patientRows = appointment.patient as
+        | { id_paciente?: string; nombre?: string | null; apellido?: string | null; documento?: string | null }
+        | { id_paciente?: string; nombre?: string | null; apellido?: string | null; documento?: string | null }[]
+        | null;
+    const patient = Array.isArray(patientRows) ? patientRows[0] : patientRows;
+    const patientName = formatPatientName(patient);
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const patientFilesUrl = `${appBaseUrl}/patients/${appointment.patient_id}?tab=archivos`;
+    const workflowsUrl = `${appBaseUrl}/workflows?section=laboratorio`;
+
+    const { data: treatment, error: treatmentError } = await adminClient
+        .from('patient_treatments')
+        .insert({
+            patient_id: appointment.patient_id,
+            workflow_id: workflow.id,
+            current_stage_id: targetStage.id,
+            doctor_id: null,
+            start_date: appointment.start_time,
+            last_stage_change: now,
+            next_milestone_date: null,
+            status: 'active',
+            metadata: {
+                source: 'agenda_turno_detallado',
+                source_appointment_id: appointment.id,
+                appointment_date: appointment.start_time,
+                type: 'Día detallado',
+                expected_next_step: 'Subir escaneo 3D al caso clínico',
+            },
+        })
+        .select('id')
+        .single();
+
+    if (treatmentError || !treatment) {
+        console.error('[turno-detallado] treatment insert failed:', treatmentError?.message);
+        await logDetailedDayWorkflowNotification({
+            workflowId: workflow.id,
+            stageId: targetStage.id,
+            eventType: 'turno_detallado_case_created',
+            status: 'failed',
+            errorMessage: treatmentError?.message || 'treatment_insert_failed',
+            eventKey: dedupeEventKey,
+        });
+        return;
+    }
+
+    await adminClient.from('treatment_history').insert({
+        treatment_id: treatment.id,
+        new_stage_id: targetStage.id,
+        comments: 'Caso iniciado automáticamente desde Día detallado en agenda.',
+    }).then(({ error }) => {
+        if (error) console.error('[turno-detallado] history insert failed:', error.message);
+    });
+
+    await adminClient.from('laboratorio_trabajos').insert({
+        paciente_id: appointment.patient_id,
+        profesional_id: null,
+        tipo_trabajo: 'Día detallado - escaneo 3D pendiente',
+        laboratorio_nombre: 'Laboratorio Interno',
+        fecha_envio: appointmentDate,
+        fecha_entrega_estimada: addDaysToDateString(appointmentDate, 7),
+        costo_usd: 0,
+        observaciones: [
+            'Caso creado automáticamente desde agenda.',
+            `Turno detallado: ${appointmentDate}.`,
+            `Paciente: ${patientName}.`,
+            `Turno ID: ${appointment.id}.`,
+            'Acción esperada: verificar/subir escaneo 3D y tomar el caso.',
+        ].join(' '),
+        estado: 'Enviado',
+    }).then(({ error }) => {
+        if (error) console.error('[turno-detallado] lab work insert failed:', error.message);
+    });
+
+    const recipients = DETAILED_DAY_LAB_RECIPIENTS
+        .split(',')
+        .map(email => email.trim())
+        .filter(Boolean);
+    const subject = `Día detallado: revisar escaneo 3D - ${patientName}`;
+    const html = `
+        <div style="font-family: Arial, sans-serif; color: #111827;">
+            <h2 style="margin: 0 0 8px;">Día detallado agendado</h2>
+            <p style="margin: 0 0 12px;">Se creó automáticamente un caso para laboratorio. La acción importante es controlar que el escaneo 3D esté subido y tomar el caso.</p>
+            <ul style="margin: 0; padding-left: 18px;">
+                <li><strong>Fecha del turno:</strong> ${appointmentDate}</li>
+                <li><strong>Paciente:</strong> ${patientName}</li>
+                <li><strong>Documento:</strong> ${patient?.documento || 'Sin documento'}</li>
+                <li><strong>Etapa Workflow:</strong> ${targetStage.name}</li>
+                <li><strong>Acción esperada:</strong> verificar/subir escaneo 3D</li>
+            </ul>
+            <p style="margin-top: 14px;">
+                <a href="${patientFilesUrl}" style="background:#111827;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">Abrir archivos del paciente</a>
+            </p>
+            <p style="margin-top: 8px;">
+                <a href="${workflowsUrl}">Abrir laboratorio en Workflow</a>
+            </p>
+        </div>
+    `;
+
+    await Promise.all(recipients.map(async email => {
+        const eventKey = createDetailedDayEventKey(['turno_detallado_lab_alert', appointment.id, email]);
+        const response = await sendEmail({
+            to: email,
+            subject,
+            html,
+            messageType: 'workflow_notification',
+            sourceModule: 'agenda',
+            templateKey: 'turno_detallado_lab_alert',
+            patientId: appointment.patient_id,
+            appointmentId: appointment.id,
+            workflowId: workflow.id,
+            treatmentId: treatment.id,
+            idempotencyKey: eventKey,
+            payload: {
+                appointmentId: appointment.id,
+                appointmentDate,
+                stageName: targetStage.name,
+            },
+        });
+
+        await logDetailedDayWorkflowNotification({
+            workflowId: workflow.id,
+            stageId: targetStage.id,
+            treatmentId: treatment.id,
+            eventType: 'turno_detallado_lab_alert',
+            recipientEmail: email,
+            subject,
+            status: response.success ? 'sent' : 'failed',
+            errorMessage: response.success ? null : String(response.error || 'unknown_error'),
+            eventKey,
+        });
+    }));
+
+    await logDetailedDayWorkflowNotification({
+        workflowId: workflow.id,
+        stageId: targetStage.id,
+        treatmentId: treatment.id,
+        eventType: 'turno_detallado_case_created',
+        subject,
+        status: 'sent',
+        eventKey: dedupeEventKey,
+    });
+
+    revalidatePath('/workflows');
+    revalidatePath(`/patients/${appointment.patient_id}`);
 }
 
 async function verifyAgendaWriteAccess() {
@@ -147,6 +438,12 @@ export async function createAppointment(formData: FormData) {
         } catch (syncErr) {
             console.error('[GoogleSync] Outbound sync failed during creation:', syncErr);
         }
+
+        try {
+            await ensureDetailedDayWorkflowCase(newApt.id);
+        } catch (workflowErr) {
+            console.error('[turno-detallado] automation failed during creation:', workflowErr);
+        }
     }
 
     revalidatePath('/agenda');
@@ -193,6 +490,12 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
         await updateGoogleEvent(id);
     } catch (syncErr) {
         console.error('[GoogleSync] Outbound sync failed during update:', syncErr);
+    }
+
+    try {
+        await ensureDetailedDayWorkflowCase(id);
+    } catch (workflowErr) {
+        console.error('[turno-detallado] automation failed during update:', workflowErr);
     }
 
     // Post-update hooks: primera visita + auto-recalls al completar
