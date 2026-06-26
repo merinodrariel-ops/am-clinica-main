@@ -15,7 +15,7 @@ $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 try {
     # Load configuration
     $driveRoot = "G:\Mi unidad" # Default fallback
-    if (Test-Path $configFile) {
+    if (Test-Path -LiteralPath $configFile) {
         $config = Get-Content $configFile | ConvertFrom-Json
         if ($config.googleDrivePath) {
             $driveRoot = $config.googleDrivePath
@@ -25,7 +25,8 @@ try {
 
     # Parse URL
     # Format: am-clinica-exocad://open?patientFolder=APELLIDO%2C%20Nombre&path=relative/path/file.project
-    if ($Url -match "am-clinica-exocad://open\?(.*)") {
+    # Note: Browsers normalize custom protocols by adding a trailing slash after host: am-clinica-exocad://open/?...
+    if ($Url -match "am-clinica-exocad://open/?\?(.*)") {
         $queryString = $Matches[1]
         
         # Parse query parameters
@@ -60,7 +61,7 @@ try {
         
         "[$timestamp] Target file/folder path: $fullPath" | Out-File $logFile -Append
         
-        if (Test-Path $fullPath) {
+        if (Test-Path -LiteralPath $fullPath) {
             "[$timestamp] Opening: $fullPath" | Out-File $logFile -Append
             # Start-Process will launch the default associated application
             Start-Process $fullPath
@@ -80,7 +81,7 @@ try {
             $found = $false
             foreach ($alt in $alternatives) {
                 "[$timestamp] Checking alternative path: $alt" | Out-File $logFile -Append
-                if (Test-Path $alt) {
+                if (Test-Path -LiteralPath $alt) {
                     "[$timestamp] Opening alternative path..." | Out-File $logFile -Append
                     Start-Process $alt
                     $found = $true
