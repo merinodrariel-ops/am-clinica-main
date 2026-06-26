@@ -15,10 +15,15 @@ $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 try {
     # Load configuration
     $driveRoot = "G:\Mi unidad" # Default fallback
+    $exocadAppPath = "C:\exocad-DentalCAD3.2-FR-2024-09-27\DentalCADApp\bin\DentalCADApp.exe" # Default correct version
+    
     if (Test-Path -LiteralPath $configFile) {
         $config = Get-Content $configFile | ConvertFrom-Json
         if ($config.googleDrivePath) {
             $driveRoot = $config.googleDrivePath
+        }
+        if ($config.exocadAppPath) {
+            $exocadAppPath = $config.exocadAppPath
         }
     }
     "[$timestamp] Using Google Drive path: $driveRoot" | Out-File $logFile -Append
@@ -63,8 +68,24 @@ try {
         
         if (Test-Path -LiteralPath $fullPath) {
             "[$timestamp] Opening: $fullPath" | Out-File $logFile -Append
-            # Start-Process will launch the default associated application
-            Start-Process $fullPath
+            
+            # Check if we are opening an Exocad file
+            $isExocadFile = ($fullPath.EndsWith(".project") -or $fullPath.EndsWith(".dentalProject") -or $fullPath.EndsWith(".dentalproject"))
+            
+            if ($isExocadFile) {
+                if (Test-Path -LiteralPath $exocadAppPath) {
+                    $exocadBinDir = Split-Path $exocadAppPath
+                    "[$timestamp] Launching Exocad directly: $exocadAppPath with project: $fullPath" | Out-File $logFile -Append
+                    Start-Process -FilePath $exocadAppPath -ArgumentList "`"$fullPath`"" -WorkingDirectory $exocadBinDir
+                } else {
+                    # Fallback to default association
+                    "[$timestamp] Exocad executable not found at $exocadAppPath. Falling back to default Windows association." | Out-File $logFile -Append
+                    Start-Process $fullPath
+                }
+            } else {
+                # Standard folder/file opening
+                Start-Process $fullPath
+            }
         } else {
             # Let's try some path variations just in case
             # e.g., if driveRoot is just "G:\" or doesn't have "Pacientes" but config has it, etc.
@@ -83,7 +104,16 @@ try {
                 "[$timestamp] Checking alternative path: $alt" | Out-File $logFile -Append
                 if (Test-Path -LiteralPath $alt) {
                     "[$timestamp] Opening alternative path..." | Out-File $logFile -Append
-                    Start-Process $alt
+                    
+                    # Check if we are opening an Exocad file for alternatives
+                    $isExocadFile = ($alt.EndsWith(".project") -or $alt.EndsWith(".dentalProject") -or $alt.EndsWith(".dentalproject"))
+                    
+                    if ($isExocadFile -and (Test-Path -LiteralPath $exocadAppPath)) {
+                        $exocadBinDir = Split-Path $exocadAppPath
+                        Start-Process -FilePath $exocadAppPath -ArgumentList "`"$alt`"" -WorkingDirectory $exocadBinDir
+                    } else {
+                        Start-Process $alt
+                    }
                     $found = $true
                     break
                 }
