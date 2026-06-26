@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Moon, Sun, Monitor, Database, Settings, LaptopMinimalCheck } from 'lucide-react';
+import { X, Moon, Sun, Monitor, Settings, LaptopMinimalCheck } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import DataImporter from './DataImporter';
 import ExocadWindowsGuide from './ExocadWindowsGuide';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { canAccessExocadGuide } from '@/lib/settings-access';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -14,7 +14,7 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-    const [activeTab, setActiveTab] = useState<'general' | 'data' | 'software'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'software'>('general');
     const { theme, setTheme } = useTheme();
     const { categoria: role, isRealOwner } = useAuth();
 
@@ -22,7 +22,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     if (!isOpen) return null;
 
-    const isAdmin = role === 'admin' || role === 'owner' || isRealOwner;
+    const canSeeExocadGuide = canAccessExocadGuide(role, isRealOwner);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -61,20 +61,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             General
                         </button>
 
-                        {isAdmin && (
-                            <button
-                                onClick={() => setActiveTab('data')}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'data'
-                                        ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200 dark:border-gray-700'
-                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                                    }`}
-                            >
-                                <Database className="w-4 h-4" />
-                                Datos e Importación
-                            </button>
-                        )}
-
-                        {isAdmin && (
+                        {canSeeExocadGuide && (
                             <button
                                 onClick={() => setActiveTab('software')}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'software'
@@ -100,17 +87,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 <Monitor className="w-4 h-4" />
                                 General
                             </button>
-                            {isAdmin && (
-                                <button
-                                    onClick={() => setActiveTab('data')}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${activeTab === 'data' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                                        }`}
-                                >
-                                    <Database className="w-4 h-4" />
-                                    Datos
-                                </button>
-                            )}
-                            {isAdmin && (
+                            {canSeeExocadGuide && (
                                 <button
                                     onClick={() => setActiveTab('software')}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${activeTab === 'software' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
@@ -182,13 +159,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             </div>
                         )}
 
-                        {activeTab === 'data' && isAdmin && (
-                            <div className="animate-in fade-in duration-300">
-                                <DataImporter />
-                            </div>
-                        )}
-
-                        {activeTab === 'software' && isAdmin && (
+                        {activeTab === 'software' && canSeeExocadGuide && (
                             <ExocadWindowsGuide />
                         )}
                     </div>
