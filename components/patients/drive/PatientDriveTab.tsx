@@ -536,6 +536,20 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         classifiedGroups.foto.files = applySavedOrder(classifiedGroups.foto.files, savedOrder);
     }
 
+    // Sort '3d' files: Exocad project files first, ordered by createdTime descending (newest first)
+    classifiedGroups['3d'].files.sort((a, b) => {
+        const aIsExocad = a.name.toLowerCase().endsWith('.project') || a.name.toLowerCase().endsWith('.projects') || a.name.toLowerCase().endsWith('.dentalproject');
+        const bIsExocad = b.name.toLowerCase().endsWith('.project') || b.name.toLowerCase().endsWith('.projects') || b.name.toLowerCase().endsWith('.dentalproject');
+
+        if (aIsExocad && !bIsExocad) return -1;
+        if (!aIsExocad && bIsExocad) return 1;
+
+        if (aIsExocad && bIsExocad) {
+            return new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime();
+        }
+        return 0;
+    });
+
     return (
         <div className="flex gap-0 items-start">
             <div
