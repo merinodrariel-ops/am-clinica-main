@@ -43,6 +43,7 @@ export interface DriveFile {
     mimeType: string;
     webViewLink: string;
     createdTime: string;
+    modifiedTime?: string;
     thumbnailLink?: string;
     size?: string;
     parentName?: string;

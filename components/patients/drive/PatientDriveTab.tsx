@@ -131,12 +131,21 @@ function extractFolderIdFromUrl(url: string | null | undefined): string | null {
     return null;
 }
 
-function classifyFile(file: DriveFile): 'redes' | 'foto' | 'video' | '3d' | 'presentacion' | 'documentacion' | 'otros' {
+function classifyFile(file: DriveFile): 'exocad' | 'redes' | 'foto' | 'video' | '3d' | 'presentacion' | 'documentacion' | 'otros' {
     if (file.parentName === 'Redes' || (file.parentName && (file.parentName.startsWith('[Selección]') || file.parentName.includes('Selección') || file.parentName.includes('Seleccion')))) {
         return 'redes';
     }
     const name = (file.name || '').toLowerCase();
     const mime = (file.mimeType || '').toLowerCase();
+
+    // 0. Exocad Project Files
+    if (
+        name.endsWith('.project') ||
+        name.endsWith('.projects') ||
+        name.endsWith('.dentalproject')
+    ) {
+        return 'exocad';
+    }
 
     // 1. Photos
     if (mime.startsWith('image/')) {
@@ -157,15 +166,12 @@ function classifyFile(file: DriveFile): 'redes' | 'foto' | 'video' | '3d' | 'pre
     ) {
         return 'presentacion';
     }
-    // 4. 3D Files / Escaneos (including Exocad project files)
+    // 4. 3D Files / Escaneos (excluding Exocad project files)
     if (
         name.endsWith('.stl') ||
         name.endsWith('.obj') ||
         name.endsWith('.ply') ||
         name.endsWith('.3dx') ||
-        name.endsWith('.project') ||
-        name.endsWith('.projects') ||
-        name.endsWith('.dentalproject') ||
         mime.includes('3d') ||
         mime.includes('mesh') ||
         name.includes('3d') ||
@@ -516,6 +522,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
     // Classify files
     const classifiedGroups = {
+        exocad: { title: 'Proyectos Exocad', icon: <Sparkles size={16} className="text-orange-400 animate-pulse" />, files: [] as DriveFile[] },
         foto: { title: 'Fotos', icon: <FileImage size={16} className="text-emerald-500" />, files: [] as DriveFile[] },
         video: { title: 'Videos', icon: <Video size={16} className="text-amber-500" />, files: [] as DriveFile[] },
         '3d': { title: 'Escaneos y Diseños 3D', icon: <Layers size={16} className="text-indigo-500" />, files: [] as DriveFile[] },
@@ -536,18 +543,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         classifiedGroups.foto.files = applySavedOrder(classifiedGroups.foto.files, savedOrder);
     }
 
-    // Sort '3d' files: Exocad project files first, ordered by createdTime descending (newest first)
-    classifiedGroups['3d'].files.sort((a, b) => {
-        const aIsExocad = a.name.toLowerCase().endsWith('.project') || a.name.toLowerCase().endsWith('.projects') || a.name.toLowerCase().endsWith('.dentalproject');
-        const bIsExocad = b.name.toLowerCase().endsWith('.project') || b.name.toLowerCase().endsWith('.projects') || b.name.toLowerCase().endsWith('.dentalproject');
-
-        if (aIsExocad && !bIsExocad) return -1;
-        if (!aIsExocad && bIsExocad) return 1;
-
-        if (aIsExocad && bIsExocad) {
-            return new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime();
-        }
-        return 0;
+    // Sort 'exocad' files: ordered by modifiedTime descending (newest first)
+    classifiedGroups.exocad.files.sort((a, b) => {
+        const timeA = new Date(a.modifiedTime || a.createdTime).getTime();
+        const timeB = new Date(b.modifiedTime || b.createdTime).getTime();
+        return timeB - timeA;
     });
 
     return (

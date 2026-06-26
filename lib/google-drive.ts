@@ -648,14 +648,14 @@ export async function ensurePatientPresentationFolder(
 /**
  * List files in any folder by its ID
  */
-export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string; thumbnailLink?: string; size?: string }[]; error?: string }> {
+export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string; modifiedTime?: string; thumbnailLink?: string; size?: string }[]; error?: string }> {
     try {
         const drive = getDrive();
         const response = await drive.files.list({
             q: `'${folderId}' in parents and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
-            fields: 'files(id, name, webViewLink, mimeType, createdTime, thumbnailLink, size)',
+            fields: 'files(id, name, webViewLink, mimeType, createdTime, modifiedTime, thumbnailLink, size)',
             orderBy: 'createdTime asc',
         });
 
@@ -666,6 +666,7 @@ export async function listFolderFiles(folderId: string): Promise<{ files?: { id:
                 webViewLink: f.webViewLink!,
                 mimeType: f.mimeType!,
                 createdTime: f.createdTime!,
+                modifiedTime: f.modifiedTime || undefined,
                 thumbnailLink: f.thumbnailLink || undefined,
                 size: f.size || undefined,
             })) || [],
