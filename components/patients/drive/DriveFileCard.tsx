@@ -16,6 +16,7 @@ import {
     Mail,
     Tag,
     Star,
+    Sparkles,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { getCategoryDef, getTagLabel } from '@/lib/photo-tag-taxonomy';
@@ -43,9 +44,10 @@ interface DriveFileCardProps {
     onSmileDesign?: (file: DriveFile) => void;
     isPortada?: boolean;
     onSetPortada?: (file: DriveFile) => void;
+    patientFolder?: string;
 }
 
-function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'other' {
+function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'exocad' | 'other' {
     const mime = file.mimeType.toLowerCase();
     const name = file.name.toLowerCase();
 
@@ -54,6 +56,7 @@ function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'g
     if (name.endsWith('.stl') || name.endsWith('.ply') || mime === 'application/sla' || mime === 'model/stl') return '3d';
     if (mime === 'application/pdf') return 'pdf';
     if (mime.startsWith('application/vnd.google-apps.')) return 'google-doc';
+    if (name.endsWith('.project') || name.endsWith('.projects') || name.endsWith('.dentalproject')) return 'exocad';
     return 'other';
 }
 
@@ -87,6 +90,7 @@ const ICON_MAP = {
     '3d': Box,
     pdf: FileText,
     'google-doc': FileText,
+    exocad: Sparkles,
     other: File,
 };
 
@@ -96,10 +100,11 @@ const COLOR_MAP = {
     '3d': 'text-[#C9A96E] bg-[#C9A96E]/10',
     pdf: 'text-red-400 bg-red-400/10',
     'google-doc': 'text-green-400 bg-green-400/10',
+    exocad: 'text-orange-400 bg-orange-400/10',
     other: 'text-gray-400 bg-gray-400/10',
 };
 
-export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign, isPortada, onSetPortada }: DriveFileCardProps) {
+export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign, isPortada, onSetPortada, patientFolder }: DriveFileCardProps) {
     const [showShare, setShowShare] = useState(false);
     const category = getFileCategory(file);
     const Icon = ICON_MAP[category];
@@ -111,7 +116,10 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
     const hasShare = onShare || onShareWithPatient || onShareEmail;
 
     const handleClick = () => {
-        if (canPreview) {
+        if (category === 'exocad') {
+            const protocolUrl = `am-clinica-exocad://open?patientFolder=${encodeURIComponent(patientFolder || '')}&path=${encodeURIComponent(file.relativePath || '')}`;
+            window.location.href = protocolUrl;
+        } else if (canPreview) {
             onPreview(file);
         } else {
             window.open(file.webViewLink, '_blank', 'noopener,noreferrer');
@@ -162,6 +170,13 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                         fileId={file.id}
                         format={file.name.toLowerCase().endsWith('.ply') ? 'ply' : 'stl'}
                     />
+                ) : category === 'exocad' ? (
+                    <div className="flex flex-col items-center justify-center p-4 text-center h-full w-full bg-orange-500/5 dark:bg-orange-500/10">
+                        <div className={`h-12 w-12 rounded-xl ${colorClass} flex items-center justify-center mb-2 shadow-inner`}>
+                            <Icon size={22} className="text-orange-400" />
+                        </div>
+                        <span className="text-[9px] font-bold text-orange-400 uppercase tracking-widest">Proyecto Exocad</span>
+                    </div>
                 ) : (
                     <div className={`h-12 w-12 rounded-xl ${colorClass} flex items-center justify-center`}>
                         <Icon size={22} />
@@ -295,6 +310,19 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                     <span className="text-xs text-gray-400 dark:text-white/30">{size}</span>
                 )}
             </div>
+            {category === 'exocad' && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const protocolUrl = `am-clinica-exocad://open?patientFolder=${encodeURIComponent(patientFolder || '')}&path=${encodeURIComponent(file.relativePath || '')}`;
+                        window.location.href = protocolUrl;
+                    }}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold shadow-md shadow-orange-500/20 hover:shadow-orange-500/35 transition-all active:scale-[0.97]"
+                >
+                    <Play size={12} fill="currentColor" className="ml-0.5 text-white" />
+                    Diseñar en Exocad
+                </button>
+            )}
         </motion.div>
     );
 }

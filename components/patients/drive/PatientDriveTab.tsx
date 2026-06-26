@@ -52,6 +52,7 @@ function SortableFileCard({
     photoTag,
     onSmileDesign,
     onSetPortada,
+    patientFolder,
 }: {
     file: DriveFile;
     isPortada: boolean;
@@ -64,6 +65,7 @@ function SortableFileCard({
     photoTag?: PhotoTag | null;
     onSmileDesign?: (f: DriveFile) => void;
     onSetPortada?: (f: DriveFile) => void;
+    patientFolder?: string;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
     const style: CSSProperties = {
@@ -88,7 +90,7 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} isPortada={isPortada} onSetPortada={onSetPortada} />
+            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} isPortada={isPortada} onSetPortada={onSetPortada} patientFolder={patientFolder} />
         </div>
     );
 }
@@ -106,6 +108,17 @@ function buildPatientPrefix(patientName: string, folderDisplayName: string): str
     const patientSlug = toSlug(patientName) || 'paciente';
     const folderSlug = toSlug(folderDisplayName) || 'archivo';
     return `${patientSlug}_am-clinica_${folderSlug}`;
+}
+
+function getFormattedFolderName(patientName: string): string {
+    const parts = patientName.split(',');
+    if (parts.length === 2) {
+        const apellido = parts[0].trim().toUpperCase();
+        const nombre = parts[1].trim();
+        const formattedNombre = nombre ? nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase() : '';
+        return `${apellido}, ${formattedNombre}`;
+    }
+    return patientName.trim();
 }
 
 function extractFolderIdFromUrl(url: string | null | undefined): string | null {
@@ -144,12 +157,15 @@ function classifyFile(file: DriveFile): 'redes' | 'foto' | 'video' | '3d' | 'pre
     ) {
         return 'presentacion';
     }
-    // 4. 3D Files / Escaneos
+    // 4. 3D Files / Escaneos (including Exocad project files)
     if (
         name.endsWith('.stl') ||
         name.endsWith('.obj') ||
         name.endsWith('.ply') ||
         name.endsWith('.3dx') ||
+        name.endsWith('.project') ||
+        name.endsWith('.projects') ||
+        name.endsWith('.dentalproject') ||
         mime.includes('3d') ||
         mime.includes('mesh') ||
         name.includes('3d') ||
@@ -207,6 +223,9 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const globalDragDepthRef = useRef(0);
     const [fotosOrder, setFotosOrder] = useState<Record<string, string[]>>({});
     const [extractingSlidesId, setExtractingSlidesId] = useState<string | null>(null);
+    const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
+    const [tagFile, setTagFile] = useState<DriveFile | null>(null);
+    const [photoTags, setPhotoTags] = useState<Record<string, PhotoTag>>({});
 
     // dnd-kit sensors — require 8px move before drag activates (avoids accidental drags on click)
     const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -353,10 +372,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
         setExtractingSlidesId(null);
     }
-
-    const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
-    const [tagFile, setTagFile] = useState<DriveFile | null>(null);
-    const [photoTags, setPhotoTags] = useState<Record<string, PhotoTag>>({});
 
     const openPreview = (file: DriveFile, folderId: string) => {
         setPreviewAutoSmile(false);
@@ -559,6 +574,18 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                             Abrir en Drive
                         </a>
                         <button
+                            onClick={() => {
+                                const formattedFolder = getFormattedFolderName(patientName);
+                                const protocolUrl = `am-clinica-exocad://open?patientFolder=${encodeURIComponent(formattedFolder)}&path=`;
+                                window.location.href = protocolUrl;
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-orange-400 dark:text-orange-400/80 hover:bg-orange-500/10 border border-orange-500/20 transition-colors"
+                            title="Abrir la carpeta local de Google Drive para este paciente"
+                        >
+                            <FolderOpen size={14} />
+                            Carpeta Local
+                        </button>
+                        <button
                             onClick={handleRefresh}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-white/40 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                         >
@@ -617,6 +644,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             photoTag={photoTags[file.id]}
                                                             onSmileDesign={f => openSmileDesign(f, motherFolderId)}
                                                             onSetPortada={canUpload ? handleSetPortada : undefined}
+                                                            patientFolder={getFormattedFolderName(patientName)}
                                                         />
                                                     ))}
                                                 </div>
@@ -636,6 +664,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         onTag={canUpload ? setTagFile : undefined}
                                                         photoTag={photoTags[file.id]}
                                                         onSmileDesign={f => openSmileDesign(f, motherFolderId)}
+                                                        patientFolder={getFormattedFolderName(patientName)}
                                                     />
                                                     {key === 'presentacion' && canUpload && (
                                                         <button

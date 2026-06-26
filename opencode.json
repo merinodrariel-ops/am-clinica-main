@@ -5,7 +5,7 @@
       "type": "local",
       "command": [
         "bash",
-        "/Users/arimacm5/Documents/Proyectos Antigravity/am-clinica-main/mcp_google_drive.sh"
+        "./mcp_google_drive.sh"
       ]
     }
   }

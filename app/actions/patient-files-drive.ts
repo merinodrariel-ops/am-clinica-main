@@ -46,6 +46,7 @@ export interface DriveFile {
     thumbnailLink?: string;
     size?: string;
     parentName?: string;
+    relativePath?: string;
 }
 
 export interface FolderWithFiles {
@@ -87,7 +88,8 @@ async function listFilesRecursive(
     folderId: string,
     folderName?: string,
     depth: number = 0,
-    maxDepth: number = 3
+    maxDepth: number = 3,
+    currentPath: string = ''
 ): Promise<DriveFile[]> {
     if (depth > maxDepth) return [];
 
@@ -101,9 +103,11 @@ async function listFilesRecursive(
         if (item.mimeType === FOLDER_MIME) {
             subfolders.push({ id: item.id, name: item.name });
         } else {
+            const fileRelativePath = currentPath ? `${currentPath}/${item.name}` : item.name;
             files.push({
                 ...item,
                 parentName: folderName,
+                relativePath: fileRelativePath,
             } as DriveFile);
         }
     }
@@ -111,7 +115,10 @@ async function listFilesRecursive(
     // Recurse into subfolders
     if (subfolders.length > 0 && depth < maxDepth) {
         const nestedResults = await Promise.all(
-            subfolders.map(sf => listFilesRecursive(sf.id, sf.name, depth + 1, maxDepth))
+            subfolders.map(sf => {
+                const nextPath = currentPath ? `${currentPath}/${sf.name}` : sf.name;
+                return listFilesRecursive(sf.id, sf.name, depth + 1, maxDepth, nextPath);
+            })
         );
         for (const nested of nestedResults) {
             files.push(...nested);
