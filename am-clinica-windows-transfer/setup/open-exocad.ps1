@@ -33,8 +33,8 @@ try {
         $queryString.Split('&') | ForEach-Object {
             $kv = $_.Split('=')
             if ($kv.Length -eq 2) {
-                $key = [uri]::UnescapeDataString($kv[0])
-                $value = [uri]::UnescapeDataString($kv[1])
+                $key = [uri]::UnescapeDataString($kv[0].Replace("+", "%20"))
+                $value = [uri]::UnescapeDataString($kv[1].Replace("+", "%20"))
                 $params[$key] = $value
             }
         }

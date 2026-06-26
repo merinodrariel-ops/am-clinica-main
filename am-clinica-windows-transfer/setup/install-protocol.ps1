@@ -1,20 +1,13 @@
-# Run this script as Administrator to register the protocol handler
+# Custom protocol registration for current user (does NOT require Admin rights)
 Add-Type -AssemblyName PresentationFramework
 
-# Check for Administrator privileges
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    [System.Windows.MessageBox]::Show("Por favor, ejecuta este instalador como Administrador (clic derecho -> 'Ejecutar con PowerShell' en modo Administrador).", "Permisos requeridos", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning)
-    exit
-}
-
 $setupDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$batPath = Join-Path $setupDir "open-exocad.bat"
+$scriptPath = Join-Path $setupDir "open-exocad.ps1"
 $configFile = Join-Path $setupDir "exocad-config.json"
 
-# Check if bat exists
-if (-not (Test-Path $batPath)) {
-    [System.Windows.MessageBox]::Show("No se encontró el archivo open-exocad.bat en $setupDir", "Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+# Check if open-exocad.ps1 exists
+if (-not (Test-Path $scriptPath)) {
+    [System.Windows.MessageBox]::Show("No se encontró el archivo open-exocad.ps1 en $setupDir", "Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
     exit
 }
 
@@ -28,9 +21,11 @@ if (-not (Test-Path $configFile)) {
         }
     }
     
-    # Try to find a 'Pacientes' subfolder
+    # Try to find a 'Pacientes' or 'PACIENTES' subfolder
     $detectedPath = $defaultDrive
-    if (Test-Path (Join-Path $defaultDrive "Pacientes")) {
+    if (Test-Path (Join-Path $defaultDrive "PACIENTES")) {
+        $detectedPath = Join-Path $defaultDrive "PACIENTES"
+    } elseif (Test-Path (Join-Path $defaultDrive "Pacientes")) {
         $detectedPath = Join-Path $defaultDrive "Pacientes"
     }
     
@@ -40,9 +35,9 @@ if (-not (Test-Path $configFile)) {
     $configObj | ConvertTo-Json | Out-File $configFile
 }
 
-# Registry paths
+# Registry paths under HKEY_CURRENT_USER\Software\Classes
 $protocolName = "am-clinica-exocad"
-$registryPath = "HKCR:\$protocolName"
+$registryPath = "HKCU:\Software\Classes\$protocolName"
 
 try {
     # Remove existing key if any
@@ -59,8 +54,9 @@ try {
     $openPath = New-Item -Path (Join-Path $shellPath "open") -Force
     $commandPath = New-Item -Path (Join-Path $openPath "command") -Force
 
-    # For Windows registry command values, we escape quotes properly
-    $commandValue = "`"$batPath`" `"%1`" "
+    # Format the command value pointing directly to powershell.exe
+    $psPath = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $commandValue = "`"$psPath`" -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" `"%1`""
     New-ItemProperty -Path $commandPath.PsPath -Name "(Default)" -Value $commandValue -PropertyType String -Force | Out-Null
 
     $msg = "¡Protocolo registrado con éxito!`n`nAhora la aplicación web de AM Clínica podrá abrir directamente archivos .project en Exocad.`n`nRuta configurada de Google Drive: $((Get-Content $configFile | ConvertFrom-Json).googleDrivePath)`n`nSi necesitas cambiar esta ruta, edita el archivo:`n$configFile"
