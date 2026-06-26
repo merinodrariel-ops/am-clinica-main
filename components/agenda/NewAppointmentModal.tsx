@@ -11,7 +11,14 @@ import { upsertPatientAction } from '@/app/actions/patients';
 
 import { createClient } from '@/utils/supabase/client';
 import { type TarifarioItem } from '@/lib/supabase';
-import { parseOrthoReplacementDays, serializeAppointmentNotes, stripAppointmentMeta } from '@/lib/agenda-appointment-meta';
+import {
+    type AppointmentModality,
+    normalizeAppointmentModality,
+    parseAppointmentModality,
+    parseOrthoReplacementDays,
+    serializeAppointmentNotes,
+    stripAppointmentMeta,
+} from '@/lib/agenda-appointment-meta';
 import { buildPreloadedPatientPayload } from '@/lib/preloaded-patient';
 
 interface Patient {
@@ -37,6 +44,7 @@ interface AppointmentData {
     end: Date;
     status: string;
     type: string;
+    modality?: AppointmentModality | string | null;
     notes: string;
     patient?: { full_name?: string };
     doctor?: { full_name?: string };
@@ -82,6 +90,12 @@ const TYPE_DURATIONS_MIN: Record<string, number> = {
     tallado:   240,
 };
 
+const APPOINTMENT_PRESETS = [
+    { key: 'primera_presencial', label: 'Primera presencial', type: 'consulta', modality: 'presencial' as AppointmentModality, durationMin: 60 },
+    { key: 'primera_virtual', label: 'Primera virtual', type: 'consulta', modality: 'virtual' as AppointmentModality, durationMin: 60 },
+    { key: 'segunda_virtual', label: 'Segunda virtual', type: 'control', modality: 'virtual' as AppointmentModality, durationMin: 20 },
+] as const;
+
 export default function NewAppointmentModal({ isOpen, onClose, onSave, initialData, initialDate }: NewAppointmentModalProps) {
     const supabase = createClient();
     const [loading, setLoading] = useState(false);
@@ -96,6 +110,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [endTime, setEndTime] = useState('');
     const [status, setStatus] = useState('confirmed');
     const [type, setType] = useState('consulta');
+    const [modality, setModality] = useState<AppointmentModality>('presencial');
     const [notes, setNotes] = useState('');
     const [orthoReplacementDays, setOrthoReplacementDays] = useState<10 | 15>(15);
 
@@ -181,6 +196,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                         ? 'limpieza_convencional'
                         : (initialData.type || 'consulta')
             );
+            setModality(normalizeAppointmentModality(initialData.modality ?? parseAppointmentModality(initialData.notes || '')));
             setNotes(stripAppointmentMeta(initialData.notes || ''));
             setOrthoReplacementDays(parsedDays ?? 15);
             setSelectedPatientName(initialData.patient?.full_name || '');
@@ -205,6 +221,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setEndTime(toDateTimeLocal(end));
             setStatus('confirmed');
             setType('consulta');
+            setModality('presencial');
             setNotes('');
             setOrthoReplacementDays(15);
             setShowPreloadPatient(false);
@@ -212,6 +229,20 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setPreloadEmail('');
         }
     }, [isOpen, initialData, initialDate]);
+
+    const setEndFromStart = useCallback((durationMin: number) => {
+        if (!startTime) return;
+        const start = new Date(startTime);
+        const end = new Date(start);
+        end.setMinutes(end.getMinutes() + durationMin);
+        setEndTime(toDateTimeLocal(end));
+    }, [startTime]);
+
+    const applyPreset = useCallback((preset: typeof APPOINTMENT_PRESETS[number]) => {
+        setType(preset.type);
+        setModality(preset.modality);
+        setEndFromStart(preset.durationMin);
+    }, [setEndFromStart]);
 
     useEffect(() => {
         if (!initialData?.id) return;
@@ -306,10 +337,12 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         formData.append('endTime', new Date(endTime).toISOString());
         formData.append('status', status);
         formData.append('type', type);
+        formData.append('modality', modality);
         const serializedNotes = serializeAppointmentNotes({
             visibleNotes: notes,
             type,
             orthoReplacementDays,
+            modality,
         });
 
         formData.append('notes', serializedNotes);
@@ -325,6 +358,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     end_time: new Date(endTime).toISOString(),
                     status,
                     type,
+                    modality,
                     notes: serializedNotes,
                     is_primera_vez: false
                 };
@@ -349,7 +383,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setLoading(false);
             isSubmitting.current = false;
         }
-    }, [initialData?.id, loading, title, patientId, doctorId, startTime, endTime, status, type, orthoReplacementDays, notes, onSave, onClose]);
+    }, [initialData?.id, loading, title, patientId, doctorId, startTime, endTime, status, type, modality, orthoReplacementDays, notes, onSave, onClose]);
 
     const handleFormSubmit = useCallback(() => {
         handleSubmit();
@@ -707,6 +741,34 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                         </div>
                     </div>
 
+                    {/* Consultation Presets */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1">Consulta</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {APPOINTMENT_PRESETS.map((preset) => {
+                                const isActive = type === preset.type && modality === preset.modality &&
+                                    (preset.key !== 'segunda_virtual' || minutesBetween(startTime, endTime) === 20);
+
+                                return (
+                                    <Button
+                                        key={preset.key}
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => applyPreset(preset)}
+                                        className={`justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all h-auto ${
+                                            isActive
+                                                ? 'bg-violet-50 text-violet-700 border-violet-200 ring-2 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-200 dark:border-violet-800'
+                                                : 'bg-white dark:bg-gray-800 text-gray-600 border-gray-200 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        {preset.modality === 'virtual' ? <MessageCircle size={14} /> : <User size={14} />}
+                                        <span>{preset.label}</span>
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* Doctor & Type Row */}
                     <div className="grid grid-cols-2 gap-5">
                         <div className={`relative ${type === 'recordatorio_interno' ? 'opacity-40 pointer-events-none select-none' : ''}`}>
@@ -783,21 +845,32 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 onChange={(e) => {
                                     const newType = e.target.value;
                                     setType(newType);
-                                    if (startTime) {
-                                        const start = new Date(startTime);
-                                        const end = new Date(start);
-                                        end.setMinutes(end.getMinutes() + (TYPE_DURATIONS_MIN[newType] ?? 60));
-                                        setEndTime(toDateTimeLocal(end));
-                                    }
+                                    setEndFromStart(TYPE_DURATIONS_MIN[newType] ?? 60);
                                 }}
                             >
                                 {APPOINTMENT_TYPE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
                             </select>
+                            <div className="mt-3">
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Modalidad</label>
+                                <select
+                                    className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all shadow-sm appearance-none font-medium"
+                                    value={modality}
+                                    onChange={(e) => setModality(normalizeAppointmentModality(e.target.value))}
+                                >
+                                    <option value="presencial">Presencial</option>
+                                    <option value="virtual">Virtual</option>
+                                </select>
+                            </div>
                             {type === 'consulta' && (
                                 <p className="text-[11px] text-violet-500 font-semibold mt-1.5 pl-1">
-                                    El paciente será contabilizado como nuevo ingreso
+                                    El paciente será contabilizado como nuevo ingreso{modality === 'virtual' ? ' aunque sea virtual' : ''}
+                                </p>
+                            )}
+                            {type === 'control' && modality === 'virtual' && minutesBetween(startTime, endTime) === 20 && (
+                                <p className="text-[11px] text-violet-500 font-semibold mt-1.5 pl-1">
+                                    Segunda consulta virtual rápida de 20 minutos
                                 </p>
                             )}
                             {type === 'recordatorio_interno' && (
@@ -921,4 +994,12 @@ function toDateTimeLocal(date: Date) {
         '-' + pad(date.getDate()) +
         'T' + pad(date.getHours()) +
         ':' + pad(date.getMinutes());
+}
+
+function minutesBetween(startTime: string, endTime: string) {
+    if (!startTime || !endTime) return null;
+    const start = new Date(startTime).getTime();
+    const end = new Date(endTime).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+    return Math.round((end - start) / 60000);
 }

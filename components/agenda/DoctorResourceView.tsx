@@ -28,6 +28,7 @@ interface Appointment {
     end_time: string;
     status: string;
     type: string;
+    modality?: string | null;
     notes: string | null;
     patient_id: string | null;
     doctor_id: string | null;
@@ -284,7 +285,7 @@ function DoctorColumn({
                             )}
                             {!isShort && (
                                 <p className="text-[10px] leading-tight mt-auto" style={{ color: style.mutedText }}>
-                                    {formatTime(apt.start_time)} – {formatTime(apt.end_time)}
+                                    {apt.modality === 'virtual' ? 'Virtual · ' : ''}{formatTime(apt.start_time)} – {formatTime(apt.end_time)}
                                 </p>
                             )}
                         </div>

@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
-import { parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
+import { normalizeAppointmentModality, parseAppointmentModality, parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
 import { sendEmail } from '@/lib/email-service';
 
 // Service-role client bypasses RLS for agenda mutations.
@@ -332,6 +332,7 @@ type AppointmentUpdatePayload = Partial<{
     end_time: string;
     status: string;
     type: string;
+    modality: string;
     notes: string | null;
     created_at: string;
     created_by: string;
@@ -375,6 +376,7 @@ export async function getAppointments(start: string, end: string) {
         return {
             ...apt,
             status: virtualStatus,
+            modality: normalizeAppointmentModality(apt.modality ?? parseAppointmentModality(apt.notes)),
             patient: patient ? {
                 ...patient,
                 full_name: `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'Paciente',
@@ -403,6 +405,7 @@ export async function createAppointment(formData: FormData) {
     const endTime = formData.get('endTime') as string;
     const status = formData.get('status') as string || 'confirmed';
     const type = formData.get('type') as string || 'consulta';
+    const modality = normalizeAppointmentModality(formData.get('modality') as string | null);
     const notes = formData.get('notes') as string;
 
     if (type !== 'recordatorio_interno' && !patientId) {
@@ -419,6 +422,7 @@ export async function createAppointment(formData: FormData) {
             end_time: endTime,
             status,
             type,
+            modality,
             notes,
             created_by: user.id
         })
@@ -464,6 +468,9 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     delete safeUpdates.created_at;
     delete safeUpdates.created_by;
     delete safeUpdates.is_primera_vez;
+    if (safeUpdates.modality) {
+        safeUpdates.modality = normalizeAppointmentModality(safeUpdates.modality);
+    }
 
     if (safeUpdates.type !== 'recordatorio_interno' && safeUpdates.patient_id === null) {
         return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };

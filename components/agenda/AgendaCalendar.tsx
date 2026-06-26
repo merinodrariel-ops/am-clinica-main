@@ -37,6 +37,7 @@ interface AppointmentModalData {
     doctorId: string;
     status: string;
     type: string;
+    modality?: string | null;
     notes: string;
     patient?: { full_name?: string; intervalo_limpieza_meses?: number | null };
     doctor?: { full_name?: string };
@@ -49,6 +50,7 @@ interface AgendaAppointmentRecord {
     end_time: string;
     status: string;
     type: string;
+    modality?: string | null;
     notes: string | null;
     patient_id: string | null;
     doctor_id: string | null;
@@ -60,6 +62,7 @@ interface AgendaAppointmentRecord {
 interface AgendaEventExtendedProps {
     status?: string;
     type?: string;
+    modality?: string | null;
     notes?: string;
     patient_id?: string;
     doctor_id?: string;
@@ -281,7 +284,7 @@ export default function AgendaCalendar() {
 
     const confirmNewAppointment = (start: Date, end: Date) => {
         setSelectionPopup(null);
-        setSelectedEvent({ title: '', start, end, patientId: '', doctorId: '', status: 'confirmed', type: 'consulta', notes: '' });
+        setSelectedEvent({ title: '', start, end, patientId: '', doctorId: '', status: 'confirmed', type: 'consulta', modality: 'presencial', notes: '' });
         setModalOpen(true);
     };
 
@@ -305,6 +308,7 @@ export default function AgendaCalendar() {
             end: safeEnd,
             status: props.status || 'confirmed',
             type: props.type || 'consulta',
+            modality: props.modality || 'presencial',
             notes: props.notes || '',
             patientId: props.patient_id || '',
             doctorId: props.doctor_id || '',
@@ -475,6 +479,7 @@ export default function AgendaCalendar() {
                         extendedProps: {
                             status: apt.status,
                             type: apt.type,
+                            modality: apt.modality || 'presencial',
                             notes: apt.notes || '',
                             patient_id: apt.patient_id || '',
                             doctor_id: apt.doctor_id || '',
@@ -511,6 +516,7 @@ export default function AgendaCalendar() {
                     extendedProps: {
                         status: apt.status,
                         type: apt.type,
+                        modality: apt.modality || 'presencial',
                         notes: apt.notes || '',
                         patient_id: apt.patient_id || '',
                         doctor_id: apt.doctor_id || '',
@@ -1139,7 +1145,10 @@ export default function AgendaCalendar() {
                                 botox: 'Botox',
                             };
                             const isDetailedDay = DETAILED_DAY_APPOINTMENT_TYPES.has(props.type || '');
-                            const typeLabel = isPrimeraVez ? '⭐ 1ª vez' : (TYPE_LABELS[props.type ?? ''] ?? null);
+                            const isVirtual = props.modality === 'virtual';
+                            const typeLabel = isPrimeraVez
+                                ? (isVirtual ? '⭐ 1ª vez virtual' : '⭐ 1ª vez')
+                                : (isVirtual ? 'Virtual' : (TYPE_LABELS[props.type ?? ''] ?? null));
                             const primaryLine = patientName || event.title || 'Cita';
                             const treatmentLine = event.title && event.title !== primaryLine ? event.title : '';
                             const doctorLine = props.doctor?.full_name ? `Dr. ${props.doctor.full_name.split(' ')[0]}` : '';
@@ -1203,6 +1212,7 @@ export default function AgendaCalendar() {
                                 doctorId: apt.doctor_id || '',
                                 status: apt.status,
                                 type: apt.type,
+                                modality: apt.modality || 'presencial',
                                 notes: apt.notes || '',
                                 patient: apt.patient?.full_name ? { full_name: apt.patient.full_name } : undefined,
                                 doctor: apt.doctor?.full_name ? { full_name: apt.doctor.full_name } : undefined,
@@ -1213,7 +1223,7 @@ export default function AgendaCalendar() {
                             setSelectedEvent({
                                 title: '', start, end,
                                 patientId: '', doctorId,
-                                status: 'confirmed', type: 'consulta', notes: ''
+                                status: 'confirmed', type: 'consulta', modality: 'presencial', notes: ''
                             });
                             setModalOpen(true);
                         }}
