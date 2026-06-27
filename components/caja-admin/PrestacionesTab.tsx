@@ -7,20 +7,30 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import MoneyInput from '@/components/ui/MoneyInput';
 import {
-    type PrestacionLista,
-    getPrestacionesLista,
-    createPrestacionListaItem
-} from '@/lib/caja-admin-prestaciones';
+    type PrestacionCatalogoItem,
+    createPrestacionCatalogoItem,
+    deactivatePrestacionCatalogoItem,
+    getPrestacionesCatalogoCompleto,
+    updatePrestacionCatalogoItem,
+} from '@/app/actions/prestaciones';
 import { toast } from 'sonner';
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 
 export default function PrestacionesTab() {
-    const [prestaciones, setPrestaciones] = useState<PrestacionLista[]>([]);
+    const [prestaciones, setPrestaciones] = useState<PrestacionCatalogoItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedArea, setSelectedArea] = useState('Todas');
     const [isCreating, setIsCreating] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingDraft, setEditingDraft] = useState({
+        nombre: '',
+        area_nombre: '',
+        precio_base: 0,
+        moneda: 'ARS' as 'ARS' | 'USD',
+        terminos: '',
+    });
 
     // New prestacion form
     const [nombre, setNombre] = useState('');
@@ -38,9 +48,9 @@ export default function PrestacionesTab() {
     async function loadData() {
         setLoading(true);
         try {
-            const data = await getPrestacionesLista();
+            const data = (await getPrestacionesCatalogoCompleto()) as PrestacionCatalogoItem[];
             setPrestaciones(data);
-        } catch (error) {
+        } catch (_error) {
             toast.error('Error al cargar prestaciones');
         } finally {
             setLoading(false);
@@ -51,23 +61,78 @@ export default function PrestacionesTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const res = await createPrestacionListaItem({
+            const created = await createPrestacionCatalogoItem({
                 nombre,
                 precio_base: precioBase,
                 moneda,
                 area_nombre: areaNombre
             });
-            if (res.success) {
-                toast.success('Prestación creada');
-                setIsCreating(false);
-                setNombre('');
-                setPrecioBase(0);
-                await loadData();
-            } else {
-                toast.error(res.error || 'Error al crear');
-            }
+            setPrestaciones(prev => [...prev, created].sort((a, b) => {
+                const areaCompare = (a.area_nombre || '').localeCompare(b.area_nombre || '');
+                if (areaCompare !== 0) return areaCompare;
+                return a.nombre.localeCompare(b.nombre);
+            }));
+            toast.success('Prestación creada');
+            setIsCreating(false);
+            setNombre('');
+            setPrecioBase(0);
         } catch (error) {
-            toast.error('Ocurrió un error inesperado');
+            toast.error(error instanceof Error ? error.message : 'Ocurrió un error inesperado');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    function startEditing(prestacion: PrestacionCatalogoItem) {
+        setEditingId(prestacion.id);
+        setEditingDraft({
+            nombre: prestacion.nombre,
+            area_nombre: prestacion.area_nombre || '',
+            precio_base: Number(prestacion.precio_base || 0),
+            moneda: prestacion.moneda,
+            terminos: prestacion.terminos || '',
+        });
+    }
+
+    function stopEditing() {
+        setEditingId(null);
+    }
+
+    async function handleSaveEdit(prestacionId: string) {
+        setSaving(true);
+        try {
+            const updated = await updatePrestacionCatalogoItem({
+                id: prestacionId,
+                nombre: editingDraft.nombre,
+                area_nombre: editingDraft.area_nombre,
+                precio_base: editingDraft.precio_base,
+                moneda: editingDraft.moneda,
+                terminos: editingDraft.terminos,
+            });
+
+            setPrestaciones(prev => prev.map(item => item.id === prestacionId ? updated as PrestacionCatalogoItem : item));
+            setEditingId(null);
+            toast.success('Prestación actualizada');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo actualizar la prestación');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleDeactivate(prestacion: PrestacionCatalogoItem) {
+        if (!confirm(`¿Desactivar "${prestacion.nombre}"?`)) return;
+
+        setSaving(true);
+        try {
+            await deactivatePrestacionCatalogoItem(prestacion.id);
+            setPrestaciones(prev => prev.filter(item => item.id !== prestacion.id));
+            if (editingId === prestacion.id) {
+                setEditingId(null);
+            }
+            toast.success('Prestación desactivada');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo desactivar la prestación');
         } finally {
             setSaving(false);
         }
@@ -234,26 +299,82 @@ export default function PrestacionesTab() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {filteredPrestaciones.map(prestacion => (
-                                <tr key={prestacion.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                                        {prestacion.nombre}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-500">
-                                        {prestacion.area_nombre || '-'}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="font-semibold text-slate-900 dark:text-white">
-                                            {prestacion.moneda} {prestacion.precio_base.toLocaleString()}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600">
-                                            <Pencil className="w-4 h-4" />
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
+                            {filteredPrestaciones.map(prestacion => {
+                                const isEditing = editingId === prestacion.id;
+
+                                return (
+                                    <tr key={prestacion.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                                            {isEditing ? (
+                                                <Input
+                                                    value={editingDraft.nombre}
+                                                    onChange={(e) => setEditingDraft(prev => ({ ...prev, nombre: e.target.value }))}
+                                                />
+                                            ) : (
+                                                prestacion.nombre
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500">
+                                            {isEditing ? (
+                                                <Input
+                                                    value={editingDraft.area_nombre}
+                                                    onChange={(e) => setEditingDraft(prev => ({ ...prev, area_nombre: e.target.value }))}
+                                                />
+                                            ) : (
+                                                prestacion.area_nombre || '-'
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {isEditing ? (
+                                                <div className="flex items-center gap-2 justify-end">
+                                                    <div className="min-w-[140px]">
+                                                        <MoneyInput
+                                                            value={editingDraft.precio_base}
+                                                            onChange={(value) => setEditingDraft(prev => ({ ...prev, precio_base: value }))}
+                                                            currency={editingDraft.moneda}
+                                                        />
+                                                    </div>
+                                                    <select
+                                                        value={editingDraft.moneda}
+                                                        onChange={(e) => setEditingDraft(prev => ({ ...prev, moneda: e.target.value as 'ARS' | 'USD' }))}
+                                                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 text-slate-900 dark:text-white"
+                                                    >
+                                                        <option value="ARS">ARS</option>
+                                                        <option value="USD">USD</option>
+                                                    </select>
+                                                </div>
+                                            ) : (
+                                                <div className="font-semibold text-slate-900 dark:text-white">
+                                                    {prestacion.moneda} {prestacion.precio_base.toLocaleString()}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {isEditing ? (
+                                                    <>
+                                                        <Button type="button" variant="ghost" size="sm" onClick={stopEditing}>
+                                                            Cancelar
+                                                        </Button>
+                                                        <Button type="button" size="sm" onClick={() => void handleSaveEdit(prestacion.id)} disabled={saving}>
+                                                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar'}
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Button type="button" variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600" onClick={() => startEditing(prestacion)}>
+                                                            <Pencil className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button type="button" variant="ghost" size="sm" className="text-slate-400 hover:text-red-600" onClick={() => void handleDeactivate(prestacion)} disabled={saving}>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {filteredPrestaciones.length === 0 && (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-8 text-center text-slate-500">

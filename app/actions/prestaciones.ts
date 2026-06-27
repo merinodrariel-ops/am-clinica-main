@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { normalizePrestacionCatalogoPayload } from '@/lib/prestaciones-catalog';
 
 function getAdminClient() {
     return createAdminClient(
@@ -199,28 +200,20 @@ export async function createTarifarioItem(input: CreateTarifarioItemInput): Prom
         throw new Error('No autorizado para crear prestaciones');
     }
 
-    const areaNombre = input.area_nombre.trim();
-    const nombre = input.nombre.trim();
-    if (!areaNombre) {
+    const normalized = normalizePrestacionCatalogoPayload(input);
+    if (!normalized.area_nombre) {
         throw new Error('El area no puede estar vacia');
-    }
-    if (!nombre) {
-        throw new Error('El nombre no puede estar vacio');
-    }
-
-    if (!Number.isFinite(input.precio_base) || input.precio_base < 0) {
-        throw new Error('Precio invalido');
     }
 
     const admin = getAdminClient();
     const { data, error } = await admin
         .from('prestaciones_lista')
         .insert({
-            area_nombre: areaNombre,
-            nombre,
-            precio_base: Math.round((input.precio_base + Number.EPSILON) * 100) / 100,
-            moneda: input.moneda === 'USD' ? 'USD' : 'ARS',
-            terminos: typeof input.terminos === 'string' ? input.terminos.trim() || null : null,
+            area_nombre: normalized.area_nombre,
+            nombre: normalized.nombre,
+            precio_base: normalized.precio_base,
+            moneda: normalized.moneda,
+            terminos: normalized.terminos,
             activo: true,
         })
         .select('id, nombre, area_nombre, precio_base, moneda, terminos')
@@ -310,35 +303,37 @@ export async function updateTarifarioItem(input: UpdateTarifarioItemInput): Prom
         throw new Error('ID de prestación inválido');
     }
 
+    const currentPayload = normalizePrestacionCatalogoPayload({
+        nombre: input.nombre ?? 'placeholder',
+        area_nombre: input.area_nombre,
+        precio_base: typeof input.precio_base === 'number' ? input.precio_base : 0,
+        moneda: input.moneda,
+        terminos: input.terminos,
+    });
+
     const patch: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
     };
 
     if (typeof input.nombre === 'string') {
-        const nombre = input.nombre.trim();
-        if (!nombre) throw new Error('El nombre no puede estar vacío');
-        patch.nombre = nombre;
+        patch.nombre = currentPayload.nombre;
     }
 
     if (typeof input.area_nombre === 'string') {
-        const areaNombre = input.area_nombre.trim();
-        if (!areaNombre) throw new Error('El area no puede estar vacia');
-        patch.area_nombre = areaNombre;
+        if (!currentPayload.area_nombre) throw new Error('El area no puede estar vacia');
+        patch.area_nombre = currentPayload.area_nombre;
     }
 
     if (typeof input.precio_base === 'number') {
-        if (!Number.isFinite(input.precio_base) || input.precio_base < 0) {
-            throw new Error('Precio inválido');
-        }
-        patch.precio_base = Math.round((input.precio_base + Number.EPSILON) * 100) / 100;
+        patch.precio_base = currentPayload.precio_base;
     }
 
     if (input.moneda) {
-        patch.moneda = input.moneda;
+        patch.moneda = currentPayload.moneda;
     }
 
     if (typeof input.terminos === 'string') {
-        patch.terminos = input.terminos.trim() || null;
+        patch.terminos = currentPayload.terminos;
     }
 
     const { data, error } = await admin
