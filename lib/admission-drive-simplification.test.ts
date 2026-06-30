@@ -7,6 +7,10 @@ const admissionActionSource = readFileSync(
     join(process.cwd(), 'app/actions/admission.ts'),
     'utf8'
 );
+const googleDriveSource = readFileSync(
+    join(process.cwd(), 'lib/google-drive.ts'),
+    'utf8'
+);
 const clinicalWorkflowsSource = readFileSync(
     join(process.cwd(), 'app/actions/clinical-workflows.ts'),
     'utf8'
@@ -22,6 +26,24 @@ test('admission only prepares the patient root Drive folder', () => {
         admissionActionSource,
         /link_google_slides:\s*docResult/,
         'admission should not save an auto-generated presentation link'
+    );
+    assert.match(
+        admissionActionSource,
+        /ensureStandardPatientFolders/,
+        'admission should still prepare the patient root Drive folder'
+    );
+});
+
+test('legacy patient document generation stays disabled', () => {
+    assert.match(
+        googleDriveSource,
+        /Deshabilitado: las admisiones ya no generan presentaciones base de pacientes/,
+        'legacy patient document generation should return a disabled response'
+    );
+    assert.doesNotMatch(
+        googleDriveSource,
+        /Plantilla Ficha\/Presentacion|Plantilla Presupuesto|Ficha - \$\{|Presupuesto - \$\{/,
+        'Drive utilities should not keep the old patient presentation template-copy path'
     );
 });
 

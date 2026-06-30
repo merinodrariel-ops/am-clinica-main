@@ -896,16 +896,13 @@ export async function updateFileContentInDrive(
     }
 }
 
-// Template IDs from environment (recommended) or fallback to name search
-const getTemplateFichaId = () => process.env.GOOGLE_SLIDES_TEMPLATE_FICHA || '';
-const getTemplatePresupuestoId = () => process.env.GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO || '';
-
 /**
- * Copies templates and replaces placeholders for a new patient
+ * Disabled by clinic policy: patient admissions and patient setup must not
+ * generate base Google Slides/Presentation documents anymore.
  */
 export async function createPatientDocuments(
-    motherFolderId: string,
-    patientData: {
+    _motherFolderId: string,
+    _patientData: {
         nombre: string;
         apellido: string;
         dni: string;
@@ -924,164 +921,9 @@ export async function createPatientDocuments(
         observacionesGenerales?: string;
     }
 ): Promise<{ fichaUrl?: string; presupuestoUrl?: string; error?: string }> {
-    try {
-        const drive = getDrive();
-        const slides = google.slides({ version: 'v1', auth: getAuth() });
-
-        // 1. Find the PRESENTACION and PRESUPUESTO subfolders
-        const subfolders = await drive.files.list({
-            q: `'${motherFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-            fields: 'files(id, name)',
-            supportsAllDrives: true,
-            includeItemsFromAllDrives: true,
-        });
-
-        let presentacionFolder = subfolders.data.files?.find(f => f.name?.includes('PRESENTACION'));
-        let presupuestoFolder = subfolders.data.files?.find(f => f.name?.includes('PRESUPUESTO'));
-
-        if (!presentacionFolder || !presupuestoFolder) {
-            // Try harder by looking for folders that might have different naming (e.g. without brackets if they were missing)
-            if (!presentacionFolder) {
-                 const res = await drive.files.list({
-                    q: `'${motherFolderId}' in parents and name contains 'PRESENTACION' and trashed=false`,
-                    fields: 'files(id, name)',
-                    supportsAllDrives: true,
-                });
-                presentacionFolder = res.data.files?.[0];
-            }
-            if (!presupuestoFolder) {
-                 const res = await drive.files.list({
-                    q: `'${motherFolderId}' in parents and name contains 'PRESUPUESTO' and trashed=false`,
-                    fields: 'files(id, name)',
-                    supportsAllDrives: true,
-                });
-                presupuestoFolder = res.data.files?.[0];
-            }
-        }
-
-        const presentacionDestId = presentacionFolder?.id || motherFolderId;
-        const presupuestoDestId = presupuestoFolder?.id || motherFolderId;
-
-        const results: { fichaUrl?: string; presupuestoUrl?: string } = {};
-
-        // 2. Copy and populate "Ficha/Presentacion"
-        const fichaTemplateId = getTemplateFichaId() || (await findFileByName(drive, 'Plantilla Ficha/Presentacion'))?.id;
-        console.log('Ficha template lookup:', fichaTemplateId ? `Found ID: ${fichaTemplateId}` : 'NOT FOUND - create template and set GOOGLE_SLIDES_TEMPLATE_FICHA in .env.local');
-        if (fichaTemplateId) {
-            const newFichaName = `Ficha - ${patientData.apellido}, ${patientData.nombre}`;
-            const copyRes = await drive.files.copy({
-                fileId: fichaTemplateId,
-                supportsAllDrives: true,
-                requestBody: {
-                    name: newFichaName,
-                    parents: [presentacionDestId],
-                },
-            });
-
-            if (copyRes.data.id) {
-                await replaceSlidesPlaceholders(slides, copyRes.data.id, patientData);
-                results.fichaUrl = `https://docs.google.com/presentation/d/${copyRes.data.id}/edit`;
-            }
-        }
-
-        // 3. Copy and populate "Presupuesto"
-        const presupuestoTemplateId = getTemplatePresupuestoId() || (await findFileByName(drive, 'Plantilla Presupuesto'))?.id;
-        console.log('Presupuesto template lookup:', presupuestoTemplateId ? `Found ID: ${presupuestoTemplateId}` : 'NOT FOUND - create template and set GOOGLE_SLIDES_TEMPLATE_PRESUPUESTO in .env.local');
-        if (presupuestoTemplateId) {
-            const newPresuName = `Presupuesto - ${patientData.apellido}, ${patientData.nombre}`;
-            const copyRes = await drive.files.copy({
-                fileId: presupuestoTemplateId,
-                supportsAllDrives: true,
-                requestBody: {
-                    name: newPresuName,
-                    parents: [presupuestoDestId],
-                },
-            });
-
-            if (copyRes.data.id) {
-                await replaceSlidesPlaceholders(slides, copyRes.data.id, patientData);
-                results.presupuestoUrl = `https://docs.google.com/presentation/d/${copyRes.data.id}/edit`;
-            }
-        }
-
-        return results;
-    } catch (error) {
-        console.error('Error creating patient documents:', error);
-        return { error: error instanceof Error ? error.message : String(error) };
-    }
-}
-
-/**
- * Replaces placeholders in a Google Slides document
- */
-async function replaceSlidesPlaceholders(
-    slides: ReturnType<typeof google.slides>,
-    presentationId: string,
-    data: {
-        nombre: string;
-        apellido: string;
-        dni: string;
-        fecha: string;
-        fechaNacimiento?: string;
-        edad?: string;
-        whatsapp?: string;
-        email?: string;
-        ciudad?: string;
-        barrio?: string;
-        motivoConsulta?: string;
-        comoNosConocio?: string;
-        alergias?: string;
-        medicacion?: string;
-        tratamientoActivo?: string;
-        observacionesGenerales?: string;
-    }
-) {
-    const fullName = `${data.apellido}, ${data.nombre}`;
-    const replacements: Record<string, string> = {
-        '{{Nombre}}': data.nombre,
-        '{{Apellido}}': data.apellido,
-        '{{NombreApellido}}': fullName,
-        '{{DNI}}': data.dni || '-',
-        '{{Fecha}}': data.fecha,
-        '{{FechaNacimiento}}': data.fechaNacimiento || '-',
-        '{{Edad}}': data.edad || '-',
-        '{{Telefono}}': data.whatsapp || '-',
-        '{{Email}}': data.email || '-',
-        '{{Ciudad}}': data.ciudad || '-',
-        '{{Barrio}}': data.barrio || '-',
-        '{{MotivoConsulta}}': data.motivoConsulta || '-',
-        '{{ComoNosConocio}}': data.comoNosConocio || '-',
-        '{{Alergias}}': data.alergias || 'Sin alergias reportadas',
-        '{{Medicacion}}': data.medicacion || 'Sin medicación activa',
-        '{{TratamientoActivo}}': data.tratamientoActivo || 'Sin tratamiento activo',
-        '{{ObservacionesGenerales}}': data.observacionesGenerales || '-',
+    return {
+        error: 'Deshabilitado: las admisiones ya no generan presentaciones base de pacientes',
     };
-
-    const requests = Object.entries(replacements).map(([placeholder, value]) => ({
-        replaceAllText: {
-            replaceText: value,
-            containsText: { text: placeholder, matchCase: false },
-        },
-    }));
-
-    await slides.presentations.batchUpdate({
-        presentationId,
-        requestBody: { requests },
-    });
-}
-
-/**
- * Utility to find a file by name anywhere in the accessible Drive
- */
-async function findFileByName(drive: ReturnType<typeof google.drive>, name: string) {
-    const res = await drive.files.list({
-        q: `name = '${name}' and trashed = false`,
-        includeItemsFromAllDrives: true,
-        supportsAllDrives: true,
-        fields: 'files(id, name)',
-        pageSize: 1,
-    });
-    return res.data.files && res.data.files.length > 0 ? res.data.files[0] : null;
 }
 
 /**
