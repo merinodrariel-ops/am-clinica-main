@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, type DragEvent, type CSSProperties } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
     FolderOpen,
     RefreshCw,
@@ -199,6 +198,71 @@ function classifyFile(file: DriveFile): 'exocad' | 'redes' | 'foto' | 'video' | 
     return 'otros';
 }
 
+type DentalArch = 'upper' | 'lower';
+
+function normalize3DName(name: string): string {
+    return name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\.(stl|ply)$/i, '')
+        .replace(/\b(maxilar|mandibula|mandible|upper|lower|superior|inferior|sup|inf|arriba|abajo)\b/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function get3DFormat(file: DriveFile): 'stl' | 'ply' | null {
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.stl')) return 'stl';
+    if (name.endsWith('.ply')) return 'ply';
+    return null;
+}
+
+function getDentalArch(file: DriveFile): DentalArch | null {
+    const normalized = file.name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
+    if (/\b(superior|upper|sup|arriba)\b/.test(normalized)) return 'upper';
+    if (/\b(inferior|lower|inf|abajo|mandibula|mandible)\b/.test(normalized)) return 'lower';
+    return null;
+}
+
+function isPairable3D(file: DriveFile): boolean {
+    return get3DFormat(file) !== null;
+}
+
+function buildDentalBitePairs(files3D: DriveFile[]): Map<string, DriveFile> {
+    const pairs = new Map<string, DriveFile>();
+    const upperFiles = files3D.filter(file => isPairable3D(file) && getDentalArch(file) === 'upper');
+    const lowerFiles = files3D.filter(file => isPairable3D(file) && getDentalArch(file) === 'lower');
+
+    for (const upper of upperFiles) {
+        let best: { file: DriveFile; score: number } | null = null;
+        for (const lower of lowerFiles) {
+            if (pairs.has(lower.id)) continue;
+            const sameFolder = upper.parentName && lower.parentName && upper.parentName === lower.parentName;
+            const sameFormat = get3DFormat(upper) === get3DFormat(lower);
+            const sameBase = normalize3DName(upper.name) && normalize3DName(upper.name) === normalize3DName(lower.name);
+            const createdDiff = Math.abs(new Date(upper.createdTime).getTime() - new Date(lower.createdTime).getTime());
+            const closeInTime = Number.isFinite(createdDiff) && createdDiff < 1000 * 60 * 60 * 24;
+            const score = (sameBase ? 6 : 0) + (sameFolder ? 3 : 0) + (sameFormat ? 2 : 0) + (closeInTime ? 1 : 0);
+
+            if (!best || score > best.score) {
+                best = { file: lower, score };
+            }
+        }
+
+        if (best && best.score >= 3) {
+            pairs.set(upper.id, best.file);
+            pairs.set(best.file.id, upper);
+        }
+    }
+
+    return pairs;
+}
+
 function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] {
     if (!savedOrder.length) return files;
     const pos = new Map(savedOrder.map((id, i) => [id, i]));
@@ -221,6 +285,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [files, setFiles] = useState<DriveFile[]>([]);
     const [errorMsg, setErrorMsg] = useState('');
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
+    const [previewPaired3DFile, setPreviewPaired3DFile] = useState<DriveFile | null>(null);
     const [previewFolderId, setPreviewFolderId] = useState<string>('');
     const [previewAutoSmile, setPreviewAutoSmile] = useState(false);
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
@@ -381,13 +446,25 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
     const openPreview = (file: DriveFile, folderId: string) => {
         setPreviewAutoSmile(false);
+        setPreviewPaired3DFile(null);
         setPreviewFile(file);
         setPreviewFolderId(folderId);
     };
 
     const openSmileDesign = (file: DriveFile, folderId: string) => {
         setPreviewAutoSmile(true);
+        setPreviewPaired3DFile(null);
         setPreviewFile(file);
+        setPreviewFolderId(folderId);
+    };
+
+    const openBitePreview = (file: DriveFile, pairedFile: DriveFile, folderId: string) => {
+        const clickedArch = getDentalArch(file);
+        const primary = clickedArch === 'lower' ? pairedFile : file;
+        const secondary = clickedArch === 'lower' ? file : pairedFile;
+        setPreviewAutoSmile(false);
+        setPreviewFile(primary);
+        setPreviewPaired3DFile(secondary);
         setPreviewFolderId(folderId);
     };
 
@@ -542,6 +619,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     if (savedOrder.length > 0) {
         classifiedGroups.foto.files = applySavedOrder(classifiedGroups.foto.files, savedOrder);
     }
+    const dentalBitePairs = buildDentalBitePairs(classifiedGroups['3d'].files);
 
     // Sort 'exocad' files: ordered by modifiedTime descending (newest first)
     classifiedGroups.exocad.files.sort((a, b) => {
@@ -619,8 +697,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         {Object.entries(classifiedGroups).map(([key, group]) => {
                             if (group.files.length === 0) return null;
 
-                            const isCoverFolder = key === 'foto';
-
                             return (
                                 <div key={key} className="space-y-3 p-4 rounded-xl border border-white/5 bg-white/5 dark:bg-navy-950/20 backdrop-blur-sm shadow-md">
                                     <div className="flex items-center justify-between border-b border-white/5 pb-2">
@@ -680,6 +756,16 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         onSmileDesign={f => openSmileDesign(f, motherFolderId)}
                                                         patientFolder={getFormattedFolderName(patientName)}
                                                     />
+                                                    {key === '3d' && dentalBitePairs.has(file.id) && (
+                                                        <button
+                                                            onClick={() => openBitePreview(file, dentalBitePairs.get(file.id)!, motherFolderId)}
+                                                            className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#C9A96E]/15 hover:bg-[#C9A96E]/25 border border-[#C9A96E]/30 text-[#C9A96E] text-[11px] font-semibold transition-all"
+                                                            title="Previsualizar superior e inferior juntos"
+                                                        >
+                                                            <Layers size={12} />
+                                                            Ver mordida
+                                                        </button>
+                                                    )}
                                                     {key === 'presentacion' && canUpload && (
                                                         <button
                                                             onClick={() => handleExtractSlides(file.id)}
@@ -746,13 +832,14 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 {/* Preview modal */}
                 <DrivePreviewModal
                     file={previewFile}
+                    paired3DFile={previewPaired3DFile}
                     folderId={previewFolderId}
                     patientId={patientId}
                     patientName={patientName}
                     canSave={canUpload}
                     allFolderFiles={files.filter(f => ['foto', 'redes'].includes(classifyFile(f)))}
                     autoStartSmile={previewAutoSmile}
-                    onClose={() => { setPreviewFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
+                    onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
                     onSaved={() => {
                         handleUploadedToFolder();
                     }}

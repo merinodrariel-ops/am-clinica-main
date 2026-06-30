@@ -1,7 +1,9 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Box, Download, Video, StopCircle, Share2, X } from 'lucide-react';
+import { Box, Download, Eye, EyeOff, Video, StopCircle, Share2, X } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type RecordFmt  = 'story' | 'post' | 'presentation';
@@ -13,6 +15,17 @@ interface VideoPreview {
     mimeType: string;
     fmt: RecordFmt;
     secs: number;
+}
+type ModelSlot = 'primary' | 'secondary';
+
+interface STLViewerProps {
+    url: string;
+    format?: 'stl' | 'ply';
+    onClose?: () => void;
+    secondModelUrl?: string;
+    secondModelFormat?: 'stl' | 'ply';
+    primaryLabel?: string;
+    secondModelLabel?: string;
 }
 
 // Output dimensions per format — true 4K for post & presentation
@@ -45,7 +58,15 @@ function dlBlob(blobUrl: string, name: string) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function STLViewer({ url, format = 'stl', onClose }: { url: string; format?: 'stl' | 'ply'; onClose?: () => void }) {
+export default function STLViewer({
+    url,
+    format = 'stl',
+    onClose,
+    secondModelUrl,
+    secondModelFormat = 'stl',
+    primaryLabel = 'Superior',
+    secondModelLabel = 'Inferior',
+}: STLViewerProps) {
     const mountRef  = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sceneRef  = useRef<{
@@ -55,6 +76,8 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
         removeSecondModel?: () => void;
         setWireframeMode?: (on: boolean) => void;
         setSmileDesignMode?: (on: boolean) => void;
+        setModelVisibility?: (slot: ModelSlot, visible: boolean) => void;
+        setModelOpacity?: (slot: ModelSlot, opacity: number) => void;
         setPostRenderHook?: (fn: (() => void) | null) => void;
     } | null>(null);
     const dragRef            = useRef<{ sx: number; sy: number; orig: SelRect; resize: boolean } | null>(null);
@@ -62,6 +85,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
     const chunksRef          = useRef<Blob[]>([]);
     const tickRef            = useRef<ReturnType<typeof setInterval> | null>(null);
     const firstModelInfoRef  = useRef<{ cx: number; cy: number; cz: number; scale: number } | null>(null);
+    const loadedSecondUrlRef = useRef<string | null>(null);
 
     const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error' | 'no-three'>('loading');
     const [loadPct,    setLoadPct]    = useState(0);
@@ -76,6 +100,10 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
     const [isDragOver,   setIsDragOver]  = useState(false);
     const [secondModel,  setSecondModel] = useState<'none' | 'loading' | 'loaded'>('none');
     const [recSecs,      setRecSecs]     = useState<RecDuration>(8);
+    const [primaryVisible, setPrimaryVisible] = useState(true);
+    const [secondaryVisible, setSecondaryVisible] = useState(true);
+    const [primaryOpacity, setPrimaryOpacity] = useState(1);
+    const [secondaryOpacity, setSecondaryOpacity] = useState(1);
 
     // ── Enter selection mode ───────────────────────────────────────────────────
     const enterSelecting = useCallback(() => {
@@ -233,6 +261,58 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
         sceneRef.current?.setSmileDesignMode?.(smileDesign);
     }, [smileDesign, loadStatus]);
 
+    useEffect(() => {
+        sceneRef.current?.setModelVisibility?.('primary', primaryVisible);
+    }, [primaryVisible, loadStatus]);
+
+    useEffect(() => {
+        sceneRef.current?.setModelVisibility?.('secondary', secondaryVisible);
+    }, [secondaryVisible, loadStatus, secondModel]);
+
+    useEffect(() => {
+        sceneRef.current?.setModelOpacity?.('primary', primaryOpacity);
+    }, [primaryOpacity, loadStatus]);
+
+    useEffect(() => {
+        sceneRef.current?.setModelOpacity?.('secondary', secondaryOpacity);
+    }, [secondaryOpacity, loadStatus, secondModel]);
+
+    useEffect(() => {
+        loadedSecondUrlRef.current = null;
+        setSecondModel('none');
+        setPrimaryVisible(true);
+        setSecondaryVisible(true);
+        setPrimaryOpacity(1);
+        setSecondaryOpacity(1);
+    }, [url]);
+
+    useEffect(() => {
+        if (loadStatus !== 'ready' || !secondModelUrl || loadedSecondUrlRef.current === secondModelUrl) return;
+        let cancelled = false;
+
+        async function loadInitialSecondModel() {
+            try {
+                setSecondModel('loading');
+                const response = await fetch(secondModelUrl!);
+                if (!response.ok) throw new Error(`No se pudo cargar el segundo modelo (${response.status})`);
+                const buffer = await response.arrayBuffer();
+                if (cancelled) return;
+                await sceneRef.current?.loadSecondModel?.(buffer, secondModelFormat === 'ply');
+                if (cancelled) return;
+                loadedSecondUrlRef.current = secondModelUrl!;
+                setSecondModel('loaded');
+            } catch (error) {
+                console.error('[3DViewer] second model', error);
+                if (!cancelled) setSecondModel('none');
+            }
+        }
+
+        void loadInitialSecondModel();
+        return () => {
+            cancelled = true;
+        };
+    }, [loadStatus, secondModelUrl, secondModelFormat]);
+
     // ── Drag handlers (second model) ───────────────────────────────────────────
     const onViewerDragOver = useCallback((e: React.DragEvent) => {
         if (loadStatus !== 'ready') return;
@@ -256,11 +336,13 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
         setSecondModel('loading');
         const buffer = await file.arrayBuffer();
         await sceneRef.current?.loadSecondModel?.(buffer, name.endsWith('.ply'));
+        loadedSecondUrlRef.current = null;
         setSecondModel('loaded');
     }, []);
 
     const handleRemoveSecondModel = useCallback(() => {
         sceneRef.current?.removeSecondModel?.();
+        loadedSecondUrlRef.current = null;
         setSecondModel('none');
     }, []);
 
@@ -395,6 +477,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     const mesh = new THREE.Mesh(geo, mat);
                     mesh.scale.setScalar(s);
                     mesh.castShadow = mesh.receiveShadow = true;
+                    mesh.userData.modelSlot = 'primary';
                     scene.add(mesh);
                     setLoadStatus('ready');
                 }
@@ -482,6 +565,7 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     mesh2.scale.setScalar(info.scale);
                     mesh2.castShadow = mesh2.receiveShadow = true;
                     mesh2.userData.isSecondModel = true;
+                    mesh2.userData.modelSlot = 'secondary';
                     scene.add(mesh2);
                     // If wireframe was already active, apply to new mesh too
                     if (wireframeActive) setWireframeFn(true);
@@ -504,6 +588,28 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                         if (Array.isArray(m)) m.forEach((x: any) => x.dispose?.());
                         else m?.dispose?.();
                     }
+                }
+
+                function setModelVisibilityFn(slot: ModelSlot, visible: boolean) {
+                    scene.traverse((obj: any) => {
+                        if (!obj.isMesh || obj.userData?.modelSlot !== slot) return;
+                        obj.visible = visible;
+                    });
+                }
+
+                function setModelOpacityFn(slot: ModelSlot, opacity: number) {
+                    const nextOpacity = Math.max(0.08, Math.min(1, opacity));
+                    scene.traverse((obj: any) => {
+                        if (!obj.isMesh || obj.userData?.modelSlot !== slot) return;
+                        const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+                        for (const material of materials) {
+                            if (!material) continue;
+                            material.transparent = nextOpacity < 0.99;
+                            material.opacity = nextOpacity;
+                            material.depthWrite = nextOpacity >= 0.99;
+                            material.needsUpdate = true;
+                        }
+                    });
                 }
 
                 // ── Smile Design overlay — single measurement, counter + fill bar ──────────
@@ -633,6 +739,8 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                     removeSecondModel: removeSecondModelFn,
                     setWireframeMode: setWireframeFn,
                     setSmileDesignMode: setSmileDesignFn,
+                    setModelVisibility: setModelVisibilityFn,
+                    setModelOpacity: setModelOpacityFn,
                     setPostRenderHook: (fn) => { postRenderHook = fn; },
                 };
 
@@ -752,13 +860,61 @@ export default function STLViewer({ url, format = 'stl', onClose }: { url: strin
                             </div>
                         )}
                         {secondModel === 'loaded' && (
-                            <button
-                                onClick={handleRemoveSecondModel}
-                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-black/50 backdrop-blur border border-white/15 text-white/60 text-xs hover:text-white transition-all"
-                                title="Quitar modelo inferior"
-                            >
-                                <X size={11} /> Inferior
-                            </button>
+                            <div className="w-56 rounded-xl bg-black/55 backdrop-blur border border-white/15 p-2 shadow-lg space-y-2">
+                                {([
+                                    {
+                                        slot: 'primary' as const,
+                                        label: primaryLabel,
+                                        visible: primaryVisible,
+                                        opacity: primaryOpacity,
+                                        setVisible: setPrimaryVisible,
+                                        setOpacity: setPrimaryOpacity,
+                                    },
+                                    {
+                                        slot: 'secondary' as const,
+                                        label: secondModelLabel,
+                                        visible: secondaryVisible,
+                                        opacity: secondaryOpacity,
+                                        setVisible: setSecondaryVisible,
+                                        setOpacity: setSecondaryOpacity,
+                                    },
+                                ]).map(layer => (
+                                    <div key={layer.slot} className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => layer.setVisible(!layer.visible)}
+                                                className="p-1 rounded-md bg-white/10 text-white/70 hover:text-white"
+                                                title={layer.visible ? `Ocultar ${layer.label}` : `Mostrar ${layer.label}`}
+                                            >
+                                                {layer.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                                            </button>
+                                            <span className="min-w-0 flex-1 truncate text-white/70 text-xs font-medium">
+                                                {layer.label}
+                                            </span>
+                                            <span className="text-white/35 text-[10px] tabular-nums">
+                                                {Math.round(layer.opacity * 100)}%
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="0.15"
+                                            max="1"
+                                            step="0.05"
+                                            value={layer.opacity}
+                                            onChange={event => layer.setOpacity(Number(event.target.value))}
+                                            className="w-full accent-[#C9A96E]"
+                                            aria-label={`Opacidad ${layer.label}`}
+                                        />
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={handleRemoveSecondModel}
+                                    className="w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 text-xs hover:text-white transition-all"
+                                    title={`Quitar ${secondModelLabel}`}
+                                >
+                                    <X size={11} /> Quitar segundo modelo
+                                </button>
+                            </div>
                         )}
                         {secondModel === 'none' && !wireframe && (
                             <div className="px-2.5 py-1 rounded-full bg-black/30 border border-white/8 text-white/25 text-xs pointer-events-none">

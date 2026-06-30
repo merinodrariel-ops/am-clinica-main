@@ -17,6 +17,7 @@ const STLViewer = dynamic(() => import('@/components/portal-paciente/STLViewer')
 
 interface DrivePreviewModalProps {
     file: DriveFile | null;
+    paired3DFile?: DriveFile | null;
     folderId: string;
     allFolderFiles: DriveFile[];
     patientId: string;
@@ -42,6 +43,7 @@ function get3DFormat(file: DriveFile): 'stl' | 'ply' {
 
 export default function DrivePreviewModal({
     file,
+    paired3DFile,
     folderId,
     allFolderFiles,
     patientId,
@@ -73,6 +75,7 @@ export default function DrivePreviewModal({
     }
 
     const proxyUrl = `/api/drive/file/${file.id}`;
+    const pairedProxyUrl = paired3DFile ? `/api/drive/file/${paired3DFile.id}` : undefined;
 
     // Video / 3D → original minimal modal
     return (
@@ -141,7 +144,15 @@ export default function DrivePreviewModal({
                     )}
                     {previewType === '3d' && (
                         <div className="flex-1">
-                            <STLViewer url={proxyUrl} format={get3DFormat(file)} onClose={onClose} />
+                            <STLViewer
+                                url={proxyUrl}
+                                format={get3DFormat(file)}
+                                onClose={onClose}
+                                secondModelUrl={pairedProxyUrl}
+                                secondModelFormat={paired3DFile ? get3DFormat(paired3DFile) : undefined}
+                                primaryLabel={paired3DFile ? file.name : 'Modelo'}
+                                secondModelLabel={paired3DFile?.name}
+                            />
                         </div>
                     )}
                 </div>
