@@ -898,17 +898,12 @@ export default function OwnerDashboard() {
             value: `$${stats.cobroMensualFinanciacionUsd.toLocaleString()} USD/mes`,
             secondaryValue: `${stats.personasEnFinanciacion} personas`,
             secondaryLabel: 'Activas',
-            subtitle: isCurrentMonth ? 'Programados del mes' : `Programados de ${selectedMonthLabel}`,
+            subtitle: 'Cuotas activas a cobrar',
             supportingMetrics: [
                 {
-                    label: 'Cobrado',
+                    label: `Cobrado ${selectedMonthLabel}`,
                     value: `$${stats.financiacionMensualCobradoUsd.toLocaleString()} USD`,
                     color: 'hsl(150 80% 50%)',
-                },
-                {
-                    label: 'Pendiente',
-                    value: `$${stats.financiacionMensualPendienteUsd.toLocaleString()} USD`,
-                    color: 'hsl(35 95% 60%)',
                 },
             ],
             gradient: 'linear-gradient(135deg, hsl(270 67% 55%), hsl(285 65% 50%))',
@@ -924,7 +919,7 @@ export default function OwnerDashboard() {
                             </span>
                             {pendingPlanes.length > 0 && (
                                 <span className="text-[10px] text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded font-mono font-medium">
-                                    Deuda: ${pendingPlanes.reduce((sum, p) => sum + (Number(p.monto_cuota_usd) || 0), 0).toLocaleString()} USD
+                                    Pendiente: ${pendingPlanes.reduce((sum, p) => sum + (Number(p.monto_cuota_usd) || 0), 0).toLocaleString()} USD
                                 </span>
                             )}
                         </div>

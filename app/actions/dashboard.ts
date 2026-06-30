@@ -244,7 +244,17 @@ export async function getOwnerDashboardStatsAction(
             .eq('estado', 'En curso');
 
         const planesFinanciacion = (financData || []) as PlanFinanciacionDashboard[];
-        const financiacionMensual = getFinanciacionMensualResumen(planesFinanciacion, new Date(year, month, 1));
+        const { data: cuotaPaymentsData } = await supabase
+            .from('caja_recepcion_movimientos')
+            .select('usd_equivalente')
+            .eq('is_deleted', false)
+            .eq('estado', 'pagado')
+            .not('cuota_nro', 'is', null)
+            .gte('fecha_movimiento', monthStart)
+            .lt('fecha_movimiento', nextMonthStart);
+
+        const cuotasCobradasMesUsd = cuotaPaymentsData?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
+        const financiacionMensual = getFinanciacionMensualResumen(planesFinanciacion, new Date(year, month, 1), cuotasCobradasMesUsd);
 
         return {
             totalPacientes: totalPacientes || 0,

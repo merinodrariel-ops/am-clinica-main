@@ -50,3 +50,63 @@ test('keeps programmed financing as the main monthly asset and separates collect
         pendienteUsd: 500,
     });
 });
+
+test('includes future first-due plans in the stable monthly programmed total', () => {
+    const resumen = getFinanciacionMensualResumen(
+        [
+            plan({ id: 'first', fecha_inicio: '2026-07-07', cuotas_pagadas: 0, cuotas_total: 12, monto_cuota_usd: 578 }),
+        ],
+        new Date(2026, 6, 1),
+    );
+
+    assert.deepEqual(resumen, {
+        programadoUsd: 578,
+        cobradoUsd: 0,
+        pendienteUsd: 0,
+    });
+});
+
+test('includes all July financing installments when first due dates fall in July', () => {
+    const resumen = getFinanciacionMensualResumen(
+        [
+            plan({ id: 'a', fecha_inicio: '2025-09-12', cuotas_pagadas: 9, cuotas_total: 12, monto_cuota_usd: 653.33 }),
+            plan({ id: 'b', fecha_inicio: '2025-10-16', cuotas_pagadas: 8, cuotas_total: 12, monto_cuota_usd: 56 }),
+            plan({ id: 'c', fecha_inicio: '2025-10-17', cuotas_pagadas: 8, cuotas_total: 12, monto_cuota_usd: 233.33 }),
+            plan({ id: 'd', fecha_inicio: '2025-12-26', cuotas_pagadas: 6, cuotas_total: 12, monto_cuota_usd: 373.33 }),
+            plan({ id: 'e', fecha_inicio: '2026-06-07', cuotas_pagadas: 1, cuotas_total: 12, monto_cuota_usd: 917 }),
+            plan({ id: 'f', fecha_inicio: '2026-06-07', cuotas_pagadas: 1, cuotas_total: 12, monto_cuota_usd: 1100 }),
+            plan({ id: 'g', fecha_inicio: '2026-07-07', cuotas_pagadas: 0, cuotas_total: 12, monto_cuota_usd: 578 }),
+            plan({ id: 'h', fecha_inicio: '2026-07-08', cuotas_pagadas: 0, cuotas_total: 3, monto_cuota_usd: 858 }),
+        ],
+        new Date(2026, 6, 1),
+    );
+
+    assert.deepEqual(resumen, {
+        programadoUsd: 4768.99,
+        cobradoUsd: 2017,
+        pendienteUsd: 1315.9899999999998,
+    });
+});
+
+test('uses real cashbox quota payments for monthly collected and does not create false current debt', () => {
+    const resumen = getFinanciacionMensualResumen(
+        [
+            plan({ id: 'a', fecha_inicio: '2025-09-12', cuotas_pagadas: 9, cuotas_total: 12, monto_cuota_usd: 653.33 }),
+            plan({ id: 'b', fecha_inicio: '2025-10-16', cuotas_pagadas: 8, cuotas_total: 12, monto_cuota_usd: 56 }),
+            plan({ id: 'c', fecha_inicio: '2025-10-17', cuotas_pagadas: 8, cuotas_total: 12, monto_cuota_usd: 233.33 }),
+            plan({ id: 'd', fecha_inicio: '2025-12-26', cuotas_pagadas: 6, cuotas_total: 12, monto_cuota_usd: 373.33 }),
+            plan({ id: 'e', fecha_inicio: '2026-06-07', cuotas_pagadas: 1, cuotas_total: 12, monto_cuota_usd: 917 }),
+            plan({ id: 'f', fecha_inicio: '2026-06-07', cuotas_pagadas: 1, cuotas_total: 12, monto_cuota_usd: 1100 }),
+            plan({ id: 'g', fecha_inicio: '2026-07-07', cuotas_pagadas: 0, cuotas_total: 12, monto_cuota_usd: 578 }),
+            plan({ id: 'h', fecha_inicio: '2026-07-08', cuotas_pagadas: 0, cuotas_total: 3, monto_cuota_usd: 858 }),
+        ],
+        new Date(2026, 5, 1),
+        2971.27,
+    );
+
+    assert.deepEqual(resumen, {
+        programadoUsd: 4768.99,
+        cobradoUsd: 2971.27,
+        pendienteUsd: 0,
+    });
+});
