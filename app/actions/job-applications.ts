@@ -6,6 +6,9 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
 import {
     buildJobApplicationStoragePath,
+    findRecentDuplicateJobApplication,
+    groupJobApplicationsByCandidate,
+    type GroupedJobApplication,
     hashPrivacyValue,
     isJobApplicationStatus,
     isLikelyUrl,
@@ -22,6 +25,7 @@ import {
 const MIN_FORM_COMPLETION_MS = 4000;
 const RATE_LIMIT_WINDOW_MINUTES = 15;
 const RATE_LIMIT_MAX_SUBMISSIONS = 3;
+const DUPLICATE_SUBMISSION_WINDOW_MS = 10 * 60 * 1000;
 
 export type JobApplicationRow = {
     id: string;
@@ -48,6 +52,8 @@ export type JobApplicationRow = {
     reviewed_at: string | null;
     reviewed_by: string | null;
 };
+
+export type GroupedJobApplicationRow = GroupedJobApplication<JobApplicationRow>;
 
 export type SubmitJobApplicationResult = {
     success?: true;
@@ -174,6 +180,33 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
         return { error: 'Recibimos demasiados envíos recientes. Probá más tarde.' };
     }
 
+    const duplicateWindowStart = new Date(Date.now() - DUPLICATE_SUBMISSION_WINDOW_MS).toISOString();
+    const { data: recentCandidates, error: duplicateCheckError } = await admin
+        .from('job_applications')
+        .select('id, created_at, email, full_name, area')
+        .eq('email', payload.email)
+        .gte('created_at', duplicateWindowStart)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+    if (duplicateCheckError) {
+        console.error('[submitJobApplication] duplicate check failed:', duplicateCheckError.message);
+        return { error: genericSubmitError() };
+    }
+
+    const duplicate = findRecentDuplicateJobApplication(
+        (recentCandidates || []) as Array<{ id: string; created_at: string; email: string; full_name: string; area: string }>,
+        {
+            email: payload.email,
+            fullName: payload.fullName,
+            area: payload.area,
+        },
+    );
+
+    if (duplicate) {
+        return { success: true };
+    }
+
     const applicationId = crypto.randomUUID();
     const storagePath = buildJobApplicationStoragePath(applicationId, cv.name);
     const bytes = Buffer.from(await cv.arrayBuffer());
@@ -254,7 +287,7 @@ export async function listJobApplications(filters?: { status?: string; area?: st
         return [];
     }
 
-    return (data || []) as JobApplicationRow[];
+    return groupJobApplicationsByCandidate((data || []) as JobApplicationRow[]);
 }
 
 export async function updateJobApplicationReview(input: { id: string; status: JobApplicationStatus; review_notes?: string }) {

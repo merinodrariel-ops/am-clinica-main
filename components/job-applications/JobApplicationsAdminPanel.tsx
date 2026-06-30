@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { Check, Download, Eye, Instagram, Link, Loader2, Mail, MapPin, Search, UserCheck } from 'lucide-react';
 import {
     createJobApplicationCvSignedUrl,
-    type JobApplicationRow,
+    type GroupedJobApplicationRow,
     updateJobApplicationReview,
 } from '@/app/actions/job-applications';
 import {
@@ -55,7 +55,7 @@ function getInstagramLabel(handleOrUrl: string) {
     return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
 }
 
-export default function JobApplicationsAdminPanel({ initialRows }: { initialRows: JobApplicationRow[] }) {
+export default function JobApplicationsAdminPanel({ initialRows }: { initialRows: GroupedJobApplicationRow[] }) {
     const [rows, setRows] = useState(initialRows);
     const [statusFilter, setStatusFilter] = useState('todos');
     const [areaFilter, setAreaFilter] = useState('todas');
@@ -84,7 +84,7 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
     const [activePreviews, setActivePreviews] = useState<Record<string, boolean>>({});
     const [loadingCvId, setLoadingCvId] = useState<string | null>(null);
 
-    async function togglePreview(row: JobApplicationRow) {
+    async function togglePreview(row: GroupedJobApplicationRow) {
         if (activePreviews[row.id]) {
             setActivePreviews((prev) => ({ ...prev, [row.id]: false }));
             return;
@@ -115,7 +115,7 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
         const rawSearch = search.trim().toLowerCase();
         return rows.filter((row) => {
             if (statusFilter !== 'todos' && row.status !== statusFilter) return false;
-            if (areaFilter !== 'todas' && row.area !== areaFilter) return false;
+            if (areaFilter !== 'todas' && !row.applications.some((application) => application.area === areaFilter)) return false;
             if (!rawSearch) return true;
             return `${row.full_name} ${row.email}`.toLowerCase().includes(rawSearch);
         });
@@ -139,7 +139,7 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
         }));
     }
 
-    function saveReview(row: JobApplicationRow) {
+    function saveReview(row: GroupedJobApplicationRow) {
         const draft = drafts[row.id];
         if (!draft) return;
 
@@ -163,7 +163,7 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
         });
     }
 
-    async function openCv(row: JobApplicationRow) {
+    async function openCv(row: GroupedJobApplicationRow) {
         setPendingId(row.id);
         const result = await createJobApplicationCvSignedUrl(row.id);
         setPendingId(null);
@@ -239,6 +239,23 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                                         </span>
                                     </div>
                                     <p className="mt-1 text-sm text-slate-500">{formatDate(row.created_at)} · {row.area}{row.other_area ? ` · ${row.other_area}` : ''}</p>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Postulaciones</span>
+                                        {row.applications.map((application) => (
+                                            <span
+                                                key={application.id}
+                                                title={formatDate(application.created_at)}
+                                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                                    application.isDuplicate
+                                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                                                        : 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-200'
+                                                }`}
+                                            >
+                                                {application.area}{application.other_area ? ` · ${application.other_area}` : ''}
+                                                {application.isDuplicate ? ' · duplicada' : ''}
+                                            </span>
+                                        ))}
+                                    </div>
                                     <div className="mt-3 flex flex-wrap gap-y-2 gap-x-4 text-sm">
                                         <a href={`mailto:${row.email}`} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition">
                                             <Mail className="h-4 w-4 text-slate-400" />

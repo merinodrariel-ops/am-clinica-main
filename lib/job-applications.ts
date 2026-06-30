@@ -41,6 +41,25 @@ export type JobApplicationFileLike = {
     size: number;
 };
 
+export type JobApplicationDuplicateComparable = {
+    id: string;
+    created_at: string;
+    email: string;
+    full_name: string;
+    area: string;
+    other_area?: string | null;
+};
+
+export type GroupedJobApplication<T extends JobApplicationDuplicateComparable> = T & {
+    applications: Array<{
+        id: string;
+        created_at: string;
+        area: string;
+        other_area: string | null;
+        isDuplicate: boolean;
+    }>;
+};
+
 export function sanitizeText(value: FormDataEntryValue | string | null | undefined, maxLength = 240) {
     return String(value || '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
 }
@@ -50,6 +69,10 @@ export function sanitizeLongText(value: FormDataEntryValue | string | null | und
 }
 
 export function normalizeEmail(value: FormDataEntryValue | string | null | undefined) {
+    return sanitizeText(value, 180).toLowerCase();
+}
+
+function normalizeComparableName(value: string) {
     return sanitizeText(value, 180).toLowerCase();
 }
 
@@ -114,4 +137,110 @@ export function isValidEmail(value: string) {
 export function isLikelyUrl(value: string) {
     if (!value) return false;
     return /^https?:\/\/[^\s]+$/i.test(value) || /^@?[a-zA-Z0-9._]{2,40}$/.test(value);
+}
+
+export function findRecentDuplicateJobApplication(
+    recentRows: JobApplicationDuplicateComparable[],
+    incoming: {
+        email: string;
+        fullName: string;
+        area: string;
+    },
+    now = new Date(),
+    windowMs = 10 * 60 * 1000,
+) {
+    const normalizedEmail = normalizeEmail(incoming.email);
+    const normalizedName = normalizeComparableName(incoming.fullName);
+    const normalizedArea = sanitizeText(incoming.area, 180);
+    const nowTime = now.getTime();
+
+    return recentRows.find((row) => {
+        if (normalizeEmail(row.email) !== normalizedEmail) return false;
+        if (normalizeComparableName(row.full_name) !== normalizedName) return false;
+        if (sanitizeText(row.area, 180) !== normalizedArea) return false;
+
+        const createdAtTime = new Date(row.created_at).getTime();
+        return Number.isFinite(createdAtTime) && nowTime - createdAtTime >= 0 && nowTime - createdAtTime <= windowMs;
+    }) ?? null;
+}
+
+export function collapseDuplicateJobApplications<T extends JobApplicationDuplicateComparable>(
+    rows: T[],
+    windowMs = 10 * 60 * 1000,
+) {
+    const keptRows: T[] = [];
+
+    for (const row of rows) {
+        const rowEmail = normalizeEmail(row.email);
+        const rowName = normalizeComparableName(row.full_name);
+        const rowArea = sanitizeText(row.area, 180);
+        const rowTime = new Date(row.created_at).getTime();
+
+        const duplicate = keptRows.find((keptRow) => {
+            if (normalizeEmail(keptRow.email) !== rowEmail) return false;
+            if (normalizeComparableName(keptRow.full_name) !== rowName) return false;
+            if (sanitizeText(keptRow.area, 180) !== rowArea) return false;
+
+            const keptTime = new Date(keptRow.created_at).getTime();
+            return Number.isFinite(keptTime) && Number.isFinite(rowTime) && keptTime >= rowTime && keptTime - rowTime <= windowMs;
+        });
+
+        if (!duplicate) {
+            keptRows.push(row);
+        }
+    }
+
+    return keptRows;
+}
+
+function getCandidateGroupingKey(row: JobApplicationDuplicateComparable) {
+    return `${normalizeEmail(row.email)}::${normalizeComparableName(row.full_name)}`;
+}
+
+function getApplicationAreaKey(row: JobApplicationDuplicateComparable) {
+    return `${sanitizeText(row.area, 180)}::${sanitizeText(row.other_area || '', 180)}`;
+}
+
+function getRowTime(row: JobApplicationDuplicateComparable) {
+    const time = new Date(row.created_at).getTime();
+    return Number.isFinite(time) ? time : 0;
+}
+
+export function groupJobApplicationsByCandidate<T extends JobApplicationDuplicateComparable>(
+    rows: T[],
+): Array<GroupedJobApplication<T>> {
+    const sortedRows = [...rows].sort((a, b) => getRowTime(b) - getRowTime(a));
+    const byCandidate = new Map<string, T[]>();
+
+    for (const row of sortedRows) {
+        const key = getCandidateGroupingKey(row);
+        byCandidate.set(key, [...(byCandidate.get(key) || []), row]);
+    }
+
+    return Array.from(byCandidate.values()).map((candidateRows) => {
+        const [primary] = candidateRows;
+        const seenAreas = new Set<string>();
+
+        const applications = candidateRows.map((row) => {
+            const areaKey = getApplicationAreaKey(row);
+            const isDuplicate = seenAreas.has(areaKey);
+            seenAreas.add(areaKey);
+
+            return {
+                id: row.id,
+                created_at: row.created_at,
+                area: row.area,
+                other_area: row.other_area || null,
+                isDuplicate,
+            };
+        });
+
+        return {
+            ...primary,
+            applications: applications.sort((a, b) => {
+                if (a.isDuplicate !== b.isDuplicate) return a.isDuplicate ? 1 : -1;
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }),
+        };
+    });
 }
