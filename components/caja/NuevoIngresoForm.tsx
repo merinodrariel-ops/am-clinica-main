@@ -32,6 +32,7 @@ import {
     calculateFinancingAdvanceSummary,
     requiresTreatmentTotalForAdvance,
 } from '@/lib/caja-recepcion/financing-intent-policy';
+import { buildActiveInstallmentSuggestion } from '@/lib/caja-recepcion/active-installment-suggestion';
 
 interface Paciente {
     id_paciente: string;
@@ -428,24 +429,16 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 .limit(1)
                 .maybeSingle();
 
-            if (activePlan) {
-                const cuotasPagadas = Number(activePlan.cuotas_pagadas || 0);
-                const cuotasTotal = Number(activePlan.cuotas_total || 0);
-                const nextQuota = cuotasPagadas + 1;
-                const cuotaUsd = Number(activePlan.monto_cuota_usd || 0);
+            const suggestion = buildActiveInstallmentSuggestion(activePlan);
 
-                if (cuotasTotal > 0 && nextQuota <= cuotasTotal) {
-                    setBaseInstallmentAmount(cuotaUsd);
-                    setFormData(prev => ({
-                        ...prev,
-                        es_cuota: true,
-                        es_inicio_financiacion: false,
-                        cuota_nro: nextQuota,
-                        cuotas_total: cuotasTotal,
-                        monto: cuotaUsd,
-                        moneda: 'USD',
-                    }));
-                }
+            if (suggestion) {
+                setBaseInstallmentAmount(suggestion.monto_cuota_usd);
+                setFormData(prev => ({
+                    ...prev,
+                    es_cuota: false,
+                    cuota_nro: suggestion.cuota_nro,
+                    cuotas_total: suggestion.cuotas_total,
+                }));
             }
         } catch (e) {
             console.error('Error fetching financing data:', e);
@@ -1729,6 +1722,12 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                             {formData.es_cuota ? '✓ ' : ''}Pago de cuota
                                         </Button>
                                     </div>
+
+                                    {baseInstallmentAmount > 0 && !formData.es_cuota && !formData.es_inicio_financiacion && (
+                                        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                                            Plan activo detectado: cuota {formData.cuota_nro}/{formData.cuotas_total} de USD {baseInstallmentAmount.toFixed(2)}. Este ingreso queda como pago normal salvo que marques Pago de cuota.
+                                        </div>
+                                    )}
 
                                     {formData.es_inicio_financiacion && (
                                         <div className="mt-5 space-y-4">

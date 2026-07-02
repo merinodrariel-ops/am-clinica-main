@@ -26,6 +26,7 @@ import {
 import { calculateWorkedHours, inferSalidaDiaSiguiente } from './attendance-utils';
 import { summarizeCriticalObservedLeaders, type ObservadoLeaderRow } from './observados-summary';
 import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
+import { getLiquidacionMonthEndISODate } from '@/lib/caja-admin/liquidacion-period';
 
 // ==========================================
 // MÉTODOS DE CATEGORÍAS (NEW)
@@ -111,10 +112,7 @@ async function getWorkerHistoricalSettings(
     defaults: { cleaningHourValue: number; staffGeneralHourValue: number }
 ) {
     const supabase = getSupabase();
-    const normalizedMes = mes.slice(0, 7);
-    const [year, month] = normalizedMes.split('-').map(Number);
-    const lastDayDate = new Date(year, month + 1, 0);
-    const lastDayStr = lastDayDate.toISOString().slice(0, 10);
+    const lastDayStr = getLiquidacionMonthEndISODate(mes);
 
     const { data: workerHist, error: workerHistError } = await supabase
         .from('personal_valores_hora_historia')

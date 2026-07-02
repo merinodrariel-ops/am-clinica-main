@@ -78,7 +78,7 @@ import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
 import { registrarMensualidadFija } from '@/app/actions/liquidaciones';
 import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
-import { eliminarPrestacion, updatePrestacionRealizada } from '@/app/actions/prestaciones';
+import { eliminarPrestaciones, updatePrestacionesRealizadas } from '@/app/actions/prestaciones';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
 import { formatDateForLocale, getLocalISODate, toDateInputValue } from '@/lib/local-date';
@@ -198,6 +198,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     // Prestaciones list per professional (expand/edit/delete)
     const [expandedPrestaciones, setExpandedPrestaciones] = useState<Set<string>>(new Set());
     const [editingPrestacion, setEditingPrestacion] = useState<PrestacionRealizada | null>(null);
+    const [editingPrestacionIds, setEditingPrestacionIds] = useState<string[]>([]);
     const [portfolioModal, setPortfolioModal] = useState<{ profesional: Personal; prestaciones: PrestacionRealizada[] } | null>(null);
     const [editPrestacionForm, setEditPrestacionForm] = useState({
         prestacion_nombre: '',
@@ -299,10 +300,36 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         setPortalReady(true);
     }, []);
 
+    const closePrestacionEdit = () => {
+        setEditingPrestacion(null);
+        setEditingPrestacionIds([]);
+    };
+
+    const openPrestacionEdit = (rows: PrestacionRealizada[]) => {
+        const firstRow = rows[0];
+        if (!firstRow) return;
+        const cantidad = Math.max(1, rows.length);
+        const totalValorCobrado = rows.reduce((sum, row) => sum + Number(row.valor_cobrado || 0), 0);
+        const totalHonorarios = rows.reduce((sum, row) => sum + Number(row.monto_honorarios || row.valor_cobrado || 0), 0);
+
+        setEditingPrestacion(firstRow);
+        setEditingPrestacionIds(rows.map(row => row.id));
+        setEditPrestacionForm({
+            prestacion_nombre: firstRow.prestacion_nombre,
+            fecha_realizacion: toDateInputValue(firstRow.fecha_realizacion),
+            paciente_nombre: firstRow.paciente_nombre || '',
+            valor_cobrado: Math.round((totalValorCobrado / cantidad) * 100) / 100,
+            monto_honorarios: Math.round((totalHonorarios / cantidad) * 100) / 100,
+            moneda_cobro: firstRow.moneda_cobro as 'ARS' | 'USD',
+            slides_url: firstRow.slides_url || '',
+            notas: firstRow.notas || '',
+        });
+    };
+
     const handleSavePrestacionEdit = async () => {
         if (!editingPrestacion) return;
         setSavingPrestacion(true);
-        const res = await updatePrestacionRealizada(editingPrestacion.id, {
+        const res = await updatePrestacionesRealizadas(editingPrestacionIds.length > 0 ? editingPrestacionIds : [editingPrestacion.id], {
             prestacion_nombre: editPrestacionForm.prestacion_nombre,
             fecha_realizacion: editPrestacionForm.fecha_realizacion,
             paciente_nombre: editPrestacionForm.paciente_nombre,
@@ -314,8 +341,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         });
         setSavingPrestacion(false);
         if (res.success) {
-            toast.success('Prestación actualizada');
-            setEditingPrestacion(null);
+            toast.success(editingPrestacionIds.length > 1 ? 'Prestaciones actualizadas' : 'Prestación actualizada');
+            closePrestacionEdit();
             loadData();
             if (selectedProfesionalId) {
                 getPrestacionesRealizadas({ profesionalId: selectedProfesionalId }).then(data => setModalPrestaciones(data));
@@ -324,14 +351,16 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         else toast.error(res.error || 'Error al guardar');
     };
 
-    const handleDeletePrestacion = async (id: string, nombre: string) => {
-        if (!confirm(`¿Eliminar "${nombre}"?`)) return;
-        setConfirmDeletePrestacionId(id);
-        setModalPrestaciones(prev => prev.filter(p => p.id !== id));
-        const res = await eliminarPrestacion(id);
+    const handleDeletePrestacionGroup = async (rows: PrestacionRealizada[], nombre: string) => {
+        const ids = rows.map(row => row.id);
+        const label = ids.length > 1 ? `${ids.length} registros de "${nombre}"` : `"${nombre}"`;
+        if (!confirm(`¿Eliminar ${label}?`)) return;
+        setConfirmDeletePrestacionId(ids[0] || null);
+        setModalPrestaciones(prev => prev.filter(p => !ids.includes(p.id)));
+        const res = await eliminarPrestaciones(ids);
         setConfirmDeletePrestacionId(null);
         if (res.success) {
-            toast.success('Prestación eliminada');
+            toast.success(ids.length > 1 ? 'Prestaciones eliminadas' : 'Prestación eliminada');
             loadData();
             if (selectedProfesionalId) {
                 getPrestacionesRealizadas({ profesionalId: selectedProfesionalId }).then(data => setModalPrestaciones(data));
@@ -362,7 +391,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         }
     };
 
-    useModalKeyboard(!!editingPrestacion, () => setEditingPrestacion(null), () => void handleSavePrestacionEdit(), { disabled: savingPrestacion });
+    useModalKeyboard(!!editingPrestacion, closePrestacionEdit, () => void handleSavePrestacionEdit(), { disabled: savingPrestacion });
     useModalKeyboard(!!activatingPrestador, () => setActivatingPrestador(null), () => void handleActivatePrestadorConfirm(), { disabled: activating || !activationData.area });
     useModalKeyboard(showPrestacionForm, () => setShowPrestacionForm(false), () => void handleRegistrarPrestacion(), { disabled: submitting });
 
@@ -3234,7 +3263,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                                             {grouped.map(group => {
                                                                 const firstRow = group.rows[0];
-                                                                const canEditSingle = group.rows.length === 1;
                                                                 return (
                                                                 <div key={group.key} className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
                                                                     <div className="flex items-start justify-between gap-2">
@@ -3264,45 +3292,25 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                                             : `${group.cantidad} registros`}
                                                                                     </p>
                                                                                 )}
-                                                                                {canEditSingle && safeHref(firstRow.slides_url) && (
+                                                                                {safeHref(firstRow.slides_url) && (
                                                                                     <a href={safeHref(firstRow.slides_url)} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-500 hover:underline">HC ↗</a>
                                                                                 )}
                                                                             </div>
-                                                                            {canEditSingle ? (
-                                                                                <>
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            setEditingPrestacion(firstRow);
-                                                                                            setEditPrestacionForm({
-                                                                                                prestacion_nombre: firstRow.prestacion_nombre,
-                                                                                                fecha_realizacion: toDateInputValue(firstRow.fecha_realizacion),
-                                                                                                paciente_nombre: firstRow.paciente_nombre || '',
-                                                                                                valor_cobrado: Number(firstRow.valor_cobrado || 0),
-                                                                                                monto_honorarios: Number(firstRow.monto_honorarios || firstRow.valor_cobrado || 0),
-                                                                                                moneda_cobro: firstRow.moneda_cobro as 'ARS' | 'USD',
-                                                                                                slides_url: firstRow.slides_url || '',
-                                                                                                notas: firstRow.notas || '',
-                                                                                            });
-                                                                                        }}
-                                                                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
-                                                                                        title="Editar"
-                                                                                    >
-                                                                                        <Pencil className="w-3.5 h-3.5" />
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => void handleDeletePrestacion(firstRow.id, firstRow.prestacion_nombre)}
-                                                                                        disabled={confirmDeletePrestacionId === firstRow.id}
-                                                                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-50"
-                                                                                        title="Eliminar"
-                                                                                    >
-                                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                                    </button>
-                                                                                </>
-                                                                            ) : (
-                                                                                <span className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] font-medium text-slate-400">
-                                                                                    Resumido
-                                                                                </span>
-                                                                            )}
+                                                                            <button
+                                                                                onClick={() => openPrestacionEdit(group.rows)}
+                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
+                                                                                title={group.cantidad > 1 ? `Editar ${group.cantidad} registros` : 'Editar'}
+                                                                            >
+                                                                                <Pencil className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => void handleDeletePrestacionGroup(group.rows, group.prestacion_nombre)}
+                                                                                disabled={confirmDeletePrestacionId === firstRow.id}
+                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-50"
+                                                                                title={group.cantidad > 1 ? `Eliminar ${group.cantidad} registros` : 'Eliminar'}
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -4214,11 +4222,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             {/* Modal: editar prestación */}
             {editingPrestacion && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingPrestacion(null)} />
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closePrestacionEdit} />
                     <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 w-full max-w-md m-4 space-y-4">
                         <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
                             <Pencil className="w-5 h-5 text-blue-500" />
-                            Editar Prestación
+                            {editingPrestacionIds.length > 1 ? `Editar ${editingPrestacionIds.length} prestaciones` : 'Editar Prestación'}
                         </h3>
                         <div className="space-y-3">
                             <div>
@@ -4267,7 +4275,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                             </div>
                         </div>
                         <div className="flex gap-3 pt-2">
-                            <button type="button" onClick={() => setEditingPrestacion(null)} className="flex-1 px-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">Cancelar</button>
+                            <button type="button" onClick={closePrestacionEdit} className="flex-1 px-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">Cancelar</button>
                             <button
                                 type="button"
                                 disabled={savingPrestacion}

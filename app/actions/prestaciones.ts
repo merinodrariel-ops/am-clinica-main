@@ -468,28 +468,45 @@ export async function actualizarSlidesUrl(
 export async function eliminarPrestacion(
     prestacionId: string
 ): Promise<{ success: boolean; error?: string }> {
+    return eliminarPrestaciones([prestacionId]);
+}
+
+export async function eliminarPrestaciones(
+    prestacionIds: string[]
+): Promise<{ success: boolean; error?: string }> {
     const admin = getAdminClient();
+    const ids = Array.from(new Set(prestacionIds.filter(Boolean)));
+
+    if (ids.length === 0) {
+        return { success: false, error: 'No se informaron prestaciones para eliminar' };
+    }
 
     // Verificar que no esté pagada antes de borrar
-    const { data: row } = await admin
+    const { data: rows, error: fetchError } = await admin
         .from('prestaciones_realizadas')
-        .select('estado_pago')
-        .eq('id', prestacionId)
-        .single();
+        .select('id, estado_pago')
+        .in('id', ids);
 
-    if (row?.estado_pago === 'pagado') {
-        return { success: false, error: 'No se puede eliminar una prestación ya pagada' };
+    if (fetchError) return { success: false, error: fetchError.message };
+
+    if ((rows || []).some(row => row.estado_pago === 'pagado')) {
+        return { success: false, error: 'No se pueden eliminar prestaciones ya pagadas' };
+    }
+
+    if ((rows || []).length !== ids.length) {
+        return { success: false, error: 'No se encontraron todas las prestaciones para eliminar' };
     }
 
     const { error } = await admin
         .from('prestaciones_realizadas')
         .delete()
-        .eq('id', prestacionId);
+        .in('id', ids);
 
     if (error) return { success: false, error: error.message };
 
     revalidatePath('/portal/prestaciones');
     revalidatePath('/caja-admin/personal');
+    revalidatePath('/caja-admin/liquidaciones');
     return { success: true };
 }
 
@@ -506,17 +523,54 @@ export async function updatePrestacionRealizada(
         notas?: string;
     }
 ): Promise<{ success: boolean; error?: string }> {
+    return updatePrestacionesRealizadas([id], updates);
+}
+
+export async function updatePrestacionesRealizadas(
+    ids: string[],
+    updates: {
+        prestacion_nombre?: string;
+        fecha_realizacion?: string;
+        paciente_nombre?: string;
+        valor_cobrado?: number;
+        monto_honorarios?: number;
+        moneda_cobro?: string;
+        slides_url?: string | null;
+        notas?: string;
+    }
+): Promise<{ success: boolean; error?: string }> {
     const admin = getAdminClient();
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+
+    if (uniqueIds.length === 0) {
+        return { success: false, error: 'No se informaron prestaciones para editar' };
+    }
+
+    const { data: rows, error: fetchError } = await admin
+        .from('prestaciones_realizadas')
+        .select('id, estado_pago')
+        .in('id', uniqueIds);
+
+    if (fetchError) return { success: false, error: fetchError.message };
+
+    if ((rows || []).length !== uniqueIds.length) {
+        return { success: false, error: 'No se encontraron todas las prestaciones para editar' };
+    }
+
+    if ((rows || []).some(row => row.estado_pago === 'pagado')) {
+        return { success: false, error: 'No se pueden editar prestaciones ya pagadas' };
+    }
+
     const { error } = await admin
         .from('prestaciones_realizadas')
         .update(updates)
-        .eq('id', id)
-        .eq('estado_pago', 'pendiente');
+        .in('id', uniqueIds);
 
     if (error) return { success: false, error: error.message };
 
     revalidatePath('/portal/prestaciones');
     revalidatePath('/caja-admin/personal');
+    revalidatePath('/caja-admin/liquidaciones');
     return { success: true };
 }
 

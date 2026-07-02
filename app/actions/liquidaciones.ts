@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { awardAchievement, updateGoalProgressByCode } from './worker-portal';
 import { calculateAdjustedEarnings, type PayrollLog } from '@/lib/payroll-rules';
+import { getLiquidacionMonthEndISODate } from '@/lib/caja-admin/liquidacion-period';
 
 function getAdminClient() {
     return createAdminClient(
@@ -126,10 +127,7 @@ async function getWorkerHistoricalSettings(
     },
     defaults: { cleaningHourValue: number; staffGeneralHourValue: number }
 ) {
-    const normalizedMes = mes.slice(0, 7);
-    const [year, month] = normalizedMes.split('-').map(Number);
-    const lastDayDate = new Date(year, month + 1, 0);
-    const lastDayStr = lastDayDate.toISOString().slice(0, 10);
+    const lastDayStr = getLiquidacionMonthEndISODate(mes);
 
     const { data: workerHist, error: workerHistError } = await admin
         .from('personal_valores_hora_historia')
