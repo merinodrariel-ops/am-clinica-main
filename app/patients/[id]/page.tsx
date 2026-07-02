@@ -6,14 +6,29 @@ import { getMovimientosPorPaciente } from '@/lib/caja-recepcion';
 import type { PlanFinanciacion } from '@/lib/financiacion';
 import { getPatientDesignReview } from '@/app/actions/design-review';
 import { getUserAppProfile } from '@/app/actions/worker-portal';
+import { canViewPatientContactData, canViewPatientFinancialData, canViewPatientRecords } from '@/lib/patient-access';
+import { createAdminClient } from '@/utils/supabase/admin';
 
 export const revalidate = 0; // Always get fresh data
 
 export default async function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const supabase = await createClient();
+    await createClient();
     const appProfile = await getUserAppProfile();
-    const canViewFinancialData = ['admin', 'owner'].includes(appProfile?.categoria || '');
+    const role = appProfile?.categoria || '';
+    const canViewFinancialData = canViewPatientFinancialData(role);
+    const canViewContactData = canViewPatientContactData(role);
+
+    if (!canViewPatientRecords(role)) {
+        return (
+            <div className="p-10 text-center">
+                <h2 className="text-xl font-bold text-red-500 mb-2">Acceso denegado</h2>
+                <p className="text-gray-600">Tu usuario no tiene permiso para ver pacientes.</p>
+            </div>
+        );
+    }
+
+    const adminSupabase = createAdminClient();
 
     let patient;
     let historiaClinica;
@@ -27,19 +42,19 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
     try {
         // Fetch patient from Supabase
-        patient = await getPacienteById(supabase, id);
+        patient = await getPacienteById(adminSupabase, id);
 
         if (patient) {
             // Fetch related data
             const relatedData = await Promise.all([
-                getHistoriaClinica(supabase, id),
-                supabase
+                getHistoriaClinica(adminSupabase, id),
+                adminSupabase
                     .from('agenda_appointments')
                     .select('id, patient_id, doctor_id, start_time, status, type')
                     .eq('patient_id', id)
                     .order('start_time', { ascending: false }),
-                canViewFinancialData ? getPlanesTratamiento(supabase, id) : Promise.resolve([]),
-                canViewFinancialData ? getMovimientosPorPaciente(id, supabase) : Promise.resolve([]),
+                canViewFinancialData ? getPlanesTratamiento(adminSupabase, id) : Promise.resolve([]),
+                canViewFinancialData ? getMovimientosPorPaciente(id, adminSupabase) : Promise.resolve([]),
                 canViewFinancialData ? getPrestacionesByPaciente(id) : Promise.resolve([]),
             ]);
 
@@ -50,7 +65,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             prestaciones = relatedData[4];
 
             if (canViewFinancialData) {
-                const { data: fpData } = await supabase
+                const { data: fpData } = await adminSupabase
                     .from('planes_financiacion')
                     .select('*')
                     .eq('paciente_id', id)
@@ -87,16 +102,27 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         );
     }
 
-    const safePatient = canViewFinancialData
-        ? patient
-        : {
-            ...patient,
+    const safePatient = {
+        ...patient,
+        ...(!canViewContactData ? {
+            documento: undefined,
+            fecha_nacimiento: undefined,
+            email: undefined,
+            whatsapp: undefined,
+            whatsapp_pais_code: undefined,
+            whatsapp_numero: undefined,
+            cuit: undefined,
+            direccion: undefined,
+            domicilio: undefined,
+        } : {}),
+        ...(!canViewFinancialData ? {
             financ_estado: undefined,
             financ_monto_total: undefined,
             financ_cuotas_total: undefined,
             saldo_a_favor_usd: undefined,
             presupuesto_total: undefined,
-        };
+        } : {}),
+    };
 
     return (
         <PatientDashboard

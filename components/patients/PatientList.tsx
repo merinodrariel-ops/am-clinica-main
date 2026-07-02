@@ -42,9 +42,15 @@ function isAdmissionLead(patient: Paciente): boolean {
     return source.includes('lead');
 }
 
+function hasIncompleteDriveLinks(patient: Paciente): boolean {
+    return !patient.link_historia_clinica || !patient.link_google_slides;
+}
+
 interface PatientListProps {
     patients: Paciente[];
     onRefresh?: () => void;
+    canShowContactActions?: boolean;
+    canDeletePatients?: boolean;
 }
 
 interface DeleteModalProps {
@@ -117,7 +123,12 @@ function DeleteModal({ isOpen, onClose, onDelete, patient, isDeleting }: DeleteM
     );
 }
 
-export default function PatientList({ patients, onRefresh }: PatientListProps) {
+export default function PatientList({
+    patients,
+    onRefresh,
+    canShowContactActions = true,
+    canDeletePatients = true,
+}: PatientListProps) {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [patientToDelete, setPatientToDelete] = useState<Paciente | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -224,6 +235,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                             const email = patient.email;
                             const missingCount = getMissingCount(patient);
                             const isLead = isAdmissionLead(patient);
+                            const incompleteDrive = hasIncompleteDriveLinks(patient);
 
                             return (
                                 <motion.tr
@@ -270,6 +282,15 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                                             {missingCount}
                                                         </span>
                                                     )}
+                                                    {incompleteDrive && (
+                                                        <span
+                                                            className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/25"
+                                                            title="Falta vincular carpeta Drive o presentación. Puede ser un paciente cargado al revés o con material antiguo sin asociar."
+                                                        >
+                                                            <AlertTriangle size={10} />
+                                                            Drive
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {patient.documento && (
                                                     <p className="text-xs text-slate-500">
@@ -294,7 +315,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-center gap-1">
                                             {/* WhatsApp */}
-                                            {whatsapp ? (
+                                            {canShowContactActions && whatsapp ? (
                                                 <>
                                                     <a
                                                         href={formatWhatsAppLink(whatsapp)}
@@ -337,7 +358,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                             )}
 
                                             {/* Email */}
-                                            {email ? (
+                                            {canShowContactActions && email ? (
                                                 <>
                                                     <a
                                                         href={formatMailtoLink(email)}
@@ -367,7 +388,7 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-2">
-                                            {missingCount > 0 && !isLead && (
+                                            {canShowContactActions && missingCount > 0 && !isLead && (
                                                 <button
                                                     onClick={() => handleSendEnrichmentLink(patient)}
                                                     disabled={sendingEnrichId === patient.id_paciente}
@@ -388,13 +409,15 @@ export default function PatientList({ patients, onRefresh }: PatientListProps) {
                                             >
                                                 <Edit2 size={18} />
                                             </Link>
-                                            <button
-                                                onClick={() => setPatientToDelete(patient)}
-                                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg inline-flex transition-colors"
-                                                title="Eliminar paciente"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            {canDeletePatients && (
+                                                <button
+                                                    onClick={() => setPatientToDelete(patient)}
+                                                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg inline-flex transition-colors"
+                                                    title="Eliminar paciente"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </motion.tr>

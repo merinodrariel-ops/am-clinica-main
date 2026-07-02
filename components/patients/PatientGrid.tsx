@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Paciente } from '@/lib/patients';
@@ -43,23 +43,6 @@ function getInitials(nombre: string, apellido: string): string {
     return (a + n).toUpperCase() || '?';
 }
 
-function extractGoogleFileIdFromUrl(url: string | null | undefined): string | null {
-    if (!url) return null;
-
-    const patterns = [
-        /\/d\/([a-zA-Z0-9_-]{10,})/,
-        /[?&]id=([a-zA-Z0-9_-]{10,})/,
-        /^([a-zA-Z0-9_-]{10,})$/,
-    ];
-
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match?.[1]) return match[1];
-    }
-
-    return null;
-}
-
 function resolvePatientPhotoSrc(patient: Paciente): string | null {
     const cover = patient.foto_perfil_url?.trim();
     if (cover) {
@@ -90,24 +73,25 @@ function getStatusTag(status?: string): { label: string; cls: string } | null {
     }
 }
 
+function hasIncompleteDriveLinks(patient: Paciente): boolean {
+    return !patient.link_historia_clinica || !patient.link_google_slides;
+}
+
 interface PatientCardProps {
     patient: Paciente;
     index: number;
 }
 
 function PatientCard({ patient, index }: PatientCardProps) {
-    const [imgFailed, setImgFailed] = useState(false);
+    const [failedPhotoSrc, setFailedPhotoSrc] = useState<string | null>(null);
     const missingCount = getMissingCount(patient);
     const photoSrc = useMemo(() => resolvePatientPhotoSrc(patient), [patient]);
-    const hasPhoto = !!photoSrc && !imgFailed;
+    const hasPhoto = !!photoSrc && failedPhotoSrc !== photoSrc;
     const paletteIdx = hashString(patient.id_paciente) % INITIAL_PALETTE.length;
     const palette = INITIAL_PALETTE[paletteIdx];
     const initials = getInitials(patient.nombre, patient.apellido);
     const tag = getStatusTag(patient.estado_paciente);
-
-    useEffect(() => {
-        setImgFailed(false);
-    }, [photoSrc]);
+    const incompleteDrive = hasIncompleteDriveLinks(patient);
 
     return (
         <motion.div
@@ -126,7 +110,7 @@ function PatientCard({ patient, index }: PatientCardProps) {
                             alt={`${patient.nombre} ${patient.apellido}`}
                             loading="lazy"
                             referrerPolicy="no-referrer"
-                            onError={() => setImgFailed(true)}
+                            onError={() => setFailedPhotoSrc(photoSrc)}
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                     ) : (
@@ -151,6 +135,15 @@ function PatientCard({ patient, index }: PatientCardProps) {
                             title={`${missingCount} dato${missingCount > 1 ? 's' : ''} faltante${missingCount > 1 ? 's' : ''}`}
                         >
                             {missingCount}
+                        </span>
+                    )}
+
+                    {incompleteDrive && (
+                        <span
+                            className="absolute left-2 top-10 rounded-full border border-rose-300/40 bg-rose-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white shadow"
+                            title="Falta vincular carpeta Drive o presentación"
+                        >
+                            Drive
                         </span>
                     )}
 

@@ -270,6 +270,7 @@ function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] 
 }
 
 const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
+const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente']);
 
 interface PatientDriveTabProps {
     patientId: string;
@@ -280,6 +281,7 @@ interface PatientDriveTabProps {
 export default function PatientDriveTab({ patientId, patientName, motherFolderUrl }: PatientDriveTabProps) {
     const { categoria: role, profile } = useAuth();
     const canUpload = UPLOAD_ROLES.has(role || '');
+    const canManageDrive = DRIVE_MANAGE_ROLES.has(role || '');
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
     const [files, setFiles] = useState<DriveFile[]>([]);
@@ -709,7 +711,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                         </h3>
                                     </div>
 
-                                    {key === 'foto' ? (
+                                    {key === 'foto' && canManageDrive ? (
                                         <DndContext
                                             sensors={dndSensors}
                                             collisionDetection={closestCenter}
@@ -726,14 +728,14 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             file={file}
                                                             isPortada={idx === 0}
                                                             onPreview={f => openPreview(f, motherFolderId)}
-                                                            onDelete={canUpload ? handleDeleteFile : undefined}
+                                                            onDelete={canManageDrive ? handleDeleteFile : undefined}
                                                             onShare={handleShareFile}
-                                                            onShareWithPatient={setSharePatientFile}
-                                                            onShareEmail={handleShareEmail}
-                                                            onTag={canUpload ? setTagFile : undefined}
+                                                            onShareWithPatient={canManageDrive ? setSharePatientFile : undefined}
+                                                            onShareEmail={canManageDrive ? handleShareEmail : undefined}
+                                                            onTag={canManageDrive ? setTagFile : undefined}
                                                             photoTag={photoTags[file.id]}
-                                                            onSmileDesign={f => openSmileDesign(f, motherFolderId)}
-                                                            onSetPortada={canUpload ? handleSetPortada : undefined}
+                                                            onSmileDesign={canManageDrive ? (f => openSmileDesign(f, motherFolderId)) : undefined}
+                                                            onSetPortada={canManageDrive ? handleSetPortada : undefined}
                                                             patientFolder={getFormattedFolderName(patientName)}
                                                         />
                                                     ))}
@@ -747,13 +749,13 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                     <DriveFileCard
                                                         file={file}
                                                         onPreview={f => openPreview(f, motherFolderId)}
-                                                        onDelete={canUpload ? handleDeleteFile : undefined}
+                                                        onDelete={canManageDrive ? handleDeleteFile : undefined}
                                                         onShare={handleShareFile}
-                                                        onShareWithPatient={setSharePatientFile}
-                                                        onShareEmail={handleShareEmail}
-                                                        onTag={canUpload ? setTagFile : undefined}
+                                                        onShareWithPatient={canManageDrive ? setSharePatientFile : undefined}
+                                                        onShareEmail={canManageDrive ? handleShareEmail : undefined}
+                                                        onTag={canManageDrive ? setTagFile : undefined}
                                                         photoTag={photoTags[file.id]}
-                                                        onSmileDesign={f => openSmileDesign(f, motherFolderId)}
+                                                        onSmileDesign={canManageDrive ? (f => openSmileDesign(f, motherFolderId)) : undefined}
                                                         patientFolder={getFormattedFolderName(patientName)}
                                                     />
                                                     {key === '3d' && dentalBitePairs.has(file.id) && (
@@ -766,7 +768,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             Ver mordida
                                                         </button>
                                                     )}
-                                                    {key === 'presentacion' && canUpload && (
+                                                    {key === 'presentacion' && canManageDrive && (
                                                         <button
                                                             onClick={() => handleExtractSlides(file.id)}
                                                             disabled={extractingSlidesId === file.id}
@@ -815,7 +817,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 )}
 
                 {/* Share with patient */}
-                {sharePatientFile && (
+                {canManageDrive && sharePatientFile && (
                     <ShareWithPatientModal
                         files={[{
                             id: sharePatientFile.id,
@@ -836,7 +838,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     folderId={previewFolderId}
                     patientId={patientId}
                     patientName={patientName}
-                    canSave={canUpload}
+                    canSave={canManageDrive}
                     allFolderFiles={files.filter(f => ['foto', 'redes'].includes(classifyFile(f)))}
                     autoStartSmile={previewAutoSmile}
                     onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}

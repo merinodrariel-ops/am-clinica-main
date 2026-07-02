@@ -136,8 +136,9 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const isOdontologo = role === 'odontologo';
     const isRecaptacion = role === 'recaptacion';
     const isAsistente = role === 'asistente';
+    const isLaboratorio = role === 'laboratorio';
     const hidePaymentTabs = role !== 'admin' && role !== 'owner';
-    const hideContactData = isAsistente || isOdontologo;
+    const hideContactData = isAsistente || isOdontologo || isLaboratorio;
 
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);

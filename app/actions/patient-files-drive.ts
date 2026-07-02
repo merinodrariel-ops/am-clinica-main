@@ -25,6 +25,9 @@ export async function renameDriveFileAction(
     newName: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        const roleCheck = await requireDriveManageRole('renombrar archivos en Drive');
+        if (roleCheck.error) return { success: false, error: roleCheck.error };
+
         const res = await renameFileInDrive(fileId, newName);
         return res;
     } catch (error) {
@@ -234,8 +237,26 @@ export async function createPatientDriveFolderAction(
 
 // ─── Fotos order persistence ────────────────────────────────────────────────
 
-const DRIVE_WRITE_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
+const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente']);
 const DRIVE_ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
+
+async function requireDriveManageRole(actionLabel: string): Promise<{ error?: string }> {
+    const supabaseServer = await createServerClient();
+    const { data: { user } } = await supabaseServer.auth.getUser();
+    if (!user) return { error: 'No autenticado' };
+
+    const { data: profile } = await supabaseServer
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile?.categoria || !DRIVE_MANAGE_ROLES.has(profile.categoria)) {
+        return { error: `Sin permisos para ${actionLabel}` };
+    }
+
+    return {};
+}
 
 /** Returns the saved photo order for a patient: { [folderId]: [fileId, ...] } */
 export async function getPatientFotosOrder(patientId: string): Promise<Record<string, string[]>> {
@@ -255,9 +276,8 @@ export async function saveFotosOrderAction(
     coverFileId?: string | null
 ): Promise<{ error?: string }> {
     try {
-        const supabaseServer = await createServerClient();
-        const { data: { user } } = await supabaseServer.auth.getUser();
-        if (!user) return { error: 'No autenticado' };
+        const roleCheck = await requireDriveManageRole('ordenar archivos en Drive');
+        if (roleCheck.error) return roleCheck;
 
         // Read current value then merge — avoids overwriting other folders' orders
         const { data: current } = await supabase
@@ -303,18 +323,8 @@ export async function uploadEditedPhotoAction(
     formData: FormData
 ): Promise<{ fileId?: string; webViewLink?: string; error?: string }> {
     try {
-        const supabaseServer = await createServerClient();
-        const { data: { user } } = await supabaseServer.auth.getUser();
-        if (!user) return { error: 'No autenticado' };
-
-        const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('categoria')
-            .eq('id', user.id)
-            .single();
-        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
-            return { error: 'Sin permisos para guardar archivos en Drive' };
-        }
+        const roleCheck = await requireDriveManageRole('guardar ediciones en Drive');
+        if (roleCheck.error) return roleCheck;
 
         if (!folderId || !DRIVE_ID_RE.test(folderId)) return { error: 'Carpeta inválida' };
 
@@ -379,18 +389,8 @@ export async function uploadPhotoForSocialAction(
     formData: FormData
 ): Promise<{ fileId?: string; error?: string }> {
     try {
-        const supabaseServer = await createServerClient();
-        const { data: { user } } = await supabaseServer.auth.getUser();
-        if (!user) return { error: 'No autenticado' };
-
-        const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('categoria')
-            .eq('id', user.id)
-            .single();
-        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
-            return { error: 'Sin permisos para guardar archivos en Drive' };
-        }
+        const roleCheck = await requireDriveManageRole('guardar ediciones en Drive');
+        if (roleCheck.error) return roleCheck;
 
         if (!patientFolderId || !DRIVE_ID_RE.test(patientFolderId)) return { error: 'Carpeta inválida' };
 
@@ -447,18 +447,8 @@ export async function replaceEditedPhotoAction(
     formData: FormData
 ): Promise<{ error?: string }> {
     try {
-        const supabaseServer = await createServerClient();
-        const { data: { user } } = await supabaseServer.auth.getUser();
-        if (!user) return { error: 'No autenticado' };
-
-        const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('categoria')
-            .eq('id', user.id)
-            .single();
-        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
-            return { error: 'Sin permisos para guardar archivos en Drive' };
-        }
+        const roleCheck = await requireDriveManageRole('reemplazar archivos en Drive');
+        if (roleCheck.error) return roleCheck;
 
         if (!fileId || !DRIVE_ID_RE.test(fileId)) return { error: 'ID de archivo inválido' };
 
@@ -485,18 +475,8 @@ export async function deleteDriveFileAction(
     fileId: string
 ): Promise<{ error?: string }> {
     try {
-        const supabaseServer = await createServerClient();
-        const { data: { user } } = await supabaseServer.auth.getUser();
-        if (!user) return { error: 'No autenticado' };
-
-        const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('categoria')
-            .eq('id', user.id)
-            .single();
-        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
-            return { error: 'Sin permisos para eliminar archivos de Drive' };
-        }
+        const roleCheck = await requireDriveManageRole('eliminar archivos de Drive');
+        if (roleCheck.error) return roleCheck;
 
         if (!fileId || !DRIVE_ID_RE.test(fileId)) {
             return { error: 'ID de archivo inválido' };
@@ -518,18 +498,8 @@ export async function duplicateDriveFileAction(
     newName: string
 ): Promise<{ fileId?: string; error?: string }> {
     try {
-        const supabaseServer = await createServerClient();
-        const { data: { user } } = await supabaseServer.auth.getUser();
-        if (!user) return { error: 'No autenticado' };
-
-        const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('categoria')
-            .eq('id', user.id)
-            .single();
-        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
-            return { error: 'Sin permisos para duplicar archivos en Drive' };
-        }
+        const roleCheck = await requireDriveManageRole('duplicar archivos en Drive');
+        if (roleCheck.error) return roleCheck;
 
         const result = await copyDriveFile(fileId, newName);
         if (result.error) return { error: result.error };
@@ -548,18 +518,8 @@ export async function setPatientCoverPhotoAction(
     fileId: string | null
 ): Promise<{ error?: string }> {
     try {
-        const supabaseServer = await createServerClient();
-        const { data: { user } } = await supabaseServer.auth.getUser();
-        if (!user) return { error: 'No autenticado' };
-
-        const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('categoria')
-            .eq('id', user.id)
-            .single();
-        if (!profile?.categoria || !DRIVE_WRITE_ROLES.has(profile.categoria)) {
-            return { error: 'Sin permisos para editar pacientes' };
-        }
+        const roleCheck = await requireDriveManageRole('editar pacientes');
+        if (roleCheck.error) return roleCheck;
 
         if (fileId !== null && (!fileId || !DRIVE_ID_RE.test(fileId))) {
             return { error: 'ID de archivo inválido' };

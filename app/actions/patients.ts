@@ -4,6 +4,13 @@ import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { Paciente, softDeletePaciente, updatePaciente } from '@/lib/patients';
 import { buildFreeTextHistoriaEntry } from '@/lib/clinical-history';
+import { canManagePatients, canViewPatientContactData, canViewPatientRecords } from '@/lib/patient-access';
+import {
+    getPatientSearchTokens,
+    normalizePatientSearchText,
+    patientMatchesSearch,
+    shouldUseOnlyWithPhotosFilter,
+} from '@/lib/patient-search';
 
 import { syncPatientToSheet } from '@/lib/google-sheets';
 import { sendWelcomeEmailAction } from '@/app/actions/email';
@@ -25,20 +32,11 @@ export interface ListPatientsFilters {
     onlyWithPhotos?: boolean;
 }
 
-function normalizePatientText(value: string | null | undefined): string {
-    return (value || '')
-        .toString()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-        .toLowerCase();
-}
-
 function sanitizeDocumento(value: unknown): string | undefined {
     const raw = typeof value === 'string' ? value.trim() : '';
     if (!raw) return undefined;
 
-    const normalized = normalizePatientText(raw).replace(/[\s._-]+/g, '');
+    const normalized = normalizePatientSearchText(raw).replace(/[\s._-]+/g, '');
     const placeholders = new Set([
         'dni',
         'udni',
@@ -60,10 +58,10 @@ function sanitizeDocumento(value: unknown): string | undefined {
 }
 
 function namesLookLikeSamePatient(existing: Paciente, incoming: Partial<Paciente>): boolean {
-    const existingNombre = normalizePatientText(existing.nombre);
-    const existingApellido = normalizePatientText(existing.apellido);
-    const incomingNombre = normalizePatientText(incoming.nombre);
-    const incomingApellido = normalizePatientText(incoming.apellido);
+    const existingNombre = normalizePatientSearchText(existing.nombre);
+    const existingApellido = normalizePatientSearchText(existing.apellido);
+    const incomingNombre = normalizePatientSearchText(incoming.nombre);
+    const incomingApellido = normalizePatientSearchText(incoming.apellido);
 
     if (!incomingNombre || !incomingApellido) return false;
     return existingNombre === incomingNombre && existingApellido === incomingApellido;
@@ -71,13 +69,6 @@ function namesLookLikeSamePatient(existing: Paciente, incoming: Partial<Paciente
 
 function patientDisplayName(patient: Pick<Paciente, 'nombre' | 'apellido'>): string {
     return `${patient.nombre || ''} ${patient.apellido || ''}`.trim() || 'otro paciente';
-}
-
-function getSearchTokens(search?: string): string[] {
-    return normalizePatientText(search)
-        .split(/\s+/)
-        .map((token) => token.trim())
-        .filter(Boolean);
 }
 
 function escapeSupabaseSearchTerm(term: string): string {
@@ -98,22 +89,6 @@ function buildSearchOrClause(tokens: string[]): string {
             ];
         })
         .join(',');
-}
-
-function patientMatchesSearch(patient: Paciente, tokens: string[]): boolean {
-    if (!tokens.length) return true;
-
-    const haystack = normalizePatientText([
-        patient.apellido,
-        patient.nombre,
-        `${patient.apellido || ''} ${patient.nombre || ''}`,
-        `${patient.nombre || ''} ${patient.apellido || ''}`,
-        patient.email,
-        patient.documento,
-        patient.whatsapp,
-    ].filter(Boolean).join(' '));
-
-    return tokens.every((token) => haystack.includes(token));
 }
 
 // Only the columns the patients list/grid actually renders — keeps the payload
@@ -141,18 +116,54 @@ const PATIENT_LIST_COLUMNS = [
     'link_historia_clinica',
 ].join(', ');
 
+const PATIENT_LIST_COLUMNS_PRIVATE = [
+    'id_paciente',
+    'nombre',
+    'apellido',
+    'ciudad',
+    'zona_barrio',
+    'estado_paciente',
+    'origen_registro',
+    'referencia_origen',
+    'como_nos_conocio',
+    'primera_consulta_fecha',
+    'fecha_alta',
+    'foto_perfil_url',
+    'link_google_slides',
+    'link_historia_clinica',
+].join(', ');
+
 export async function listPatientsAction(filters: ListPatientsFilters = {}) {
     try {
         const supabase = await createClient();
-        const searchTokens = getSearchTokens(filters.search);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return { success: false, error: 'Sesión no autorizada. Por favor, inicia sesión.' };
+        }
 
-        let query = supabase
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        const role = profile?.categoria || user.user_metadata?.categoria;
+        if (!canViewPatientRecords(role)) {
+            return { success: false, error: 'No tienes permisos para ver pacientes.' };
+        }
+
+        const adminSupabase = createAdminClient();
+        const searchTokens = getPatientSearchTokens(filters.search);
+        const onlyWithPhotos = shouldUseOnlyWithPhotosFilter(filters.onlyWithPhotos, filters.search);
+        const canViewContactData = canViewPatientContactData(role);
+
+        let query = adminSupabase
             .from('pacientes')
-            .select(PATIENT_LIST_COLUMNS)
+            .select(canViewContactData ? PATIENT_LIST_COLUMNS : PATIENT_LIST_COLUMNS_PRIVATE)
             .eq('is_deleted', false)
             .order('fecha_alta', { ascending: false });
 
-        if (filters.onlyWithPhotos) {
+        if (onlyWithPhotos) {
             // Real patients have at least one of: clinical history link, Google Slides link, or profile photo.
             query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
         }
@@ -199,7 +210,7 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
             return { success: true, data: patients };
         }
 
-        const { data: patientFiles, error: filesError } = await supabase
+        const { data: patientFiles, error: filesError } = await adminSupabase
             .from('patient_files')
             .select('patient_id, thumbnail_url, file_url, created_at')
             .in('patient_id', patientIds)
@@ -240,17 +251,39 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
 export async function getPatientsCountAction(filters: ListPatientsFilters = {}) {
     try {
         const supabase = await createClient();
-        const searchTokens = getSearchTokens(filters.search);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return { success: false, count: 0 };
+        }
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        const role = profile?.categoria || user.user_metadata?.categoria;
+        if (!canViewPatientRecords(role)) {
+            return { success: false, count: 0 };
+        }
+
+        const adminSupabase = createAdminClient();
+        const searchTokens = getPatientSearchTokens(filters.search);
+        const onlyWithPhotos = shouldUseOnlyWithPhotosFilter(filters.onlyWithPhotos, filters.search);
+        const canViewContactData = canViewPatientContactData(role);
 
         // If searchTokens.length > 1, we must fetch in memory to perform the AND match.
         // We select the minimal search fields to keep it as light as possible.
         if (searchTokens.length > 1) {
-            let dataQuery = supabase
+            let dataQuery = adminSupabase
                 .from('pacientes')
-                .select('id_paciente, nombre, apellido, email, documento, whatsapp')
+                .select(canViewContactData
+                    ? 'id_paciente, nombre, apellido, email, documento, whatsapp'
+                    : 'id_paciente, nombre, apellido'
+                )
                 .eq('is_deleted', false);
 
-            if (filters.onlyWithPhotos) {
+            if (onlyWithPhotos) {
                 dataQuery = dataQuery.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
             }
             dataQuery = dataQuery.or(buildSearchOrClause(searchTokens));
@@ -268,12 +301,12 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
         }
 
         // For 0 or 1 search tokens, do a 100% database-side count query (head: true)
-        let query = supabase
+        let query = adminSupabase
             .from('pacientes')
             .select('id_paciente', { count: 'exact', head: true })
             .eq('is_deleted', false);
 
-        if (filters.onlyWithPhotos) {
+        if (onlyWithPhotos) {
             query = query.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
         }
 
@@ -314,10 +347,7 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
         }
 
         const { data: profile } = await supabase.from('profiles').select('categoria').eq('id', user.id).maybeSingle();
-        const role = profile?.categoria || '';
-        const allowedRoles = ['admin', 'owner', 'reception', 'asistente', 'dr', 'developer'];
-
-        if (!allowedRoles.includes(role.toLowerCase())) {
+        if (!canManagePatients(profile?.categoria || user.user_metadata?.categoria)) {
             return { success: false, error: 'No tienes permisos para gestionar pacientes.' };
         }
 

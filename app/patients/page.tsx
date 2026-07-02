@@ -22,11 +22,12 @@ import { listPatientsAction, getPatientsCountAction } from '@/app/actions/patien
 import { type Paciente } from '@/lib/patients';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import { useAuth } from '@/contexts/AuthContext';
+import { canManagePatients, canViewPatientContactData } from '@/lib/patient-access';
 
 const PAGE_SIZE = 48;
 
 export default function PatientsPage() {
-    const { canEdit } = useAuth();
+    const { canEdit, categoria } = useAuth();
     const [patients, setPatients] = useState<Paciente[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -274,7 +275,12 @@ export default function PatientsPage() {
                         {viewMode === 'grid' ? (
                             <PatientGrid patients={patients} onRefresh={() => loadPatients(page)} />
                         ) : (
-                            <PatientList patients={patients} onRefresh={() => loadPatients(page)} />
+                            <PatientList
+                                patients={patients}
+                                onRefresh={() => loadPatients(page)}
+                                canShowContactActions={canViewPatientContactData(categoria)}
+                                canDeletePatients={canManagePatients(categoria)}
+                            />
                         )}
                         <PaginationBar
                             page={page}
