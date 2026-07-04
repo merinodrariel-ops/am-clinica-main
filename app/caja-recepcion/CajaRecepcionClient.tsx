@@ -57,6 +57,7 @@ import CategoriaGuard from '@/components/auth/CategoriaGuard';
 import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 import { shouldRegenerateReceiptAfterEdit } from '@/lib/caja-recepcion/receipt-regeneration';
+import { getFinancingStatusForMovementAction } from '@/app/actions/financing-status';
 
 
 // Types
@@ -141,6 +142,12 @@ interface AperturaAudit {
     hora_inicio: string | null;
     created_at: string;
     estado: 'abierto' | 'cerrado';
+}
+
+interface FinancingStatusPreview {
+    movementId: string;
+    patientName: string;
+    message: string;
 }
 
 // Payment data for copy functionality
@@ -297,6 +304,9 @@ function CajaRecepcionContent() {
     const [deletingMovId, setDeletingMovId] = useState<string | null>(null);
     const [deletionConfirmation, setDeletionConfirmation] = useState("");
     const [deletionReason, setDeletionReason] = useState("");
+    const [financingStatusPreview, setFinancingStatusPreview] = useState<FinancingStatusPreview | null>(null);
+    const [financingStatusLoadingId, setFinancingStatusLoadingId] = useState<string | null>(null);
+    const [financingStatusError, setFinancingStatusError] = useState<string | null>(null);
 
     // QR Modal state
     const [qrModal, setQrModal] = useState<{ open: boolean; value: string; title: string }>({
@@ -535,6 +545,30 @@ function CajaRecepcionContent() {
         setTimeout(() => setCopiedKey(null), 2000);
     }
 
+    async function openFinancingStatusPreview(mov: Movimiento) {
+        setFinancingStatusError(null);
+        setFinancingStatusLoadingId(mov.id);
+        try {
+            const result = await getFinancingStatusForMovementAction(mov.id);
+            if (!result.success || !result.message) {
+                setFinancingStatusError(result.error || 'No se pudo generar el estado de financiación.');
+                return;
+            }
+
+            setFinancingStatusPreview({
+                movementId: mov.id,
+                patientName: mov.paciente
+                    ? `${mov.paciente.nombre} ${mov.paciente.apellido}`.trim()
+                    : 'Paciente',
+                message: result.message,
+            });
+        } catch (error) {
+            setFinancingStatusError(error instanceof Error ? error.message : 'No se pudo generar el estado de financiación.');
+        } finally {
+            setFinancingStatusLoadingId(null);
+        }
+    }
+
     function formatPaymentData(key: keyof typeof PAYMENT_DATA): string {
         const data = PAYMENT_DATA[key];
         const lines = [data.label];
@@ -678,7 +712,7 @@ function CajaRecepcionContent() {
                 usd_equivalente = Math.abs(editMonto) / bnaRate.venta;
             }
 
-            const updates: any = {};
+            const updates: Record<string, string | number | boolean | null> = {};
 
             if (editingMov.origen === 'transferencias_caja') {
                 updates.estado = editEstado;
@@ -1527,6 +1561,20 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
 
                                                                 {mov.categoria !== 'Egreso' && (
                                                                     <>
+                                                                        {(mov.cuota_nro || mov.paciente?.financ_estado === 'activo') && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    void openFinancingStatusPreview(mov);
+                                                                                }}
+                                                                                disabled={financingStatusLoadingId === mov.id}
+                                                                                className="p-1.5 rounded-lg transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500 hover:text-blue-600 disabled:opacity-60"
+                                                                                title="Previsualizar estado de financiación"
+                                                                            >
+                                                                                {financingStatusLoadingId === mov.id
+                                                                                    ? <Loader2 size={16} className="animate-spin" />
+                                                                                    : <FileText size={16} />}
+                                                                            </button>
+                                                                        )}
                                                                         <button
                                                                             onClick={() => {
                                                                                 const isCollection = mov.estado === 'pendiente';
@@ -2116,6 +2164,69 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             mes={mesActual}
                             tabla="caja_recepcion_movimientos"
                         />
+
+                        {financingStatusError && (
+                            <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl border border-amber-500/30 bg-slate-950 p-4 text-sm text-amber-100 shadow-2xl">
+                                <div className="flex items-start gap-3">
+                                    <AlertTriangle size={18} className="mt-0.5 text-amber-400" />
+                                    <div className="flex-1">
+                                        <p className="font-semibold">No se pudo abrir el estado de financiación</p>
+                                        <p className="mt-1 text-amber-200/80">{financingStatusError}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setFinancingStatusError(null)}
+                                        className="rounded-lg p-1 text-amber-200/70 hover:bg-white/10 hover:text-white"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {financingStatusPreview && (
+                            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+                                    <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-5">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-white">Estado de financiación</h3>
+                                            <p className="mt-1 text-sm text-slate-400">
+                                                Vista previa interna para {financingStatusPreview.patientName}. Revisá antes de enviar.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setFinancingStatusPreview(null)}
+                                            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-4 p-5">
+                                        <textarea
+                                            value={financingStatusPreview.message}
+                                            onChange={(event) => setFinancingStatusPreview((prev) => prev ? { ...prev, message: event.target.value } : prev)}
+                                            className="min-h-[280px] w-full rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm leading-relaxed text-slate-100 outline-none focus:border-blue-500"
+                                        />
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                                            <button
+                                                onClick={() => copyToClipboard('financing-status', financingStatusPreview.message)}
+                                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-800"
+                                            >
+                                                {copiedKey === 'financing-status' ? <CheckCircle size={16} /> : <Copy size={16} />}
+                                                Copiar texto
+                                            </button>
+                                            <button
+                                                onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(financingStatusPreview.message)}`, '_blank')}
+                                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                                            >
+                                                <MessageCircle size={16} />
+                                                Abrir WhatsApp
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
 
