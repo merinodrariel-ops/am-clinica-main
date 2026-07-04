@@ -106,6 +106,52 @@ function monthBounds(mes: string) {
     };
 }
 
+function roundMoney(value: number) {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function positiveNumber(value: unknown) {
+    const parsed = Number(value || 0);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+async function resolveHourValues(admin: ReturnType<typeof getAdminClient>, base?: Partial<HourValuesConfig>): Promise<HourValuesConfig> {
+    const baseCleaning = positiveNumber(base?.cleaningHourValue);
+    const baseStaff = positiveNumber(base?.staffGeneralHourValue);
+
+    if (baseCleaning > 0 && baseStaff > 0) {
+        return {
+            cleaningHourValue: baseCleaning,
+            staffGeneralHourValue: baseStaff,
+        };
+    }
+
+    const [{ data: history }, { data: sucursal }] = await Promise.all([
+        admin
+            .from('sucursal_valores_hora_historia')
+            .select('valor_hora_limpieza_ars, valor_hora_staff_ars')
+            .order('fecha_desde', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        admin
+            .from('sucursales')
+            .select('valor_hora_limpieza_ars, valor_hora_staff_ars')
+            .eq('activa', true)
+            .order('nombre')
+            .limit(1)
+            .maybeSingle(),
+    ]);
+
+    const fallbackCleaning = positiveNumber(history?.valor_hora_limpieza_ars) || positiveNumber(sucursal?.valor_hora_limpieza_ars);
+    const fallbackStaff = positiveNumber(history?.valor_hora_staff_ars) || positiveNumber(sucursal?.valor_hora_staff_ars);
+
+    return {
+        cleaningHourValue: baseCleaning || fallbackCleaning,
+        staffGeneralHourValue: baseStaff || fallbackStaff,
+    };
+}
+
 function classifyProvider(input: {
     area?: string | null;
     categoria?: string | null;
@@ -213,11 +259,13 @@ export async function getLiquidacionesConfig(): Promise<{
         throw new Error(servicesError.message);
     }
 
+    const hourValues = await resolveHourValues(admin, {
+        cleaningHourValue: hourValuesRow?.cleaning_hour_value,
+        staffGeneralHourValue: hourValuesRow?.staff_general_hour_value,
+    });
+
     return {
-        hourValues: {
-            cleaningHourValue: Number(hourValuesRow?.cleaning_hour_value || 0),
-            staffGeneralHourValue: Number(hourValuesRow?.staff_general_hour_value || 0),
-        },
+        hourValues,
         services: (services || []).map((item) => ({
             id: item.id,
             name: item.name,
@@ -235,20 +283,23 @@ export async function saveHourValues(config: HourValuesConfig): Promise<void> {
     const cleaning = Number(config.cleaningHourValue);
     const staff = Number(config.staffGeneralHourValue);
 
-    if (!Number.isFinite(cleaning) || cleaning < 0) {
-        throw new Error('Valor hora de Limpieza inválido');
+    if (!Number.isFinite(cleaning) || cleaning <= 0) {
+        throw new Error('Valor hora de Limpieza inválido. Debe ser mayor a cero.');
     }
 
-    if (!Number.isFinite(staff) || staff < 0) {
-        throw new Error('Valor hora de Staff General inválido');
+    if (!Number.isFinite(staff) || staff <= 0) {
+        throw new Error('Valor hora de Staff General inválido. Debe ser mayor a cero.');
     }
+
+    const roundedCleaning = roundMoney(cleaning);
+    const roundedStaff = roundMoney(staff);
 
     const { error } = await admin
         .from('liquidacion_hour_values')
         .upsert({
             id: 1,
-            cleaning_hour_value: Math.round((cleaning + Number.EPSILON) * 100) / 100,
-            staff_general_hour_value: Math.round((staff + Number.EPSILON) * 100) / 100,
+            cleaning_hour_value: roundedCleaning,
+            staff_general_hour_value: roundedStaff,
             updated_at: new Date().toISOString(),
         }, { onConflict: 'id' });
 
@@ -256,7 +307,52 @@ export async function saveHourValues(config: HourValuesConfig): Promise<void> {
         throw new Error(error.message);
     }
 
+    const { data: sucursales, error: sucursalesError } = await admin
+        .from('sucursales')
+        .select('id')
+        .eq('activa', true);
+
+    if (sucursalesError) {
+        throw new Error(sucursalesError.message);
+    }
+
+    if (sucursales && sucursales.length > 0) {
+        const today = new Date().toISOString().slice(0, 10);
+        const now = new Date().toISOString();
+
+        const { error: sucursalUpdateError } = await admin
+            .from('sucursales')
+            .update({
+                valor_hora_limpieza_ars: roundedCleaning,
+                valor_hora_staff_ars: roundedStaff,
+            })
+            .in('id', sucursales.map((sucursal) => sucursal.id));
+
+        if (sucursalUpdateError) {
+            throw new Error(sucursalUpdateError.message);
+        }
+
+        const { error: historyError } = await admin
+            .from('sucursal_valores_hora_historia')
+            .upsert(
+                sucursales.map((sucursal) => ({
+                    sucursal_id: sucursal.id,
+                    fecha_desde: today,
+                    valor_hora_limpieza_ars: roundedCleaning,
+                    valor_hora_staff_ars: roundedStaff,
+                    notas: 'Actualización desde Liquidaciones',
+                    created_at: now,
+                })),
+                { onConflict: 'sucursal_id,fecha_desde' }
+            );
+
+        if (historyError) {
+            throw new Error(historyError.message);
+        }
+    }
+
     revalidatePath('/caja-admin/liquidaciones');
+    revalidatePath('/caja-admin');
 }
 
 export async function createInternalService(input: {
