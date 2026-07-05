@@ -81,7 +81,7 @@ const CARD_TITLES: Record<CardId, string> = {
     'ingresos-mes': 'Ingresos Recepción',
     'egresos-mes': 'Egresos Admin',
     'en-financiacion': 'En Financiación',
-    'deuda-total': 'Deuda Total Circulante',
+    'deuda-total': 'Saldo Financiado',
 };
 
 const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout: LayoutConfig }> = {
@@ -96,7 +96,7 @@ const GRID_PRESETS: Record<PresetId, { name: string; description: string; layout
     },
     finanzas: {
         name: 'Finanzas',
-        description: 'Enfocado en ingresos, egresos, deuda y financiación.',
+        description: 'Enfocado en ingresos, egresos, saldo financiado y financiación.',
         layout: {
             order: ['ingresos-mes', 'egresos-mes', 'deuda-total', 'en-financiacion', 'total-pacientes', 'primera-vez'],
             hidden: ['total-pacientes', 'primera-vez'],
@@ -911,15 +911,15 @@ export default function OwnerDashboard() {
             iconColor: 'hsl(270 67% 65%)',
             expandContent: stats.planesFinanciacion.length > 0 ? (
                 <div className="space-y-4">
-                    {/* Lista de Pendientes */}
+                    {/* Seguimiento de cuotas del mes */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-bold tracking-wider uppercase text-amber-500/80">
-                                Cuotas Pendientes ({pendingPlanes.length})
+                                Cuotas a revisar ({pendingPlanes.length})
                             </span>
                             {pendingPlanes.length > 0 && (
                                 <span className="text-[10px] text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded font-mono font-medium">
-                                    Pendiente: ${pendingPlanes.reduce((sum, p) => sum + (Number(p.monto_cuota_usd) || 0), 0).toLocaleString()} USD
+                                    Revisión: ${pendingPlanes.reduce((sum, p) => sum + (Number(p.monto_cuota_usd) || 0), 0).toLocaleString()} USD
                                 </span>
                             )}
                         </div>
@@ -943,8 +943,8 @@ export default function OwnerDashboard() {
                                                 <span>{p.tratamiento}</span>
                                                 <span>
                                                     {isOverdue
-                                                        ? `Vencido (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
-                                                        : `Cuota ${instNum} pendiente (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
+                                                        ? `Revisar plan (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
+                                                        : `Cuota ${instNum} a revisar (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
                                                     }
                                                 </span>
                                             </div>
@@ -991,9 +991,9 @@ export default function OwnerDashboard() {
         'deuda-total': {
             id: 'deuda-total',
             icon: Landmark,
-            label: 'Deuda Total Circulante',
+            label: 'Saldo financiado',
             value: `$${stats.deudaTotalUsd.toLocaleString()} USD`,
-            subtitle: isCurrentMonth ? 'Saldo pendiente de todos los planes' : 'Estado actual (no varía por mes)',
+            subtitle: isCurrentMonth ? 'Saldo restante de planes activos' : 'Estado actual (no varía por mes)',
             gradient: 'linear-gradient(135deg, hsl(35 95% 55%), hsl(25 90% 48%))',
             iconBg: 'hsla(35, 95%, 55%, 0.15)',
             iconColor: 'hsl(35 95% 60%)',
@@ -1007,7 +1007,7 @@ export default function OwnerDashboard() {
                 return (
                     <div className="space-y-1">
                         <div className="text-[10px] font-bold tracking-wider uppercase text-amber-500/80 mb-2">
-                            Pacientes con saldo ({planesConSaldo.length})
+                            Planes con saldo restante ({planesConSaldo.length})
                         </div>
                         <ul className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
                             {planesConSaldo.map((p) => (

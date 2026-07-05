@@ -66,6 +66,22 @@ test('includes future first-due plans in the stable monthly programmed total', (
     });
 });
 
+test('excludes plans whose first due month is after the dashboard month', () => {
+    const resumen = getFinanciacionMensualResumen(
+        [
+            plan({ id: 'july', fecha_inicio: '2026-07-07', cuotas_pagadas: 0, cuotas_total: 12, monto_cuota_usd: 578 }),
+            plan({ id: 'august', fecha_inicio: '2026-08-07', cuotas_pagadas: 0, cuotas_total: 12, monto_cuota_usd: 1540 }),
+        ],
+        new Date(2026, 6, 1),
+    );
+
+    assert.deepEqual(resumen, {
+        programadoUsd: 578,
+        cobradoUsd: 0,
+        pendienteUsd: 0,
+    });
+});
+
 test('includes all July financing installments when first due dates fall in July', () => {
     const resumen = getFinanciacionMensualResumen(
         [
@@ -100,13 +116,13 @@ test('uses real cashbox quota payments for monthly collected and does not create
             plan({ id: 'g', fecha_inicio: '2026-07-07', cuotas_pagadas: 0, cuotas_total: 12, monto_cuota_usd: 578 }),
             plan({ id: 'h', fecha_inicio: '2026-07-08', cuotas_pagadas: 0, cuotas_total: 3, monto_cuota_usd: 858 }),
         ],
-        new Date(2026, 5, 1),
-        2971.27,
+        new Date(2026, 6, 1),
+        3332.99,
     );
 
     assert.deepEqual(resumen, {
         programadoUsd: 4768.99,
-        cobradoUsd: 2971.27,
+        cobradoUsd: 3332.99,
         pendienteUsd: 0,
     });
 });
