@@ -1362,6 +1362,33 @@ export default function PhotoStudioModal({
         return [...ordered, ...byId.values()];
     }, [baseImageFiles, imageOrderIds]);
 
+    // Prefetch neighboring photos so arrow-key navigation feels instant.
+    // Warms the small placeholder for a ±2 window (cheap) and the full-res original
+    // for the immediate next/prev (±1). Kept small to stay friendly on mobile data.
+    useEffect(() => {
+        if (!activeFile || imageFiles.length < 2) return;
+        const idx = imageFiles.findIndex(f => f.id === activeFile.id);
+        if (idx === -1) return;
+
+        const warmed: HTMLImageElement[] = [];
+        const warm = (src: string) => {
+            const img = new window.Image();
+            img.src = src;
+            warmed.push(img);
+        };
+        const thumb = (f: DriveFile) =>
+            `/api/drive/thumbnail/${encodeURIComponent(f.id)}?s=400${f.modifiedTime ? `&v=${encodeURIComponent(f.modifiedTime)}` : ''}`;
+
+        for (const offset of [-2, -1, 1, 2]) {
+            const neighbor = imageFiles[idx + offset];
+            if (!neighbor || !neighbor.thumbnailLink) continue;
+            warm(thumb(neighbor));
+            if (offset === -1 || offset === 1) warm(driveImageUrl(neighbor));
+        }
+
+        return () => { warmed.forEach(img => { img.src = ''; }); };
+    }, [activeFile?.id, imageFiles]);
+
     useEffect(() => {
         setImageOrderIds((prev) => {
             const validPrev = prev.filter((id) => baseImageFiles.some((item) => item.id === id));
