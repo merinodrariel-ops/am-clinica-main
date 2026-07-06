@@ -7,6 +7,7 @@ export interface PhotoTag {
     file_id: string;
     category: string;
     subcategory?: string | null;
+    description?: string | null;
 }
 
 export async function savePhotoTagAction(
@@ -14,6 +15,7 @@ export async function savePhotoTagAction(
     patientId: string,
     category: string,
     subcategory: string | null,
+    description?: string | null,
 ) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -25,6 +27,7 @@ export async function savePhotoTagAction(
         patient_id:  patientId,
         category,
         subcategory: subcategory ?? null,
+        description: description?.trim() || null,
         tagged_by:   user.id,
         tagged_at:   new Date().toISOString(),
     }, { onConflict: 'file_id' });
@@ -48,7 +51,7 @@ export async function getPhotoTagsForPatientAction(patientId: string): Promise<P
     const admin = createAdminClient();
     const { data } = await admin
         .from('patient_file_tags')
-        .select('file_id, category, subcategory')
+        .select('file_id, category, subcategory, description')
         .eq('patient_id', patientId);
     return (data as PhotoTag[]) ?? [];
 }
