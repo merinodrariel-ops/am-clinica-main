@@ -4,6 +4,8 @@
 
 - Do what has been asked; nothing more, nothing less
 - For this clinic app, every user-visible production change must be committed, pushed to GitHub, deployed to Vercel production, and verified on the production URL before reporting it as done. Do not leave visible fixes only in the local worktree.
+- Before editing, sync mentally and technically with the current repo state: `git fetch`, inspect `origin/main`, read recent commits for every file/module you may touch, and never work from a stale snapshot. If `main` moved, rebase/merge first instead of overwriting recent work.
+- Multi-agent anti-regression rule: a task in one domain must not roll back another agent's recent work in the same domain. Before committing, review the full diff and confirm it only changes the requested scope; if a shared contract changed recently, preserve it explicitly.
 - NEVER create files unless they're absolutely necessary for achieving your goal
 - ALWAYS prefer editing an existing file to creating a new one
 - NEVER proactively create documentation files (*.md) or README files unless explicitly requested
@@ -26,6 +28,8 @@
 
 - Follow Domain-Driven Design with bounded contexts
 - Keep files under 500 lines
+- Large clinical flows must be split by responsibility. Do not re-centralize photo/Drive/editor behavior into a monolithic component.
+- For the photo workflow, preserve the shared contract: cover photo first, Selección photos immediately after the cover, then the rest. Selection, cover, save, and editor tools are one shared domain even when split into multiple files.
 - Use typed interfaces for all public APIs
 - Prefer TDD London School (mock-first) for new code
 - Use event sourcing for state changes
