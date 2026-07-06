@@ -1745,15 +1745,21 @@ export default function PhotoStudioModal({
         };
     }, []);
 
-    // Keyboard shortcut: Cmd/Ctrl+Z → undo, Cmd/Ctrl+Y / Cmd/Ctrl+Shift+Z → redo
+    // Keyboard shortcut: Cmd/Ctrl+Z → undo draw step first, then photo history.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
             if (e.metaKey || e.ctrlKey) {
                 if (e.shiftKey && e.key.toLowerCase() === 'z') {
                     e.preventDefault();
                     handleRedo();
                 } else if (e.key.toLowerCase() === 'z') {
                     e.preventDefault();
+                    if (drawMode !== 'idle' && (currentPoints.length > 0 || drawShapes.length > 0)) {
+                        handleUndoLastDrawPoint();
+                        return;
+                    }
                     handleUndo();
                 } else if (e.key.toLowerCase() === 'y') {
                     e.preventDefault();
@@ -1764,7 +1770,7 @@ export default function PhotoStudioModal({
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [history, redoStack]);
+    }, [history, redoStack, drawMode, currentPoints.length, drawShapes.length]);
 
     // Keyboard shortcut: Cmd+C / Cmd+V for selected text annotations or draw shapes
     useEffect(() => {
@@ -7683,16 +7689,33 @@ function ToolsPanel({
                     </p>
                 )}
                 {(drawMode === 'selected' || drawMode === 'editing') && (
-                    <button
-                        onClick={onFlipHorizontal}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm bg-white/5 text-white/70 hover:text-white/90 border border-white/10 hover:border-white/20 transition-colors"
-                    >
-                        <ArrowLeftRight size={18} /> Voltear horizontal
-                    </button>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {drawMode === 'selected' ? (
+                            <button
+                                onClick={() => onSetDrawMode('editing')}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm bg-[#C9A96E]/15 text-[#C9A96E] border border-[#C9A96E]/25 hover:bg-[#C9A96E]/25 transition-colors"
+                            >
+                                <Edit2 size={16} /> Editar puntos
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => onSetDrawMode('selected')}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm bg-white/5 text-white/70 hover:text-white/90 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                                <Check size={16} /> Terminar edición
+                            </button>
+                        )}
+                        <button
+                            onClick={onFlipHorizontal}
+                            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm bg-white/5 text-white/70 hover:text-white/90 border border-white/10 hover:border-white/20 transition-colors"
+                        >
+                            <ArrowLeftRight size={16} /> Voltear
+                        </button>
+                    </div>
                 )}
                 {drawMode === 'selected' && (
                     <p className="text-white/35 text-xs">
-                        Esquinas: arrastrar=escalar · Cmd+arrastrar=rotar · mover · doble clic=editar · Cmd+C/V=copiar
+                        Esquinas: arrastrar=escalar · Cmd+arrastrar=rotar · mover · Cmd+C/V=copiar
                     </p>
                 )}
                 {drawMode === 'editing' && (
