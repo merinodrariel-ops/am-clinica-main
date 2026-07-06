@@ -54,10 +54,12 @@ export function makeLayer(
     dropX = 0.5,
     dropY = 0.5,
 ): CanvasLayer {
-    const maxW = 0.5;
-    const aspect = img.naturalWidth / (img.naturalHeight || 1);
-    const w = maxW;
-    const h = w / aspect;
+    const maxSide = 0.55;
+    const aspect = img.naturalWidth > 0 && img.naturalHeight > 0
+        ? img.naturalWidth / img.naturalHeight
+        : 1;
+    const w = aspect >= 1 ? maxSide : maxSide * aspect;
+    const h = aspect >= 1 ? maxSide / aspect : maxSide;
     return {
         id: `layer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         src, fileId,
@@ -385,9 +387,17 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
             if (distSqStart < 1) return l; // Avoid tiny distances (pixels^2)
             
             const ratio = Math.sqrt(distSqNow / distSqStart);
-            const newW = Math.max(0.05, Math.min(2, origLayer.w * ratio));
-            const aspect = origLayer.w / (origLayer.h || 1);
-            return { ...l, w: newW, h: newW / aspect };
+            const aspect = Number.isFinite(origLayer.w / origLayer.h) && origLayer.h > 0
+                ? origLayer.w / origLayer.h
+                : 1;
+            let newW = Math.max(0.05, Math.min(3, origLayer.w * ratio));
+            let newH = newW / aspect;
+            if (!Number.isFinite(newW) || !Number.isFinite(newH) || newW <= 0 || newH <= 0) return l;
+            if (newH > 3) {
+                newH = 3;
+                newW = newH * aspect;
+            }
+            return { ...l, w: newW, h: newH };
         }));
     }
 

@@ -3035,6 +3035,7 @@ export default function PhotoStudioModal({
         for (const layer of canvasLayers) {
             const px = layer.x * renderW, py = layer.y * renderH;
             const pw = layer.w * renderW, ph = layer.h * renderH;
+            if (!Number.isFinite(pw) || !Number.isFinite(ph) || pw <= 0 || ph <= 0) continue;
             const previewCanvas = canvasHealPreviewRef.current?.layerId === layer.id
                 ? canvasHealPreviewRef.current.canvas
                 : null;
@@ -3197,8 +3198,19 @@ export default function PhotoStudioModal({
             const distSqNow = Math.pow((nx - origLayer.x) * W, 2) + Math.pow((ny - origLayer.y) * H, 2);
             if (distSqStart < 1) return l;
             const ratio = Math.sqrt(distSqNow / distSqStart);
-            const newW = Math.max(0.05, origLayer.w * ratio);
-            return { ...l, w: newW, h: newW / (origLayer.w / (origLayer.h || 1)) };
+            const aspect = Number.isFinite(origLayer.w / origLayer.h) && origLayer.h > 0
+                ? origLayer.w / origLayer.h
+                : (origLayer.img?.naturalWidth && origLayer.img?.naturalHeight
+                    ? origLayer.img.naturalWidth / origLayer.img.naturalHeight
+                    : 1);
+            let newW = Math.max(0.05, Math.min(3, origLayer.w * ratio));
+            let newH = newW / aspect;
+            if (!Number.isFinite(newW) || !Number.isFinite(newH) || newW <= 0 || newH <= 0) return l;
+            if (newH > 3) {
+                newH = 3;
+                newW = newH * aspect;
+            }
+            return { ...l, w: newW, h: newH };
         }));
     }
 
@@ -3559,9 +3571,19 @@ export default function PhotoStudioModal({
             ctx.save();
             ctx.translate(layer.x * expW, layer.y * expH);
             ctx.rotate(layer.rotation * Math.PI / 180);
+            const pw = layer.w * expW;
+            const ph = layer.h * expH;
             // Safety check for export
-            if (layer.img instanceof HTMLImageElement && layer.img.complete && layer.img.naturalWidth > 0) {
-                ctx.drawImage(layer.img, -layer.w * expW / 2, -layer.h * expH / 2, layer.w * expW, layer.h * expH);
+            if (
+                layer.img instanceof HTMLImageElement &&
+                layer.img.complete &&
+                layer.img.naturalWidth > 0 &&
+                Number.isFinite(pw) &&
+                Number.isFinite(ph) &&
+                pw > 0 &&
+                ph > 0
+            ) {
+                ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
             }
             ctx.restore();
         }
