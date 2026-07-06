@@ -15,7 +15,6 @@ import {
     Share2,
     Mail,
     Tag,
-    Star,
     Sparkles,
     Check,
 } from 'lucide-react';
@@ -42,8 +41,6 @@ interface DriveFileCardProps {
     onShareEmail?: (file: DriveFile) => void;
     onTag?: (file: DriveFile) => void;
     photoTag?: PhotoTag | null;
-    isPortada?: boolean;
-    onSetPortada?: (file: DriveFile) => void;
     patientFolder?: string;
     selectionEnabled?: boolean;
     isSelected?: boolean;
@@ -119,8 +116,6 @@ export default function DriveFileCard({
     onShareEmail,
     onTag,
     photoTag,
-    isPortada,
-    onSetPortada,
     patientFolder,
     selectionEnabled,
     isSelected,
@@ -328,15 +323,6 @@ export default function DriveFileCard({
                         title="Clasificar foto"
                     >
                         <Tag size={13} />
-                    </button>
-                )}
-                {onSetPortada && category === 'image' && !isPortada && (
-                    <button
-                        onClick={e => { e.stopPropagation(); onSetPortada(file); }}
-                        className="absolute top-8 left-1.5 p-1.5 rounded-lg bg-black/60 text-[#C9A96E]/80 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-[#C9A96E] hover:text-black z-10"
-                        title="Usar como portada"
-                    >
-                        <Star size={13} />
                     </button>
                 )}
             </div>

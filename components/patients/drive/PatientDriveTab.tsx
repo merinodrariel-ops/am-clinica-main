@@ -52,7 +52,6 @@ function SortableFileCard({
     onShareEmail,
     onTag,
     photoTag,
-    onSetPortada,
     patientFolder,
     selectionEnabled,
     isSelected,
@@ -67,7 +66,6 @@ function SortableFileCard({
     onShareEmail?: (f: DriveFile) => void;
     onTag?: (f: DriveFile) => void;
     photoTag?: PhotoTag | null;
-    onSetPortada?: (f: DriveFile) => void;
     patientFolder?: string;
     selectionEnabled?: boolean;
     isSelected?: boolean;
@@ -108,8 +106,6 @@ function SortableFileCard({
                 onShareEmail={onShareEmail}
                 onTag={onTag}
                 photoTag={photoTag}
-                isPortada={isPortada}
-                onSetPortada={onSetPortada}
                 patientFolder={patientFolder}
                 selectionEnabled={selectionEnabled}
                 isSelected={isSelected}
@@ -398,25 +394,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         void saveFotosOrderAction(patientId, motherFolderId, ids, coverFileId).then(result => {
             if (result.error) {
                 toast.error(`No se pudo guardar la portada: ${result.error}`);
-            }
-        });
-    }
-
-    function handleSetPortada(file: DriveFile) {
-        const photos = files.filter(f => classifyFile(f) === 'foto');
-        const idx = photos.findIndex(f => f.id === file.id);
-        if (idx < 0) return;
-        const reordered = [photos[idx], ...photos.slice(0, idx), ...photos.slice(idx + 1)];
-        const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
-        setFiles([...reordered, ...otherFiles]);
-        const ids = reordered.map(f => f.id);
-        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
-        setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
-        void saveFotosOrderAction(patientId, motherFolderId, ids, file.id).then(result => {
-            if (result.error) {
-                toast.error(`No se pudo guardar la portada: ${result.error}`);
-            } else {
-                toast.success('Foto de portada actualizada');
             }
         });
     }
@@ -811,7 +788,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             onShareEmail={canManageDrive ? handleShareEmail : undefined}
                                                             onTag={canManageDrive ? setTagFile : undefined}
                                                             photoTag={photoTags[file.id]}
-                                                            onSetPortada={canManageDrive ? handleSetPortada : undefined}
                                                             patientFolder={getFormattedFolderName(patientName)}
                                                             selectionEnabled={canManageDrive}
                                                             isSelected={selectedPhotoIds.includes(file.id)}
