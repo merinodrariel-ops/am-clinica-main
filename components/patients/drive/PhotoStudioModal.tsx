@@ -936,7 +936,7 @@ export default function PhotoStudioModal({
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
     const [magicWandActive, setMagicWandActive] = useState(false);
-    const [magicWandTolerance, setMagicWandTolerance] = useState(50);
+    const [magicWandTolerance, setMagicWandTolerance] = useState(25);
     const [exportFileName, setExportFileName] = useState('');
     const [healMode, setHealMode] = useState(false);
     const [healSize, setHealSize] = useState(28);
