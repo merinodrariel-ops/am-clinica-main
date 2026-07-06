@@ -946,7 +946,7 @@ export default function PhotoStudioModal({
     const [magicWandTolerance, setMagicWandTolerance] = useState(25);
     const [exportFileName, setExportFileName] = useState('');
     const [healMode, setHealMode] = useState(false);
-    const [healSize, setHealSize] = useState(28);
+    const [healSize, setHealSize] = useState(16);
     const [healPreviewNonce, setHealPreviewNonce] = useState(0);
     const [healCursor, setHealCursor] = useState<{ x: number; y: number; size: number; visible: boolean }>({ x: 0, y: 0, size: 28, visible: false });
     const manualBackgroundToolActive = brushMode !== null || magicWandActive || healMode;
@@ -2560,7 +2560,7 @@ export default function PhotoStudioModal({
             healLastPointRef.current = { x, y, target };
             return true;
         }
-        const minDist = Math.max(2, radius * 0.35);
+        const minDist = Math.max(3, radius * 0.75);
         const moved = Math.hypot(x - last.x, y - last.y);
         if (moved < minDist) return false;
         healLastPointRef.current = { x, y, target };
@@ -2571,7 +2571,10 @@ export default function PhotoStudioModal({
         const cv = openCvRef.current;
         if (!cv) return false;
 
-        const margin = Math.max(16, Math.ceil(radius * 2.5));
+        const maskRadius = Math.max(2, radius * 0.5);
+        const blendRadius = maskRadius * 1.35;
+        const inpaintRadius = Math.max(1, Math.min(8, Math.round(maskRadius * 0.25)));
+        const margin = Math.max(12, Math.ceil(blendRadius + inpaintRadius * 3));
         const sx = Math.max(0, Math.floor(x - margin));
         const sy = Math.max(0, Math.floor(y - margin));
         const sw = Math.min(ctx.canvas.width - sx, Math.ceil(margin * 2));
@@ -2591,7 +2594,7 @@ export default function PhotoStudioModal({
         maskCtx.fillRect(0, 0, sw, sh);
         maskCtx.fillStyle = '#fff';
         maskCtx.beginPath();
-        maskCtx.arc(x - sx, y - sy, radius, 0, Math.PI * 2);
+        maskCtx.arc(x - sx, y - sy, maskRadius, 0, Math.PI * 2);
         maskCtx.fill();
 
         const src = cv.imread(sourceCanvas);
@@ -2602,14 +2605,29 @@ export default function PhotoStudioModal({
         try {
             cv.cvtColor(maskRgba, mask, cv.COLOR_RGBA2GRAY, 0);
             cv.threshold(mask, mask, 1, 255, cv.THRESH_BINARY);
-            cv.inpaint(src, mask, dst, Math.max(3, Math.round(radius * 0.45)), cv.INPAINT_TELEA);
+            cv.inpaint(src, mask, dst, inpaintRadius, cv.INPAINT_TELEA);
 
             const outCanvas = document.createElement('canvas');
             outCanvas.width = sw;
             outCanvas.height = sh;
             cv.imshow(outCanvas, dst);
-            ctx.clearRect(sx, sy, sw, sh);
-            ctx.drawImage(outCanvas, sx, sy);
+
+            const patchCanvas = document.createElement('canvas');
+            patchCanvas.width = sw;
+            patchCanvas.height = sh;
+            const patchCtx = patchCanvas.getContext('2d')!;
+            patchCtx.drawImage(outCanvas, 0, 0);
+            patchCtx.globalCompositeOperation = 'destination-in';
+            const blend = patchCtx.createRadialGradient(x - sx, y - sy, 0, x - sx, y - sy, blendRadius);
+            blend.addColorStop(0, 'rgba(0, 0, 0, 1)');
+            blend.addColorStop(0.65, 'rgba(0, 0, 0, 0.95)');
+            blend.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            patchCtx.fillStyle = blend;
+            patchCtx.beginPath();
+            patchCtx.arc(x - sx, y - sy, blendRadius, 0, Math.PI * 2);
+            patchCtx.fill();
+
+            ctx.drawImage(patchCanvas, sx, sy);
             return true;
         } finally {
             src.delete();
@@ -7811,7 +7829,7 @@ function ToolsPanel({
                     <p className="text-white/35 text-xs uppercase tracking-wider">Tamaño del pincel</p>
                     <div className="flex items-center gap-2">
                         <input
-                            type="range" min={6} max={90} step={2}
+                            type="range" min={4} max={48} step={2}
                             value={healSize}
                             onChange={e => onSetHealSize(Number(e.target.value))}
                             disabled={!healMode}
