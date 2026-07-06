@@ -8,12 +8,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
-const SUPABASE_URL = 'https://ybozzesadqcorvfqpsyo.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlib3p6ZXNhZHFjb3J2ZnFwc3lvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjU0NDg5MCwiZXhwIjoyMDgyMTIwODkwfQ.8XihVtil2IGTq8DQMX2sHPn_blXdKJIeZadjPzrgkH4';
-const RESEND_API_KEY = 're_V1sbguSt_B3F9wrdy8tMsQdAAaACrHRyu';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const APP_URL = 'https://am-clinica-main.vercel.app';
 const FROM = 'AM Clínica <info@amesteticadental.com>';
 
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !RESEND_API_KEY) {
+    console.error('Faltan NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / RESEND_API_KEY en el entorno (correr con node --env-file=.env.local).');
+    process.exit(1);
+}
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const resend = new Resend(RESEND_API_KEY);
 
