@@ -309,6 +309,13 @@ function clampMenuToViewport(x: number, y: number, width: number, height: number
     return { x: left, y: top };
 }
 
+// Build the Drive image URL for on-screen display. `v=modifiedTime` busts the shared
+// CDN cache when a photo is replaced in place (same fileId, new bytes).
+function driveImageUrl(f: { id: string; modifiedTime?: string }): string {
+    const v = f.modifiedTime ? `&v=${encodeURIComponent(f.modifiedTime)}` : '';
+    return `/api/drive/file/${f.id}?cors=1${v}`;
+}
+
 function AirDropIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
     return (
         <svg
@@ -899,7 +906,7 @@ export default function PhotoStudioModal({
 
     // Active file in the studio (may differ from initial file when user clicks thumbnails)
     const [activeFile, setActiveFile] = useState<DriveFile | null>(file);
-    const [imageUrl, setImageUrl] = useState(() => file ? `/api/drive/file/${file.id}?cors=1` : '');
+    const [imageUrl, setImageUrl] = useState(() => file ? driveImageUrl(file) : '');
     const [imgLoaded, setImgLoaded] = useState(false);
 
     // Reset loading flag whenever we switch to a Drive-proxied URL (not local blobs/base64)
@@ -931,7 +938,6 @@ export default function PhotoStudioModal({
     const [magicWandActive, setMagicWandActive] = useState(false);
     const [magicWandTolerance, setMagicWandTolerance] = useState(50);
     const [exportFileName, setExportFileName] = useState('');
-    const [exportDestination, setExportDestination] = useState<'patient' | 'social'>('social');
     const [healMode, setHealMode] = useState(false);
     const [healSize, setHealSize] = useState(28);
     const [healPreviewNonce, setHealPreviewNonce] = useState(0);
@@ -1560,7 +1566,7 @@ export default function PhotoStudioModal({
     useEffect(() => {
         if (file && file.id !== activeFile?.id) {
             setActiveFile(file);
-            setImageUrl(`/api/drive/file/${file.id}?cors=1`);
+            setImageUrl(driveImageUrl(file));
             resetEdits();
         }
     }, [file?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1809,7 +1815,7 @@ export default function PhotoStudioModal({
             setTextAnnotations(saved.textAnnotations);
         }
         setActiveFile(newFile);
-        setImageUrl(`/api/drive/file/${newFile.id}?cors=1`);
+        setImageUrl(driveImageUrl(newFile));
     }
 
     function clearMultiSelection() {
@@ -4876,9 +4882,8 @@ export default function PhotoStudioModal({
         }
     }
 
-    async function handleSaveToDrive(mode: 'replace' | 'copy', destinationOverride?: 'patient' | 'social') {
+    async function handleSaveToDrive(mode: 'replace' | 'copy', dest: 'patient' | 'social') {
         if (!activeFile) return;
-        const dest = destinationOverride ?? exportDestination;
         setSaving(mode);
         try {
             const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
@@ -5172,13 +5177,12 @@ export default function PhotoStudioModal({
                                     const baseName = activeFile?.name.replace(/\.[^.]+$/, '') ?? 'foto';
                                     const cleanPatientName = patientName.replace(/\s+/g, '_');
                                     setExportFileName(`${cleanPatientName}_${baseName}_editada`);
-                                    setExportDestination('social');
                                     setSaveDialogOpen(true);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#b8924e] transition-colors"
                             >
                                 <Save size={14} />
-                                <span className="hidden sm:inline">Guardar en Drive</span>
+                                <span className="hidden sm:inline">Guardar foto</span>
                             </button>
                         )}
                         {!smileMode && (
@@ -6495,15 +6499,6 @@ export default function PhotoStudioModal({
                                     >
                                         {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
                                         Guardar copia en Selección (Redes)
-                                    </button>
-
-                                    <button
-                                        onClick={() => handleSaveToDrive('copy', 'patient')}
-                                        disabled={!!saving}
-                                        className="w-full py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/15 border border-white/10 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
-                                    >
-                                        {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                        Guardar copia nueva en el Drive
                                     </button>
 
                                     <button

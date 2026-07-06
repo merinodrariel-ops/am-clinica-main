@@ -176,6 +176,13 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
     const size = formatFileSize(file.size);
     const hasShare = onShare || onShareWithPatient || onShareEmail;
 
+    // Serve grid thumbnails through our cached proxy (small, reliable, 1-week edge cache)
+    // instead of Google's raw thumbnailLink. `v=modifiedTime` busts the cache when a
+    // photo's content is replaced in place (same fileId, new bytes).
+    const thumbnailSrc = file.thumbnailLink
+        ? `/api/drive/thumbnail/${encodeURIComponent(file.id)}?s=400${file.modifiedTime ? `&v=${encodeURIComponent(file.modifiedTime)}` : ''}`
+        : undefined;
+
     const handleClick = () => {
         if (category === 'exocad') {
             const protocolUrl = `am-clinica-exocad://open?patientFolder=${encodeURIComponent(patientFolder || '')}&path=${encodeURIComponent(file.relativePath || '')}`;
@@ -201,7 +208,7 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
             <div className="aspect-square rounded-lg overflow-hidden mb-2 flex items-center justify-center bg-gray-50 dark:bg-white/5 relative">
                 {(category === 'image' || category === 'pdf' || category === 'google-doc') && file.thumbnailLink ? (
                     <img
-                        src={file.thumbnailLink}
+                        src={thumbnailSrc}
                         alt={file.name}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
@@ -211,7 +218,7 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                     <div className="relative flex items-center justify-center w-full h-full">
                         {file.thumbnailLink ? (
                             <img
-                                src={file.thumbnailLink}
+                                src={thumbnailSrc}
                                 alt={file.name}
                                 referrerPolicy="no-referrer"
                                 className="w-full h-full object-cover"
