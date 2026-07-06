@@ -2257,12 +2257,9 @@ export default function PhotoStudioModal({
                 preCropImageRef.current = null; // bg changed — crop reference must be refreshed
                 setImageUrl(newUrl);
                 setBgDone(true);
-                setBgColor('transparent');
+                setBgColor('white');
                 initBrushCanvas(newUrl, preBgUrlRef.current!);
-                // Canva-style: open the subject transform editor right away so the
-                // cutout is immediately draggable/scalable as its own layer.
-                setSubjectTransformOpen(true);
-                toast.success('Fondo eliminado — arrastrá el sujeto para moverlo', { duration: 4000 });
+                toast.success('Fondo eliminado con fondo blanco', { duration: 3000 });
             }
         } catch (err) {
             console.error('[bg-removal]', err);
@@ -2615,54 +2612,6 @@ export default function PhotoStudioModal({
             y: v * layer.img.naturalHeight,
             radius: Math.max(4, sizeCss * ((scaleX + scaleY) / 2)),
         };
-    }
-
-    async function handleConfirmBg() {
-        // Push history pointing to the PRE-bg-removal URL so Undo cleanly
-        // restores the original image (the bg-removed blob gets revoked below).
-        pushHistory({
-            kind: 'photo',
-            imageUrl: preBgUrlRef.current ?? imageUrl,
-            rotation, brightness,
-            bgDone: false, bgColor: 'transparent',
-            hasTransparentBg,
-        });
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const el = new Image();
-            if (imageUrl && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('data:')) {
-                el.crossOrigin = 'anonymous';
-            }
-            el.onload = () => resolve(el);
-            el.onerror = reject;
-            el.src = imageUrl;
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d')!;
-        if (bgColor === 'white') {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        } else if (bgColor === 'black') {
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-        ctx.drawImage(img, 0, 0);
-        const isPng = bgColor === 'transparent';
-        canvas.toBlob(blob => {
-            if (!blob) return;
-            const newUrl = URL.createObjectURL(blob);
-            createdBlobUrlsRef.current.push(newUrl);
-            objectUrlRef.current = newUrl;
-            setImageUrl(newUrl);
-            setBgDone(false);
-            setBgColor('transparent');
-            setHasTransparentBg(isPng);
-            setBrushMode(null);
-            offscreenCanvasRef.current = null;
-            preBgUrlRef.current = null;
-            preCropImageRef.current = null;
-        }, isPng ? 'image/png' : 'image/jpeg', 0.95);
     }
 
     function handleUndoBgRemoval() {
@@ -6279,7 +6228,6 @@ export default function PhotoStudioModal({
                             showGrid={showGrid}
                             setShowGrid={setShowGrid}
                             isGridVisible={showGrid || rotation !== 0}
-                            onConfirmBg={handleConfirmBg}
                             drawMode={drawMode}
                             onSetDrawMode={(mode) => {
                                 setDrawMode(mode);
@@ -6447,30 +6395,22 @@ export default function PhotoStudioModal({
                                 <ArrowLeftRight size={13} /> Mover
                             </button>
                         )}
-                        {/* Cancelar / Confirmar bg removal — mobile */}
+                        {/* Revert bg removal — mobile */}
                         {bgDone && (
                             <button
                                 onClick={handleUndoBgRemoval}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/50 transition-colors"
                             >
-                                <X size={13} /> Cancelar
-                            </button>
-                        )}
-                        {bgDone && (
-                            <button
-                                onClick={handleConfirmBg}
-                                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-blue-600/80 text-white font-semibold transition-colors hover:bg-blue-600"
-                            >
-                                <Check size={13} /> Confirmar
+                                <X size={13} /> Deshacer fondo
                             </button>
                         )}
                         {/* BG color selector — only when bg removed */}
                         {bgDone && (
                             <div className="flex items-center gap-1">
                                 {([
-                                    { value: 'transparent', label: '▥', title: 'Transparente' },
                                     { value: 'white', label: '⬜', title: 'Blanco' },
                                     { value: 'black', label: '⬛', title: 'Negro' },
+                                    { value: 'transparent', label: '▥', title: 'Transparente' },
                                 ] as const).map(opt => (
                                     <button
                                         key={opt.value}
@@ -7087,7 +7027,6 @@ interface ToolsPanelProps {
     showGrid: boolean;
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
     isGridVisible: boolean;
-    onConfirmBg: () => void;
     drawMode: 'idle' | 'drawing' | 'selected' | 'editing';
     onSetDrawMode: (mode: 'idle' | 'drawing' | 'selected' | 'editing') => void;
     drawVisible: boolean;
@@ -7158,7 +7097,6 @@ function ToolsPanel({
     redoCount,
     showGrid, setShowGrid,
     isGridVisible,
-    onConfirmBg,
     drawMode, onSetDrawMode,
     drawVisible, onToggleDrawVisible,
     drawColor, onSetDrawColor,
@@ -7531,12 +7469,12 @@ function ToolsPanel({
                 {/* Background color selector — only visible after bg removed */}
                 {bgDone && !bgProcessing && (
                     <div className="space-y-1.5">
-                        <p className="text-white/50 text-sm">Reemplazar con:</p>
+                        <p className="text-white/50 text-sm">Fondo:</p>
                         <div className="flex gap-2">
                             {([
-                                { value: 'transparent', label: '▥', title: 'Transparente', cls: 'bg-white/10' },
                                 { value: 'white', label: '⬜', title: 'Blanco', cls: 'bg-white' },
                                 { value: 'black', label: '⬛', title: 'Negro', cls: 'bg-black' },
+                                { value: 'transparent', label: '▥', title: 'Transparente', cls: 'bg-white/10' },
                             ] as const).map(opt => (
                                 <button
                                     key={opt.value}
@@ -7555,15 +7493,9 @@ function ToolsPanel({
                         <div className="flex gap-2 mt-1">
                             <button
                                 onClick={onUndoBg}
-                                className="flex-1 py-3 rounded-xl bg-white/10 text-white/70 text-sm font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
+                                className="w-full py-3 rounded-xl bg-white/10 text-white/70 text-sm font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
                             >
-                                <X size={18} /> Cancelar
-                            </button>
-                            <button
-                                onClick={onConfirmBg}
-                                className="flex-1 py-3 rounded-xl bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Check size={18} /> Confirmar
+                                <X size={18} /> Deshacer fondo
                             </button>
                         </div>
                     </div>
