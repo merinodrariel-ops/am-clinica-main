@@ -1943,7 +1943,39 @@ export default function PhotoStudioModal({
         setCropActive(false);
         setCompletedCrop(null);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
-        setBrushMode(null);
+
+        if (brushMode !== null || magicWandActive) {
+            // Keep brush/wand active and reload the undone image into the offscreen/onscreen canvases
+            const img = new Image();
+            if (snap.imageUrl && !snap.imageUrl.startsWith('blob:') && !snap.imageUrl.startsWith('data:')) {
+                img.crossOrigin = 'anonymous';
+            }
+            img.onload = () => {
+                const oc = offscreenCanvasRef.current;
+                if (oc) {
+                    oc.width = img.naturalWidth;
+                    oc.height = img.naturalHeight;
+                    const octx = oc.getContext('2d')!;
+                    octx.clearRect(0, 0, oc.width, oc.height);
+                    octx.drawImage(img, 0, 0);
+
+                    const vc = brushCanvasRef.current;
+                    if (vc) {
+                        vc.width = oc.width;
+                        vc.height = oc.height;
+                        const vctx = vc.getContext('2d')!;
+                        vctx.clearRect(0, 0, vc.width, vc.height);
+                        vctx.drawImage(oc, 0, 0);
+                    }
+                }
+            };
+            img.src = snap.imageUrl;
+        } else {
+            setBrushMode(null);
+            setMagicWandActive(false);
+            offscreenCanvasRef.current = null;
+        }
+
         setHealMode(false);
         hideHealCursor();
         canvasHealPreviewRef.current = null;
