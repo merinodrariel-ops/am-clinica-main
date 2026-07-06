@@ -652,7 +652,7 @@ function CanvasThumbnailPreview({ layers, bgColor, ratio }: {
                 }
             }
         } else {
-            ctx.fillStyle = bgColor === 'black' ? '#111111' : '#ffffff';
+            ctx.fillStyle = bgColor === 'black' ? '#000000' : '#ffffff';
             ctx.fillRect(0, 0, SIZE, SIZE);
         }
         if (layers.length === 0) return;
@@ -2596,7 +2596,7 @@ export default function PhotoStudioModal({
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         } else if (bgColor === 'black') {
-            ctx.fillStyle = '#111111';
+            ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         ctx.drawImage(img, 0, 0);
@@ -2979,7 +2979,7 @@ export default function PhotoStudioModal({
         if (isTransparent) {
             ctx.clearRect(0, 0, renderW, renderH);
         } else {
-            ctx.fillStyle = effectiveBg === 'black' ? '#111111' : '#ffffff';
+            ctx.fillStyle = effectiveBg === 'black' ? '#000000' : '#ffffff';
             ctx.fillRect(0, 0, renderW, renderH);
         }
         for (const layer of canvasLayers) {
@@ -3503,7 +3503,7 @@ export default function PhotoStudioModal({
         if (isTransparent) {
             ctx.clearRect(0, 0, expW, expH);
         } else {
-            ctx.fillStyle = effectiveBg === 'black' ? '#111111' : '#ffffff';
+            ctx.fillStyle = effectiveBg === 'black' ? '#000000' : '#ffffff';
             ctx.fillRect(0, 0, expW, expH);
         }
         for (const layer of canvasLayers) {
@@ -4377,7 +4377,7 @@ export default function PhotoStudioModal({
         const ctx = canvas.getContext('2d')!;
 
         if (bgDone && bgColor !== 'transparent') {
-            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#111111';
+            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#000000';
             ctx.fillRect(0, 0, canvasW, canvasH);
         }
 
@@ -4978,7 +4978,7 @@ export default function PhotoStudioModal({
         ? bgColor === 'white'
             ? 'bg-white'
             : bgColor === 'black'
-            ? 'bg-[#111]'
+            ? 'bg-black'
             : 'bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D\'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg\'%20width%3D\'16\'%20height%3D\'16\'%3E%3Crect%20width%3D\'8\'%20height%3D\'8\'%20fill%3D\'%23bbb\'%2F%3E%3Crect%20x%3D\'8\'%20y%3D\'8\'%20width%3D\'8\'%20height%3D\'8\'%20fill%3D\'%23bbb\'%2F%3E%3C%2Fsvg%3E")]'
         : 'bg-[#0D0D12]';
 
@@ -6422,7 +6422,7 @@ export default function PhotoStudioModal({
                             bgColor === 'white'
                                 ? '#fff'
                                 : bgColor === 'black'
-                                    ? '#111'
+                                    ? '#000'
                                     : 'repeating-conic-gradient(#bbb 0% 25%, #e5e5e5 0% 50%) 0 / 16px 16px'
                         }
                         onApply={handleSubjectTransformApply}
@@ -7488,7 +7488,7 @@ function ToolsPanel({
                             {([
                                 { value: 'transparent', label: '▥', title: 'Transparente', cls: 'bg-white/10' },
                                 { value: 'white', label: '⬜', title: 'Blanco', cls: 'bg-white' },
-                                { value: 'black', label: '⬛', title: 'Negro', cls: 'bg-[#111]' },
+                                { value: 'black', label: '⬛', title: 'Negro', cls: 'bg-black' },
                             ] as const).map(opt => (
                                 <button
                                     key={opt.value}

@@ -347,7 +347,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
-        const photos = files.filter(f => classifyFile(f) === 'foto');
+        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
+        const photos = applySavedOrder(files.filter(f => classifyFile(f) === 'foto'), fotosOrder[motherFolderId] || []);
         const oldIdx = photos.findIndex(f => f.id === String(active.id));
         const newIdx = photos.findIndex(f => f.id === String(over.id));
         if (oldIdx === -1 || newIdx === -1) return;
@@ -360,12 +361,13 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
         setFiles([...reordered, ...otherFiles]);
 
-        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
         setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
 
         void saveFotosOrderAction(patientId, motherFolderId, ids, coverFileId).then(result => {
             if (result.error) {
                 toast.error(`No se pudo guardar la portada: ${result.error}`);
+            } else {
+                toast.success('Orden y portada actualizados');
             }
         });
     }

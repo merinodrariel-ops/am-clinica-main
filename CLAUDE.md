@@ -3,6 +3,7 @@
 ## Behavioral Rules (Always Enforced)
 
 - Do what has been asked; nothing more, nothing less
+- For this clinic app, every user-visible production change must be committed, pushed to GitHub, deployed to Vercel production, and verified on the production URL before reporting it as done. Do not leave visible fixes only in the local worktree.
 - NEVER create files unless they're absolutely necessary for achieving your goal
 - ALWAYS prefer editing an existing file to creating a new one
 - NEVER proactively create documentation files (*.md) or README files unless explicitly requested
