@@ -942,6 +942,7 @@ export default function PhotoStudioModal({
     const [healSize, setHealSize] = useState(28);
     const [healPreviewNonce, setHealPreviewNonce] = useState(0);
     const [healCursor, setHealCursor] = useState<{ x: number; y: number; size: number; visible: boolean }>({ x: 0, y: 0, size: 28, visible: false });
+    const manualBackgroundToolActive = brushMode !== null || magicWandActive || healMode;
 
     type PhotoSnapshot = { kind: 'photo'; imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor; hasTransparentBg?: boolean };
     type CanvasLayerSnapshot = { kind: 'canvas-layer'; canvasId: string; layerId: string; layerSrc: string };
@@ -1900,6 +1901,7 @@ export default function PhotoStudioModal({
 
     function handleMouseDown(e: React.MouseEvent) {
         if (zoom <= 1) return;
+        if (manualBackgroundToolActive) return;
         if (drawMode !== 'idle') return; // draw tool active — don't pan
         e.preventDefault();
         dragRef.current = { startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY };
@@ -1907,6 +1909,11 @@ export default function PhotoStudioModal({
     }
 
     function handleMouseMove(e: React.MouseEvent) {
+        if (manualBackgroundToolActive) {
+            dragRef.current = null;
+            setIsDragging(false);
+            return;
+        }
         if (!dragRef.current) return;
         const dx = (e.clientX - dragRef.current.startX) / zoom;
         const dy = (e.clientY - dragRef.current.startY) / zoom;
@@ -1937,6 +1944,7 @@ export default function PhotoStudioModal({
     }
 
     function handleTouchStart(e: React.TouchEvent) {
+        if (manualBackgroundToolActive && e.touches.length === 1) return;
         if (e.touches.length >= 1) {
             // Cancel any active mouse drag when touch begins
             dragRef.current = null;
@@ -3662,6 +3670,8 @@ export default function PhotoStudioModal({
     }
 
     function handleBrushDown(e: React.PointerEvent<HTMLCanvasElement>) {
+        e.preventDefault();
+        e.stopPropagation();
         updateHealCursor(e.clientX, e.clientY);
         e.currentTarget.setPointerCapture(e.pointerId);
         brushDrawingRef.current = true;
@@ -3675,6 +3685,8 @@ export default function PhotoStudioModal({
     }
 
     function handleBrushMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        e.preventDefault();
+        e.stopPropagation();
         updateHealCursor(e.clientX, e.clientY);
         if (!brushDrawingRef.current) return;
         const { x, y } = getCanvasXY(e);
@@ -3686,6 +3698,8 @@ export default function PhotoStudioModal({
     }
 
     function handleBrushUp(e: React.PointerEvent<HTMLCanvasElement>) {
+        e.preventDefault();
+        e.stopPropagation();
         if (!brushDrawingRef.current) return;
         brushDrawingRef.current = false;
         healLastPointRef.current = null;
@@ -3703,6 +3717,8 @@ export default function PhotoStudioModal({
     }
 
     function handleMagicWandClick(e: React.PointerEvent<HTMLCanvasElement>) {
+        e.preventDefault();
+        e.stopPropagation();
         const oc = offscreenCanvasRef.current;
         if (!oc || oc.width === 0) return;
         const { x, y } = getCanvasXY(e);
@@ -5461,7 +5477,7 @@ export default function PhotoStudioModal({
                         onTouchMove={canvasActive || cropActive ? undefined : handleTouchMove}
                         onTouchEnd={canvasActive ? undefined : handleTouchEnd}
                         onDoubleClick={canvasActive || cropActive ? undefined : () => { setZoom(1); setPanX(0); setPanY(0); }}
-                        style={{ cursor: (!canvasActive && zoom > 1) ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+                        style={{ cursor: (!canvasActive && zoom > 1 && !manualBackgroundToolActive) ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                     >
                         {!canvasActive && selectedText && (
                             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-[#12121A]/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
@@ -5514,7 +5530,7 @@ export default function PhotoStudioModal({
                                 <canvas
                                     ref={brushCanvasRef}
                                     className={canvasBg}
-                                    style={{ ...imageStyle, cursor: 'crosshair' }}
+                                    style={{ ...imageStyle, cursor: 'crosshair', touchAction: 'none' }}
                                     onPointerDown={magicWandActive ? handleMagicWandClick : handleBrushDown}
                                     onPointerMove={magicWandActive ? undefined : handleBrushMove}
                                     onPointerUp={magicWandActive ? undefined : handleBrushUp}
