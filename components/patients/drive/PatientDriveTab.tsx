@@ -45,6 +45,7 @@ import DrivePreviewModal from './DrivePreviewModal';
 import DriveUploadButton from './DriveUploadButton';
 import ShareWithPatientModal from './ShareWithPatientModal';
 import PhotoTagPanel from './PhotoTagPanel';
+import PublicCasePublishModal from './PublicCasePublishModal';
 import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo-tags';
 import { getContextMenuSelection, updatePhotoGridSelection } from '@/lib/drive-photo-grid-selection';
 
@@ -363,6 +364,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [extractingSlidesId, setExtractingSlidesId] = useState<string | null>(null);
     const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
     const [sharePatientFiles, setSharePatientFiles] = useState<DriveFile[]>([]);
+    const [publicCaseFiles, setPublicCaseFiles] = useState<DriveFile[]>([]);
     const [tagFile, setTagFile] = useState<DriveFile | null>(null);
     const [photoTags, setPhotoTags] = useState<Record<string, PhotoTag>>({});
     const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
@@ -501,7 +503,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     function handlePrepareCloudinaryUpload(targetIds = selectedPhotoIds) {
         const targetFiles = getPhotoSelectionFiles(targetIds);
         if (targetFiles.length === 0) return;
-        toast.info(`${targetFiles.length} foto${targetFiles.length > 1 ? 's seleccionadas' : ' seleccionada'} para subir a la web. Siguiente paso: editor de caso y carga a Cloudinary.`);
+        setPublicCaseFiles(targetFiles);
         closePhotoContextMenu();
     }
 
@@ -1184,6 +1186,13 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         patientId={patientId}
                         patientName={patientName}
                         onClose={() => setSharePatientFiles([])}
+                    />
+                )}
+                {canManageDrive && publicCaseFiles.length > 0 && (
+                    <PublicCasePublishModal
+                        files={publicCaseFiles}
+                        patientName={patientName}
+                        onClose={() => setPublicCaseFiles([])}
                     />
                 )}
 
