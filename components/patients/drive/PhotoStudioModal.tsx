@@ -672,6 +672,7 @@ export default function PhotoStudioModal({
 }: PhotoStudioModalProps) {
     const imgRef = useRef<HTMLImageElement>(null);
     const objectUrlRef = useRef<string | null>(null);
+    const createdBlobUrlsRef = useRef<string[]>([]);
     const preBgUrlRef = useRef<string | null>(null); // URL before bg removal (for undo)
     const preCropImageRef = useRef<string | null>(null);  // full image (rotation-baked) used as crop source; stays until reset
     const prevCroppedUrlRef = useRef<string | null>(null); // cropped imageUrl saved when entering re-crop (for cancel)
@@ -1149,9 +1150,6 @@ export default function PhotoStudioModal({
                 // No rotation — restore flat base image
                 preCropImageRef.current = base;
                 setImageUrl(base);
-                if (objectUrlRef.current && objectUrlRef.current !== base) {
-                    URL.revokeObjectURL(objectUrlRef.current);
-                }
                 objectUrlRef.current = base.startsWith('blob:') ? base : null;
                 setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
                 setCompletedCrop(null);
@@ -1195,9 +1193,7 @@ export default function PhotoStudioModal({
                     canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
                 );
                 const newUrl = URL.createObjectURL(blob);
-                if (objectUrlRef.current && objectUrlRef.current !== base) {
-                    URL.revokeObjectURL(objectUrlRef.current);
-                }
+                createdBlobUrlsRef.current.push(newUrl);
                 objectUrlRef.current = newUrl;
                 preCropImageRef.current = newUrl;
                 setImageUrl(newUrl);
@@ -1422,6 +1418,9 @@ export default function PhotoStudioModal({
     const [downloadingWeb, setDownloadingWeb] = useState(false);
     const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
     const [sharePatientItems, setSharePatientItems] = useState<ShareWithPatientItem[] | null>(null);
+    const [shareModalOpen, setShareModalOpen] = useState(false);
+    const [shareLoading, setShareLoading] = useState(false);
+    const [shareFile, setShareFile] = useState<{ url: string; name: string; rawFile?: File } | null>(null);
     const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
     const [thumbnailDragId, setThumbnailDragId] = useState<string | null>(null);
     const [thumbnailDropIndicator, setThumbnailDropIndicator] = useState<{ id: string; edge: 'top' | 'bottom' } | null>(null);
@@ -1557,11 +1556,19 @@ export default function PhotoStudioModal({
         }
     }, [file?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Cleanup object URL on unmount
+    // Cleanup object URLs on unmount
     useEffect(() => {
         return () => {
+            createdBlobUrlsRef.current.forEach((url) => {
+                try {
+                    URL.revokeObjectURL(url);
+                } catch (e) {}
+            });
+            createdBlobUrlsRef.current = [];
             if (objectUrlRef.current) {
-                URL.revokeObjectURL(objectUrlRef.current);
+                try {
+                    URL.revokeObjectURL(objectUrlRef.current);
+                } catch (e) {}
                 objectUrlRef.current = null;
             }
         };
@@ -2022,6 +2029,7 @@ export default function PhotoStudioModal({
             }
             
             const newUrl = URL.createObjectURL(resultBlob);
+            createdBlobUrlsRef.current.push(newUrl);
             
             if (selectedLayer) {
                 let baseName = 'recorte';
@@ -2054,7 +2062,6 @@ export default function PhotoStudioModal({
                     toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
                 }
             } else {
-                if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
                 objectUrlRef.current = newUrl;
                 preCropImageRef.current = null; // bg changed — crop reference must be refreshed
                 setImageUrl(newUrl);
@@ -2452,8 +2459,8 @@ export default function PhotoStudioModal({
         const isPng = bgColor === 'transparent';
         canvas.toBlob(blob => {
             if (!blob) return;
-            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
             const newUrl = URL.createObjectURL(blob);
+            createdBlobUrlsRef.current.push(newUrl);
             objectUrlRef.current = newUrl;
             setImageUrl(newUrl);
             setBgDone(false);
@@ -2472,8 +2479,6 @@ export default function PhotoStudioModal({
         setBrushMode(null);
         setMagicWandActive(false);
         offscreenCanvasRef.current = null;
-        // Revoke the bg-removed object URL
-        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
         // Restore: if prev was itself an object URL keep tracking it, else clear ref
         objectUrlRef.current = prev.startsWith('blob:') ? prev : null;
         setImageUrl(prev);
@@ -3515,8 +3520,8 @@ export default function PhotoStudioModal({
         preCropImageRef.current = null; // brush stroke changed the image — crop reference must be refreshed
         offscreenCanvasRef.current?.toBlob(blob => {
             if (!blob) return;
-            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
             const newUrl = URL.createObjectURL(blob);
+            createdBlobUrlsRef.current.push(newUrl);
             objectUrlRef.current = newUrl;
             setImageUrl(newUrl);
             if (healMode) setHealMode(false);
@@ -3537,11 +3542,10 @@ export default function PhotoStudioModal({
         vctx.clearRect(0, 0, e.currentTarget.width, e.currentTarget.height);
         vctx.drawImage(oc, 0, 0);
         
-        // Commit changes to imageUrl
         oc.toBlob(blob => {
             if (!blob) return;
-            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
             const newUrl = URL.createObjectURL(blob);
+            createdBlobUrlsRef.current.push(newUrl);
             objectUrlRef.current = newUrl;
             setImageUrl(newUrl);
             preCropImageRef.current = null;
@@ -4323,7 +4327,7 @@ export default function PhotoStudioModal({
                 canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isPng ? 'image/png' : 'image/jpeg', 0.95)
             );
             const newUrl = URL.createObjectURL(blob);
-            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+            createdBlobUrlsRef.current.push(newUrl);
             objectUrlRef.current = newUrl;
             preCropImageRef.current = newUrl; // full baked image shown in crop mode
             setImageUrl(newUrl);
@@ -4460,32 +4464,52 @@ export default function PhotoStudioModal({
         });
     }
 
-    async function handleShare(targetIds = getDefaultTargetIds()) {
-        if (targetIds.length === 0) return;
+    async function triggerNativeShare() {
+        if (!shareFile || !shareFile.rawFile) return;
         try {
-            setThumbnailContextMenu(null);
-            const exportableFiles = await exportVisibleFiles(targetIds);
-            const files = exportableFiles.map(item => item.file).filter((file): file is File => Boolean(file));
-            if (files.length === 0) return;
-            if (navigator.canShare?.({ files })) {
+            const files = [shareFile.rawFile];
+            // Check navigator.canShare as well
+            if (navigator.share) {
                 await navigator.share({
                     files,
-                    title: files.length === 1 ? files[0].name.replace(/\.[^.]+$/, '') : `${files.length} fotos`,
+                    title: shareFile.name.replace(/\.[^.]+$/, ''),
                 });
-            } else {
-                files.forEach((file) => {
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(file);
-                    a.download = file.name;
-                    a.click();
-                    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-                });
-                toast.info(files.length === 1 ? 'Tu browser no soporta AirDrop — se descargó el archivo' : `Tu browser no soporta AirDrop — se descargaron ${files.length} archivos`);
             }
         } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError') {
-                toast.error('No se pudo compartir la imagen');
+                toast.error('No se pudo abrir el menú de compartir');
             }
+        }
+    }
+
+    async function handleShare(targetIds = getDefaultTargetIds()) {
+        if (targetIds.length === 0) return;
+        setThumbnailContextMenu(null);
+        setShareModalOpen(true);
+        setShareLoading(true);
+        setShareFile(null);
+        try {
+            const exportableFiles = await exportVisibleFiles(targetIds);
+            const files = exportableFiles.map(item => item.file).filter((file): file is File => Boolean(file));
+            if (files.length === 0) {
+                setShareModalOpen(false);
+                setShareLoading(false);
+                return;
+            }
+            const file = files[0];
+            const url = URL.createObjectURL(file);
+            createdBlobUrlsRef.current.push(url);
+            setShareFile({
+                url,
+                name: file.name,
+                rawFile: file
+            });
+            setShareLoading(false);
+        } catch (err) {
+            console.error('Error exporting files for sharing:', err);
+            setShareModalOpen(false);
+            setShareLoading(false);
+            toast.error('No se pudo preparar la imagen para compartir');
         }
     }
 
@@ -6672,6 +6696,73 @@ export default function PhotoStudioModal({
                 patientName={patientName}
                 onClose={() => setSharePatientItems(null)}
             />
+        )}
+        {shareModalOpen && (
+            <div className="fixed inset-0 z-[99] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+                <div className="bg-[#1A1A24] border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+                        <span className="font-semibold text-white text-sm">Compartir foto</span>
+                        <button
+                            onClick={() => {
+                                if (shareFile) URL.revokeObjectURL(shareFile.url);
+                                setShareFile(null);
+                                setShareModalOpen(false);
+                            }}
+                            className="p-1 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                    {/* Body */}
+                    <div className="p-5 space-y-4 overflow-y-auto flex-1 text-center flex flex-col items-center justify-center custom-scrollbar">
+                        {shareLoading ? (
+                            <div className="py-8 flex flex-col items-center gap-3">
+                                <div className="w-8 h-8 border-4 border-[#C9A96E] border-t-transparent rounded-full animate-spin" />
+                                <p className="text-sm text-white/70">Preparando imagen...</p>
+                            </div>
+                        ) : shareFile ? (
+                            <>
+                                <p className="text-xs text-white/60 leading-relaxed">
+                                    La imagen está lista. Elegí cómo compartirla:
+                                </p>
+                                
+                                {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+                                    <button
+                                        onClick={triggerNativeShare}
+                                        className="w-full py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 flex-shrink-0 shadow-lg"
+                                    >
+                                        <Globe2 size={16} /> Compartir por WhatsApp / Instagram / AirDrop
+                                    </button>
+                                )}
+
+                                <div className="bg-white/5 p-3 rounded-xl space-y-2 text-left w-full text-xs text-white/80">
+                                    <p className="font-semibold text-[#C9A96E]">Opciones manuales (Instagram / WhatsApp):</p>
+                                    <p><strong>1.</strong> Mantén presionada la imagen de abajo.</p>
+                                    <p><strong>2.</strong> Selecciona <strong>"Guardar en Fotos"</strong> o <strong>"Descargar"</strong>.</p>
+                                    <p><strong>3.</strong> Súbela a tu Historia de Instagram o compártela directamente.</p>
+                                </div>
+
+                                <div className="relative group border border-white/10 rounded-lg overflow-hidden max-h-[30vh] w-auto flex justify-center bg-black/40 flex-shrink-0">
+                                    <img
+                                        src={shareFile.url}
+                                        alt="Compartir"
+                                        className="max-h-[30vh] max-w-full object-contain pointer-events-auto"
+                                    />
+                                </div>
+
+                                <a
+                                    href={shareFile.url}
+                                    download={shareFile.name}
+                                    className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs transition-colors block text-center flex-shrink-0"
+                                >
+                                    Descargar archivo
+                                </a>
+                            </>
+                        ) : null}
+                    </div>
+                </div>
+            </div>
         )}
         </>
     );
