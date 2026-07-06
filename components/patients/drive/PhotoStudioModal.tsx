@@ -1940,6 +1940,16 @@ export default function PhotoStudioModal({
         setRedoStack([]); // Clear redo stack on new action
     }
 
+    const drawManualPreview = useCallback((canvasEl: HTMLCanvasElement, sourceCanvas: HTMLCanvasElement) => {
+        const ctx = canvasEl.getContext('2d')!;
+        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        if (bgDone && bgColor !== 'transparent') {
+            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#000000';
+            ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+        }
+        ctx.drawImage(sourceCanvas, 0, 0);
+    }, [bgColor, bgDone]);
+
     function handleUndo() {
         const snap = history[history.length - 1];
         if (!snap) return;
@@ -2017,9 +2027,7 @@ export default function PhotoStudioModal({
                     if (vc) {
                         vc.width = oc.width;
                         vc.height = oc.height;
-                        const vctx = vc.getContext('2d')!;
-                        vctx.clearRect(0, 0, vc.width, vc.height);
-                        vctx.drawImage(oc, 0, 0);
+                        drawManualPreview(vc, oc);
                     }
                 }
             };
@@ -2114,9 +2122,7 @@ export default function PhotoStudioModal({
                     if (vc) {
                         vc.width = oc.width;
                         vc.height = oc.height;
-                        const vctx = vc.getContext('2d')!;
-                        vctx.clearRect(0, 0, vc.width, vc.height);
-                        vctx.drawImage(oc, 0, 0);
+                        drawManualPreview(vc, oc);
                     }
                 }
             };
@@ -2642,10 +2648,10 @@ export default function PhotoStudioModal({
             if (oc.width === 0) { requestAnimationFrame(sync); return; }
             vc.width = oc.width;
             vc.height = oc.height;
-            vc.getContext('2d')!.drawImage(oc, 0, 0);
+            drawManualPreview(vc, oc);
         };
         sync();
-    }, [brushMode, healMode, magicWandActive, canvasActive]);
+    }, [brushMode, healMode, magicWandActive, canvasActive, drawManualPreview]);
 
     useEffect(() => {
         if (!healMode || canvasActive) return;
@@ -2657,13 +2663,13 @@ export default function PhotoStudioModal({
             if (!vc) return;
             vc.width = canvas.width;
             vc.height = canvas.height;
-            vc.getContext('2d')!.drawImage(canvas, 0, 0);
+            drawManualPreview(vc, canvas);
         }).catch(() => {
             toast.error('No se pudo preparar el corrector');
             setHealMode(false);
         });
         return () => { cancelled = true; };
-    }, [healMode, canvasActive, imageUrl]);
+    }, [healMode, canvasActive, imageUrl, drawManualPreview]);
 
     // Redraw annotation layer whenever shapes or visibility change
     useEffect(() => {
@@ -3614,9 +3620,7 @@ export default function PhotoStudioModal({
             octx.restore();
         }
 
-        const vctx = canvasEl.getContext('2d')!;
-        vctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-        vctx.drawImage(oc, 0, 0);
+        drawManualPreview(canvasEl, oc);
     }
 
     function applyHealToPhoto(canvasEl: HTMLCanvasElement, x: number, y: number) {
@@ -3627,9 +3631,7 @@ export default function PhotoStudioModal({
         if (!shouldApplyHealPoint(x, y, radius, 'photo')) return;
         const octx = oc.getContext('2d')!;
         if (!applySpotHealAt(octx, x, y, radius)) return;
-        const vctx = canvasEl.getContext('2d')!;
-        vctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-        vctx.drawImage(oc, 0, 0);
+        drawManualPreview(canvasEl, oc);
     }
 
     function handleBrushDown(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -3687,8 +3689,7 @@ export default function PhotoStudioModal({
         // Draw the current state with a temporary selection mask (bright red) on the visible canvas
         const canvasElement = e.currentTarget;
         const vctx = canvasElement.getContext('2d')!;
-        vctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        vctx.drawImage(oc, 0, 0);
+        drawManualPreview(canvasElement, oc);
         
         const tempImgData = vctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
         const tempD = tempImgData.data;
@@ -3708,8 +3709,7 @@ export default function PhotoStudioModal({
             if (offscreenCanvasRef.current === oc && canvasElement) {
                 const currentCtx = canvasElement.getContext('2d');
                 if (currentCtx) {
-                    currentCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                    currentCtx.drawImage(oc, 0, 0);
+                    drawManualPreview(canvasElement, oc);
                 }
             }
         }, 400);
