@@ -15,6 +15,8 @@ import {
     FileText,
     FileCode,
     Sparkles,
+    CloudUpload,
+    X,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -36,6 +38,7 @@ import DriveUploadButton from './DriveUploadButton';
 import ShareWithPatientModal from './ShareWithPatientModal';
 import PhotoTagPanel from './PhotoTagPanel';
 import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo-tags';
+import { getBatchActionTargetIds, updatePhotoGridSelection } from '@/lib/drive-photo-selection';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -49,9 +52,11 @@ function SortableFileCard({
     onShareEmail,
     onTag,
     photoTag,
-    onSmileDesign,
     onSetPortada,
     patientFolder,
+    selectionEnabled,
+    isSelected,
+    onSelectionClick,
 }: {
     file: DriveFile;
     isPortada: boolean;
@@ -62,9 +67,14 @@ function SortableFileCard({
     onShareEmail?: (f: DriveFile) => void;
     onTag?: (f: DriveFile) => void;
     photoTag?: PhotoTag | null;
-    onSmileDesign?: (f: DriveFile) => void;
     onSetPortada?: (f: DriveFile) => void;
     patientFolder?: string;
+    selectionEnabled?: boolean;
+    isSelected?: boolean;
+    onSelectionClick?: (
+        file: DriveFile,
+        event: { additive: boolean; range: boolean; checkbox: boolean }
+    ) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
     const style: CSSProperties = {
@@ -89,7 +99,22 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} isPortada={isPortada} onSetPortada={onSetPortada} patientFolder={patientFolder} />
+            <DriveFileCard
+                file={file}
+                onPreview={onPreview}
+                onDelete={onDelete}
+                onShare={onShare}
+                onShareWithPatient={onShareWithPatient}
+                onShareEmail={onShareEmail}
+                onTag={onTag}
+                photoTag={photoTag}
+                isPortada={isPortada}
+                onSetPortada={onSetPortada}
+                patientFolder={patientFolder}
+                selectionEnabled={selectionEnabled}
+                isSelected={isSelected}
+                onSelectionClick={onSelectionClick}
+            />
         </div>
     );
 }
@@ -289,7 +314,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
     const [previewPaired3DFile, setPreviewPaired3DFile] = useState<DriveFile | null>(null);
     const [previewFolderId, setPreviewFolderId] = useState<string>('');
-    const [previewAutoSmile, setPreviewAutoSmile] = useState(false);
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
     const [creating, setCreating] = useState(false);
     const [isGlobalDragging, setIsGlobalDragging] = useState(false);
@@ -299,9 +323,16 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
     const [tagFile, setTagFile] = useState<DriveFile | null>(null);
     const [photoTags, setPhotoTags] = useState<Record<string, PhotoTag>>({});
+    const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+    const [photoSelectionAnchorId, setPhotoSelectionAnchorId] = useState<string | null>(null);
 
     // dnd-kit sensors — require 8px move before drag activates (avoids accidental drags on click)
     const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+    const clearPhotoSelection = useCallback(() => {
+        setSelectedPhotoIds([]);
+        setPhotoSelectionAnchorId(null);
+    }, []);
 
     const fetchFolders = useCallback(async (url: string) => {
         const folderId = extractFolderIdFromUrl(url);
@@ -321,6 +352,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
 
         setFiles(result.files || []);
+        clearPhotoSelection();
 
         // Load saved photo order
         const orderData = await getPatientFotosOrder(patientId);
@@ -333,7 +365,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const tagMap: Record<string, PhotoTag> = {};
         for (const t of tags) tagMap[t.file_id] = t;
         setPhotoTags(tagMap);
-    }, [patientId]);
+    }, [patientId, clearPhotoSelection]);
 
     useEffect(() => {
         if (currentFolderUrl && status === 'idle') {
@@ -389,6 +421,35 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         });
     }
 
+    function handlePhotoSelection(
+        file: DriveFile,
+        orderedIds: string[],
+        event: { additive: boolean; range: boolean; checkbox: boolean }
+    ) {
+        const nextSelection = updatePhotoGridSelection({
+            orderedIds,
+            selectedIds: selectedPhotoIds,
+            anchorId: photoSelectionAnchorId,
+            clickedId: file.id,
+            additive: event.additive,
+            range: event.range,
+            checkbox: event.checkbox,
+        });
+
+        setSelectedPhotoIds(nextSelection.selectedIds);
+        setPhotoSelectionAnchorId(nextSelection.anchorId);
+
+        if (nextSelection.shouldOpenPreview) {
+            openPreview(file, extractFolderIdFromUrl(currentFolderUrl) || '');
+        }
+    }
+
+    function handlePrepareCloudinaryUpload() {
+        const targetIds = getBatchActionTargetIds(selectedPhotoIds);
+        if (targetIds.length === 0) return;
+        toast.info(`${targetIds.length} foto${targetIds.length > 1 ? 's seleccionadas' : ' seleccionada'} para subir a la web. Siguiente paso: editor de caso y carga a Cloudinary.`);
+    }
+
     async function handleDeleteFile(file: DriveFile) {
         if (!confirm(`¿Eliminar "${file.name}"? Esta acción no se puede deshacer.`)) return;
         const result = await deleteDriveFileAction(file.id);
@@ -398,6 +459,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
         toast.success(`"${file.name}" eliminado`);
         setFiles(prev => prev.filter(fi => fi.id !== file.id));
+        setSelectedPhotoIds(prev => prev.filter(id => id !== file.id));
+        setPhotoSelectionAnchorId(prev => prev === file.id ? null : prev);
     }
 
     function handleShareEmail(file: DriveFile) {
@@ -447,14 +510,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     }
 
     const openPreview = (file: DriveFile, folderId: string) => {
-        setPreviewAutoSmile(false);
-        setPreviewPaired3DFile(null);
-        setPreviewFile(file);
-        setPreviewFolderId(folderId);
-    };
-
-    const openSmileDesign = (file: DriveFile, folderId: string) => {
-        setPreviewAutoSmile(true);
         setPreviewPaired3DFile(null);
         setPreviewFile(file);
         setPreviewFolderId(folderId);
@@ -464,7 +519,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const clickedArch = getDentalArch(file);
         const primary = clickedArch === 'lower' ? pairedFile : file;
         const secondary = clickedArch === 'lower' ? file : pairedFile;
-        setPreviewAutoSmile(false);
         setPreviewFile(primary);
         setPreviewPaired3DFile(secondary);
         setPreviewFolderId(folderId);
@@ -621,6 +675,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     if (savedOrder.length > 0) {
         classifiedGroups.foto.files = applySavedOrder(classifiedGroups.foto.files, savedOrder);
     }
+    const photoIds = classifiedGroups.foto.files.map(file => file.id);
+    const selectedPhotoFiles = classifiedGroups.foto.files.filter(file => selectedPhotoIds.includes(file.id));
     const dentalBitePairs = buildDentalBitePairs(classifiedGroups['3d'].files);
 
     // Sort 'exocad' files: ordered by modifiedTime descending (newest first)
@@ -709,6 +765,27 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                 {group.files.length} archivo{group.files.length !== 1 ? 's' : ''}
                                             </span>
                                         </h3>
+                                        {key === 'foto' && selectedPhotoFiles.length > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="hidden sm:inline text-xs font-semibold text-[#C9A96E]">
+                                                    {selectedPhotoFiles.length} seleccionada{selectedPhotoFiles.length !== 1 ? 's' : ''}
+                                                </span>
+                                                <button
+                                                    onClick={handlePrepareCloudinaryUpload}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-xs font-bold hover:bg-[#d9bb7d] transition-colors"
+                                                >
+                                                    <CloudUpload size={14} />
+                                                    Subir a web
+                                                </button>
+                                                <button
+                                                    onClick={clearPhotoSelection}
+                                                    className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-slate-400 hover:text-white hover:bg-white/15 transition-colors"
+                                                    title="Limpiar selección"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {key === 'foto' && canManageDrive ? (
@@ -734,9 +811,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             onShareEmail={canManageDrive ? handleShareEmail : undefined}
                                                             onTag={canManageDrive ? setTagFile : undefined}
                                                             photoTag={photoTags[file.id]}
-                                                            onSmileDesign={canManageDrive ? (f => openSmileDesign(f, motherFolderId)) : undefined}
                                                             onSetPortada={canManageDrive ? handleSetPortada : undefined}
                                                             patientFolder={getFormattedFolderName(patientName)}
+                                                            selectionEnabled={canManageDrive}
+                                                            isSelected={selectedPhotoIds.includes(file.id)}
+                                                            onSelectionClick={(selectedFile, event) => handlePhotoSelection(selectedFile, photoIds, event)}
                                                         />
                                                     ))}
                                                 </div>
@@ -755,8 +834,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         onShareEmail={canManageDrive ? handleShareEmail : undefined}
                                                         onTag={canManageDrive ? setTagFile : undefined}
                                                         photoTag={photoTags[file.id]}
-                                                        onSmileDesign={canManageDrive ? (f => openSmileDesign(f, motherFolderId)) : undefined}
                                                         patientFolder={getFormattedFolderName(patientName)}
+                                                        selectionEnabled={key === 'foto' && canManageDrive}
+                                                        isSelected={selectedPhotoIds.includes(file.id)}
+                                                        onSelectionClick={(selectedFile, event) => handlePhotoSelection(selectedFile, photoIds, event)}
                                                     />
                                                     {key === '3d' && dentalBitePairs.has(file.id) && (
                                                         <button
@@ -840,8 +921,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     patientName={patientName}
                     canSave={canManageDrive}
                     allFolderFiles={files.filter(f => ['foto', 'redes'].includes(classifyFile(f)))}
-                    autoStartSmile={previewAutoSmile}
-                    onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
+                    onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); }}
                     onSaved={() => {
                         handleUploadedToFolder();
                     }}

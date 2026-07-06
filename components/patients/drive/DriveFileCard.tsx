@@ -17,6 +17,7 @@ import {
     Tag,
     Star,
     Sparkles,
+    Check,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { getCategoryDef, getTagLabel } from '@/lib/photo-tag-taxonomy';
@@ -41,10 +42,15 @@ interface DriveFileCardProps {
     onShareEmail?: (file: DriveFile) => void;
     onTag?: (file: DriveFile) => void;
     photoTag?: PhotoTag | null;
-    onSmileDesign?: (file: DriveFile) => void;
     isPortada?: boolean;
     onSetPortada?: (file: DriveFile) => void;
     patientFolder?: string;
+    selectionEnabled?: boolean;
+    isSelected?: boolean;
+    onSelectionClick?: (
+        file: DriveFile,
+        event: { additive: boolean; range: boolean; checkbox: boolean }
+    ) => void;
 }
 
 function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'exocad' | 'other' {
@@ -104,7 +110,22 @@ const COLOR_MAP = {
     other: 'text-gray-400 bg-gray-400/10',
 };
 
-export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign, isPortada, onSetPortada, patientFolder }: DriveFileCardProps) {
+export default function DriveFileCard({
+    file,
+    onPreview,
+    onDelete,
+    onShare,
+    onShareWithPatient,
+    onShareEmail,
+    onTag,
+    photoTag,
+    isPortada,
+    onSetPortada,
+    patientFolder,
+    selectionEnabled,
+    isSelected,
+    onSelectionClick,
+}: DriveFileCardProps) {
     const [showShare, setShowShare] = useState(false);
     const category = getFileCategory(file);
     const Icon = ICON_MAP[category];
@@ -115,7 +136,16 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
     const size = formatFileSize(file.size);
     const hasShare = onShare || onShareWithPatient || onShareEmail;
 
-    const handleClick = () => {
+    const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (selectionEnabled && onSelectionClick && (event.metaKey || event.ctrlKey || event.shiftKey)) {
+            onSelectionClick(file, {
+                additive: event.metaKey || event.ctrlKey,
+                range: event.shiftKey,
+                checkbox: false,
+            });
+            return;
+        }
+
         if (category === 'exocad') {
             const protocolUrl = `am-clinica-exocad://open?patientFolder=${encodeURIComponent(patientFolder || '')}&path=${encodeURIComponent(file.relativePath || '')}`;
             window.location.href = protocolUrl;
@@ -133,11 +163,41 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
             onClick={handleClick}
             role="button"
             tabIndex={0}
-            onKeyDown={(e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && handleClick()}
-            className="text-left rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-3 hover:border-blue-300 dark:hover:border-[#C9A96E]/30 hover:shadow-sm transition-all group w-full cursor-pointer"
+            onKeyDown={(e: React.KeyboardEvent) => {
+                if ((e.key === 'Enter' || e.key === ' ') && !selectionEnabled) {
+                    onPreview(file);
+                }
+            }}
+            className={`text-left rounded-xl bg-white dark:bg-white/5 border p-3 hover:shadow-sm transition-all group w-full cursor-pointer ${
+                isSelected
+                    ? 'border-[#C9A96E] ring-2 ring-[#C9A96E]/35 shadow-sm'
+                    : 'border-gray-200 dark:border-white/10 hover:border-blue-300 dark:hover:border-[#C9A96E]/30'
+            }`}
         >
             {/* Thumbnail or icon */}
             <div className="aspect-square rounded-lg overflow-hidden mb-2 flex items-center justify-center bg-gray-50 dark:bg-white/5 relative">
+                {selectionEnabled && category === 'image' && onSelectionClick && (
+                    <button
+                        onClick={e => {
+                            e.stopPropagation();
+                            onSelectionClick(file, {
+                                additive: e.metaKey || e.ctrlKey,
+                                range: e.shiftKey,
+                                checkbox: true,
+                            });
+                        }}
+                        className={`absolute top-1.5 right-1.5 z-30 h-6 w-6 rounded-md border flex items-center justify-center transition-all ${
+                            isSelected
+                                ? 'border-[#C9A96E] bg-[#C9A96E] text-black opacity-100'
+                                : 'border-white/80 bg-black/55 text-white opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/75'
+                        }`}
+                        title={isSelected ? 'Quitar de selección' : 'Seleccionar foto'}
+                        aria-pressed={Boolean(isSelected)}
+                        aria-label={isSelected ? 'Quitar foto de la selección' : 'Seleccionar foto'}
+                    >
+                        {isSelected && <Check size={15} strokeWidth={3} />}
+                    </button>
+                )}
                 {(category === 'image' || category === 'pdf' || category === 'google-doc') && file.thumbnailLink ? (
                     <img
                         src={file.thumbnailLink}
@@ -277,15 +337,6 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                         title="Usar como portada"
                     >
                         <Star size={13} />
-                    </button>
-                )}
-                {onSmileDesign && category === 'image' && (
-                    <button
-                        onClick={e => { e.stopPropagation(); onSmileDesign(file); }}
-                        className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-black/60 text-purple-300 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-purple-600 hover:text-white z-10"
-                        title="Smile Design con IA"
-                    >
-                        ✨
                     </button>
                 )}
             </div>
