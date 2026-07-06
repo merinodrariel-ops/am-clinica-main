@@ -200,7 +200,7 @@ export default function DriveFileCard({
     // google-docs are served by Google directly; the proxy can't download them
     const canDownload = category !== 'google-doc';
     const size = formatFileSize(file.size);
-    const hasShare = !hideInlineActions && (onShare || onShareWithPatient || onShareEmail || canDownload);
+    const hasShare = onShare || onShareWithPatient || onShareEmail || canDownload;
 
     // Serve grid thumbnails through our cached proxy (small, reliable, 1-week edge cache)
     // instead of Google's raw thumbnailLink. `v=modifiedTime` busts the cache when a

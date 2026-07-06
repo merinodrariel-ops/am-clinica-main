@@ -30,3 +30,20 @@ test('photo grid card does not render redundant cover or smile-design actions', 
     assert.doesNotMatch(html, /Usar como portada/);
     assert.doesNotMatch(html, /Smile Design con IA/);
 });
+
+test('photo grid card keeps the share button when other inline actions are hidden', () => {
+    const html = renderToStaticMarkup(
+        <DriveFileCard
+            file={imageFile}
+            onPreview={() => undefined}
+            onShare={() => undefined}
+            onShareWithPatient={() => undefined}
+            onShareEmail={() => undefined}
+            hideInlineActions
+        />
+    );
+
+    assert.match(html, /title="Compartir"/);
+    assert.doesNotMatch(html, /Usar como portada/);
+    assert.doesNotMatch(html, /Smile Design con IA/);
+});
