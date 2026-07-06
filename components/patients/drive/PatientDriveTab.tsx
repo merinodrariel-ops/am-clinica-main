@@ -270,24 +270,19 @@ function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] 
 }
 
 // The main photo grid merges "Fotos" + "Selección" (Redes) into a single sortable grid.
-// Order: cover first, then the selection photos, then the rest. Manual drag order is
-// respected; "Selección" photos that don't have a saved position yet bubble up right
-// after the cover, so newly selected photos always appear first.
+// Order: cover first, then every selection photo, then the rest. Saved order still decides
+// the cover and the relative order inside each group, but never sends Selección to the end.
 function getOrderedGridPhotos(files: DriveFile[], savedOrder: string[]): DriveFile[] {
     const gridFiles = files.filter(f => {
         const c = classifyFile(f);
         return c === 'foto' || c === 'redes';
     });
     const ordered = applySavedOrder(gridFiles, savedOrder);
-    const savedSet = new Set(savedOrder);
-    const newSelection = ordered.filter(f => classifyFile(f) === 'redes' && !savedSet.has(f.id));
-    if (newSelection.length === 0) return ordered;
-
-    const newSelSet = new Set(newSelection.map(f => f.id));
-    const withoutNew = ordered.filter(f => !newSelSet.has(f.id));
-    const cover = withoutNew.slice(0, 1);
-    const rest = withoutNew.slice(1);
-    return [...cover, ...newSelection, ...rest];
+    const cover = ordered.slice(0, 1);
+    const coverId = cover[0]?.id;
+    const selection = ordered.filter(f => f.id !== coverId && classifyFile(f) === 'redes');
+    const rest = ordered.filter(f => f.id !== coverId && classifyFile(f) !== 'redes');
+    return [...cover, ...selection, ...rest];
 }
 
 function isGridPhoto(file: DriveFile): boolean {
