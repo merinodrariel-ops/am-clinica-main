@@ -239,6 +239,12 @@ function guessCategory(filename: string): string | null {
 
 type BgColor = 'transparent' | 'white' | 'black';
 
+function normalizeRotation(value: number) {
+    if (!Number.isFinite(value)) return 0;
+    const normalized = ((((value + 180) % 360) + 360) % 360) - 180;
+    return normalized === -180 ? 180 : normalized;
+}
+
 type DrawColor = 'white' | 'yellow' | 'cyan' | 'red';
 
 interface DrawPoint {
@@ -276,7 +282,7 @@ interface FileEditState {
 
 function normalizeFileEditState(state?: Partial<FileEditState> | null): FileEditState {
     return {
-        rotation: state?.rotation ?? 0,
+        rotation: normalizeRotation(state?.rotation ?? 0),
         brightness: state?.brightness ?? 100,
         drawShapes: state?.drawShapes ?? [],
         textAnnotations: (state?.textAnnotations ?? []).map(normalizeTextAnnotation),
@@ -935,6 +941,7 @@ export default function PhotoStudioModal({
 
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
+    const [brushFeather, setBrushFeather] = useState(80);
     const [magicWandActive, setMagicWandActive] = useState(false);
     const [magicWandTolerance, setMagicWandTolerance] = useState(25);
     const [exportFileName, setExportFileName] = useState('');
@@ -1012,7 +1019,7 @@ export default function PhotoStudioModal({
             const currentSaved = mergedStates.get(currentFileId);
             if (currentSaved) {
                 skipNextPhotoStateAutosaveRef.current = true;
-                setRotation(currentSaved.rotation);
+                setRotation(normalizeRotation(currentSaved.rotation));
                 setBrightness(currentSaved.brightness);
                 setDrawShapes(currentSaved.drawShapes);
                 setTextAnnotations(currentSaved.textAnnotations);
@@ -1096,7 +1103,7 @@ export default function PhotoStudioModal({
                     if (serializeFileEditState(nextState) === serializeFileEditState(localState)) return;
 
                     skipNextPhotoStateAutosaveRef.current = true;
-                    setRotation(nextState.rotation);
+                    setRotation(normalizeRotation(nextState.rotation));
                     setBrightness(nextState.brightness);
                     setDrawShapes(nextState.drawShapes);
                     setTextAnnotations(nextState.textAnnotations);
@@ -1837,7 +1844,7 @@ export default function PhotoStudioModal({
         resetEdits();
         const saved = fileStatesRef.current.get(newFile.id);
         if (saved) {
-            setRotation(saved.rotation);
+            setRotation(normalizeRotation(saved.rotation));
             setBrightness(saved.brightness);
             setDrawShapes(saved.drawShapes);
             setTextAnnotations(saved.textAnnotations);
@@ -2034,7 +2041,7 @@ export default function PhotoStudioModal({
 
         objectUrlRef.current = snap.imageUrl.startsWith('blob:') ? snap.imageUrl : null;
         setImageUrl(snap.imageUrl);
-        setRotation(snap.rotation);
+        setRotation(normalizeRotation(snap.rotation));
         setBrightness(snap.brightness);
         setBgDone(snap.bgDone);
         setBgColor(snap.bgColor);
@@ -2130,7 +2137,7 @@ export default function PhotoStudioModal({
 
         objectUrlRef.current = snap.imageUrl.startsWith('blob:') ? snap.imageUrl : null;
         setImageUrl(snap.imageUrl);
-        setRotation(snap.rotation);
+        setRotation(normalizeRotation(snap.rotation));
         setBrightness(snap.brightness);
         setBgDone(snap.bgDone);
         setBgColor(snap.bgColor);
@@ -3181,7 +3188,7 @@ export default function PhotoStudioModal({
                 if (e.shiftKey) {
                     deg = Math.round(deg / 45) * 45;
                 }
-                return { ...l, rotation: deg };
+                return { ...l, rotation: normalizeRotation(deg) };
             }
             const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
             const distSqStart = Math.pow((startX - origLayer.x) * W, 2) + Math.pow((startY - origLayer.y) * H, 2);
@@ -3209,7 +3216,6 @@ export default function PhotoStudioModal({
                             ? { ...layer, src: nextUrl, img }
                             : layer
                     ));
-                    setHealMode(false);
                 }).catch(() => {
                     toast.error('No se pudo aplicar el corrector');
                 }).finally(() => {
@@ -3607,12 +3613,14 @@ export default function PhotoStudioModal({
         const octx = oc.getContext('2d')!;
         const scaleX = oc.width / canvasEl.getBoundingClientRect().width;
         const brushPx = Math.max(1, brushSize * scaleX);
+        const feather = Math.max(0, Math.min(1, brushFeather / 100));
+        const hardStop = Math.max(0, Math.min(0.95, 1 - feather));
 
         if (brushMode === 'erase') {
             octx.save();
             const grad = octx.createRadialGradient(x, y, 0, x, y, brushPx);
             grad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-            grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.8)');
+            grad.addColorStop(hardStop, 'rgba(0, 0, 0, 1.0)');
             grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
             
             octx.globalCompositeOperation = 'destination-out';
@@ -3637,7 +3645,7 @@ export default function PhotoStudioModal({
             // Draw the soft brush in local coordinates
             const grad = tempCtx.createRadialGradient(brushPx, brushPx, 0, brushPx, brushPx, brushPx);
             grad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-            grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.8)');
+            grad.addColorStop(hardStop, 'rgba(0, 0, 0, 1.0)');
             grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
 
             tempCtx.fillStyle = grad;
@@ -3712,7 +3720,6 @@ export default function PhotoStudioModal({
             createdBlobUrlsRef.current.push(newUrl);
             objectUrlRef.current = newUrl;
             setImageUrl(newUrl);
-            if (healMode) setHealMode(false);
         }, 'image/png');
     }
 
@@ -4651,7 +4658,7 @@ export default function PhotoStudioModal({
             prevCroppedUrlRef.current = null;
         }
         // Restore the rotation that was active when crop mode was entered
-        setRotation(cropEntryRotationRef.current);
+        setRotation(normalizeRotation(cropEntryRotationRef.current));
         cropPreBakeRef.current = null;
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
         setCompletedCrop(null);
@@ -5943,7 +5950,7 @@ export default function PhotoStudioModal({
                     {cropActive && (
                         <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center gap-3 px-4 py-2.5 bg-black/70 backdrop-blur-sm border-t border-white/10">
                             <button
-                                onClick={() => setRotation((r: number) => { const n = r - 0.5; return n < -180 ? n + 360 : n; })}
+                                onClick={() => setRotation((r: number) => normalizeRotation(r - 0.5))}
                                 className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
                                 title="-0.5°"
                             >
@@ -5952,11 +5959,11 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
-                                onChange={e => setRotation(Number(e.target.value))}
+                                onChange={e => setRotation(normalizeRotation(Number(e.target.value)))}
                                 className="w-48 md:w-64 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
                             />
                             <button
-                                onClick={() => setRotation((r: number) => { const n = r + 0.5; return n > 180 ? n - 360 : n; })}
+                                onClick={() => setRotation((r: number) => normalizeRotation(r + 0.5))}
                                 className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
                                 title="+0.5°"
                             >
@@ -6164,8 +6171,12 @@ export default function PhotoStudioModal({
                                 ? (canvasLayers.find(l => l.id === canvasSelectedId)?.rotation ?? 0)
                                 : rotation}
                             setRotation={canvasActive && canvasSelectedId
-                                ? (v) => setCanvasLayers(prev => prev.map(l => l.id === canvasSelectedId ? { ...l, rotation: typeof v === 'function' ? (v as any)(l.rotation) : v } : l))
-                                : setRotation}
+                                ? (v) => setCanvasLayers(prev => prev.map(l => {
+                                    if (l.id !== canvasSelectedId) return l;
+                                    const next = typeof v === 'function' ? (v as (prev: number) => number)(l.rotation) : v;
+                                    return { ...l, rotation: normalizeRotation(next) };
+                                }))
+                                : (v) => setRotation(prev => normalizeRotation(typeof v === 'function' ? v(prev) : v))}
                             brightness={canvasActive && canvasSelectedId
                                 ? (canvasLayers.find(l => l.id === canvasSelectedId)?.brightness ?? 100)
                                 : brightness}
@@ -6220,6 +6231,8 @@ export default function PhotoStudioModal({
                             }}
                             brushSize={brushSize}
                             onSetBrushSize={setBrushSize}
+                            brushFeather={brushFeather}
+                            onSetBrushFeather={setBrushFeather}
                             magicWandActive={magicWandActive}
                             onSetMagicWandActive={(active) => {
                                 setMagicWandActive(active);
@@ -6235,22 +6248,22 @@ export default function PhotoStudioModal({
                             onStartManualEraser={startManualEraser}
                             healMode={healMode}
                             onSetHealMode={(next) => {
-                                if (next) {
-                                    toast.message('Corrector temporalmente en revisión');
-                                    setHealMode(false);
-                                    hideHealCursor();
-                                    healLastPointRef.current = null;
-                                    canvasHealPreviewRef.current = null;
-                                    canvasHealSessionRef.current = null;
-                                    setHealPreviewNonce(v => v + 1);
-                                    return;
-                                }
                                 setHealMode(next);
                                 hideHealCursor();
                                 healLastPointRef.current = null;
                                 canvasHealPreviewRef.current = null;
                                 canvasHealSessionRef.current = null;
                                 setHealPreviewNonce(v => v + 1);
+                                if (next) {
+                                    setBrushMode(null);
+                                    setMagicWandActive(false);
+                                    setDrawMode('idle');
+                                    setMousePos(null);
+                                    void getOpenCv().catch(() => {
+                                        toast.error('No se pudo cargar el corrector');
+                                        setHealMode(false);
+                                    });
+                                }
                             }}
                             healSize={healSize}
                             onSetHealSize={setHealSize}
@@ -6334,7 +6347,7 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
-                                onChange={e => setRotation(Number(e.target.value))}
+                                onChange={e => setRotation(normalizeRotation(Number(e.target.value)))}
                                 className="w-20 accent-white/70"
                             />
                             <span className="text-white/40 text-xs w-8">
@@ -7054,6 +7067,8 @@ interface ToolsPanelProps {
     onSetBrushMode: (mode: 'restore' | 'erase' | null) => void;
     brushSize: number;
     onSetBrushSize: (v: number) => void;
+    brushFeather: number;
+    onSetBrushFeather: (v: number) => void;
     magicWandActive: boolean;
     onSetMagicWandActive: (active: boolean) => void;
     magicWandTolerance: number;
@@ -7124,6 +7139,8 @@ function ToolsPanel({
     onSetBrushMode,
     brushSize,
     onSetBrushSize,
+    brushFeather,
+    onSetBrushFeather,
     magicWandActive,
     onSetMagicWandActive,
     magicWandTolerance,
@@ -7215,7 +7232,7 @@ function ToolsPanel({
                         <p className="text-xs text-white/45 uppercase tracking-wide font-semibold">Presets rápidos</p>
                         <div className="grid grid-cols-3 gap-1.5">
                             <button
-                                onClick={() => { onPushHistory(); setRotation((r: number) => { const n = r - 90; return n < -180 ? n + 360 : n; }); }}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => normalizeRotation(r - 90)); }}
                                 className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar -90°"
                             >
@@ -7223,7 +7240,7 @@ function ToolsPanel({
                                 <span className="text-xs text-white/40 group-hover:text-white font-bold">-90°</span>
                             </button>
                             <button
-                                onClick={() => { onPushHistory(); setRotation((r: number) => { const n = r + 90; return n > 180 ? n - 360 : n; }); }}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => normalizeRotation(r + 90)); }}
                                 className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Rotar +90°"
                             >
@@ -7231,7 +7248,7 @@ function ToolsPanel({
                                 <span className="text-xs text-white/40 group-hover:text-white font-bold">+90°</span>
                             </button>
                             <button
-                                onClick={() => { onPushHistory(); setRotation((r: number) => (r > 0 ? r - 180 : r + 180)); }}
+                                onClick={() => { onPushHistory(); setRotation((r: number) => normalizeRotation(r + 180)); }}
                                 className="flex flex-col items-center gap-1.5 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group"
                                 title="Voltear 180°"
                             >
@@ -7453,6 +7470,16 @@ function ToolsPanel({
                                         className="flex-1 accent-white/70"
                                     />
                                     <span className="text-white/50 text-xs w-8 text-right">{brushSize}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-white/50 text-xs w-16">Degradé</span>
+                                    <input
+                                        type="range" min={0} max={100} step={5}
+                                        value={brushFeather}
+                                        onChange={e => onSetBrushFeather(Number(e.target.value))}
+                                        className="flex-1 accent-[#C9A96E]"
+                                    />
+                                    <span className="text-white/50 text-xs w-8 text-right">{brushFeather}%</span>
                                 </div>
                             </div>
                         )}
@@ -7796,26 +7823,30 @@ function ToolsPanel({
                 </p>
                 <button
                     type="button"
-                    onClick={() => onSetHealMode(false)}
-                    disabled
-                    className="w-full py-3 rounded-xl text-base font-semibold transition-colors disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-white/5 text-white/45"
+                    onClick={() => onSetHealMode(!healMode)}
+                    disabled={canvasActive && !canvasSelectedId}
+                    className={`w-full py-3 rounded-xl text-base font-semibold transition-colors disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                        healMode
+                            ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]/30'
+                            : 'bg-white/5 text-white/60 hover:bg-white/10 border border-white/10'
+                    }`}
                 >
-                    <Zap size={20} /> {healMode ? 'Corrector en revisión' : 'En revisión'}
+                    <Zap size={20} /> {healMode ? 'Corrector activo' : 'Activar corrector'}
                 </button>
-                <div className="space-y-2 rounded-xl border border-white/5 bg-white/[0.03] p-3 opacity-60">
-                    <p className="text-white/35 text-xs uppercase tracking-wider">Tamaño</p>
+                <div className={`space-y-2 rounded-xl border border-white/5 bg-white/[0.03] p-3 ${healMode ? '' : 'opacity-60'}`}>
+                    <p className="text-white/35 text-xs uppercase tracking-wider">Tamaño del pincel</p>
                     <div className="flex items-center gap-2">
                         <input
                             type="range" min={6} max={90} step={2}
                             value={healSize}
                             onChange={e => onSetHealSize(Number(e.target.value))}
-                            disabled
-                            className="flex-1 accent-white/40"
+                            disabled={!healMode}
+                            className="flex-1 accent-[#C9A96E]"
                         />
                         <span className="text-white/35 text-sm w-8">{healSize}</span>
                     </div>
                     <p className="text-white/35 text-xs">
-                        Desactivado temporalmente para evitar que la foto se bloquee.
+                        Pintá sobre puntos chicos para mimetizarlos con piel, mucosa o diente.
                     </p>
                 </div>
             </div>
